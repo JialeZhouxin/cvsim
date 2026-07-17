@@ -1,5 +1,11 @@
 from cvsim.gaussian.state import GaussianState
-from cvsim.gaussian.gates import beamsplitter, displace, phase, squeeze
+from cvsim.gaussian.gates import (
+    beamsplitter,
+    displace,
+    phase,
+    squeeze,
+    two_mode_squeeze,
+)
 from cvsim.gaussian.observables import (
     det_cov,
     homodyne_mean,
@@ -13,6 +19,7 @@ __all__ = [
     "displace",
     "phase",
     "beamsplitter",
+    "two_mode_squeeze",
     "det_cov",
     "mean_photon",
     "homodyne_mean",

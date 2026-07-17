@@ -1,0 +1,5 @@
+{"file": "cvsim/gaussian/symplectic.py", "reason": "唯一 S 公式扩展点"}
+{"file": "cvsim/gaussian/gates.py", "reason": "apply_symplectic 包装"}
+{"file": "cvsim/bosonic/gates.py", "reason": "批套模式"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "B1/B2 合同延续"}
+{"file": "04-Fock四问详解与Gaussian模拟器原理.md", "reason": "S₂ 块形式"}

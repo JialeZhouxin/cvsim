@@ -76,3 +76,39 @@ def S_beamsplitter(
 
     # S = [[ReU, -ImU], [ImU, ReU]]
     return np.block([[ReU, -ImU], [ImU, ReU]])
+
+
+def S_two_mode_squeeze(
+    nmode: int, r: float, mode1: int, mode2: int
+) -> np.ndarray:
+    """Two-mode squeeze S₂(r) in xxpp (real r), EPR form.
+
+    On (x_i, x_j, p_i, p_j):
+      x_i' = ch x_i + sh x_j,  x_j' = sh x_i + ch x_j
+      p_i' = ch p_i - sh p_j,  p_j' = -sh p_i + ch p_j
+    Vacuum: ⟨n_i⟩=⟨n_j⟩=sinh²r; cross ⟨x_i x_j⟩, ⟨p_i p_j⟩ ≠ 0.
+    """
+    if mode1 == mode2:
+        raise ValueError("mode1 and mode2 must differ")
+    for m in (mode1, mode2):
+        if not 0 <= m < nmode:
+            raise IndexError(f"mode {m} out of range for nmode={nmode}")
+
+    ch, sh = np.cosh(r), np.sinh(r)
+    S = np.eye(2 * nmode)
+    i, j = mode1, mode2
+    pi, pj = nmode + i, nmode + j
+    idx = [i, j, pi, pj]
+    block = np.array(
+        [
+            [ch, sh, 0.0, 0.0],
+            [sh, ch, 0.0, 0.0],
+            [0.0, 0.0, ch, -sh],
+            [0.0, 0.0, -sh, ch],
+        ],
+        dtype=float,
+    )
+    for a in range(4):
+        for b in range(4):
+            S[idx[a], idx[b]] = block[a, b]
+    return S

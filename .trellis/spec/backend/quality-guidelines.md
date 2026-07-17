@@ -80,6 +80,18 @@ Do **not** duplicate BS/phase matrices in bosonic — import `cvsim.gaussian.sym
 
 Out of B2: conditional update, sampling, Bosonic/Fock Homodyne.
 
+### B3 two-mode squeeze S₂ (real r)
+
+| Item | Contract |
+|------|----------|
+| Formula | only in `symplectic.S_two_mode_squeeze` |
+| xxpp EPR block | `(x_i,x_j,p_i,p_j)`: x-mix `[[ch,sh],[sh,ch]]`, p-mix `[[ch,-sh],[-sh,ch]]` |
+| Vacuum TMS | total `⟨n⟩=2 sinh² r`, each mode `sinh² r` |
+| Pure 2-mode | `det V ≈ (1/4)²` |
+| Bosonic | same S per component; `w` unchanged |
+
+Out of B3: S₂ phase φ, Fock TMS.
+
 ---
 
 ## Testing Requirements

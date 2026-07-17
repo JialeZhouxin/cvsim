@@ -9,6 +9,7 @@ from cvsim.gaussian.symplectic import (
     S_beamsplitter,
     S_phase,
     S_squeeze,
+    S_two_mode_squeeze,
     d_displace,
 )
 
@@ -51,3 +52,10 @@ def beamsplitter(
 ) -> GaussianState:
     """Two-mode beam splitter BS(θ, φ)."""
     return apply_symplectic(state, S_beamsplitter(state.nmode, mode1, mode2, theta, phi))
+
+
+def two_mode_squeeze(
+    state: GaussianState, r: float, mode1: int, mode2: int
+) -> GaussianState:
+    """Two-mode squeeze S₂(r) (real r)."""
+    return apply_symplectic(state, S_two_mode_squeeze(state.nmode, r, mode1, mode2))

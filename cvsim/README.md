@@ -39,9 +39,9 @@ python -m pytest tests -q
 
 | 后端 | 门 |
 |------|----|
-| Gaussian 多模 | `displace` / `phase` / `squeeze` / `beamsplitter` |
+| Gaussian 多模 | `displace` / `phase` / `squeeze` / `beamsplitter` / **`two_mode_squeeze`** |
 | Fock 单模 | `displace` / `phase` / `squeeze` |
-| Bosonic | 同上（逐组件辛更新，权重不变） |
+| Bosonic | 同上（含 S₂；逐组件辛更新，权重不变） |
 
 辛矩阵生成在 `cvsim/gaussian/symplectic.py`（共享）。无 Circuit DSL。
 
