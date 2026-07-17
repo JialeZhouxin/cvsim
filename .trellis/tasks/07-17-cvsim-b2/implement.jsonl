@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "ħ/xxpp 与 B1 门合同"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "observables 放置"}
+{"file": "cvsim/gaussian/observables.py", "reason": "现有 det/mean_photon 扩展点"}
+{"file": "cvsim/gaussian/state.py", "reason": "V/rbar 布局"}
+{"file": "02-Gaussian表示原理.md", "reason": "Homodyne 边缘图像"}

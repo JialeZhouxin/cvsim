@@ -35,11 +35,11 @@ cv-photonic-notes/
 |------|------|
 | `cvsim/conventions.py` | Global physics constants and vacuum helpers |
 | `cvsim/gaussian/symplectic.py` | Shared xxpp S/d generators (only place for BS/D/R/S formulas) |
-| `cvsim/gaussian/` | GaussianState, apply_symplectic, D/R/S/BS, det/⟨n⟩ |
+| `cvsim/gaussian/` | GaussianState, apply_symplectic, D/R/S/BS, det/⟨n⟩, Homodyne mean/var |
 | `cvsim/fock/` | FockState, ladder+expm D/R/S, norm/⟨n⟩ |
 | `cvsim/bosonic/` | Components, cat, gates reuse `gaussian.symplectic` |
 | `cvsim/demos/m*.py` | Runnable AC scripts for MVP milestones |
-| `tests/test_m*.py` / `test_b1_*.py` | MVP + B1 gate regression |
+| `tests/test_m*.py` / `test_b1_*.py` / `test_b2_*.py` | MVP + B1 gates + B2 Homodyne |
 
 Do **not** invent a Circuit DSL until multi-representation shared scheduling is required.  
 New gate matrices go in `symplectic.py` first; backends only apply maps.

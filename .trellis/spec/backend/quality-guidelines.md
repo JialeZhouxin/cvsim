@@ -66,6 +66,20 @@ Hard AC patterns: `S→BS(π/4)` total ⟨n⟩ = sinh² r; pure 2-mode det V ≈
 
 Do **not** duplicate BS/phase matrices in bosonic — import `cvsim.gaussian.symplectic`.
 
+### B2 Homodyne (Gaussian edge moments only)
+
+| Item | Contract |
+|------|----------|
+| API | `homodyne_mean` / `homodyne_var` in `gaussian/observables.py` |
+| Quad | `x_φ = x cosφ + p sinφ` |
+| Mean | `⟨x_φ⟩ = cosφ r̄_x + sinφ r̄_p` |
+| Var | `uᵀ V u` **central** (no r̄²) |
+| Vacuum | any φ: mean=0, var=1/2 |
+| After S(r) | var(0)=½e^{-2r}, var(π/2)=½e^{2r} |
+| After D(α) | mean = √2 (Reα cosφ + Imα sinφ); var still 1/2 |
+
+Out of B2: conditional update, sampling, Bosonic/Fock Homodyne.
+
 ---
 
 ## Testing Requirements
@@ -73,6 +87,7 @@ Do **not** duplicate BS/phase matrices in bosonic — import `cvsim.gaussian.sym
 - Each milestone: pytest under `tests/` **and** `python -m cvsim.demos.m*_...` green.
 - New observable/gate: at least one analytic or cross-backend assert.
 - B1: `tests/test_b1_*.py` + symplectic `S Ω Sᵀ=Ω`.
+- B2: `tests/test_b2_homodyne.py`.
 - Commands:
 
 ```bash
