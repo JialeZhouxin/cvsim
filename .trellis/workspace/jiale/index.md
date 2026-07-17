@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
-- **Last Active**: 2026-07-17
+- **Total Sessions**: 6
+- **Last Active**: 2026-07-18
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~173 | Active |
+| `journal-1.md` | ~206 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-07-18 | Gaussian 全流程 condition+loss | `7544443` | `master` |
 | 5 | 2026-07-17 | B3 双模挤压 S2 | `260e213` | `master` |
 | 4 | 2026-07-17 | 最终用户验收 U1-U6 | `72a5836` | `master` |
 | 3 | 2026-07-17 | B2 Homodyne 边缘矩 | `d57aefe` | `master` |

@@ -171,3 +171,36 @@ EPR 型 S2；G+B；pytest 29；笔记 Z-block 陷阱已记；归档
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Gaussian 全流程 condition+loss
+
+**Date**: 2026-07-18
+**Task**: Gaussian 全流程 condition+loss
+**Branch**: `master`
+
+### Summary
+
+G1 条件Homodyne + G2 loss；37 tests；F/B 不动；归档
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7544443` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
