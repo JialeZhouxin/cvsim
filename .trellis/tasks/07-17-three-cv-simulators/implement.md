@@ -34,8 +34,8 @@
 ### Phase 4 · 收尾
 
 1. [x] `cvsim/README.md`
-2. [ ] 用户确认后 check / finish-work
-3. [ ] 约定回写 `.trellis/spec`（可选）
+2. [x] pytest 11 passed + demos 绿；commit `b5d85be`
+3. [x] 约定回写 `.trellis/spec/backend/`（directory + quality）
 
 ## Validation commands
 
