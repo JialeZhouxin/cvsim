@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "cvsim 包布局与新增 gates 位置"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "ħ/xxpp/真空与测试门禁"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "S 矩阵只写一处，Bosonic 复用"}
+{"file": "cvsim/gaussian/gates.py", "reason": "现有 apply_symplectic / squeeze 扩展点"}
+{"file": "02-Gaussian表示原理.md", "reason": "辛门与 BS 约定"}
+{"file": "04-Fock四问详解与Gaussian模拟器原理.md", "reason": "门表与 xxpp 辛矩阵"}

@@ -5,6 +5,12 @@ from __future__ import annotations
 import numpy as np
 
 from cvsim.gaussian.state import GaussianState
+from cvsim.gaussian.symplectic import (
+    S_beamsplitter,
+    S_phase,
+    S_squeeze,
+    d_displace,
+)
 
 
 def apply_symplectic(
@@ -22,15 +28,26 @@ def apply_symplectic(
 
 
 def squeeze(state: GaussianState, r: float, mode: int = 0) -> GaussianState:
-    """Single-mode squeeze S(r) in xxpp.
+    """Single-mode squeeze S(r) in xxpp."""
+    return apply_symplectic(state, S_squeeze(state.nmode, r, mode))
 
-    On mode i: x_i → e^{-r} x_i, p_i → e^{r} p_i.
-    Notes: vacuum → V = ½ diag(e^{-2r}, e^{2r}) for m=1.
-    """
-    m = state.nmode
-    if not 0 <= mode < m:
-        raise IndexError(f"mode {mode} out of range for nmode={m}")
-    S = np.eye(2 * m)
-    S[mode, mode] = np.exp(-r)
-    S[m + mode, m + mode] = np.exp(r)
-    return apply_symplectic(state, S)
+
+def displace(state: GaussianState, alpha: complex, mode: int = 0) -> GaussianState:
+    """Single-mode displacement D(α)."""
+    return apply_symplectic(state, np.eye(2 * state.nmode), d_displace(state.nmode, alpha, mode))
+
+
+def phase(state: GaussianState, theta: float, mode: int = 0) -> GaussianState:
+    """Single-mode phase rotation R(θ)."""
+    return apply_symplectic(state, S_phase(state.nmode, theta, mode))
+
+
+def beamsplitter(
+    state: GaussianState,
+    mode1: int,
+    mode2: int,
+    theta: float,
+    phi: float = 0.0,
+) -> GaussianState:
+    """Two-mode beam splitter BS(θ, φ)."""
+    return apply_symplectic(state, S_beamsplitter(state.nmode, mode1, mode2, theta, phi))

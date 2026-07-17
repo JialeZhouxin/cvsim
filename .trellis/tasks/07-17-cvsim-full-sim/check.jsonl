@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "物理约定与禁止模式"}
+{"file": ".trellis/tasks/07-17-cvsim-full-sim/prd.md", "reason": "AC-G/F/B 硬验收"}
+{"file": ".trellis/tasks/07-17-cvsim-full-sim/design.md", "reason": "S 共享与 xxpp 合同"}
+{"file": "tests/test_m1_gaussian.py", "reason": "回归 MVP 不破"}

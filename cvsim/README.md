@@ -27,14 +27,28 @@ uv pip install pytest
 python -m pytest tests -q
 ```
 
+## 门集（B1）
+
+| 后端 | 门 |
+|------|----|
+| Gaussian 多模 | `displace` / `phase` / `squeeze` / `beamsplitter` |
+| Fock 单模 | `displace` / `phase` / `squeeze` |
+| Bosonic | 同上（逐组件辛更新，权重不变） |
+
+辛矩阵生成在 `cvsim/gaussian/symplectic.py`（共享）。无 Circuit DSL。
+
+```bash
+python -m pytest tests -q   # MVP + B1
+```
+
 ## 包结构
 
 ```text
 cvsim/
   conventions.py   # ħ, xxpp, Ω, vacuum
-  gaussian/        # (V, r̄) + squeeze + det/⟨n⟩
-  fock/            # 截断振幅 + squeeze(expm) + ⟨n⟩/norm
-  bosonic/         # 组件列表 + even/odd cat
+  gaussian/        # (V, r̄) + D/R/S/BS + det/⟨n⟩
+  fock/            # 截断振幅 + D/R/S + ⟨n⟩/norm
+  bosonic/         # 组件 + cat + 高斯门
   demos/           # 里程碑自检
 ```
 

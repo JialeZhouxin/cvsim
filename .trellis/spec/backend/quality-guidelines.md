@@ -51,12 +51,28 @@ Wrong: set cross weight equal to diagonal without `ov`.
 - `x_i → e^{-r} x_i`, `p_i → e^{r} p_i`
 - Vacuum single-mode: `V = ½ diag(e^{-2r}, e^{2r})`
 
+### B1 gate contracts (ħ=1, xxpp)
+
+| Gate | Contract |
+|------|----------|
+| `D(α)` | `d_x=√2 Re α`, `d_p=√2 Im α`; vac ⟨n⟩ = |α|² |
+| `R(θ)` | (x,p) rotation; `S Ω Sᵀ = Ω` |
+| `S(r)` | as above |
+| `BS(θ,φ)` | unitary U embed `S=[[ReU,-ImU],[ImU,ReU]]`; only in `symplectic.py` |
+| Bosonic gates | same S,d per component; **w unchanged** under unitary Gaussian |
+| Fock B1 | single-mode D/R/S only; no multi-mode BS yet |
+
+Hard AC patterns: `S→BS(π/4)` total ⟨n⟩ = sinh² r; pure 2-mode det V ≈ (1/4)²; Fock vs Gaussian ⟨n⟩ closes with cutoff.
+
+Do **not** duplicate BS/phase matrices in bosonic — import `cvsim.gaussian.symplectic`.
+
 ---
 
 ## Testing Requirements
 
 - Each milestone: pytest under `tests/` **and** `python -m cvsim.demos.m*_...` green.
 - New observable/gate: at least one analytic or cross-backend assert.
+- B1: `tests/test_b1_*.py` + symplectic `S Ω Sᵀ=Ω`.
 - Commands:
 
 ```bash
@@ -76,3 +92,5 @@ python -m cvsim.demos.m3_cat_weights
 - [ ] Theory MD unchanged re: API bindings
 - [ ] Fock error claims use projection or ⟨n⟩ trend, not only `norm(Uψ)`
 - [ ] Cat `∑w` and cross/diag structure covered by test
+- [ ] New S matrices live in `symplectic.py` and pass Ω identity
+- [ ] Bosonic reuses shared S/d (no second BS formula)

@@ -17,14 +17,25 @@ def annihilation(cutoff: int) -> np.ndarray:
 
 
 def squeeze(state: FockState, r: float) -> FockState:
-    """Single-mode squeeze S(r) = exp(½(r* a² − r a†²)).
-
-    Real r: S(r) = exp(½ r (a² − a†²)).
-    """
+    """Single-mode squeeze S(r) = exp(½ r (a² − a†²)) for real r."""
     N = state.cutoff
     a = annihilation(N)
     ad = a.conj().T
-    # generator G = ½ r (a² − ad²); S = exp(G)
     G = 0.5 * r * (a @ a - ad @ ad)
-    U = expm(G)
-    return FockState(amps=U @ state.amps)
+    return FockState(amps=expm(G) @ state.amps)
+
+
+def phase(state: FockState, theta: float) -> FockState:
+    """Phase shift: |n⟩ → e^{i n θ} |n⟩."""
+    n = np.arange(state.cutoff)
+    return FockState(amps=state.amps * np.exp(1j * theta * n))
+
+
+def displace(state: FockState, alpha: complex) -> FockState:
+    """Displacement D(α) = exp(α a† − α* a)."""
+    N = state.cutoff
+    a = annihilation(N)
+    ad = a.conj().T
+    alpha = complex(alpha)
+    G = alpha * ad - np.conj(alpha) * a
+    return FockState(amps=expm(G) @ state.amps)

@@ -19,11 +19,11 @@ cv-photonic-notes/
 ├── *.md / *.html          # pure theory notes (no dq./API)
 ├── cvsim/                 # simulators
 │   ├── conventions.py     # ħ, xxpp, Ω, vacuum
-│   ├── gaussian/          # (V, r̄)
-│   ├── fock/              # truncated amplitudes
-│   ├── bosonic/           # Gaussian mixture components
+│   ├── gaussian/          # (V, r̄) + symplectic.py + gates
+│   ├── fock/              # truncated amplitudes + single-mode gates
+│   ├── bosonic/           # components + cat + component-wise gates
 │   └── demos/             # milestone self-checks (python -m)
-├── tests/                 # pytest
+├── tests/                 # pytest (test_m* + test_b1_*)
 └── .trellis/              # workflow / specs / tasks
 ```
 
@@ -34,13 +34,15 @@ cv-photonic-notes/
 | Path | Owns |
 |------|------|
 | `cvsim/conventions.py` | Global physics constants and vacuum helpers |
-| `cvsim/gaussian/` | GaussianState, symplectic gates, det/⟨n⟩ |
-| `cvsim/fock/` | FockState, ladder+expm gates, norm/⟨n⟩ |
-| `cvsim/bosonic/` | Component list, cat constructors, weight_sum |
-| `cvsim/demos/m*.py` | Runnable AC scripts for each milestone |
-| `tests/test_m*.py` | Regression tests mirroring demos |
+| `cvsim/gaussian/symplectic.py` | Shared xxpp S/d generators (only place for BS/D/R/S formulas) |
+| `cvsim/gaussian/` | GaussianState, apply_symplectic, D/R/S/BS, det/⟨n⟩ |
+| `cvsim/fock/` | FockState, ladder+expm D/R/S, norm/⟨n⟩ |
+| `cvsim/bosonic/` | Components, cat, gates reuse `gaussian.symplectic` |
+| `cvsim/demos/m*.py` | Runnable AC scripts for MVP milestones |
+| `tests/test_m*.py` / `test_b1_*.py` | MVP + B1 gate regression |
 
-Do **not** invent a Circuit DSL until multi-representation shared scheduling is required.
+Do **not** invent a Circuit DSL until multi-representation shared scheduling is required.  
+New gate matrices go in `symplectic.py` first; backends only apply maps.
 
 ---
 
@@ -58,3 +60,4 @@ Do **not** invent a Circuit DSL until multi-representation shared scheduling is 
 - M1: `cvsim/gaussian/` + `tests/test_m1_gaussian.py`
 - M2: `cvsim/fock/` + `tests/test_m2_fock.py`
 - M3: `cvsim/bosonic/` + `tests/test_m3_bosonic.py`
+- B1: `gaussian/symplectic.py` + `tests/test_b1_*.py`
