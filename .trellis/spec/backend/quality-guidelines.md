@@ -92,6 +92,18 @@ Out of B2: conditional update, sampling, Bosonic/Fock Homodyne.
 
 Out of B3: S₂ phase φ, Fock TMS.
 
+### G-full Gaussian loop (condition + loss)
+
+| Item | Contract |
+|------|----------|
+| `homodyne_condition` | ideal; no mode delete; `V'=V−vvᵀ/σ`, `r̄'=r̄+v(outcome−μ)/σ`; same `u` as edge API |
+| singular V | measured direction var → 0; OK |
+| `loss(T)` | `channels.py`; `0≤T≤1`; `X=√T`, `Y=(1−T)I/2` on acted quads (align `V_vac=I/2`) |
+| `T=1` / `T=0` | identity / vacuum on acted modes |
+| coherent + loss | `⟨n⟩ ≈ T\|α\|²` |
+
+Out of G-full core: sampling, PNRD/Hafnian, Fock/Bosonic condition/loss.
+
 ---
 
 ## Testing Requirements

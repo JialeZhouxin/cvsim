@@ -45,16 +45,22 @@ python -m pytest tests -q
 
 辛矩阵生成在 `cvsim/gaussian/symplectic.py`（共享）。无 Circuit DSL。
 
-## 观测量
+## 观测量 / 通道（Gaussian 闭环）
 
 | 后端 | 量 |
 |------|----|
-| Gaussian | `det_cov` / `mean_photon` / **`homodyne_mean` · `homodyne_var`**（B2 边缘矩） |
+| Gaussian | `det_cov` / `mean_photon` / `homodyne_mean` · `homodyne_var` / **`homodyne_condition`** / **`loss(T)`** |
 | Fock | `norm` / `mean_photon` |
 | Bosonic | `weight_sum` |
 
+高斯全流程（概念）：
+
+```text
+真空 → 门(D/R/S/BS/S₂) → [loss] → homodyne_condition → 矩
+```
+
 ```bash
-python -m pytest tests -q   # MVP + B1 + B2
+python -m pytest tests -q   # MVP + B1 + B2 + B3 + G1/G2
 ```
 
 ## 包结构

@@ -1,0 +1,5 @@
+{"file": "cvsim/gaussian/observables.py", "reason": "边缘 Homodyne 复用 u"}
+{"file": "cvsim/gaussian/gates.py", "reason": "仿射更新对照"}
+{"file": "cvsim/gaussian/state.py", "reason": "GaussianState 构造"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "ħ/xxpp/B2 合同"}
+{"file": "02-Gaussian表示原理.md", "reason": "损失与 Generaldyne"}
