@@ -105,3 +105,36 @@ Gaussian homodyne_mean/var；AC 真空/挤/位移/相移；pytest 25；spec B2�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: 最终用户验收 U1-U6
+
+**Date**: 2026-07-17
+**Task**: 最终用户验收 U1-U6
+**Branch**: `master`
+
+### Summary
+
+USER_ACCEPTANCE.md + demos.user_acceptance；目标钉死；U1-U5 一键 5/5；pytest 25；归档
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `72a5836` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
