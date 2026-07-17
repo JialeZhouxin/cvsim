@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
+- **Total Sessions**: 5
 - **Last Active**: 2026-07-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~140 | Active |
+| `journal-1.md` | ~173 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-07-17 | B3 双模挤压 S2 | `260e213` | `master` |
 | 4 | 2026-07-17 | 最终用户验收 U1-U6 | `72a5836` | `master` |
 | 3 | 2026-07-17 | B2 Homodyne 边缘矩 | `d57aefe` | `master` |
 | 2 | 2026-07-17 | B1 门集 D/R/S/BS | `c44293d` | `master` |
