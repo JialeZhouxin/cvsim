@@ -12,7 +12,15 @@ uv venv
 uv pip install numpy scipy
 ```
 
-## 验收自检（README 最小闭环）
+## 最终用户验收
+
+目标、场景 U1–U6、未做列表见 **[USER_ACCEPTANCE.md](./USER_ACCEPTANCE.md)**。
+
+```bash
+python -m cvsim.demos.user_acceptance   # U1–U5 一键；汇总后 exit
+```
+
+## 里程碑自检（README 最小闭环）
 
 ```bash
 python -m cvsim.demos.m1_gaussian_squeeze   # 真空→挤压→V, det V, ⟨n⟩=sinh²r

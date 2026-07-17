@@ -39,6 +39,8 @@ cv-photonic-notes/
 | `cvsim/fock/` | FockState, ladder+expm D/R/S, norm/⟨n⟩ |
 | `cvsim/bosonic/` | Components, cat, gates reuse `gaussian.symplectic` |
 | `cvsim/demos/m*.py` | Runnable AC scripts for MVP milestones |
+| `cvsim/USER_ACCEPTANCE.md` | Final user acceptance narrative (U1–U6) |
+| `cvsim/demos/user_acceptance.py` | One-shot U1–U5 checks; summary then exit |
 | `tests/test_m*.py` / `test_b1_*.py` / `test_b2_*.py` | MVP + B1 gates + B2 Homodyne |
 
 Do **not** invent a Circuit DSL until multi-representation shared scheduling is required.  

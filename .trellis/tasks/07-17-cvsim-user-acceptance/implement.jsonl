@@ -1,0 +1,6 @@
+{"file": "cvsim/README.md", "reason": "链与现有验收命令"}
+{"file": "README.md", "reason": "笔记侧短链"}
+{"file": "cvsim/demos/m1_gaussian_squeeze.py", "reason": "U2 数值复用"}
+{"file": "cvsim/demos/m2_fock_cutoff_scan.py", "reason": "U4 参数"}
+{"file": "cvsim/demos/m3_cat_weights.py", "reason": "U5 参数"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "物理合同与测试门禁"}

@@ -88,11 +88,13 @@ Out of B2: conditional update, sampling, Bosonic/Fock Homodyne.
 - New observable/gate: at least one analytic or cross-backend assert.
 - B1: `tests/test_b1_*.py` + symplectic `S Ω Sᵀ=Ω`.
 - B2: `tests/test_b2_homodyne.py`.
+- Final user acceptance: `cvsim/USER_ACCEPTANCE.md` + `python -m cvsim.demos.user_acceptance` (U1–U5; run-all then exit).
 - Commands:
 
 ```bash
 uv pip install numpy scipy pytest
 python -m pytest tests -q
+python -m cvsim.demos.user_acceptance
 python -m cvsim.demos.m1_gaussian_squeeze
 python -m cvsim.demos.m2_fock_cutoff_scan
 python -m cvsim.demos.m3_cat_weights
