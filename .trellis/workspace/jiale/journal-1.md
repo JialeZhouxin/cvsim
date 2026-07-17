@@ -72,3 +72,36 @@ B 轨 B1：共享 symplectic + Gaussian/Fock/Bosonic 门；pytest 21；spec 固�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: B2 Homodyne 边缘矩
+
+**Date**: 2026-07-17
+**Task**: B2 Homodyne 边缘矩
+**Branch**: `master`
+
+### Summary
+
+Gaussian homodyne_mean/var；AC 真空/挤/位移/相移；pytest 25；spec B2；归档 07-17-cvsim-b2
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d57aefe` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
