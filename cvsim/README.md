@@ -30,11 +30,18 @@ F: 1–2 模 → D/R/S/Kerr/BS → PNRD
 B: cat|gkp0 → 门 → [loss] → 加权矩
 ```
 
+### Wigner（教学单模）
+
+```python
+from cvsim.wigner import wigner_grid, wigner_gaussian, wigner_bosonic
+X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
+# even/odd cat：odd 中心 W<0（干涉）
+```
+
 ### 诚实边界
 
 - `gkp0`：对角 **x 齿梳**（无 p 齿 / 无 cross），教学近似，非完整纯态 GKP  
-- Fock：仅 **1–2 模**；无 Fock loss  
-- 无 Wigner 网格（规划下一切片）  
+- Fock：仅 **1–2 模**；无 Fock loss / Fock Wigner  
 - 无 Hafnian / 生产 GBS
 
 ## 最终用户验收

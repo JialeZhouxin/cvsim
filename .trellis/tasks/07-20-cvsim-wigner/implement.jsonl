@@ -1,0 +1,6 @@
+{"file": "cvsim/gaussian/state.py", "reason": "V,rbar"}
+{"file": "cvsim/bosonic/state.py", "reason": "components"}
+{"file": "cvsim/bosonic/cat.py", "reason": "cross 复中心"}
+{"file": "04-Fock四问详解与Gaussian模拟器原理.md", "reason": "Wigner 公式与相位"}
+{"file": "03-Bosonic表示原理.md", "reason": "§5.1"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "ħ 约定"}

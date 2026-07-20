@@ -68,7 +68,20 @@ Bosonic `loss(T)`: per-component same X,Y as Gaussian; **w unchanged**.
 | weights | `w∝exp(−π ε k²)`, real, `∑w=1` |
 | honesty | **no** p-teeth / cross → diagonal approx, not full pure GKP |
 
-Out: `|1⟩_GKP`, 2D lattice, Wigner, conditional Homodyne.
+Out: `|1⟩_GKP`, 2D lattice, conditional Homodyne.
+
+### Wigner grid (single-mode, ħ=1)
+
+| Item | Contract |
+|------|----------|
+| API | `cvsim/wigner.py`: `wigner_gaussian` / `wigner_bosonic` / `wigner_grid` |
+| vacuum | `V=I/2` → `W(0,0)=1/π` |
+| pref | `1/(π √det(2V))`, quadratic `−½ δᵀV⁻¹δ` |
+| complex mean | `exp(+½ sᵀV⁻¹s) exp(i δᵀV⁻¹s)`, `s=Im r̄` |
+| Bosonic | `∑ w_k W_G`; return real part |
+| cat check | odd cat: `W(0,0)<0` |
+
+Out: Fock Wigner, multimode, GUI.
 
 ### Gaussian squeeze (xxpp, mode `i`)
 
