@@ -55,8 +55,8 @@
 3. 同一电路用 Fock 扫 cutoff，看何时逼近高斯结果  
 4. 建一个小振幅 cat（高斯叠加），画 Wigner 或看组件权重
 
-工程落地与**最终用户验收**（目标 / U1–U6 / 一键脚本）见：
-[`cvsim/USER_ACCEPTANCE.md`](./cvsim/USER_ACCEPTANCE.md) · `python -m cvsim.demos.user_acceptance`
+工程落地与**最终用户验收**（目标 / U1–U5+U7 / 能力矩阵）见：
+[`cvsim/README.md`](./cvsim/README.md) · [`cvsim/USER_ACCEPTANCE.md`](./cvsim/USER_ACCEPTANCE.md) · `python -m cvsim.demos.user_acceptance`
 
 ---
 

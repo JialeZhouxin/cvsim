@@ -1,4 +1,4 @@
-"""Final user acceptance: U1–U5. Run all, then summary; exit 1 if any fail."""
+"""Final user acceptance: U1–U5 + U7. Run all, then summary; exit 1 if any fail."""
 
 from __future__ import annotations
 
@@ -7,16 +7,25 @@ from collections.abc import Callable
 
 import numpy as np
 
-from cvsim.bosonic import even_cat, phase as b_phase, weight_sum
-from cvsim.fock import FockState, mean_photon as f_n, norm, squeeze as f_squeeze
+from cvsim.bosonic import (
+    even_cat,
+    gkp0,
+    loss as b_loss,
+    mean_photon as b_n,
+    phase as b_phase,
+    weight_sum,
+)
+from cvsim.fock import FockState, beamsplitter as f_bs, mean_photon as f_n, norm, squeeze as f_squeeze
 from cvsim.fock.gates import squeeze as f_squeeze_gate
 from cvsim.gaussian import (
     GaussianState,
     beamsplitter,
     det_cov,
     displace,
+    homodyne_condition,
     homodyne_mean,
     homodyne_var,
+    loss as g_loss,
     mean_photon,
     phase,
     squeeze,
@@ -106,6 +115,33 @@ def _u5() -> tuple[bool, str]:
     return ok, f"K={st.n_components} sum_w={s0:.6g}"
 
 
+def _u7() -> tuple[bool, str]:
+    """Extended smoke: G loss/condition, F BS, B gkp0/loss."""
+    alpha, T = 0.7 + 0.2j, 0.4
+    g_ok = abs(mean_photon(g_loss(displace(GaussianState.vacuum(1), alpha), T)) - T * abs(alpha) ** 2) < 1e-12
+
+    st_c = homodyne_condition(GaussianState.vacuum(1), 0, 0.0, 0.25)
+    c_ok = abs(st_c.V[0, 0]) < 1e-12 and abs(st_c.rbar[0] - 0.25) < 1e-12
+
+    st_f = f_bs(FockState.fock2(1, 0, 12), np.pi / 4)
+    f_ok = abs(abs(st_f.amps[1, 0]) ** 2 - 0.5) < 1e-6 and abs(abs(st_f.amps[0, 1]) ** 2 - 0.5) < 1e-6
+
+    st_g = gkp0(0.1, grid_size=3)
+    xs = sorted(float(c.rbar[0].real) for c in st_g.components)
+    delta = np.sqrt(2.0 * np.pi)
+    gkp_ok = (
+        st_g.n_components == 7
+        and abs(weight_sum(st_g) - 1.0) < 1e-12
+        and abs((xs[1] - xs[0]) - delta) < 1e-12
+    )
+
+    st_bl = b_loss(even_cat(0.8), 0.0)
+    b_ok = abs(b_n(st_bl)) < 1e-12 and abs(weight_sum(st_bl) - 1.0) < 1e-12
+
+    ok = g_ok and c_ok and f_ok and gkp_ok and b_ok
+    return ok, f"G_loss={g_ok} cond={c_ok} F_BS={f_ok} gkp0={gkp_ok} B_loss={b_ok}"
+
+
 def main() -> int:
     checks: list[tuple[str, CheckFn]] = [
         ("U1 vacuum/conventions", _u1),
@@ -113,9 +149,10 @@ def main() -> int:
         ("U3 D/BS/phase circuit", _u3),
         ("U4 Fock cutoff", _u4),
         ("U5 cat weights+phase", _u5),
+        ("U7 extended G/F/B smoke", _u7),
     ]
     results: list[tuple[str, bool, str]] = []
-    print("cvsim user acceptance (U1–U5); run-all then summary")
+    print("cvsim user acceptance (U1–U5 + U7); run-all then summary")
     for name, fn in checks:
         try:
             ok, detail = fn()

@@ -1,8 +1,8 @@
 # 最终用户验收（cvsim）
 
 > 工程验收文档（可指 API）。理论笔记仍纯物理，不绑本包。  
-> 能力边界：MVP + B1 门 + B2 Homodyne 边缘矩。  
-> 版本锚点：pytest 约 **25** passed（随切片更新本数）。
+> 能力边界：三表示独立闭环 + G 条件 Homodyne/loss + F 1–2 模 BS/Kerr/PNRD + B 矩/loss/`gkp0`。  
+> 版本锚点：pytest **56** passed（切片后请改本数）。
 
 ---
 
@@ -17,7 +17,13 @@
 
 ### 产品一句话
 
-**读完笔记 → 跑 `cvsim` → 同一套数：** ħ=1、xxpp、真空 `V=I/2`；Gaussian 挤+分束+Homodyne 边缘；Fock cutoff 逼近；Bosonic cat 权重与高斯门。
+**读完笔记 → 跑 `cvsim` → 同一套数：** ħ=1、xxpp、真空 `V=I/2`。
+
+| 表示 | 当前闭环（摘要） |
+|------|------------------|
+| **Gaussian** | 门 D/R/S/BS/S₂ → `loss(T)` → 边缘/条件 Homodyne → 矩 |
+| **Fock** | 1–2 模；D/R/S/Kerr/BS → PNRD / norm / ⟨n⟩ |
+| **Bosonic** | cat / `gkp0` → 门 → ∑w 加权矩 → `loss(T)` |
 
 ### 不是目标
 
@@ -38,7 +44,11 @@
 | 纯单模高斯 | `det V = 1/4` |
 | 挤态平均光子 | `⟨n⟩ = sinh² r` |
 | 位移 | `d_x=√2 Re α`，`d_p=√2 Im α` |
-| Homodyne | `x_φ = x cosφ + p sinφ`；`Var = uᵀ V u`（中心矩） |
+| Homodyne | `x_φ = x cosφ + p sinφ`；高斯边缘 `Var = uᵀ V u`（中心矩） |
+| 损失 | `X=√T`，`Y=(1-T)I/2`（对齐 `V_vac=I/2`） |
+| GKP `gkp0` | 对角 x 齿梳近似（无 cross）；间距 `√(2π)` |
+
+细节合同：`.trellis/spec/backend/quality-guidelines.md`。
 
 ---
 
@@ -52,7 +62,7 @@ uv pip install numpy scipy pytest
 
 ---
 
-## 一键用户验收（U1–U5）
+## 一键用户验收（U1–U5 + U7）
 
 ```bash
 python -m cvsim.demos.user_acceptance
@@ -83,11 +93,11 @@ python -m cvsim.demos.user_acceptance
 | 期望 | `det V ≈ 1/4`；`|⟨n⟩−sinh²r|` 小；`var(x)=½e^{-2r}`，`var(p)=½e^{2r}` |
 | 容差 | `1e-10` |
 
-### U3 · 有意义高斯电路（B1+B2）
+### U3 · 有意义高斯电路（门 + 边缘 Homodyne）
 
 | | |
 |--|--|
-| 笔记 | 02 门表；B1/B2 |
+| 笔记 | 02 门表 |
 | 操作 | `D(α)`；`S→BS(π/4)`；挤后 `phase` |
 | 期望 | `⟨n⟩≈|α|²`；Homodyne mean 跟 √2 约定；BS 后总 `⟨n⟩=sinh²r`，`det V≈(1/4)²`；phase 后 `var` 仍 = `uᵀVu` 且相对纯挤变化 |
 | 容差 | `1e-10`～`1e-12` |
@@ -110,6 +120,16 @@ python -m cvsim.demos.user_acceptance
 | 期望 | 4 组件；`∑w≈1`；phase 后 `∑w` 仍 1，对角峰旋转 |
 | 容差 | `1e-12` |
 
+### U7 · 扩展能力冒烟（G/F/B 后续切片）
+
+| 子项 | 操作 | 期望 |
+|------|------|------|
+| G loss | 相干 `D(α)` → `loss(T)` | `⟨n⟩≈T\|α\|²` |
+| G condition | 真空 → `homodyne_condition(…, outcome)` | 测向 var→0；`⟨x⟩→outcome` |
+| F BS | `\|10⟩` → `BS(π/4)` | `\|c₁₀\|²≈\|c₀₁\|²≈½` |
+| B gkp0 | `gkp0(0.1, N=3)` | `K=7`，`∑w≈1`，Δx=`√(2π)` |
+| B loss | `even_cat` → `loss(0)` | `⟨n⟩≈0`，`∑w=1` |
+
 ### U6 · 机器门禁（文档命令，不在一键 demo 内强制）
 
 ```bash
@@ -126,12 +146,11 @@ python -m cvsim.demos.user_acceptance
 
 ## 未做（当前不验收为绿）
 
-- S₂ 双模挤压  
-- Homodyne 条件态更新 / 采样  
-- 光子损失通道  
-- Fock 多模 BS / Kerr  
-- Wigner 网格必选 / GKP  
-- Circuit DSL；PNRD / Hafnian / Torontonian 生产路径  
+- Homodyne **采样**；Bosonic **条件** Homodyne  
+- Fock **loss** / m≥3 / Fock S₂  
+- **完整纯态 GKP**（交叉项 / `|1⟩` / 二维格点）  
+- **Wigner** 网格（规划下一切片）  
+- Circuit DSL；PNRD 大规模；Hafnian / Torontonian 生产路径  
 
 新切片落地后：在本文件 **加 Ux**、改一键 demo、更新 pytest 计数；**少改**「项目目标」段。
 
