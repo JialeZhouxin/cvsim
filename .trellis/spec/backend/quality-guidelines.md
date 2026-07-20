@@ -72,18 +72,17 @@ Bosonic `loss(T)`: per-component same X,Y as Gaussian; **w unchanged**.
 
 Out: `|1⟩_GKP`, 2D lattice, full-pair cross.
 
-### Bosonic condition Homodyne (teaching A)
+### Bosonic condition Homodyne (complex-mean OK)
 
 | Item | Contract |
 |------|----------|
 | API | `bosonic.homodyne_condition(state, mode, phi, outcome)` |
-| real peaks | same `V,r` update as G; `w *= N(outcome;μ,σ)` |
-| complex mean | **dropped** (cross discarded) |
-| renorm | `∑w=1` among survivors |
-| match G | single-component `from_gaussian` ≡ G |
-| honesty | peak-selection mixture, not full cat coherent condition |
+| all comps | `μ=u·r̄` (complex OK), `σ=uᵀVu`; `V'=V−vvᵀ/σ`, `r̄'=r̄+v(o−μ)/σ` |
+| likelihood | `L∝σ^{-1/2} exp(−(o−μ)²/(2σ))` (complex OK); `w∝wL`; `∑w→1` |
+| match G | single real-mean component ≡ G |
+| honesty | teaching closed form; not full Generaldyne POVM |
 
-Out: full complex-mean likelihood; sampling; mode delete.
+Out: sampling; mode delete; finite-noise Generaldyne.
 
 ### Wigner grid (single-mode, ħ=1)
 

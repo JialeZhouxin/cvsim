@@ -5,8 +5,6 @@ from __future__ import annotations
 import numpy as np
 
 from cvsim.bosonic.state import BosonicState, Component
-from cvsim.gaussian.observables import homodyne_condition as g_homodyne_condition
-from cvsim.gaussian.state import GaussianState
 
 _IM_TOL = 1e-8
 _SIG_EPS = 1e-14
@@ -97,16 +95,16 @@ def homodyne_condition(
     mode: int,
     phi: float,
     outcome: float,
-    *,
-    imag_tol: float = 1e-12,
 ) -> BosonicState:
-    """Ideal Homodyne condition on real-mean components only (teaching A).
+    """Ideal Homodyne condition on all components (complex-mean OK).
 
-    For each component with real rbar: same V,r update as Gaussian, then
-    w *= N(outcome; mu, sigma). Complex-mean (cross) components dropped.
-    Renormalize sum w = 1. Does not delete modes.
+    Per component (same shape as Gaussian; r̄ may be complex):
+      v=Vu, σ=uᵀVu, μ=u·r̄
+      V'=V−vvᵀ/σ,  r̄'=r̄+v(outcome−μ)/σ
+      w *= (2πσ)^{-1/2} exp(−(outcome−μ)²/(2σ))  # L may be complex
+    Then renorm ∑w=1. Does not delete modes.
 
-    Honesty: peak-selection mixture after cat, not full coherent condition.
+    Honesty: teaching closed-form extension; not full Generaldyne POVM.
     """
     m = _check_mode(state, mode)
     u = np.zeros(2 * m, dtype=float)
@@ -117,34 +115,20 @@ def homodyne_condition(
     raw_w: list[complex] = []
 
     for c in state.components:
-        if np.max(np.abs(c.rbar.imag)) > imag_tol:
-            continue
-        r_real = c.rbar.real.astype(float)
         v = c.V @ u
         sigma = float(u @ v)
         if sigma <= _SIG_EPS:
             raise ValueError(f"homodyne variance too small: σ={sigma}")
-        mu = float(u @ r_real)
+        mu = complex(u @ c.rbar)
         L = (2.0 * np.pi * sigma) ** (-0.5) * np.exp(
             -0.5 * (outcome - mu) ** 2 / sigma
         )
-        g = g_homodyne_condition(
-            GaussianState(V=c.V.copy(), rbar=r_real.copy()),
-            mode,
-            phi,
-            outcome,
-        )
-        kept.append(
-            Component(
-                V=g.V.copy(),
-                rbar=g.rbar.astype(complex),
-                w=0.0 + 0.0j,
-            )
-        )
+        Vn = c.V - np.outer(v, v) / sigma
+        Vn = 0.5 * (Vn + Vn.T)
+        rn = c.rbar + v * ((outcome - mu) / sigma)
+        kept.append(Component(V=Vn, rbar=rn, w=0.0 + 0.0j))
         raw_w.append(c.w * complex(L))
 
-    if not kept:
-        raise ValueError("homodyne_condition: no real-mean components left")
     s = sum(raw_w)
     if abs(s) < _SIG_EPS:
         raise ValueError("homodyne_condition: weight sum ~ 0 after likelihood")

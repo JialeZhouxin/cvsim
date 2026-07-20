@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-20-cvsim-bosonic-cond-complex/prd.md", "reason": "AC-1..5"}
+{"file": ".trellis/tasks/07-20-cvsim-bosonic-cond-complex/design.md", "reason": "complex affine"}
+{"file": "cvsim/gaussian/observables.py", "reason": "real parity"}
+{"file": "tests/test_bosonic_condition.py", "reason": "old A tests"}
