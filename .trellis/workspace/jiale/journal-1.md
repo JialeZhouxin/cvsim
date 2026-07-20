@@ -270,3 +270,36 @@ vacuum+加权矩；47 tests；三表示核心闭环齐；归档
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Bosonic loss 通道
+
+**Date**: 2026-07-20
+**Task**: Bosonic loss 通道
+**Branch**: `master`
+
+### Summary
+
+逐组件 loss 对齐 G；51 tests；归档
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

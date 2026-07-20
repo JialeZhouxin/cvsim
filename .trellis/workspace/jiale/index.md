@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
+- **Total Sessions**: 9
 - **Last Active**: 2026-07-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~272 | Active |
+| `journal-1.md` | ~305 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-07-20 | Bosonic loss 通道 | HEAD | `master` |
 | 8 | 2026-07-20 | Bosonic 矩闭环 | `f30680e` | `master` |
 | 7 | 2026-07-20 | Fock 独立全流程 BS/Kerr/PNRD | `29dcc60` | `master` |
 | 6 | 2026-07-18 | Gaussian 全流程 condition+loss | `7544443` | `master` |
