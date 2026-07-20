@@ -534,3 +534,36 @@ G精确+B实峰混合；74 tests；队列②完
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Fock 1模 loss
+
+**Date**: 2026-07-20
+**Task**: Fock 1模 loss
+**Branch**: `master`
+
+### Summary
+
+FockDensity+Kraus；80 tests；队列③完
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
