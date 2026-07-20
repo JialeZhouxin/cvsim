@@ -1,12 +1,15 @@
-"""Bosonic observables: weights + weighted moments (ħ=1, xxpp)."""
+"""Bosonic observables: weights + weighted moments + condition Homodyne (ħ=1, xxpp)."""
 
 from __future__ import annotations
 
 import numpy as np
 
 from cvsim.bosonic.state import BosonicState, Component
+from cvsim.gaussian.observables import homodyne_condition as g_homodyne_condition
+from cvsim.gaussian.state import GaussianState
 
 _IM_TOL = 1e-8
+_SIG_EPS = 1e-14
 
 
 def weight_sum(state: BosonicState) -> complex:
@@ -87,3 +90,64 @@ def homodyne_var(state: BosonicState, mode: int = 0, phi: float = 0.0) -> float:
         mu += c.w * mean_k
         x2 += c.w * (var_k + mean_k**2)
     return _as_real(x2 - mu**2, "homodyne_var")
+
+
+def homodyne_condition(
+    state: BosonicState,
+    mode: int,
+    phi: float,
+    outcome: float,
+    *,
+    imag_tol: float = 1e-12,
+) -> BosonicState:
+    """Ideal Homodyne condition on real-mean components only (teaching A).
+
+    For each component with real rbar: same V,r update as Gaussian, then
+    w *= N(outcome; mu, sigma). Complex-mean (cross) components dropped.
+    Renormalize sum w = 1. Does not delete modes.
+
+    Honesty: peak-selection mixture after cat, not full coherent condition.
+    """
+    m = _check_mode(state, mode)
+    u = np.zeros(2 * m, dtype=float)
+    u[mode] = np.cos(phi)
+    u[m + mode] = np.sin(phi)
+
+    kept: list[Component] = []
+    raw_w: list[complex] = []
+
+    for c in state.components:
+        if np.max(np.abs(c.rbar.imag)) > imag_tol:
+            continue
+        r_real = c.rbar.real.astype(float)
+        v = c.V @ u
+        sigma = float(u @ v)
+        if sigma <= _SIG_EPS:
+            raise ValueError(f"homodyne variance too small: σ={sigma}")
+        mu = float(u @ r_real)
+        L = (2.0 * np.pi * sigma) ** (-0.5) * np.exp(
+            -0.5 * (outcome - mu) ** 2 / sigma
+        )
+        g = g_homodyne_condition(
+            GaussianState(V=c.V.copy(), rbar=r_real.copy()),
+            mode,
+            phi,
+            outcome,
+        )
+        kept.append(
+            Component(
+                V=g.V.copy(),
+                rbar=g.rbar.astype(complex),
+                w=0.0 + 0.0j,
+            )
+        )
+        raw_w.append(c.w * complex(L))
+
+    if not kept:
+        raise ValueError("homodyne_condition: no real-mean components left")
+    s = sum(raw_w)
+    if abs(s) < _SIG_EPS:
+        raise ValueError("homodyne_condition: weight sum ~ 0 after likelihood")
+    for comp, w in zip(kept, raw_w):
+        comp.w = w / s
+    return BosonicState(components=kept)

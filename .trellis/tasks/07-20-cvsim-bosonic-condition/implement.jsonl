@@ -1,0 +1,5 @@
+{"file": "cvsim/gaussian/observables.py", "reason": "reuse homodyne_condition"}
+{"file": "cvsim/bosonic/observables.py", "reason": "add B condition"}
+{"file": "cvsim/bosonic/cat.py", "reason": "AC cat peaks"}
+{"file": "cvsim/bosonic/state.py", "reason": "Component / from_gaussian"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "contract"}

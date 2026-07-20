@@ -10,6 +10,7 @@ from cvsim.bosonic.gates import (
     two_mode_squeeze,
 )
 from cvsim.bosonic.observables import (
+    homodyne_condition,
     homodyne_mean,
     homodyne_var,
     mean_photon,
@@ -27,6 +28,7 @@ __all__ = [
     "mean_photon",
     "homodyne_mean",
     "homodyne_var",
+    "homodyne_condition",
     "squeeze",
     "displace",
     "phase",
