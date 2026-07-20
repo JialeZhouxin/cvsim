@@ -42,6 +42,23 @@ def homodyne_var(state: GaussianState, mode: int = 0, phi: float = 0.0) -> float
     return float(u @ state.V @ u)
 
 
+def homodyne_sample(
+    state: GaussianState,
+    mode: int = 0,
+    phi: float = 0.0,
+    *,
+    rng: np.random.Generator | None = None,
+) -> float:
+    """Sample outcome from ideal Homodyne edge N(μ, σ²). Does not condition."""
+    if rng is None:
+        rng = np.random.default_rng()
+    mu = homodyne_mean(state, mode, phi)
+    var = homodyne_var(state, mode, phi)
+    if var <= _EPS:
+        raise ValueError(f"homodyne variance too small: σ²={var}")
+    return float(rng.normal(mu, np.sqrt(var)))
+
+
 def homodyne_condition(
     state: GaussianState,
     mode: int,

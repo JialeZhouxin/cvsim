@@ -82,7 +82,17 @@ Out: `|1⟩_GKP`, 2D lattice, full-pair cross.
 | match G | single real-mean component ≡ G |
 | honesty | teaching closed form; not full Generaldyne POVM |
 
-Out: sampling; mode delete; finite-noise Generaldyne.
+### Homodyne sample (G exact + B mixture)
+
+| Item | Contract |
+|------|----------|
+| API | `homodyne_sample(state, mode=0, phi=0, *, rng=None) -> float` |
+| G | `outcome ~ N(μ, σ²)` from edge mean/var; no auto-condition |
+| B | pool real `r̄` and `Re(w)>0`; pick ∝ `Re(w)`; then `N(μ_k,σ_k²)` |
+| B honesty | diagonal-peak classical mixture; **no** cross in sample pool |
+| rng | `np.random.Generator`; `None` → `default_rng()` |
+
+Out: `sample_and_condition`; Fock sample; exact cat edge with cross; mode delete; finite-noise Generaldyne.
 
 ### Wigner grid (single-mode, ħ=1)
 

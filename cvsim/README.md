@@ -16,9 +16,9 @@ uv pip install numpy scipy
 
 | 表示 | 初态 | 门 | 通道 | 测量 / 矩 |
 |------|------|----|------|-----------|
-| **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T)`** | det / ⟨n⟩ / Homodyne 边缘 / **条件 Homodyne** |
+| **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件 Homodyne** |
 | **Fock** | 真空 / `fock` / `fock2` | D/R/S/**Kerr** / **BS(2 模)** | — | norm / ⟨n⟩ / **`pnrd_probs`** |
-| **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T)`** | ∑w / 加权 ⟨n⟩ / 加权 Homodyne / **`homodyne_condition`**（全组件复仿射似然） |
+| **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample**（实峰混合）/ **condition**（复仿射） |
 
 辛矩阵只在 `cvsim/gaussian/symplectic.py`。无 Circuit DSL。
 

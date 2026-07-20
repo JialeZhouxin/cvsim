@@ -11,6 +11,7 @@ from cvsim.gaussian.observables import (
     det_cov,
     homodyne_condition,
     homodyne_mean,
+    homodyne_sample,
     homodyne_var,
     mean_photon,
 )
@@ -27,5 +28,6 @@ __all__ = [
     "mean_photon",
     "homodyne_mean",
     "homodyne_var",
+    "homodyne_sample",
     "homodyne_condition",
 ]

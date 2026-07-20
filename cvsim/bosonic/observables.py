@@ -90,6 +90,55 @@ def homodyne_var(state: BosonicState, mode: int = 0, phi: float = 0.0) -> float:
     return _as_real(x2 - mu**2, "homodyne_var")
 
 
+def homodyne_sample(
+    state: BosonicState,
+    mode: int = 0,
+    phi: float = 0.0,
+    *,
+    rng: np.random.Generator | None = None,
+    imag_tol: float = 1e-12,
+) -> float:
+    """Sample Homodyne from real-peak mixture (teaching).
+
+    Pool components with real r̄ and Re(w)>0; pick k ∝ Re(w_k), then
+    N(μ_k, σ_k²). Complex-mean (cross) terms excluded from the pool.
+    Does not condition — call homodyne_condition separately.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    m = _check_mode(state, mode)
+    u = np.zeros(2 * m, dtype=float)
+    u[mode] = np.cos(phi)
+    u[m + mode] = np.sin(phi)
+
+    pool: list[Component] = []
+    weights: list[float] = []
+    for c in state.components:
+        if np.max(np.abs(c.rbar.imag)) > imag_tol:
+            continue
+        rw = float(c.w.real)
+        if rw <= 0.0:
+            continue
+        pool.append(c)
+        weights.append(rw)
+
+    if not pool:
+        raise ValueError("homodyne_sample: no real-mean positive-weight components")
+
+    if len(pool) == 1:
+        idx = 0
+    else:
+        p = np.asarray(weights, dtype=float)
+        p = p / p.sum()
+        idx = int(rng.choice(len(pool), p=p))
+    c = pool[idx]
+    mu = float(u @ c.rbar.real)
+    var = float(u @ c.V @ u)
+    if var <= _SIG_EPS:
+        raise ValueError(f"homodyne variance too small: σ²={var}")
+    return float(rng.normal(mu, np.sqrt(var)))
+
+
 def homodyne_condition(
     state: BosonicState,
     mode: int,
