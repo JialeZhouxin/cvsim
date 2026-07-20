@@ -402,3 +402,36 @@ U7+能力矩阵；6/6 UAT；下一步 Wigner
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: GKP nn cross
+
+**Date**: 2026-07-20
+**Task**: GKP nn cross
+**Branch**: `master`
+
+### Summary
+
+gkp0 cross=nn; K=6N+1; 65 tests
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
