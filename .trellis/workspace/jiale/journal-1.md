@@ -369,3 +369,36 @@ U7+能力矩阵；6/6 UAT；下一步 Wigner
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Wigner 网格 G+B
+
+**Date**: 2026-07-20
+**Task**: Wigner 网格 G+B
+**Branch**: `master`
+
+### Summary
+
+单模 Wigner；odd cat 负；60 tests；①②完成
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
