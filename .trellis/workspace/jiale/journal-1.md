@@ -204,3 +204,36 @@ G1 条件Homodyne + G2 loss；37 tests；F/B 不动；归档
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Fock 独立全流程 BS/Kerr/PNRD
+
+**Date**: 2026-07-20
+**Task**: Fock 独立全流程 BS/Kerr/PNRD
+**Branch**: `master`
+
+### Summary
+
+1-2模 Fock；BS+Kerr+PNRD；pytest 42；归档
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `29dcc60` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
