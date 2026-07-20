@@ -237,3 +237,36 @@ G1 条件Homodyne + G2 loss；37 tests；F/B 不动；归档
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Bosonic 矩闭环
+
+**Date**: 2026-07-20
+**Task**: Bosonic 矩闭环
+**Branch**: `master`
+
+### Summary
+
+vacuum+加权矩；47 tests；三表示核心闭环齐；归档
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f30680e` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
