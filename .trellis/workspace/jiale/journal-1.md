@@ -435,3 +435,36 @@ gkp0 cross=nn; K=6N+1; 65 tests
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: B 条件 Homodyne
+
+**Date**: 2026-07-20
+**Task**: B 条件 Homodyne
+**Branch**: `master`
+
+### Summary
+
+实峰似然+丢交叉；69 tests；归档
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
