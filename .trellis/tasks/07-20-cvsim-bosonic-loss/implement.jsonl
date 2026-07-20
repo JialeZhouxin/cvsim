@@ -1,0 +1,4 @@
+{"file": "cvsim/gaussian/channels.py", "reason": "X,Y 合同"}
+{"file": "cvsim/bosonic/state.py", "reason": "Component"}
+{"file": "cvsim/bosonic/observables.py", "reason": "矩验收"}
+{"file": "tests/test_g2_loss.py", "reason": "G 对照模式"}

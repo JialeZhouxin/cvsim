@@ -1,5 +1,6 @@
 from cvsim.bosonic.state import BosonicState, Component
 from cvsim.bosonic.cat import even_cat, odd_cat
+from cvsim.bosonic.channels import loss
 from cvsim.bosonic.gates import (
     beamsplitter,
     displace,
@@ -19,6 +20,7 @@ __all__ = [
     "Component",
     "even_cat",
     "odd_cat",
+    "loss",
     "weight_sum",
     "mean_photon",
     "homodyne_mean",

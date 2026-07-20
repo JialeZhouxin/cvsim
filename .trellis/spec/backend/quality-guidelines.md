@@ -56,7 +56,9 @@ Wrong: set cross weight equal to diagonal without `ov`.
 | single component | match Gaussian same gate/observable |
 | gates | `w` unchanged |
 
-Out: loss, conditional Homodyne, GKP, Wigner (this slice).
+Bosonic `loss(T)`: per-component same X,Y as Gaussian; **w unchanged**.
+
+Out: conditional Homodyne, GKP, Wigner (later slices).
 
 ### Gaussian squeeze (xxpp, mode `i`)
 
