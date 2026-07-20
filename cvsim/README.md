@@ -51,7 +51,7 @@ python -m pytest tests -q
 |------|----|
 | Gaussian | `det_cov` / `mean_photon` / `homodyne_mean` · `homodyne_var` / **`homodyne_condition`** / **`loss(T)`** |
 | Fock | `norm` / `mean_photon` / **`pnrd_probs`** |
-| Bosonic | `weight_sum` / **`mean_photon`** / **`homodyne_*`** / **`loss(T)`**（逐组件，w 不变） |
+| Bosonic | cat / **`gkp0`** / `weight_sum` / `mean_photon` / `homodyne_*` / `loss(T)` |
 
 高斯全流程（概念）：
 

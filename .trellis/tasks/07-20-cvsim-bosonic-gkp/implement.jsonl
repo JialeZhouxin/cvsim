@@ -1,0 +1,5 @@
+{"file": "cvsim/bosonic/state.py", "reason": "Component"}
+{"file": "cvsim/bosonic/cat.py", "reason": "构造器模式"}
+{"file": "cvsim/bosonic/observables.py", "reason": "⟨n⟩ 验收"}
+{"file": "03-Bosonic表示原理.md", "reason": "§4 GKP"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Bosonic 合同"}

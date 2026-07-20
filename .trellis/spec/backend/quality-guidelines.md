@@ -58,7 +58,17 @@ Wrong: set cross weight equal to diagonal without `ov`.
 
 Bosonic `loss(T)`: per-component same X,Y as Gaussian; **w unchanged**.
 
-Out: conditional Homodyne, GKP, Wigner (later slices).
+### Bosonic GKP `|0⟩` (diagonal tooth comb)
+
+| Item | Contract |
+|------|----------|
+| API | `gkp0(epsilon, grid_size=N)` → `K=2N+1` components |
+| spacing | `x_k = k √(2π)` |
+| tooth | `V=½ diag(ε,1/ε)`, det=1/4 |
+| weights | `w∝exp(−π ε k²)`, real, `∑w=1` |
+| honesty | **no** p-teeth / cross → diagonal approx, not full pure GKP |
+
+Out: `|1⟩_GKP`, 2D lattice, Wigner, conditional Homodyne.
 
 ### Gaussian squeeze (xxpp, mode `i`)
 
