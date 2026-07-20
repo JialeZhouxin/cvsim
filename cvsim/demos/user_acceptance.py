@@ -1,4 +1,4 @@
-"""Final user acceptance: U1–U5 + U7. Run all, then summary; exit 1 if any fail."""
+"""Final user acceptance: U1–U5 + U7 + U8. Run all, then summary; exit 1 if any fail."""
 
 from __future__ import annotations
 
@@ -8,14 +8,17 @@ from collections.abc import Callable
 import numpy as np
 
 from cvsim.bosonic import (
+    BosonicState,
     even_cat,
     gkp0,
+    homodyne_condition as b_cond,
+    homodyne_sample as b_sample,
     loss as b_loss,
     mean_photon as b_n,
     phase as b_phase,
     weight_sum,
 )
-from cvsim.fock import FockState, beamsplitter as f_bs, mean_photon as f_n, norm, squeeze as f_squeeze
+from cvsim.fock import FockState, beamsplitter as f_bs, loss as f_loss, mean_photon as f_n, norm, squeeze as f_squeeze, trace as f_trace
 from cvsim.fock.gates import squeeze as f_squeeze_gate
 from cvsim.gaussian import (
     GaussianState,
@@ -24,6 +27,7 @@ from cvsim.gaussian import (
     displace,
     homodyne_condition,
     homodyne_mean,
+    homodyne_sample as g_sample,
     homodyne_var,
     loss as g_loss,
     mean_photon,
@@ -142,6 +146,37 @@ def _u7() -> tuple[bool, str]:
     return ok, f"G_loss={g_ok} cond={c_ok} F_BS={f_ok} gkp0={gkp_ok} B_loss={b_ok}"
 
 
+def _u8() -> tuple[bool, str]:
+    """Queue ①②③ smoke: B condition, Homodyne sample G/B, Fock loss."""
+    alpha = 0.8
+    st2 = b_cond(even_cat(alpha), 0, 0.0, np.sqrt(2.0) * alpha)
+    b_cond_ok = (
+        st2.n_components == 4
+        and abs(weight_sum(st2) - 1.0) < 1e-10
+        and abs(st2.components[0].w) > abs(st2.components[1].w)
+    )
+
+    rng = np.random.default_rng(0)
+    xs = np.array([g_sample(GaussianState.vacuum(1), rng=rng) for _ in range(2000)])
+    g_samp_ok = abs(xs.mean()) < 0.08 and abs(xs.var(ddof=1) - 0.5) < 0.08
+
+    st_g = squeeze(GaussianState.vacuum(1), 0.4)
+    o_g = g_sample(st_g, rng=np.random.default_rng(7))
+    o_b = b_sample(BosonicState.from_gaussian(st_g), rng=np.random.default_rng(7))
+    gb_ok = abs(o_g - o_b) < 1e-12
+
+    T = 0.3
+    rho = f_loss(FockState.fock(1, 8), T)
+    f_ok = (
+        abs(rho.rho[0, 0] - (1.0 - T)) < 1e-12
+        and abs(rho.rho[1, 1] - T) < 1e-12
+        and abs(f_trace(rho) - 1.0) < 1e-12
+    )
+
+    ok = b_cond_ok and g_samp_ok and gb_ok and f_ok
+    return ok, f"B_cond={b_cond_ok} G_samp={g_samp_ok} GB={gb_ok} F_loss={f_ok}"
+
+
 def main() -> int:
     checks: list[tuple[str, CheckFn]] = [
         ("U1 vacuum/conventions", _u1),
@@ -150,9 +185,10 @@ def main() -> int:
         ("U4 Fock cutoff", _u4),
         ("U5 cat weights+phase", _u5),
         ("U7 extended G/F/B smoke", _u7),
+        ("U8 queue ①②③ smoke", _u8),
     ]
     results: list[tuple[str, bool, str]] = []
-    print("cvsim user acceptance (U1–U5 + U7); run-all then summary")
+    print("cvsim user acceptance (U1–U5 + U7 + U8); run-all then summary")
     for name, fn in checks:
         try:
             ok, detail = fn()

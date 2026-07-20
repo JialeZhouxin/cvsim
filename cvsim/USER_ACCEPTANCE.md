@@ -1,8 +1,8 @@
 # 最终用户验收（cvsim）
 
 > 工程验收文档（可指 API）。理论笔记仍纯物理，不绑本包。  
-> 能力边界：三表示独立闭环 + G 条件 Homodyne/loss + F 1–2 模 BS/Kerr/PNRD + B 矩/loss/`gkp0`。  
-> 版本锚点：pytest **56** passed（切片后请改本数）。
+> 能力边界：三表示独立闭环 + G/B condition·sample·loss + F 1–2 模 BS/Kerr/PNRD + F 1 模 loss→ρ + B 矩/`gkp0`/Wigner。  
+> 版本锚点：pytest **80** passed（切片后请改本数）。
 
 ---
 
@@ -21,9 +21,9 @@
 
 | 表示 | 当前闭环（摘要） |
 |------|------------------|
-| **Gaussian** | 门 D/R/S/BS/S₂ → `loss(T)` → 边缘/条件 Homodyne → 矩 |
-| **Fock** | 1–2 模；D/R/S/Kerr/BS → PNRD / norm / ⟨n⟩ |
-| **Bosonic** | cat / `gkp0` → 门 → ∑w 加权矩 → `loss(T)` |
+| **Gaussian** | 门 D/R/S/BS/S₂ → `loss(T)` → 边缘 / **sample** / 条件 Homodyne → 矩 |
+| **Fock** | 1–2 模；D/R/S/Kerr/BS → PNRD / norm / ⟨n⟩；**1 模 `loss→FockDensity`** |
+| **Bosonic** | cat / `gkp0` → 门 → ∑w 加权矩 → `loss(T)` → **sample** / **condition（复仿射）** |
 
 ### 不是目标
 
@@ -45,8 +45,8 @@
 | 挤态平均光子 | `⟨n⟩ = sinh² r` |
 | 位移 | `d_x=√2 Re α`，`d_p=√2 Im α` |
 | Homodyne | `x_φ = x cosφ + p sinφ`；高斯边缘 `Var = uᵀ V u`（中心矩） |
-| 损失 | `X=√T`，`Y=(1-T)I/2`（对齐 `V_vac=I/2`） |
-| GKP `gkp0` | 对角 x 齿梳近似（无 cross）；间距 `√(2π)` |
+| 损失 | G/B：`X=√T`，`Y=(1-T)I/2`；F：1 模 Kraus，`T∈[0,1]` |
+| GKP `gkp0` | 对角 x 齿梳；可选 `cross="nn"`；间距 `√(2π)` |
 
 细节合同：`.trellis/spec/backend/quality-guidelines.md`。
 
@@ -62,7 +62,7 @@ uv pip install numpy scipy pytest
 
 ---
 
-## 一键用户验收（U1–U5 + U7）
+## 一键用户验收（U1–U5 + U7 + U8）
 
 ```bash
 python -m cvsim.demos.user_acceptance
@@ -130,6 +130,15 @@ python -m cvsim.demos.user_acceptance
 | B gkp0 | `gkp0(0.1, N=3)` | `K=7`，`∑w≈1`，Δx=`√(2π)` |
 | B loss | `even_cat` → `loss(0)` | `⟨n⟩≈0`，`∑w=1` |
 
+### U8 · 队列 ①②③ 冒烟（B condition / sample / Fock loss）
+
+| 子项 | 操作 | 期望 |
+|------|------|------|
+| B condition | `even_cat` → `homodyne_condition` +outcome | K=4；`∑w≈1`；+diag `|w|` > −diag |
+| G sample | 真空 N=2000，固定 seed | `|mean|<0.08`；`|var−0.5|<0.08` |
+| B sample | `from_gaussian` 同 seed ≡ G | 单次差 `<1e-12` |
+| F loss | `\|1⟩` → `loss(T)` | `ρ₀₀≈1−T`，`ρ₁₁≈T`；`Tr≈1` |
+
 ### U6 · 机器门禁（文档命令，不在一键 demo 内强制）
 
 ```bash
@@ -146,11 +155,13 @@ python -m cvsim.demos.user_acceptance
 
 ## 未做（当前不验收为绿）
 
-- Homodyne **采样**；Bosonic **条件** Homodyne  
-- Fock **loss** / m≥3 / Fock S₂  
-- **完整纯态 GKP**（交叉项 / `|1⟩` / 二维格点）  
-- **Wigner** 网格（规划下一切片）  
+- `sample_and_condition` 一步 API  
+- Fock **2 模 loss** / m≥3 / Fock S₂ / Fock Homodyne sample  
+- **完整纯态 GKP**（full-pair cross / `|1⟩` / 二维格点）  
+- Fock **Wigner**；多模 Wigner / GUI  
 - Circuit DSL；PNRD 大规模；Hafnian / Torontonian 生产路径  
+
+已落地（见 U7/U8）：G/B Homodyne sample；B condition（复仿射）；Fock 1 模 loss→ρ；Wigner G+B 网格；GKP nn cross。
 
 新切片落地后：在本文件 **加 Ux**、改一键 demo、更新 pytest 计数；**少改**「项目目标」段。
 

@@ -46,10 +46,10 @@ X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 
 ## 最终用户验收
 
-目标、U1–U5 + **U7**、未做列表见 **[USER_ACCEPTANCE.md](./USER_ACCEPTANCE.md)**。
+目标、U1–U5 + **U7** + **U8**、未做列表见 **[USER_ACCEPTANCE.md](./USER_ACCEPTANCE.md)**。
 
 ```bash
-python -m cvsim.demos.user_acceptance   # U1–U5 + U7；汇总后 exit
+python -m cvsim.demos.user_acceptance   # U1–U5 + U7 + U8；汇总后 exit
 ```
 
 ## 里程碑自检（MVP 最小闭环）
