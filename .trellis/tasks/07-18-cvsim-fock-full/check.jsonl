@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-18-cvsim-fock-full/prd.md", "reason": "AC-F*"}
+{"file": ".trellis/tasks/07-18-cvsim-fock-full/design.md", "reason": "2 模+BS"}
+{"file": "cvsim/fock/state.py", "reason": "兼容"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "截断约定"}

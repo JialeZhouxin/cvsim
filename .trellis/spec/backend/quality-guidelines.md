@@ -60,7 +60,8 @@ Wrong: set cross weight equal to diagonal without `ov`.
 | `S(r)` | as above |
 | `BS(θ,φ)` | unitary U embed `S=[[ReU,-ImU],[ImU,ReU]]`; only in `symplectic.py` |
 | Bosonic gates | same S,d per component; **w unchanged** under unitary Gaussian |
-| Fock B1 | single-mode D/R/S only; no multi-mode BS yet |
+| Fock B1 | single-mode D/R/S (MVP) |
+| Fock full (1–2 mode) | `amps` ndim 1\|2; `kerr`; 2-mode `beamsplitter` via expm; `pnrd_probs`; no loss/Homodyne in this slice |
 
 Hard AC patterns: `S→BS(π/4)` total ⟨n⟩ = sinh² r; pure 2-mode det V ≈ (1/4)²; Fock vs Gaussian ⟨n⟩ closes with cutoff.
 

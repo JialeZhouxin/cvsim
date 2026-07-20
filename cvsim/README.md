@@ -40,7 +40,7 @@ python -m pytest tests -q
 | 后端 | 门 |
 |------|----|
 | Gaussian 多模 | `displace` / `phase` / `squeeze` / `beamsplitter` / **`two_mode_squeeze`** |
-| Fock 单模 | `displace` / `phase` / `squeeze` |
+| Fock 1–2 模 | 单模 `D/R/S/Kerr`；两模 **`beamsplitter`**；`pnrd_probs` |
 | Bosonic | 同上（含 S₂；逐组件辛更新，权重不变） |
 
 辛矩阵生成在 `cvsim/gaussian/symplectic.py`（共享）。无 Circuit DSL。
@@ -50,7 +50,7 @@ python -m pytest tests -q
 | 后端 | 量 |
 |------|----|
 | Gaussian | `det_cov` / `mean_photon` / `homodyne_mean` · `homodyne_var` / **`homodyne_condition`** / **`loss(T)`** |
-| Fock | `norm` / `mean_photon` |
+| Fock | `norm` / `mean_photon` / **`pnrd_probs`** |
 | Bosonic | `weight_sum` |
 
 高斯全流程（概念）：
