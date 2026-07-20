@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
+- **Total Sessions**: 11
 - **Last Active**: 2026-07-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~338 | Active |
+| `journal-1.md` | ~371 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-07-20 | 文档 UAT 收口 | HEAD | `master` |
 | 10 | 2026-07-20 | Bosonic gkp0 对角齿梳 | HEAD | `master` |
 | 9 | 2026-07-20 | Bosonic loss 通道 | HEAD | `master` |
 | 8 | 2026-07-20 | Bosonic 矩闭环 | `f30680e` | `master` |
