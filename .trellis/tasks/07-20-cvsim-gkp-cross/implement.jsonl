@@ -1,0 +1,5 @@
+{"file": "cvsim/bosonic/gkp.py", "reason": "extend gkp0"}
+{"file": "cvsim/bosonic/cat.py", "reason": "cross centre pattern"}
+{"file": "cvsim/wigner.py", "reason": "AC Wigner diff"}
+{"file": "tests/test_bosonic_gkp.py", "reason": "default none"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "GKP contract"}

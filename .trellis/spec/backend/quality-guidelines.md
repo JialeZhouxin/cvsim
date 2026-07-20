@@ -58,17 +58,19 @@ Wrong: set cross weight equal to diagonal without `ov`.
 
 Bosonic `loss(T)`: per-component same X,Y as Gaussian; **w unchanged**.
 
-### Bosonic GKP `|0⟩` (diagonal tooth comb)
+### Bosonic GKP `|0⟩` (x-teeth ± nn cross)
 
 | Item | Contract |
 |------|----------|
-| API | `gkp0(epsilon, grid_size=N)` → `K=2N+1` components |
+| API | `gkp0(epsilon, grid_size=N, *, cross="none"\|"nn")` |
 | spacing | `x_k = k √(2π)` |
 | tooth | `V=½ diag(ε,1/ε)`, det=1/4 |
-| weights | `w∝exp(−π ε k²)`, real, `∑w=1` |
-| honesty | **no** p-teeth / cross → diagonal approx, not full pure GKP |
+| none | `K=2N+1`, `w∝exp(−π ε k²)`, `∑w=1` |
+| nn | `K=6N+1`; diag `a_k²` + nn cross `a_k a_{k+1} ov`; `ov=exp(−π/(2ε))`; `∑w=1` |
+| cross centre | `((x_k+x_{k+1})/2, ±i(x_k−x_{k+1})/2)` |
+| honesty | no p-teeth; nn ≠ full Gram pure GKP |
 
-Out: `|1⟩_GKP`, 2D lattice, conditional Homodyne.
+Out: `|1⟩_GKP`, 2D lattice, full-pair cross, conditional Homodyne.
 
 ### Wigner grid (single-mode, ħ=1)
 

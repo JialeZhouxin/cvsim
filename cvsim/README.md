@@ -40,7 +40,7 @@ X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 
 ### 诚实边界
 
-- `gkp0`：对角 **x 齿梳**（无 p 齿 / 无 cross），教学近似，非完整纯态 GKP  
+- `gkp0`：x 齿梳；默认 `cross="none"` 对角混合；`cross="nn"` 近邻交叉（教学干涉，非完整 Gram）  
 - Fock：仅 **1–2 模**；无 Fock loss / Fock Wigner  
 - 无 Hafnian / 生产 GBS
 
