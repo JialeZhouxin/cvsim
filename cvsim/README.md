@@ -17,7 +17,7 @@ uv pip install numpy scipy
 | 表示 | 初态 | 门 | 通道 | 测量 / 矩 |
 |------|------|----|------|-----------|
 | **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件 Homodyne** |
-| **Fock** | 真空 / `fock` / `fock2` | D/R/S/**Kerr** / **BS(2 模)** | — | norm / ⟨n⟩ / **`pnrd_probs`** |
+| **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`** | D/R/S/**Kerr** / **BS(2 模)** | **`loss(T)`（1 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ |
 | **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample**（实峰混合）/ **condition**（复仿射） |
 
 辛矩阵只在 `cvsim/gaussian/symplectic.py`。无 Circuit DSL。
@@ -41,7 +41,7 @@ X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 ### 诚实边界
 
 - `gkp0`：x 齿梳；默认 `cross="none"` 对角混合；`cross="nn"` 近邻交叉（教学干涉，非完整 Gram）  
-- Fock：仅 **1–2 模**；无 Fock loss / Fock Wigner  
+- Fock：仅 **1–2 模**；`loss` 仅 1 模→`FockDensity`；无 Fock Wigner / 2 模 loss  
 - 无 Hafnian / 生产 GBS
 
 ## 最终用户验收

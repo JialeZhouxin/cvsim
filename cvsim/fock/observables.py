@@ -1,10 +1,17 @@
-"""Fock observables: norm, ⟨n⟩, PNRD probabilities."""
+"""Fock observables: pure amps + 1-mode density."""
 
 from __future__ import annotations
 
 import numpy as np
 
+from cvsim.fock.density import FockDensity
 from cvsim.fock.state import FockState
+
+FockLike = FockState | FockDensity
+
+
+def _is_density(state: FockLike) -> bool:
+    return isinstance(state, FockDensity)
 
 
 def norm(state: FockState) -> float:
@@ -12,18 +19,26 @@ def norm(state: FockState) -> float:
     return float(np.vdot(state.amps.ravel(), state.amps.ravel()).real)
 
 
-def mean_photon(state: FockState, mode: int | None = None) -> float:
-    """⟨n⟩ (unnormalized sum over |c|²).
+def trace(state: FockDensity) -> float:
+    """Tr ρ (should be ~1 if fully contained in cutoff)."""
+    return float(np.trace(state.rho).real)
 
-    single-mode: total ⟨n⟩
-    two-mode: mode=i → ⟨n_i⟩; mode=None → ⟨n0⟩+⟨n1⟩
-    """
+
+def mean_photon(state: FockLike, mode: int | None = None) -> float:
+    """⟨n⟩ from pure |c|² or from diag(ρ)."""
+    if _is_density(state):
+        if mode is not None and mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        N = state.cutoff
+        n = np.arange(N)
+        p = np.real(np.diag(state.rho))
+        return float(np.sum(n * p))
+
     N = state.cutoff
     n = np.arange(N)
     p = np.abs(state.amps) ** 2
     if state.nmode == 1:
         return float(np.sum(n * p))
-    # two-mode
     n0 = float(np.sum(n[:, None] * p))
     n1 = float(np.sum(n[None, :] * p))
     if mode is None:
@@ -35,12 +50,13 @@ def mean_photon(state: FockState, mode: int | None = None) -> float:
     raise IndexError(f"mode {mode} out of range for nmode=2")
 
 
-def pnrd_probs(state: FockState, mode: int | None = None) -> np.ndarray:
-    """Photon-number probabilities (not necessarily normalized if truncated).
+def pnrd_probs(state: FockLike, mode: int | None = None) -> np.ndarray:
+    """Photon-number probabilities from |c|² or diag(ρ)."""
+    if _is_density(state):
+        if mode is not None and mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        return np.asarray(np.real(np.diag(state.rho)), dtype=float)
 
-    single-mode: p[n]
-    two-mode: mode=None → joint p[n0,n1]; mode=i → marginal
-    """
     p = np.abs(state.amps) ** 2
     if state.nmode == 1:
         return np.asarray(p, dtype=float)

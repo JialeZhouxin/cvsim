@@ -122,7 +122,8 @@ Out: Fock Wigner, multimode, GUI.
 | `BS(θ,φ)` | unitary U embed `S=[[ReU,-ImU],[ImU,ReU]]`; only in `symplectic.py` |
 | Bosonic gates | same S,d per component; **w unchanged** under unitary Gaussian |
 | Fock B1 | single-mode D/R/S (MVP) |
-| Fock full (1–2 mode) | `amps` ndim 1\|2; `kerr`; 2-mode `beamsplitter` via expm; `pnrd_probs`; no loss/Homodyne in this slice |
+| Fock full (1–2 mode) | `amps` ndim 1\|2; `kerr`; 2-mode `beamsplitter` via expm; `pnrd_probs` |
+| Fock loss (1-mode) | `FockDensity.rho (N,N)`; `loss(T)` Kraus `E_k\|n⟩=√C(n,k)(√T)^{n-k}(√(1-T))^k\|n-k⟩`; `T∈[0,1]`; `\|1⟩` → ρ₀₀=1−T, ρ₁₁=T; no 2-mode ρ |
 
 Hard AC patterns: `S→BS(π/4)` total ⟨n⟩ = sinh² r; pure 2-mode det V ≈ (1/4)²; Fock vs Gaussian ⟨n⟩ closes with cutoff.
 

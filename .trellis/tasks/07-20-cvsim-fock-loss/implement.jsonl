@@ -1,0 +1,4 @@
+{"file": "cvsim/fock/state.py", "reason": "pure FockState contract"}
+{"file": "cvsim/fock/observables.py", "reason": "extend for rho"}
+{"file": "cvsim/gaussian/channels.py", "reason": "T convention align"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "contract"}
