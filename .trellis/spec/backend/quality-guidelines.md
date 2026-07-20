@@ -46,6 +46,18 @@ Even/odd cat uses **4 components** (2 diagonal + 2 cross). Cross weights include
 `ov = exp(-2α²)` (real α). After normalize: `∑ w_k = 1`.  
 Wrong: set cross weight equal to diagonal without `ov`.
 
+### Bosonic moment loop (full A)
+
+| Item | Contract |
+|------|----------|
+| vacuum | single component `V=I/2`, `r̄=0`, `w=1` |
+| weighted moments | `⟨O⟩=∑ w_k ⟨O⟩_k`; Homodyne `Var=⟨x²⟩−μ²` with `⟨x²⟩=∑w(var+μ²)` |
+| return type | `float` real part; physical Im≈0 |
+| single component | match Gaussian same gate/observable |
+| gates | `w` unchanged |
+
+Out: loss, conditional Homodyne, GKP, Wigner (this slice).
+
 ### Gaussian squeeze (xxpp, mode `i`)
 
 - `x_i → e^{-r} x_i`, `p_i → e^{r} p_i`

@@ -1,0 +1,7 @@
+{"file": "cvsim/bosonic/state.py", "reason": "Component/BosonicState"}
+{"file": "cvsim/bosonic/observables.py", "reason": "weight_sum 扩展"}
+{"file": "cvsim/bosonic/cat.py", "reason": "cat 权重合同"}
+{"file": "cvsim/bosonic/gates.py", "reason": "门不改 w"}
+{"file": "cvsim/gaussian/observables.py", "reason": "单组件对照"}
+{"file": "tests/test_m3_bosonic.py", "reason": "回归"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "cat 合同"}

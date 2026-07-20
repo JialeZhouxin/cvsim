@@ -1,4 +1,4 @@
-from cvsim.bosonic.state import BosonicState
+from cvsim.bosonic.state import BosonicState, Component
 from cvsim.bosonic.cat import even_cat, odd_cat
 from cvsim.bosonic.gates import (
     beamsplitter,
@@ -7,13 +7,22 @@ from cvsim.bosonic.gates import (
     squeeze,
     two_mode_squeeze,
 )
-from cvsim.bosonic.observables import weight_sum
+from cvsim.bosonic.observables import (
+    homodyne_mean,
+    homodyne_var,
+    mean_photon,
+    weight_sum,
+)
 
 __all__ = [
     "BosonicState",
+    "Component",
     "even_cat",
     "odd_cat",
     "weight_sum",
+    "mean_photon",
+    "homodyne_mean",
+    "homodyne_var",
     "squeeze",
     "displace",
     "phase",

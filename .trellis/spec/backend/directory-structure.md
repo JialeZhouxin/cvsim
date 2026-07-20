@@ -37,7 +37,7 @@ cv-photonic-notes/
 | `cvsim/gaussian/symplectic.py` | Shared xxpp S/d generators (only place for BS/D/R/S formulas) |
 | `cvsim/gaussian/` | GaussianState, gates D/R/S/BS/S₂, `channels.loss`, det/⟨n⟩, Homodyne mean/var/**condition** |
 | `cvsim/fock/` | FockState 1–2 mode, D/R/S/Kerr, BS, norm/⟨n⟩/pnrd_probs |
-| `cvsim/bosonic/` | Components, cat, gates reuse `gaussian.symplectic` |
+| `cvsim/bosonic/` | Components, cat, gates reuse `gaussian.symplectic`, weighted ⟨n⟩/Homodyne |
 | `cvsim/demos/m*.py` | Runnable AC scripts for MVP milestones |
 | `cvsim/USER_ACCEPTANCE.md` | Final user acceptance narrative (U1–U6) |
 | `cvsim/demos/user_acceptance.py` | One-shot U1–U5 checks; summary then exit |
