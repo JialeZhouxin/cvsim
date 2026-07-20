@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 14
+- **Total Sessions**: 15
 - **Last Active**: 2026-07-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~470 | Active |
+| `journal-1.md` | ~503 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 15 | 2026-07-20 | B 条件全复似然 | HEAD | `master` |
 | 14 | 2026-07-20 | B 条件 Homodyne | HEAD | `master` |
 | 13 | 2026-07-20 | GKP nn cross | HEAD | `master` |
 | 12 | 2026-07-20 | Wigner 网格 G+B | HEAD | `master` |

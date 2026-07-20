@@ -468,3 +468,36 @@ gkp0 cross=nn; K=6N+1; 65 tests
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: B 条件全复似然
+
+**Date**: 2026-07-20
+**Task**: B 条件全复似然
+**Branch**: `master`
+
+### Summary
+
+全组件复仿射；cat K=4；69 tests；队列①完
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
