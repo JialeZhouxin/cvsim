@@ -53,9 +53,13 @@
 1. 手写 / numpy：真空 → 单模挤压 → 打印 \(V\)  
 2. 同一参数下核对 \(\det V\)、平均光子 \(\sinh^2 r\)  
 3. 同一电路用 Fock 扫 cutoff，看何时逼近高斯结果  
-4. 建一个小振幅 cat（高斯叠加），画 Wigner 或看组件权重
+4. 建一个小振幅 cat（高斯叠加），画 Wigner 或看组件权重  
+5. **通道与测量检查点**（公式见 01/02/03）：  
+   - 真空 Homodyne 条件：结果 \(o\) 后 \(\langle x\rangle\to o\)、测向 var\(\to0\)  
+   - 相干/单光子损耗：\(\langle n\rangle\to T|\alpha|^2\) 或 \(\lvert1\rangle\to\rho_{00}=1-T,\rho_{11}=T\)  
+   - 真空 Wigner：\(W(0,0)=1/\pi\)；odd cat 可有 \(W(0,0)<0\)
 
-工程落地与**最终用户验收**（目标 / U1–U5+U7 / 能力矩阵）见：
+工程落地与**最终用户验收**（目标 / U1–U5+U7+U8 / 能力矩阵）见：
 [`cvsim/README.md`](./cvsim/README.md) · [`cvsim/USER_ACCEPTANCE.md`](./cvsim/USER_ACCEPTANCE.md) · `python -m cvsim.demos.user_acceptance`
 
 ---
