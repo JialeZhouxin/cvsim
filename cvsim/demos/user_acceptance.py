@@ -1,4 +1,4 @@
-"""Final user acceptance: U1–U5 + U7 + U8. Run all, then summary; exit 1 if any fail."""
+"""Final user acceptance: U1–U5 + U7 + U8 + U9. Run all, then summary; exit 1 if any fail."""
 
 from __future__ import annotations
 
@@ -19,6 +19,8 @@ from cvsim.bosonic import (
     weight_sum,
 )
 from cvsim.fock import FockState, beamsplitter as f_bs, loss as f_loss, mean_photon as f_n, norm, squeeze as f_squeeze, trace as f_trace
+from cvsim.fock.density import FockDensity
+from cvsim.fock.gates import displace as f_displace
 from cvsim.fock.gates import squeeze as f_squeeze_gate
 from cvsim.gaussian import (
     GaussianState,
@@ -28,12 +30,14 @@ from cvsim.gaussian import (
     homodyne_condition,
     homodyne_mean,
     homodyne_sample as g_sample,
+    homodyne_sample_and_condition,
     homodyne_var,
     loss as g_loss,
     mean_photon,
     phase,
     squeeze,
 )
+from cvsim.wigner import wigner_fock
 
 CheckFn = Callable[[], tuple[bool, str]]
 
@@ -177,6 +181,25 @@ def _u8() -> tuple[bool, str]:
     return ok, f"B_cond={b_cond_ok} G_samp={g_samp_ok} GB={gb_ok} F_loss={f_ok}"
 
 
+def _u9() -> tuple[bool, str]:
+    """P0 gap-fill smoke: Fock Wigner, density gate, sample_and_condition."""
+    w_vac = wigner_fock(FockState.vacuum(8), 0.0, 0.0)
+    w1 = wigner_fock(FockState.fock(1, 8), 0.0, 0.0)
+    w_ok = abs(w_vac - 1.0 / np.pi) < 1e-12 and w1 < -1e-3
+
+    rho = f_loss(FockState.fock(1, 12), 0.4)
+    rho2 = f_displace(rho, 0.3)
+    dens_ok = abs(f_trace(rho2) - 1.0) < 1e-10
+
+    o, st = homodyne_sample_and_condition(
+        GaussianState.vacuum(1), rng=np.random.default_rng(1)
+    )
+    sc_ok = abs(st.V[0, 0]) < 1e-12 and abs(st.rbar[0] - o) < 1e-12
+
+    ok = w_ok and dens_ok and sc_ok
+    return ok, f"W={w_ok} dens={dens_ok} sc={sc_ok}"
+
+
 def main() -> int:
     checks: list[tuple[str, CheckFn]] = [
         ("U1 vacuum/conventions", _u1),
@@ -186,9 +209,10 @@ def main() -> int:
         ("U5 cat weights+phase", _u5),
         ("U7 extended G/F/B smoke", _u7),
         ("U8 queue ①②③ smoke", _u8),
+        ("U9 P0 gap-fill smoke", _u9),
     ]
     results: list[tuple[str, bool, str]] = []
-    print("cvsim user acceptance (U1–U5 + U7 + U8); run-all then summary")
+    print("cvsim user acceptance (U1–U5 + U7–U9); run-all then summary")
     for name, fn in checks:
         try:
             ok, detail = fn()

@@ -16,9 +16,9 @@ uv pip install numpy scipy
 
 | 表示 | 初态 | 门 | 通道 | 测量 / 矩 |
 |------|------|----|------|-----------|
-| **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件 Homodyne** |
-| **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`** | D/R/S/**Kerr** / **BS(2 模)** | **`loss(T)`（1 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ |
-| **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample**（实峰混合）/ **condition**（复仿射） |
+| **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件** / **sample_and_condition** |
+| **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`** | D/R/S/**Kerr** / **BS(2 模)** / **ρ 上 D/R/S** | **`loss(T)`（1 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ / **Wigner** |
+| **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
 
 辛矩阵只在 `cvsim/gaussian/symplectic.py`。无 Circuit DSL。
 
@@ -33,15 +33,17 @@ B: cat|gkp0 → 门 → [loss] → 加权矩
 ### Wigner（教学单模）
 
 ```python
-from cvsim.wigner import wigner_grid, wigner_gaussian, wigner_bosonic
+from cvsim.wigner import wigner_grid, wigner_gaussian, wigner_bosonic, wigner_fock
 X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
+# Fock: wigner_fock(FockState.fock(1, N), 0, 0) < 0
 # even/odd cat：odd 中心 W<0（干涉）
 ```
 
 ### 诚实边界
 
 - `gkp0`：x 齿梳；默认 `cross="none"` 对角混合；`cross="nn"` 近邻交叉（教学干涉，非完整 Gram）  
-- Fock：仅 **1–2 模**；`loss` 仅 1 模→`FockDensity`；无 Fock Wigner / 2 模 loss  
+- Fock：仅 **1–2 模**；`loss` 与 **ρ 门** 仅 1 模；Wigner 单模；无 2 模 loss  
+- `sample_and_condition` = sample + condition 薄组合，无新物理  
 - 无 Hafnian / 生产 GBS
 
 ## 最终用户验收
@@ -49,7 +51,7 @@ X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 目标、U1–U5 + **U7** + **U8**、未做列表见 **[USER_ACCEPTANCE.md](./USER_ACCEPTANCE.md)**。
 
 ```bash
-python -m cvsim.demos.user_acceptance   # U1–U5 + U7 + U8；汇总后 exit
+python -m cvsim.demos.user_acceptance   # U1–U5 + U7–U9；汇总后 exit
 ```
 
 ## 里程碑自检（MVP 最小闭环）
@@ -65,7 +67,7 @@ python -m cvsim.demos.m4_cross_rep          # 跨表示：挤 ⟨n⟩ + 相干+l
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：80
+python -m pytest tests -q   # 当前锚点：90
 ```
 
 ## 包结构

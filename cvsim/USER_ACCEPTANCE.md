@@ -1,8 +1,8 @@
 # 最终用户验收（cvsim）
 
 > 工程验收文档（可指 API）。理论笔记仍纯物理，不绑本包。  
-> 能力边界：三表示独立闭环 + G/B condition·sample·loss + F 1–2 模 BS/Kerr/PNRD + F 1 模 loss→ρ + B 矩/`gkp0`/Wigner。  
-> 版本锚点：pytest **80** passed（切片后请改本数）。
+> 能力边界：三表示独立闭环 + G/B condition·sample·loss + F 1–2 模 BS/Kerr/PNRD + F 1 模 loss→ρ/门 + **Fock Wigner** + B 矩/`gkp0`/Wigner + sample_and_condition。  
+> 版本锚点：pytest **90** passed（切片后请改本数）。
 
 ---
 
@@ -22,8 +22,8 @@
 | 表示 | 当前闭环（摘要） |
 |------|------------------|
 | **Gaussian** | 门 D/R/S/BS/S₂ → `loss(T)` → 边缘 / **sample** / 条件 Homodyne → 矩 |
-| **Fock** | 1–2 模；D/R/S/Kerr/BS → PNRD / norm / ⟨n⟩；**1 模 `loss→FockDensity`** |
-| **Bosonic** | cat / `gkp0` → 门 → ∑w 加权矩 → `loss(T)` → **sample** / **condition（复仿射）** |
+| **Fock** | 1–2 模；D/R/S/Kerr/BS → PNRD / norm / ⟨n⟩；**1 模 `loss→FockDensity`**；**ρ 上 D/R/S**；**单模 Wigner** |
+| **Bosonic** | cat / `gkp0` → 门 → ∑w 加权矩 → `loss(T)` → **sample** / **condition（复仿射）** / **sample_and_condition** |
 
 ### 不是目标
 
@@ -62,7 +62,7 @@ uv pip install numpy scipy pytest
 
 ---
 
-## 一键用户验收（U1–U5 + U7 + U8）
+## 一键用户验收（U1–U5 + U7–U9）
 
 ```bash
 python -m cvsim.demos.user_acceptance
@@ -139,6 +139,14 @@ python -m cvsim.demos.user_acceptance
 | B sample | `from_gaussian` 同 seed ≡ G | 单次差 `<1e-12` |
 | F loss | `\|1⟩` → `loss(T)` | `ρ₀₀≈1−T`，`ρ₁₁≈T`；`Tr≈1` |
 
+### U9 · P0 gap-fill 冒烟（Fock Wigner / ρ 门 / sample_and_condition）
+
+| 子项 | 操作 | 期望 |
+|------|------|------|
+| F Wigner | 真空 / \|1⟩ 中心 | \(W_{\mathrm{vac}}(0,0)\approx1/\pi\)；\|1⟩ 中心负 |
+| ρ 门 | \|1⟩→loss→displace | Tr≈1 |
+| sample+cond | G 真空 | 测向 var→0；⟨x⟩→outcome |
+
 ### U6 · 机器门禁（文档命令，不在一键 demo 内强制）
 
 ```bash
@@ -155,13 +163,13 @@ python -m cvsim.demos.user_acceptance
 
 ## 未做（当前不验收为绿）
 
-- `sample_and_condition` 一步 API  
 - Fock **2 模 loss** / m≥3 / Fock S₂ / Fock Homodyne sample  
 - **完整纯态 GKP**（full-pair cross / `|1⟩` / 二维格点）  
-- Fock **Wigner**；多模 Wigner / GUI  
+- 多模 Wigner / GUI  
 - Circuit DSL；PNRD 大规模；Hafnian / Torontonian 生产路径  
+- 热噪声可调 Y；GKP `|1⟩`（P1 战役外）  
 
-已落地（见 U7/U8）：G/B Homodyne sample；B condition（复仿射）；Fock 1 模 loss→ρ；Wigner G+B 网格；GKP nn cross。
+已落地（见 U7–U9）：G/B Homodyne sample + **sample_and_condition**；B condition（复仿射）；Fock 1 模 loss→ρ + **ρ 门**；**Wigner G+B+F**；GKP nn cross。
 
 新切片落地后：在本文件 **加 Ux**、改一键 demo、更新 pytest 计数；**少改**「项目目标」段。
 
