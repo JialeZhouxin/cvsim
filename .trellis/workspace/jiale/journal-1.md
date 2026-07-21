@@ -699,3 +699,36 @@ G1 Fock Wigner; G2 rho gates; G3 sample+cond; G4 U9; pytest 90 UAT 8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 22: P1 包A G7+G8
+
+**Date**: 2026-07-21
+**Task**: P1 包A G7+G8
+**Branch**: `master`
+
+### Summary
+
+thermal nbar + Fock S2; pytest 96 UAT 8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
