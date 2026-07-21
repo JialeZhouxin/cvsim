@@ -732,3 +732,36 @@ thermal nbar + Fock S2; pytest 96 UAT 8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 23: P1-B Fock Homodyne
+
+**Date**: 2026-07-21
+**Task**: P1-B Fock Homodyne
+**Branch**: `master`
+
+### Summary
+
+G6 mean/var/sample; pytest 101 UAT 8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
