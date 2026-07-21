@@ -1,11 +1,14 @@
-"""Fock gates: single-mode D/R/S/Kerr (+mode=); two-mode BS."""
+"""Fock gates: single-mode D/R/S/Kerr (+mode=); two-mode BS; 1-mode ρ via UρU†."""
 
 from __future__ import annotations
 
 import numpy as np
 from scipy.linalg import expm
 
+from cvsim.fock.density import FockDensity
 from cvsim.fock.state import FockState
+
+FockLike1 = FockState | FockDensity
 
 
 def annihilation(cutoff: int) -> np.ndarray:
@@ -16,13 +19,13 @@ def annihilation(cutoff: int) -> np.ndarray:
     return a
 
 
-def _check_mode(state: FockState, mode: int) -> None:
+def _check_mode_pure(state: FockState, mode: int) -> None:
     if not 0 <= mode < state.nmode:
         raise IndexError(f"mode {mode} out of range for nmode={state.nmode}")
 
 
-def _apply_1mode_U(state: FockState, U: np.ndarray, mode: int = 0) -> FockState:
-    _check_mode(state, mode)
+def _apply_1mode_U_pure(state: FockState, U: np.ndarray, mode: int = 0) -> FockState:
+    _check_mode_pure(state, mode)
     if state.nmode == 1:
         return FockState(amps=U @ state.amps)
     if mode == 0:
@@ -31,9 +34,16 @@ def _apply_1mode_U(state: FockState, U: np.ndarray, mode: int = 0) -> FockState:
     return FockState(amps=state.amps @ U.T)
 
 
-def _diag_phase(state: FockState, phases: np.ndarray, mode: int = 0) -> FockState:
+def _apply_U_density(state: FockDensity, U: np.ndarray) -> FockDensity:
+    """ρ' = U ρ U† (1-mode)."""
+    rho = U @ state.rho @ U.conj().T
+    rho = 0.5 * (rho + rho.conj().T)
+    return FockDensity(rho=rho)
+
+
+def _diag_phase_pure(state: FockState, phases: np.ndarray, mode: int = 0) -> FockState:
     """Multiply Fock levels on `mode` by phases[n]."""
-    _check_mode(state, mode)
+    _check_mode_pure(state, mode)
     if state.nmode == 1:
         return FockState(amps=state.amps * phases)
     if mode == 0:
@@ -41,35 +51,65 @@ def _diag_phase(state: FockState, phases: np.ndarray, mode: int = 0) -> FockStat
     return FockState(amps=state.amps * phases[None, :])
 
 
-def squeeze(state: FockState, r: float, mode: int = 0) -> FockState:
-    """Single-mode squeeze S(r) = exp(½ r (a² − a†²)) for real r."""
-    N = state.cutoff
+def _squeeze_U(N: int, r: float) -> np.ndarray:
     a = annihilation(N)
     ad = a.conj().T
     G = 0.5 * r * (a @ a - ad @ ad)
-    return _apply_1mode_U(state, expm(G), mode)
+    return expm(G)
 
 
-def phase(state: FockState, theta: float, mode: int = 0) -> FockState:
-    """Phase shift: |n⟩ → e^{i n θ} |n⟩."""
-    n = np.arange(state.cutoff)
-    return _diag_phase(state, np.exp(1j * theta * n), mode)
-
-
-def displace(state: FockState, alpha: complex, mode: int = 0) -> FockState:
-    """Displacement D(α) = exp(α a† − α* a)."""
-    N = state.cutoff
+def _displace_U(N: int, alpha: complex) -> np.ndarray:
     a = annihilation(N)
     ad = a.conj().T
     alpha = complex(alpha)
     G = alpha * ad - np.conj(alpha) * a
-    return _apply_1mode_U(state, expm(G), mode)
+    return expm(G)
 
 
-def kerr(state: FockState, chi: float, mode: int = 0) -> FockState:
-    """Kerr: |n⟩ → e^{i χ n²} |n⟩."""
+def squeeze(state: FockLike1, r: float, mode: int = 0) -> FockLike1:
+    """Single-mode squeeze S(r) = exp(½ r (a² − a†²)) for real r.
+
+    FockDensity: ρ' = U ρ U† (1-mode only; mode must be 0).
+    """
+    if isinstance(state, FockDensity):
+        if mode != 0:
+            raise IndexError("FockDensity is single-mode; mode must be 0")
+        return _apply_U_density(state, _squeeze_U(state.cutoff, r))
+    return _apply_1mode_U_pure(state, _squeeze_U(state.cutoff, r), mode)
+
+
+def phase(state: FockLike1, theta: float, mode: int = 0) -> FockLike1:
+    """Phase shift: |n⟩ → e^{i n θ} |n⟩."""
+    if isinstance(state, FockDensity):
+        if mode != 0:
+            raise IndexError("FockDensity is single-mode; mode must be 0")
+        n = np.arange(state.cutoff)
+        phases = np.exp(1j * theta * n)
+        U = np.diag(phases)
+        return _apply_U_density(state, U)
     n = np.arange(state.cutoff)
-    return _diag_phase(state, np.exp(1j * chi * n * n), mode)
+    return _diag_phase_pure(state, np.exp(1j * theta * n), mode)
+
+
+def displace(state: FockLike1, alpha: complex, mode: int = 0) -> FockLike1:
+    """Displacement D(α) = exp(α a† − α* a)."""
+    if isinstance(state, FockDensity):
+        if mode != 0:
+            raise IndexError("FockDensity is single-mode; mode must be 0")
+        return _apply_U_density(state, _displace_U(state.cutoff, alpha))
+    return _apply_1mode_U_pure(state, _displace_U(state.cutoff, alpha), mode)
+
+
+def kerr(state: FockLike1, chi: float, mode: int = 0) -> FockLike1:
+    """Kerr: |n⟩ → e^{i χ n²} |n⟩. Density: UρU† (1-mode)."""
+    if isinstance(state, FockDensity):
+        if mode != 0:
+            raise IndexError("FockDensity is single-mode; mode must be 0")
+        n = np.arange(state.cutoff)
+        U = np.diag(np.exp(1j * chi * n * n))
+        return _apply_U_density(state, U)
+    n = np.arange(state.cutoff)
+    return _diag_phase_pure(state, np.exp(1j * chi * n * n), mode)
 
 
 def beamsplitter(state: FockState, theta: float, phi: float = 0.0) -> FockState:
