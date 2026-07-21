@@ -633,3 +633,36 @@ FockDensity+Kraus；80 tests；队列③完
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: m4 跨表示 demo
+
+**Date**: 2026-07-21
+**Task**: m4 跨表示 demo
+**Branch**: `master`
+
+### Summary
+
+T4+T1 G/F/B 同数；80 tests
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
