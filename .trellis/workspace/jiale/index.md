@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 18
-- **Last Active**: 2026-07-20
+- **Total Sessions**: 19
+- **Last Active**: 2026-07-21
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~602 | Active |
+| `journal-1.md` | ~635 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 19 | 2026-07-21 | 笔记对齐 A | HEAD | `master` |
 | 18 | 2026-07-20 | UAT U8 收口 | HEAD | `master` |
 | 17 | 2026-07-20 | Fock 1模 loss | HEAD | `master` |
 | 16 | 2026-07-20 | Homodyne 采样 G/B | HEAD | `master` |
