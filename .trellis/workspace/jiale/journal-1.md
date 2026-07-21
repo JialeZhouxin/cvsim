@@ -666,3 +666,36 @@ T4+T1 G/F/B 同数；80 tests
 ### Next Steps
 
 - None - task complete
+
+
+## Session 21: gap-fill 包A P0 全关
+
+**Date**: 2026-07-21
+**Task**: gap-fill 包A P0 全关
+**Branch**: `master`
+
+### Summary
+
+G1 Fock Wigner; G2 rho gates; G3 sample+cond; G4 U9; pytest 90 UAT 8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
