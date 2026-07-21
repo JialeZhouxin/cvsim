@@ -184,3 +184,16 @@ def homodyne_condition(
     for comp, w in zip(kept, raw_w):
         comp.w = w / s
     return BosonicState(components=kept)
+
+
+def homodyne_sample_and_condition(
+    state: BosonicState,
+    mode: int = 0,
+    phi: float = 0.0,
+    *,
+    rng: np.random.Generator | None = None,
+    imag_tol: float = 1e-12,
+) -> tuple[float, BosonicState]:
+    """Sample (real-peak mixture) then condition. Thin combo; no new physics."""
+    o = homodyne_sample(state, mode, phi, rng=rng, imag_tol=imag_tol)
+    return o, homodyne_condition(state, mode, phi, o)

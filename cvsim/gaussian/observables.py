@@ -85,6 +85,18 @@ def homodyne_condition(
     return GaussianState(V=Vn, rbar=rn)
 
 
+def homodyne_sample_and_condition(
+    state: GaussianState,
+    mode: int = 0,
+    phi: float = 0.0,
+    *,
+    rng: np.random.Generator | None = None,
+) -> tuple[float, GaussianState]:
+    """Sample Homodyne outcome then condition. Thin combo; no new physics."""
+    o = homodyne_sample(state, mode, phi, rng=rng)
+    return o, homodyne_condition(state, mode, phi, o)
+
+
 def mean_photon(state: GaussianState, mode: int | None = None) -> float:
     """Mean photon number ⟨n⟩.
 
