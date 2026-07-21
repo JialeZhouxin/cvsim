@@ -1,0 +1,5 @@
+{"file": "cvsim/demos/m1_gaussian_squeeze.py", "reason": "demo style"}
+{"file": "cvsim/gaussian/__init__.py", "reason": "G APIs"}
+{"file": "cvsim/fock/__init__.py", "reason": "F loss displace"}
+{"file": "cvsim/bosonic/__init__.py", "reason": "B from_gaussian loss"}
+{"file": "cvsim/README.md", "reason": "link m4"}

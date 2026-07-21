@@ -58,13 +58,14 @@ python -m cvsim.demos.user_acceptance   # U1–U5 + U7 + U8；汇总后 exit
 python -m cvsim.demos.m1_gaussian_squeeze   # 真空→挤压→V, det V, ⟨n⟩=sinh²r
 python -m cvsim.demos.m2_fock_cutoff_scan   # 同电路扫 cutoff 逼近解析
 python -m cvsim.demos.m3_cat_weights        # 小 cat 四组件 + ∑w=1
+python -m cvsim.demos.m4_cross_rep          # 跨表示：挤 ⟨n⟩ + 相干+loss（G/F/B）
 ```
 
 ## 测试
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：56
+python -m pytest tests -q   # 当前锚点：80
 ```
 
 ## 包结构
@@ -73,9 +74,9 @@ python -m pytest tests -q   # 当前锚点：56
 cvsim/
   conventions.py   # ħ, xxpp, Ω, vacuum
   gaussian/        # state, symplectic, gates, channels.loss, observables(+condition)
-  fock/            # 1–2 模 state, D/R/S/Kerr/BS, norm/⟨n⟩/pnrd
+  fock/            # 1–2 模 state, D/R/S/Kerr/BS, loss→ρ, norm/⟨n⟩/pnrd
   bosonic/         # Component, cat, gkp0, gates, channels.loss, weighted moments
-  demos/           # m1–m3 + user_acceptance
+  demos/           # m1–m4 + user_acceptance
 ```
 
 理论笔记（根目录 `*.md`）保持纯物理，不绑本包 API。
