@@ -16,9 +16,9 @@ uv pip install numpy scipy
 
 | 表示 | 初态 | 门 | 通道 | 测量 / 矩 |
 |------|------|----|------|-----------|
-| **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件** / **sample_and_condition** |
-| **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`** | D/R/S/**Kerr** / **BS(2 模)** / **ρ 上 D/R/S** | **`loss(T)`（1 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ / **Wigner** |
-| **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
+| **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T, nbar=0)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件** / **sample_and_condition** |
+| **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`** | D/R/S/**Kerr** / **BS** / **S₂** / **ρ 上 D/R/S** | **`loss(T)`（1 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ / **Wigner** |
+| **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T, nbar=0)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
 
 辛矩阵只在 `cvsim/gaussian/symplectic.py`。无 Circuit DSL。
 
@@ -67,7 +67,7 @@ python -m cvsim.demos.m4_cross_rep          # 跨表示：挤 ⟨n⟩ + 相干+l
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：90
+python -m pytest tests -q   # 当前锚点：96
 ```
 
 ## 包结构

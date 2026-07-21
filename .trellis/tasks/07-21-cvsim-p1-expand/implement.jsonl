@@ -1,0 +1,7 @@
+{"file": "cvsim/gaussian/channels.py", "reason": "G8 loss nbar"}
+{"file": "cvsim/bosonic/channels.py", "reason": "G8 B loss"}
+{"file": "cvsim/gaussian/symplectic.py", "reason": "G7 S2 form"}
+{"file": "cvsim/fock/gates.py", "reason": "G7 Fock S2"}
+{"file": "tests/test_b3_s2.py", "reason": "G numbers"}
+{"file": "tests/test_g2_loss.py", "reason": "loss regression"}
+{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}
