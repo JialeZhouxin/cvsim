@@ -128,3 +128,29 @@ def beamsplitter(state: FockState, theta: float, phi: float = 0.0) -> FockState:
     vec = state.amps.reshape(N * N)
     out = expm(G) @ vec
     return FockState(amps=out.reshape(N, N))
+
+def two_mode_squeeze(
+    state: FockState, r: float, mode1: int = 0, mode2: int = 1
+) -> FockState:
+    """Two-mode squeeze S2(r) = exp[r(a_i† a_j† - a_i a_j)] (real r). Requires nmode==2.
+
+    Aligns with Gaussian xxpp S2: vacuum mean n_i = sinh^2 r (cutoff large).
+    """
+    if state.nmode != 2:
+        raise ValueError("two_mode_squeeze requires two-mode state")
+    if mode1 == mode2:
+        raise ValueError("mode1 and mode2 must differ")
+    if {mode1, mode2} != {0, 1}:
+        raise ValueError("two_mode_squeeze: modes must be 0 and 1")
+    N = state.cutoff
+    a = annihilation(N)
+    I = np.eye(N, dtype=complex)
+    a0 = np.kron(a, I)
+    a1 = np.kron(I, a)
+    ad0 = a0.conj().T
+    ad1 = a1.conj().T
+    G = r * (ad0 @ ad1 - a0 @ a1)
+    vec = state.amps.reshape(N * N)
+    out = expm(G) @ vec
+    return FockState(amps=out.reshape(N, N))
+
