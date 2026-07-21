@@ -2,7 +2,7 @@
 
 > 工程验收文档（可指 API）。理论笔记仍纯物理，不绑本包。  
 > 能力边界：三表示独立闭环 + G/B condition·sample·loss + F 1–2 模 BS/Kerr/PNRD + F 1 模 loss→ρ/门 + **Fock Wigner** + B 矩/`gkp0`/Wigner + sample_and_condition。  
-> 版本锚点：pytest **96** passed（切片后请改本数）。
+> 版本锚点：pytest **101** passed（切片后请改本数）。
 
 ---
 
@@ -22,7 +22,7 @@
 | 表示 | 当前闭环（摘要） |
 |------|------------------|
 | **Gaussian** | 门 D/R/S/BS/S₂ → `loss(T, nbar=0)` → 边缘 / **sample** / 条件 Homodyne → 矩 |
-| **Fock** | 1–2 模；D/R/S/Kerr/BS/**S₂** → PNRD / norm / ⟨n⟩；**1 模 `loss→FockDensity`**；**ρ 上 D/R/S**；**单模 Wigner** |
+| **Fock** | 1–2 模；D/R/S/Kerr/BS/**S₂** → PNRD / norm / ⟨n⟩；**1 模 Homodyne mean/var/sample**；**1 模 `loss→FockDensity`**；**ρ 上 D/R/S**；**单模 Wigner** |
 | **Bosonic** | cat / `gkp0` → 门 → ∑w 加权矩 → `loss(T, nbar=0)` → **sample** / **condition（复仿射）** / **sample_and_condition** |
 
 ### 不是目标
@@ -163,12 +163,12 @@ python -m cvsim.demos.user_acceptance
 
 ## 未做（当前不验收为绿）
 
-- Fock **2 模 loss** / m≥3 / Fock Homodyne sample  
+- Fock **2 模 loss** / m≥3 / Fock Homodyne **condition**  
 - **完整纯态 GKP**（full-pair cross / `|1⟩` / 二维格点）  
 - 多模 Wigner / GUI  
 - Circuit DSL；PNRD 大规模；Hafnian / Torontonian 生产路径  
 
-已落地（见 U7–U9 + P1 包 A）：G/B Homodyne sample + **sample_and_condition**；B condition；Fock 1 模 loss→ρ + **ρ 门** + **S₂**；**Wigner G+B+F**；GKP nn cross；G/B **`loss(..., nbar)`**。
+已落地（见 U7–U9 + P1 A/B）：G/B Homodyne sample + **sample_and_condition**；B condition；Fock 1 模 loss→ρ + **ρ 门** + **S₂** + **Homodyne mean/var/sample**；**Wigner G+B+F**；GKP nn cross；G/B **`loss(..., nbar)`**。
 
 新切片落地后：在本文件 **加 Ux**、改一键 demo、更新 pytest 计数；**少改**「项目目标」段。
 

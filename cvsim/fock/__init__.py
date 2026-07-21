@@ -1,7 +1,15 @@
 from cvsim.fock.channels import loss
 from cvsim.fock.density import FockDensity
 from cvsim.fock.gates import beamsplitter, displace, kerr, phase, squeeze, two_mode_squeeze
-from cvsim.fock.observables import mean_photon, norm, pnrd_probs, trace
+from cvsim.fock.observables import (
+    homodyne_mean,
+    homodyne_sample,
+    homodyne_var,
+    mean_photon,
+    norm,
+    pnrd_probs,
+    trace,
+)
 from cvsim.fock.state import FockState
 
 __all__ = [
@@ -18,4 +26,7 @@ __all__ = [
     "norm",
     "pnrd_probs",
     "trace",
+    "homodyne_mean",
+    "homodyne_var",
+    "homodyne_sample",
 ]
