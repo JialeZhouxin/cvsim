@@ -1,0 +1,10 @@
+{"file": "cvsim/wigner.py", "reason": "G1 extend"}
+{"file": "cvsim/fock/gates.py", "reason": "G2 pure U"}
+{"file": "cvsim/fock/density.py", "reason": "G2 rho"}
+{"file": "cvsim/fock/channels.py", "reason": "G2 after loss"}
+{"file": "cvsim/gaussian/observables.py", "reason": "G3 sample condition"}
+{"file": "cvsim/bosonic/observables.py", "reason": "G3 B"}
+{"file": "cvsim/demos/user_acceptance.py", "reason": "G4 UAT"}
+{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "G4 docs"}
+{"file": "cvsim/README.md", "reason": "G4 matrix"}
+{"file": "tests/test_wigner.py", "reason": "G1 pattern"}

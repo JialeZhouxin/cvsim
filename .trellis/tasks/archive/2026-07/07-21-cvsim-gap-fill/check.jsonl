@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-21-cvsim-gap-fill/prd.md", "reason": "package A scope"}
+{"file": ".trellis/tasks/07-21-cvsim-gap-fill/design.md", "reason": "G1-G4 design"}
+{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做 list"}
+{"file": "cvsim/wigner.py", "reason": "vac 1/pi contract"}
