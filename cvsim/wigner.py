@@ -1,14 +1,18 @@
-"""Single-mode Wigner (ħ=1, xxpp): Gaussian closed form + Bosonic sum.
+"""Single-mode Wigner (ħ=1, xxpp): Gaussian + Bosonic + Fock.
 
 Vacuum V=I/2: W(0,0)=1/π.
 Complex mean: envelope × exp(i δᵀ V⁻¹ s), s=Im(r̄) — note 04 §Bosonic Wigner.
+Fock: number-basis kernel with associated Laguerre (Cahill–Glauber style).
 """
 
 from __future__ import annotations
 
 import numpy as np
+from scipy.special import eval_genlaguerre, factorial
 
 from cvsim.bosonic.state import BosonicState
+from cvsim.fock.density import FockDensity
+from cvsim.fock.state import FockState
 from cvsim.gaussian.state import GaussianState
 
 
@@ -53,8 +57,55 @@ def wigner_bosonic(state: BosonicState, x: float, p: float) -> float:
     return float(total.real)
 
 
+def _wigner_kernel_nm(n: int, m: int, x: float, p: float) -> complex:
+    """⟨n|W|m⟩ kernel at (x,p); α=(x+ip)/√2, ħ=1."""
+    alpha = (x + 1j * p) / np.sqrt(2.0)
+    r2 = float(abs(alpha) ** 2)
+    pref = np.exp(-2.0 * r2) / np.pi
+    if n <= m:
+        lag = eval_genlaguerre(n, m - n, 4.0 * r2)
+        return (
+            pref
+            * ((-1.0) ** n)
+            * np.sqrt(factorial(n) / factorial(m))
+            * (2.0 * np.conj(alpha)) ** (m - n)
+            * lag
+        )
+    lag = eval_genlaguerre(m, n - m, 4.0 * r2)
+    return (
+        pref
+        * ((-1.0) ** m)
+        * np.sqrt(factorial(m) / factorial(n))
+        * (2.0 * alpha) ** (n - m)
+        * lag
+    )
+
+
+def wigner_fock(state: FockState | FockDensity, x: float, p: float) -> float:
+    """Single-mode Fock pure or density Wigner at (x,p)."""
+    if isinstance(state, FockState):
+        if state.nmode != 1:
+            raise ValueError("wigner_fock: single-mode only")
+        rho = np.outer(state.amps, state.amps.conj())
+    elif isinstance(state, FockDensity):
+        if state.nmode != 1:
+            raise ValueError("wigner_fock: single-mode only")
+        rho = state.rho
+    else:
+        raise TypeError("state must be FockState or FockDensity")
+    N = rho.shape[0]
+    total = 0.0 + 0.0j
+    for n in range(N):
+        for m in range(N):
+            rnm = rho[n, m]
+            if abs(rnm) < 1e-16:
+                continue
+            total += rnm * _wigner_kernel_nm(n, m, x, p)
+    return float(total.real)
+
+
 def wigner_grid(
-    state: GaussianState | BosonicState,
+    state: GaussianState | BosonicState | FockState | FockDensity,
     lim: float = 5.0,
     n: int = 81,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -68,8 +119,12 @@ def wigner_grid(
         fn = lambda x, p: wigner_gaussian(state, x, p)
     elif isinstance(state, BosonicState):
         fn = lambda x, p: wigner_bosonic(state, x, p)
+    elif isinstance(state, (FockState, FockDensity)):
+        fn = lambda x, p: wigner_fock(state, x, p)
     else:
-        raise TypeError("state must be GaussianState or BosonicState")
+        raise TypeError(
+            "state must be GaussianState, BosonicState, FockState, or FockDensity"
+        )
     W = np.empty_like(X, dtype=float)
     for i in range(n):
         for j in range(n):
