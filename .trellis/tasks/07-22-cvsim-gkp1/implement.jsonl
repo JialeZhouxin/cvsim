@@ -1,0 +1,5 @@
+{"file": "cvsim/bosonic/gkp.py", "reason": "gkp1 + share"}
+{"file": "cvsim/bosonic/__init__.py", "reason": "export"}
+{"file": "tests/test_bosonic_gkp.py", "reason": "gkp0 baseline"}
+{"file": "tests/test_bosonic_gkp_cross.py", "reason": "nn baseline"}
+{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}

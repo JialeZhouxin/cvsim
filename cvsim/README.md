@@ -18,7 +18,7 @@ uv pip install numpy scipy
 |------|------|----|------|-----------|
 | **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T, nbar=0)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件** / **sample_and_condition** |
 | **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`（1–2 模）** | D/R/S/**Kerr** / **BS** / **S₂** / **1 模 ρ 上 D/R/S** | **`loss(T, mode=)`（1–2 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ / **Wigner** / **Homodyne mean·var·sample** |
-| **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T, nbar=0)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
+| **Bosonic** | 真空 / **cat** / **`gkp0`/`gkp1`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T, nbar=0)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
 
 辛矩阵只在 **`cvsim/symplectic.py`**（G/B 共享地基；`gaussian.symplectic` 为兼容 re-export）。无 Circuit DSL。B **不** import G 包。
 
@@ -41,7 +41,7 @@ X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 
 ### 诚实边界
 
-- `gkp0`：x 齿梳；默认 `cross="none"` 对角混合；`cross="nn"` 近邻交叉（教学干涉，非完整 Gram）  
+- `gkp0`/`gkp1`：x 齿梳（`|1⟩` 半格偏移）；默认 `cross="none"`；`cross="nn"` 近邻交叉（教学干涉，非完整 Gram / 非 2D 格）  
 - Fock：仅 **1–2 模**；`loss` 1–2 模（2 模 dens）；**ρ 门** / Wigner / Homodyne 仍 1 模；Homodyne sample = 离散网格 PDF；无 Fock condition / m≥3  
 - `sample_and_condition` = sample + condition 薄组合，无新物理  
 - 无 Hafnian / 生产 GBS
@@ -67,7 +67,7 @@ python -m cvsim.demos.m4_cross_rep          # 跨表示：T4挤 / T1 loss / T5 S
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：111
+python -m pytest tests -q   # 当前锚点：117
 ```
 
 ## 包结构
