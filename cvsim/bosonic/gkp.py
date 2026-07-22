@@ -1,13 +1,13 @@
-"""Truncated |0⟩/|1⟩_GKP as x-teeth Bosonic components (teaching).
+"""Truncated |0⟩/|1⟩_GKP as Bosonic components (teaching).
 
-Ideal: Dirac comb on x with spacing √(2π).
-|0⟩: x = k Δ;  |1⟩: x = (k+½) Δ;  k = -N…N.
-Physical: V=½ diag(ε,1/ε), envelope a_k∝exp(−π ε k²/2).
+1D: Dirac comb on x, spacing √(2π); V=½ diag(ε,1/ε).
+2D: square lattice peaks on (x,p); V=(ε/2)I (isotropic).
 
-cross="none": diagonal only (mixed tooth comb).
-cross="nn": nearest-neighbour cross terms.
-cross="full": all tooth pairs (full-pair interference on 1D comb).
-Not full Gram orthog / not 2D lattice pure GKP.
+|0⟩ 1d: x=kΔ;  |1⟩ 1d: x=(k+½)Δ;  k=-N…N.
+|0⟩ 2d: (kΔ,lΔ); |1⟩ 2d: ((k+½)Δ, lΔ).
+
+cross (1d only): none | nn | full.
+2d: diagonal only (cross must be none). Not Gram / not Clifford.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import numpy as np
 from cvsim.bosonic.state import BosonicState, Component
 
 CrossMode = Literal["none", "nn", "full"]
+LatticeMode = Literal["1d", "2d"]
 
 
 def _append_cross_pair(
@@ -61,7 +62,6 @@ def _gkp_x_comb(
     delta = np.sqrt(2.0 * np.pi)
     V = 0.5 * np.diag([epsilon, 1.0 / epsilon])
     ks = list(range(-N, N + 1))
-    # a_k ∝ exp(−π ε k² / 2); index k for envelope (same for |0⟩/|1⟩)
     a = {k: np.exp(-0.5 * np.pi * epsilon * k * k) for k in ks}
 
     comps: list[Component] = []
@@ -100,21 +100,76 @@ def _gkp_x_comb(
     return BosonicState(components=comps)
 
 
+def _gkp_xp_grid(
+    epsilon: float,
+    grid_size: int,
+    *,
+    cross: CrossMode,
+    x_of_k: Callable[[int, float], float],
+) -> BosonicState:
+    """2D diagonal lattice peaks; cross must be none."""
+    if epsilon <= 0:
+        raise ValueError(f"epsilon must be > 0, got {epsilon}")
+    if grid_size < 0:
+        raise ValueError(f"grid_size must be >= 0, got {grid_size}")
+    if cross != "none":
+        raise ValueError("lattice='2d' supports cross='none' only (no nn/full this slice)")
+
+    N = int(grid_size)
+    delta = np.sqrt(2.0 * np.pi)
+    # isotropic sharp peaks: V = (ε/2) I
+    V = 0.5 * epsilon * np.eye(2, dtype=float)
+    idxs = list(range(-N, N + 1))
+
+    comps: list[Component] = []
+    raw_w: list[float] = []
+    for k in idxs:
+        x = float(x_of_k(k, delta))
+        for ell in idxs:
+            p = float(ell * delta)
+            # envelope on lattice indices
+            amp = float(np.exp(-0.5 * np.pi * epsilon * (k * k + ell * ell)))
+            rbar = np.array([x, p], dtype=complex)
+            comps.append(Component(V=V.copy(), rbar=rbar, w=0.0 + 0.0j))
+            raw_w.append(amp * amp)
+
+    s = sum(raw_w)
+    if s <= 0:
+        raise ValueError("weight sum non-positive")
+    for c, w in zip(comps, raw_w):
+        c.w = complex(w / s)
+    return BosonicState(components=comps)
+
+
+def _dispatch(
+    epsilon: float,
+    grid_size: int,
+    *,
+    cross: CrossMode,
+    lattice: LatticeMode,
+    x_of_k: Callable[[int, float], float],
+) -> BosonicState:
+    if lattice not in ("1d", "2d"):
+        raise ValueError(f"lattice must be '1d' or '2d', got {lattice!r}")
+    if lattice == "1d":
+        return _gkp_x_comb(epsilon, grid_size, cross=cross, x_of_k=x_of_k)
+    return _gkp_xp_grid(epsilon, grid_size, cross=cross, x_of_k=x_of_k)
+
+
 def gkp0(
     epsilon: float = 0.1,
     grid_size: int = 3,
     *,
     cross: CrossMode = "none",
+    lattice: LatticeMode = "1d",
 ) -> BosonicState:
-    """Approximate |0⟩_GKP on x-axis teeth k=-N…N, x=kΔ.
+    """Approximate |0⟩_GKP.
 
-    Args:
-        epsilon: tooth squeeze ε > 0; smaller → sharper x peaks.
-        grid_size: N; diagonal count 2N+1; nn total K=6N+1; full K=(2N+1)².
-        cross: "none" diagonal; "nn" nearest-neighbour; "full" all pairs.
+    lattice="1d": x-teeth k=-N…N, x=kΔ; V=½diag(ε,1/ε); cross none|nn|full.
+    lattice="2d": square grid (kΔ,lΔ); V=(ε/2)I; cross must be none; K=(2N+1)².
     """
-    return _gkp_x_comb(
-        epsilon, grid_size, cross=cross, x_of_k=lambda k, d: k * d
+    return _dispatch(
+        epsilon, grid_size, cross=cross, lattice=lattice, x_of_k=lambda k, d: k * d
     )
 
 
@@ -123,11 +178,16 @@ def gkp1(
     grid_size: int = 3,
     *,
     cross: CrossMode = "none",
+    lattice: LatticeMode = "1d",
 ) -> BosonicState:
-    """Approximate |1⟩_GKP: same comb as gkp0 but peaks at x=(k+½)Δ.
+    """Approximate |1⟩_GKP: half-period shift in x only vs gkp0.
 
-    Same K and envelope as gkp0 for fixed N. Teaching approx; not full Gram.
+    Same K / cross / lattice rules as gkp0. Teaching approx; not full Gram.
     """
-    return _gkp_x_comb(
-        epsilon, grid_size, cross=cross, x_of_k=lambda k, d: (k + 0.5) * d
+    return _dispatch(
+        epsilon,
+        grid_size,
+        cross=cross,
+        lattice=lattice,
+        x_of_k=lambda k, d: (k + 0.5) * d,
     )

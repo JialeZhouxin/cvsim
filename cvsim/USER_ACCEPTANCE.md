@@ -2,7 +2,7 @@
 
 > 工程验收文档（可指 API）。理论笔记仍纯物理，不绑本包。  
 > 能力边界：三表示独立闭环 + G/B condition·sample·loss + F 1–2 模 BS/Kerr/PNRD + F 1 模 loss→ρ/门 + **Fock Wigner** + B 矩/`gkp0`/Wigner + sample_and_condition。  
-> 版本锚点：pytest **127** passed（切片后请改本数）。
+> 版本锚点：pytest **133** passed（切片后请改本数）。
 
 ---
 
@@ -46,7 +46,7 @@
 | 位移 | `d_x=√2 Re α`，`d_p=√2 Im α` |
 | Homodyne | `x_φ = x cosφ + p sinφ`；高斯边缘 `Var = uᵀ V u`（中心矩） |
 | 损失 | G/B：`X=√T`，`Y=(1-T)(n̄+1/2)I`（`n̄=0` 纯损耗）；F：1–2 模 Kraus（2 模 `E⊗I` / `I⊗E`），`T∈[0,1]` |
-| GKP `gkp0`/`gkp1` | x 齿梳；`|1⟩` 半格偏移；`cross=none|nn|full`；间距 `√(2π)`；非 2D / 非 Gram 正交 |
+| GKP `gkp0`/`gkp1` | `lattice=1d|2d`；1d：`cross=none|nn|full`；2d：对角格 `V=(ε/2)I`（cross 仅 none）；非 Gram / 非 Clifford |
 
 细节合同：`.trellis/spec/backend/quality-guidelines.md`。
 
@@ -164,11 +164,11 @@ python -m cvsim.demos.user_acceptance
 ## 未做（当前不验收为绿）
 
 - m≥3 / 2 模 ρ 上门·Wigner·Homodyne / Fock 多模 condition  
-- **完整纯态 GKP**（二维格点 / Gram 正交 / 逻辑 Clifford 完备）  
+- **完整纯态 GKP**（2D nn/full 交叉 / Gram 正交 / 逻辑 Clifford 完备）  
 - 多模 Wigner / GUI  
 - Circuit DSL；PNRD 大规模；Hafnian / Torontonian 生产路径  
 
-已落地（见 U7–U9 + P1 A/B + β + γ + F cond + δ1）：G/B Homodyne sample + **sample_and_condition**；B condition；Fock **1–2 模 loss→ρ** + **1 模 ρ 门** + **S₂** + **Homodyne mean/var/sample/condition**；**Wigner G+B+F**；GKP **`gkp0`/`gkp1`** + **none|nn|full**；G/B **`loss(..., nbar)`**。
+已落地（见 U7–U9 + P1 A/B + β + γ + F cond + δ1 + δ2）：G/B Homodyne sample + **sample_and_condition**；B condition；Fock **1–2 模 loss→ρ** + **1 模 ρ 门** + **S₂** + **Homodyne mean/var/sample/condition**；**Wigner G+B+F**；GKP **`gkp0`/`gkp1`** + 1d **none|nn|full** + **2d 对角格**；G/B **`loss(..., nbar)`**。
 
 新切片落地后：在本文件 **加 Ux**、改一键 demo、更新 pytest 计数；**少改**「项目目标」段。
 

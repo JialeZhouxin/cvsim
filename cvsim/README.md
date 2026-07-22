@@ -41,7 +41,7 @@ X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 
 ### 诚实边界
 
-- `gkp0`/`gkp1`：x 齿梳（`|1⟩` 半格偏移）；`cross=none|nn|full`（full=全齿对，K=(2N+1)²；非 Gram / 非 2D 格）  
+- `gkp0`/`gkp1`：`lattice=1d|2d`；1d 齿梳 `cross=none|nn|full`；2d 对角格 `V=(ε/2)I`（cross 仅 none；非 Gram / 非 Clifford）  
 - Fock：仅 **1–2 模**；`loss` 1–2 模 dens；**ρ 门** / Wigner / Homodyne 1 模；sample=网格 PDF；**condition=截断 x_φ 本征态（≠G Kalman）**；无 m≥3  
 - `sample_and_condition` = sample + condition 薄组合，无新物理  
 - 无 Hafnian / 生产 GBS
@@ -67,7 +67,7 @@ python -m cvsim.demos.m4_cross_rep          # 跨表示：T4挤 / T1 loss / T5 S
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：127
+python -m pytest tests -q   # 当前锚点：133
 ```
 
 ## 包结构
