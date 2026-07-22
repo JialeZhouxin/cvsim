@@ -54,10 +54,11 @@ def test_coherent_mean_photon():
     assert abs(mean_photon(rho) - expect) < 0.05
 
 
-def test_two_mode_raises():
+def test_two_mode_no_longer_raises():
     psi = FockState.vacuum(4, nmode=2)
-    with pytest.raises(ValueError):
-        loss(psi, 0.5)
+    rho = loss(psi, 0.5, mode=0)
+    assert rho.nmode == 2
+    assert abs(trace(rho) - 1.0) < 1e-12
 
 
 def test_bad_T_raises():

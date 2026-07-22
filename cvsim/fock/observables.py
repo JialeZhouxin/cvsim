@@ -39,15 +39,38 @@ def trace(state: FockDensity) -> float:
     return float(np.trace(state.rho).real)
 
 
+def _dens_joint_pn(state: FockDensity) -> np.ndarray:
+    """Joint P(n0,n1) for 2-mode dens, shape (N,N); 1-mode returns (N,)."""
+    p = np.asarray(np.real(np.diag(state.rho)), dtype=float)
+    if state.nmode == 1:
+        return p
+    N = state.cutoff
+    return p.reshape(N, N)
+
+
 def mean_photon(state: FockLike, mode: int | None = None) -> float:
     """⟨n⟩ from pure |c|² or from diag(ρ)."""
     if _is_density(state):
-        if mode is not None and mode != 0:
-            raise IndexError(f"mode {mode} out of range for nmode=1")
+        if state.nmode == 1:
+            if mode is not None and mode != 0:
+                raise IndexError(f"mode {mode} out of range for nmode=1")
+            N = state.cutoff
+            n = np.arange(N)
+            p = np.real(np.diag(state.rho))
+            return float(np.sum(n * p))
+        # 2-mode dens
         N = state.cutoff
         n = np.arange(N)
-        p = np.real(np.diag(state.rho))
-        return float(np.sum(n * p))
+        p2 = _dens_joint_pn(state)
+        n0 = float(np.sum(n[:, None] * p2))
+        n1 = float(np.sum(n[None, :] * p2))
+        if mode is None:
+            return n0 + n1
+        if mode == 0:
+            return n0
+        if mode == 1:
+            return n1
+        raise IndexError(f"mode {mode} out of range for nmode=2")
 
     N = state.cutoff
     n = np.arange(N)
@@ -66,11 +89,23 @@ def mean_photon(state: FockLike, mode: int | None = None) -> float:
 
 
 def pnrd_probs(state: FockLike, mode: int | None = None) -> np.ndarray:
-    """Photon-number probabilities from |c|² or diag(ρ)."""
+    """Photon-number probabilities from |c|² or diag(ρ).
+
+    2-mode dens: mode=None → joint (N,N); mode=0|1 → marginal (N,).
+    """
     if _is_density(state):
-        if mode is not None and mode != 0:
-            raise IndexError(f"mode {mode} out of range for nmode=1")
-        return np.asarray(np.real(np.diag(state.rho)), dtype=float)
+        if state.nmode == 1:
+            if mode is not None and mode != 0:
+                raise IndexError(f"mode {mode} out of range for nmode=1")
+            return np.asarray(np.real(np.diag(state.rho)), dtype=float)
+        p2 = _dens_joint_pn(state)
+        if mode is None:
+            return p2
+        if mode == 0:
+            return np.asarray(p2.sum(axis=1), dtype=float)
+        if mode == 1:
+            return np.asarray(p2.sum(axis=0), dtype=float)
+        raise IndexError(f"mode {mode} out of range for nmode=2")
 
     p = np.abs(state.amps) ** 2
     if state.nmode == 1:

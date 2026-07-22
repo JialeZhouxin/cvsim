@@ -35,10 +35,12 @@ def _apply_1mode_U_pure(state: FockState, U: np.ndarray, mode: int = 0) -> FockS
 
 
 def _apply_U_density(state: FockDensity, U: np.ndarray) -> FockDensity:
-    """ρ' = U ρ U† (1-mode)."""
+    """ρ' = U ρ U† (1-mode only)."""
+    if state.nmode != 1:
+        raise ValueError("2-mode density gates out of scope")
     rho = U @ state.rho @ U.conj().T
     rho = 0.5 * (rho + rho.conj().T)
-    return FockDensity(rho=rho)
+    return FockDensity(rho=rho, nmode=1)
 
 
 def _diag_phase_pure(state: FockState, phases: np.ndarray, mode: int = 0) -> FockState:
@@ -72,8 +74,8 @@ def squeeze(state: FockLike1, r: float, mode: int = 0) -> FockLike1:
     FockDensity: ρ' = U ρ U† (1-mode only; mode must be 0).
     """
     if isinstance(state, FockDensity):
-        if mode != 0:
-            raise IndexError("FockDensity is single-mode; mode must be 0")
+        if state.nmode != 1 or mode != 0:
+            raise IndexError("FockDensity gates: 1-mode only; mode must be 0")
         return _apply_U_density(state, _squeeze_U(state.cutoff, r))
     return _apply_1mode_U_pure(state, _squeeze_U(state.cutoff, r), mode)
 
@@ -81,8 +83,8 @@ def squeeze(state: FockLike1, r: float, mode: int = 0) -> FockLike1:
 def phase(state: FockLike1, theta: float, mode: int = 0) -> FockLike1:
     """Phase shift: |n⟩ → e^{i n θ} |n⟩."""
     if isinstance(state, FockDensity):
-        if mode != 0:
-            raise IndexError("FockDensity is single-mode; mode must be 0")
+        if state.nmode != 1 or mode != 0:
+            raise IndexError("FockDensity gates: 1-mode only; mode must be 0")
         n = np.arange(state.cutoff)
         phases = np.exp(1j * theta * n)
         U = np.diag(phases)
@@ -94,8 +96,8 @@ def phase(state: FockLike1, theta: float, mode: int = 0) -> FockLike1:
 def displace(state: FockLike1, alpha: complex, mode: int = 0) -> FockLike1:
     """Displacement D(α) = exp(α a† − α* a)."""
     if isinstance(state, FockDensity):
-        if mode != 0:
-            raise IndexError("FockDensity is single-mode; mode must be 0")
+        if state.nmode != 1 or mode != 0:
+            raise IndexError("FockDensity gates: 1-mode only; mode must be 0")
         return _apply_U_density(state, _displace_U(state.cutoff, alpha))
     return _apply_1mode_U_pure(state, _displace_U(state.cutoff, alpha), mode)
 
@@ -103,8 +105,8 @@ def displace(state: FockLike1, alpha: complex, mode: int = 0) -> FockLike1:
 def kerr(state: FockLike1, chi: float, mode: int = 0) -> FockLike1:
     """Kerr: |n⟩ → e^{i χ n²} |n⟩. Density: UρU† (1-mode)."""
     if isinstance(state, FockDensity):
-        if mode != 0:
-            raise IndexError("FockDensity is single-mode; mode must be 0")
+        if state.nmode != 1 or mode != 0:
+            raise IndexError("FockDensity gates: 1-mode only; mode must be 0")
         n = np.arange(state.cutoff)
         U = np.diag(np.exp(1j * chi * n * n))
         return _apply_U_density(state, U)
