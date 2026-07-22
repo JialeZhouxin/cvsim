@@ -897,3 +897,36 @@ gkp1 half-shift comb; 117/8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 28: Fock Homodyne condition
+
+**Date**: 2026-07-22
+**Task**: Fock Homodyne condition
+**Branch**: `master`
+
+### Summary
+
+projective truncated X eigen; 122/8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

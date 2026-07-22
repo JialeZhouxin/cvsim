@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 27
+- **Total Sessions**: 28
 - **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~899 | Active |
+| `journal-1.md` | ~932 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 28 | 2026-07-22 | Fock Homodyne condition | HEAD | `master` |
 | 27 | 2026-07-22 | γ gkp1 | HEAD | `master` |
 | 26 | 2026-07-22 | β G5 Fock 2模 loss | HEAD | `master` |
 | 25 | 2026-07-22 | α 跨表示对照加深 | HEAD | `master` |
