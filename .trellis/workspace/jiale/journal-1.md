@@ -1029,3 +1029,36 @@ Gram + 2d full + logical_overlap; 139/8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 32: Jupyter 三教程
+
+**Date**: 2026-07-22
+**Task**: Jupyter 三教程
+**Branch**: `master`
+
+### Summary
+
+tutorials 01-03 + README; cells executed; 139
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
