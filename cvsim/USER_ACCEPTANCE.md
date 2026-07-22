@@ -2,7 +2,7 @@
 
 > 工程验收文档（可指 API）。理论笔记仍纯物理，不绑本包。  
 > 能力边界：三表示独立闭环 + G/B condition·sample·loss + F 1–2 模 BS/Kerr/PNRD + F 1 模 loss→ρ/门 + **Fock Wigner** + B 矩/`gkp0`/Wigner + sample_and_condition。  
-> 版本锚点：pytest **104** passed（切片后请改本数）。
+> 版本锚点：pytest **105** passed（切片后请改本数）。
 
 ---
 

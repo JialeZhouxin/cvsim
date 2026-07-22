@@ -143,7 +143,19 @@ V\mapsto XVX^{\mathsf T}+Y,\qquad
 
 [quant-ph/0503237 Eq.(4.19–4.20)](https://arxiv.org/pdf/quant-ph/0503237)；Weedbrook [1110.3234](https://arxiv.org/abs/1110.3234)
 
-### 3.3 热噪声 / 放大
+### 3.3 热环境损耗
+
+若环境是平均光子 \(\bar n\ge 0\) 的热态（而非真空），同一 \(X\) 下噪声加性变为
+
+\[
+Y=(1-T)\Bigl(\bar n+\tfrac12\Bigr)I_{\mathrm{act}}.
+\]
+
+- \(\bar n=0\) 还原 §3.2 纯损耗。  
+- 检查点：真空初态、\(T=0\) 时作用模 \(\langle n\rangle=\bar n\)，\(V=(\bar n+1/2)I\)。  
+- 加权高斯峰表示对每个组件用同一 \((X,Y)\)，权重不变。
+
+### 3.4 放大等其它通道
 
 相位不敏感放大等见 Weedbrook §5。
 

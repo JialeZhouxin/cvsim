@@ -60,14 +60,14 @@ python -m cvsim.demos.user_acceptance   # U1–U5 + U7–U9；汇总后 exit
 python -m cvsim.demos.m1_gaussian_squeeze   # 真空→挤压→V, det V, ⟨n⟩=sinh²r
 python -m cvsim.demos.m2_fock_cutoff_scan   # 同电路扫 cutoff 逼近解析
 python -m cvsim.demos.m3_cat_weights        # 小 cat 四组件 + ∑w=1
-python -m cvsim.demos.m4_cross_rep          # 跨表示：挤 ⟨n⟩ + 相干+loss（G/F/B）
+python -m cvsim.demos.m4_cross_rep          # 跨表示：T4挤 / T1 loss / T5 S₂ / T6 nbar / T7 Homodyne mean
 ```
 
 ## 测试
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：104
+python -m pytest tests -q   # 当前锚点：105
 ```
 
 ## 包结构

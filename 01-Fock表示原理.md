@@ -161,7 +161,20 @@ Fock 基对角，Gaussian / Bosonic 不自然。
 
 - **PNRD：** \(|c_{n_1\ldots n_m}|^2\) 直接读  
 - **部分模测量：** 切对应下标，其余模条件更新  
-- **Homodyne：** 构造投影到无限挤压真空（比高斯表示贵）
+- **Homodyne：** 全量投影到无限挤压真空（比高斯表示贵）；**边缘矩**可不积分：
+
+\[
+\langle x\rangle=\sqrt2\,\mathrm{Re}\langle a\rangle,\quad
+\langle p\rangle=\sqrt2\,\mathrm{Im}\langle a\rangle,\quad
+x_\phi=x\cos\phi+p\sin\phi;
+\]
+
+\[
+\langle x^2\rangle=\langle n\rangle+\tfrac12+\mathrm{Re}\langle a^2\rangle,\quad
+\langle p^2\rangle=\langle n\rangle+\tfrac12-\mathrm{Re}\langle a^2\rangle
+\]
+
+（\(\hbar=1\)）。真空：\(\mu=0\)，\(\mathrm{Var}(x_\phi)=1/2\)。采样需位置表象 PDF（谐振子波函数叠加），截断网格为教学近似。
 
 ---
 
