@@ -996,3 +996,36 @@ lattice=2d diagonal; 133/8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 31: δ3 GKP Gram
+
+**Date**: 2026-07-22
+**Task**: δ3 GKP Gram
+**Branch**: `master`
+
+### Summary
+
+Gram + 2d full + logical_overlap; 139/8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
