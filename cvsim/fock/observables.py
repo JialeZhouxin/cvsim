@@ -244,3 +244,60 @@ def homodyne_sample(
 
     idx = int(rng.choice(n_grid, p=pdf))
     return float(qs[idx])
+
+
+def _x_phi_matrix(cutoff: int, phi: float) -> np.ndarray:
+    """Truncated x_φ = x cosφ + p sinφ = (a e^{-iφ} + a† e^{iφ})/√2."""
+    a = annihilation(cutoff)
+    ad = a.conj().T
+    eip = np.exp(-1j * phi)
+    return (eip * a + np.conj(eip) * ad) / np.sqrt(2.0)
+
+
+def _x_eigen_amps(cutoff: int, outcome: float, phi: float) -> np.ndarray:
+    """Eigenvector of truncated x_φ nearest to outcome (projective, finite N).
+
+    Discrete spectrum of cutoff X; exact eigenstate ⇒ ⟨x_φ⟩=λ, var_φ≈0 in
+    truncated space. Not continuous Dirac |x⟩; not Gaussian Kalman.
+    """
+    X = _x_phi_matrix(cutoff, phi)
+    # Hermitian numerically: eigh wants Hermitian matrix
+    Xh = 0.5 * (X + X.conj().T)
+    evals, evecs = np.linalg.eigh(Xh)
+    idx = int(np.argmin(np.abs(evals - float(outcome))))
+    amps = evecs[:, idx].astype(complex)
+    # global phase: make first large component real-positive
+    k = int(np.argmax(np.abs(amps)))
+    if abs(amps[k]) > _EPS:
+        amps = amps * np.exp(-1j * np.angle(amps[k]))
+    return amps
+
+
+def homodyne_condition(
+    state: FockLike,
+    mode: int = 0,
+    phi: float = 0.0,
+    outcome: float = 0.0,
+) -> FockState:
+    """Projective Homodyne condition → truncated x_φ eigenstate near outcome.
+
+    1-mode only. Post-state independent of prior amps/ρ (projective);
+    uses state.cutoff only. Not Gaussian Kalman. Returns pure FockState.
+    """
+    _require_1mode_homodyne(state, mode)
+    amps = _x_eigen_amps(state.cutoff, outcome, phi)
+    return FockState(amps=amps)
+
+
+def homodyne_sample_and_condition(
+    state: FockLike,
+    mode: int = 0,
+    phi: float = 0.0,
+    *,
+    rng: np.random.Generator | None = None,
+    lim: float = _SAMPLE_L,
+    n_grid: int = _SAMPLE_N,
+) -> tuple[float, FockState]:
+    """Sample Homodyne outcome then condition. Thin combo; no new physics."""
+    o = homodyne_sample(state, mode, phi, rng=rng, lim=lim, n_grid=n_grid)
+    return o, homodyne_condition(state, mode, phi, o)
