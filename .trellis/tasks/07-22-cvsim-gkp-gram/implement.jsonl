@@ -1,0 +1,5 @@
+{"file": "cvsim/bosonic/gkp.py", "reason": "1d/2d + full"}
+{"file": "cvsim/bosonic/cat.py", "reason": "Gram pattern"}
+{"file": "tests/test_bosonic_gkp_full.py", "reason": "1d full regression"}
+{"file": "tests/test_bosonic_gkp_2d.py", "reason": "2d baseline"}
+{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}

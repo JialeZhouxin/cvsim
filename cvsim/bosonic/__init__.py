@@ -1,7 +1,7 @@
 from cvsim.bosonic.state import BosonicState, Component
 from cvsim.bosonic.cat import even_cat, odd_cat
 from cvsim.bosonic.channels import loss
-from cvsim.bosonic.gkp import gkp0, gkp1
+from cvsim.bosonic.gkp import gkp0, gkp1, gkp_logical_overlap
 from cvsim.bosonic.gates import (
     beamsplitter,
     displace,
@@ -26,6 +26,7 @@ __all__ = [
     "odd_cat",
     "gkp0",
     "gkp1",
+    "gkp_logical_overlap",
     "loss",
     "weight_sum",
     "mean_photon",
