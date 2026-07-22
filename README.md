@@ -64,12 +64,16 @@
 工程落地与**最终用户验收**（目标 / U1–U5+U7+U8 / 能力矩阵）见：
 [`cvsim/README.md`](./cvsim/README.md) · [`cvsim/USER_ACCEPTANCE.md`](./cvsim/USER_ACCEPTANCE.md) · `python -m cvsim.demos.user_acceptance`
 
+**新手 Jupyter（三表示各一本）**：[tutorials/README.md](./tutorials/README.md)
+
 ---
 
 ## 目录结构
 
 cv-photonic-notes/
 ├── README.md
+├── tutorials/          # 三表示新手 Jupyter
+├── cvsim/              # 最小模拟器
 ├── 术语表.md
 ├── 00-CV核心原理.md
 ├── 01-Fock表示原理.md

@@ -12,6 +12,8 @@ uv venv
 uv pip install numpy scipy
 ```
 
+**新手教程（Jupyter）**：[`../tutorials/README.md`](../tutorials/README.md) — Gaussian / Fock / Bosonic 各一本。
+
 ## 能力矩阵（当前）
 
 | 表示 | 初态 | 门 | 通道 | 测量 / 矩 |
