@@ -930,3 +930,36 @@ projective truncated X eigen; 122/8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 29: δ1 GKP full-pair
+
+**Date**: 2026-07-22
+**Task**: δ1 GKP full-pair
+**Branch**: `master`
+
+### Summary
+
+cross=full 1D; 127/8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
