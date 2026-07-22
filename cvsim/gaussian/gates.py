@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from cvsim.gaussian.state import GaussianState
-from cvsim.gaussian.symplectic import (
+from cvsim.symplectic import (
     S_beamsplitter,
     S_phase,
     S_squeeze,

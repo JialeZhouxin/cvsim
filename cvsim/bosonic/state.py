@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from cvsim.conventions import vacuum_cov, vacuum_mean
-
-if TYPE_CHECKING:
-    from cvsim.gaussian.state import GaussianState
 
 
 @dataclass
@@ -57,8 +53,8 @@ class BosonicState:
         )
 
     @classmethod
-    def from_gaussian(cls, state: GaussianState) -> BosonicState:
-        """Wrap a GaussianState as one component with weight 1."""
+    def from_gaussian(cls, state) -> BosonicState:
+        """Wrap object with .V and .rbar as one component w=1 (duck type)."""
         return cls(
             components=[
                 Component(

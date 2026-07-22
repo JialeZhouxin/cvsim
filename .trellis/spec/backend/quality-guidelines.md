@@ -127,7 +127,7 @@ Out: Fock Wigner, multimode, GUI.
 
 Hard AC patterns: `S→BS(π/4)` total ⟨n⟩ = sinh² r; pure 2-mode det V ≈ (1/4)²; Fock vs Gaussian ⟨n⟩ closes with cutoff.
 
-Do **not** duplicate BS/phase matrices in bosonic — import `cvsim.gaussian.symplectic`.
+Do **not** duplicate BS/phase matrices in bosonic — import `cvsim.symplectic` (not `cvsim.gaussian`).
 
 ### B2 Homodyne (Gaussian edge moments only)
 

@@ -20,7 +20,7 @@ uv pip install numpy scipy
 | **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`** | D/R/S/**Kerr** / **BS** / **S₂** / **ρ 上 D/R/S** | **`loss(T)`（1 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ / **Wigner** / **Homodyne mean·var·sample** |
 | **Bosonic** | 真空 / **cat** / **`gkp0`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T, nbar=0)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
 
-辛矩阵只在 `cvsim/gaussian/symplectic.py`。无 Circuit DSL。
+辛矩阵只在 **`cvsim/symplectic.py`**（G/B 共享地基；`gaussian.symplectic` 为兼容 re-export）。无 Circuit DSL。B **不** import G 包。
 
 ### 概念闭环
 
@@ -67,7 +67,7 @@ python -m cvsim.demos.m4_cross_rep          # 跨表示：挤 ⟨n⟩ + 相干+l
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：101
+python -m pytest tests -q   # 当前锚点：104
 ```
 
 ## 包结构
@@ -75,9 +75,11 @@ python -m pytest tests -q   # 当前锚点：101
 ```text
 cvsim/
   conventions.py   # ħ, xxpp, Ω, vacuum
-  gaussian/        # state, symplectic, gates, channels.loss, observables(+condition)
-  fock/            # 1–2 模 state, D/R/S/Kerr/BS, loss→ρ, norm/⟨n⟩/pnrd
-  bosonic/         # Component, cat, gkp0, gates, channels.loss, weighted moments
+  symplectic.py    # shared S/d (G+B gates only)
+  gaussian/        # state, gates, channels.loss, observables(+condition); symplectic shim
+  fock/            # 1–2 模；独立，不依赖 G/B
+  bosonic/         # Component, cat, gkp0, gates→symplectic, loss, moments
+  wigner.py        # 跨表示门面（故意）
   demos/           # m1–m4 + user_acceptance
 ```
 
