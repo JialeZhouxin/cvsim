@@ -1,0 +1,4 @@
+{"file": "cvsim/bosonic/gkp.py", "reason": "full cross"}
+{"file": "tests/test_bosonic_gkp_cross.py", "reason": "nn baseline"}
+{"file": "tests/test_bosonic_gkp1.py", "reason": "gkp1 baseline"}
+{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}

@@ -49,4 +49,4 @@ def test_nn_gates_keep_weights():
 
 def test_cross_bad_arg():
     with pytest.raises(ValueError):
-        gkp0(cross="full")  # type: ignore[arg-type]
+        gkp0(cross="pair")  # type: ignore[arg-type]

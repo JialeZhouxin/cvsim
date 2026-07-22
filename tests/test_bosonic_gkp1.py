@@ -51,4 +51,4 @@ def test_gkp1_bad_args():
     with pytest.raises(ValueError):
         gkp1(epsilon=0.0)
     with pytest.raises(ValueError):
-        gkp1(cross="full")  # type: ignore[arg-type]
+        gkp1(cross="pair")  # type: ignore[arg-type]
