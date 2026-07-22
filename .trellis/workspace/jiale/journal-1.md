@@ -864,3 +864,36 @@ m4 T5-T7; notes nbar+F Homodyne; 105/8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 27: γ gkp1
+
+**Date**: 2026-07-22
+**Task**: γ gkp1
+**Branch**: `master`
+
+### Summary
+
+gkp1 half-shift comb; 117/8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
