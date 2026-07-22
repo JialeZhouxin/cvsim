@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 29
+- **Total Sessions**: 30
 - **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~965 | Active |
+| `journal-1.md` | ~998 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 30 | 2026-07-22 | δ2 GKP 2D lattice | HEAD | `master` |
 | 29 | 2026-07-22 | δ1 GKP full-pair | HEAD | `master` |
 | 28 | 2026-07-22 | Fock Homodyne condition | HEAD | `master` |
 | 27 | 2026-07-22 | γ gkp1 | HEAD | `master` |

@@ -963,3 +963,36 @@ cross=full 1D; 127/8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 30: δ2 GKP 2D lattice
+
+**Date**: 2026-07-22
+**Task**: δ2 GKP 2D lattice
+**Branch**: `master`
+
+### Summary
+
+lattice=2d diagonal; 133/8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
