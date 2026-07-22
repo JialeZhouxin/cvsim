@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 23
-- **Last Active**: 2026-07-21
+- **Total Sessions**: 24
+- **Last Active**: 2026-07-22
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~767 | Active |
+| `journal-1.md` | ~800 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 24 | 2026-07-22 | 三表示拆耦合 A+C | HEAD | `master` |
 | 23 | 2026-07-21 | P1-B Fock Homodyne | HEAD | `master` |
 | 22 | 2026-07-21 | P1 包A G7+G8 | HEAD | `master` |
 | 21 | 2026-07-21 | gap-fill 包A P0 全关 | HEAD | `master` |

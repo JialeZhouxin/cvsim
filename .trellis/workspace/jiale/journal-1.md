@@ -765,3 +765,36 @@ G6 mean/var/sample; pytest 101 UAT 8/8
 ### Next Steps
 
 - None - task complete
+
+
+## Session 24: 三表示拆耦合 A+C
+
+**Date**: 2026-07-22
+**Task**: 三表示拆耦合 A+C
+**Branch**: `master`
+
+### Summary
+
+shared symplectic; B no G import; duck from_gaussian; 104/8/8
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
