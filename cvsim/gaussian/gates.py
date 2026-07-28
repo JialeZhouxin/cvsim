@@ -7,6 +7,8 @@ import numpy as np
 from cvsim.gaussian.state import GaussianState
 from cvsim.symplectic import (
     S_beamsplitter,
+    S_CX,
+    S_CZ,
     S_phase,
     S_squeeze,
     S_two_mode_squeeze,
@@ -59,3 +61,23 @@ def two_mode_squeeze(
 ) -> GaussianState:
     """Two-mode squeeze S₂(r) (real r)."""
     return apply_symplectic(state, S_two_mode_squeeze(state.nmode, r, mode1, mode2))
+
+
+def cz(
+    state: GaussianState, weight: float, mode1: int, mode2: int
+) -> GaussianState:
+    """Controlled-Z: CZ = exp(i·weight·x̂₁·x̂₂).
+
+    p₁ → p₁ + weight·x₂, p₂ → p₂ + weight·x₁.
+    """
+    return apply_symplectic(state, S_CZ(state.nmode, weight, mode1, mode2))
+
+
+def cx(
+    state: GaussianState, weight: float, mode1: int, mode2: int
+) -> GaussianState:
+    """Controlled-X: CX = exp(-i·weight·x̂₁·p̂₂).
+
+    x₂ → x₂ + weight·x₁, p₁ → p₁ - weight·p₂.
+    """
+    return apply_symplectic(state, S_CX(state.nmode, weight, mode1, mode2))

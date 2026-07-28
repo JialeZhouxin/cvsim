@@ -2,6 +2,8 @@ from cvsim.gaussian.channels import loss
 from cvsim.gaussian.state import GaussianState
 from cvsim.gaussian.gates import (
     beamsplitter,
+    cx,
+    cz,
     displace,
     phase,
     squeeze,
@@ -24,6 +26,8 @@ __all__ = [
     "phase",
     "beamsplitter",
     "two_mode_squeeze",
+    "cz",
+    "cx",
     "loss",
     "det_cov",
     "mean_photon",

@@ -116,3 +116,44 @@ def S_two_mode_squeeze(
         for b in range(4):
             S[idx[a], idx[b]] = block[a, b]
     return S
+
+
+def S_CZ(nmode: int, weight: float, mode1: int, mode2: int) -> np.ndarray:
+    """Controlled-Z symplectic in xxpp: CZ = exp(i·weight·x̂₁·x̂₂).
+
+    Action: x unchanged; p₁ → p₁ + weight·x₂, p₂ → p₂ + weight·x₁.
+    """
+    if mode1 == mode2:
+        raise ValueError("mode1 and mode2 must differ")
+    for m in (mode1, mode2):
+        if not 0 <= m < nmode:
+            raise IndexError(f"mode {m} out of range for nmode={nmode}")
+
+    S = np.eye(2 * nmode)
+    i, j = mode1, mode2
+    # p_i += weight·x_j
+    S[nmode + i, j] = weight
+    # p_j += weight·x_i
+    S[nmode + j, i] = weight
+    return S
+
+
+def S_CX(nmode: int, weight: float, mode1: int, mode2: int) -> np.ndarray:
+    """Controlled-X symplectic in xxpp: CX = exp(-i·weight·x̂₁·p̂₂).
+
+    Action: x₁ unchanged, x₂ → x₂ + weight·x₁;
+    p₁ → p₁ - weight·p₂, p₂ unchanged.
+    """
+    if mode1 == mode2:
+        raise ValueError("mode1 and mode2 must differ")
+    for m in (mode1, mode2):
+        if not 0 <= m < nmode:
+            raise IndexError(f"mode {m} out of range for nmode={nmode}")
+
+    S = np.eye(2 * nmode)
+    i, j = mode1, mode2
+    # x_j += weight·x_i
+    S[j, i] = weight
+    # p_i -= weight·p_j
+    S[nmode + i, nmode + j] = -weight
+    return S
