@@ -1,6 +1,13 @@
-"""Parameterized Gaussian circuit: define once, run with different parameters."""
+"""Parameterized Gaussian circuit with measurement + feedforward (L4).
+
+L2: define once, run with different parameters.
+L3: ``c1 + c2``, ``c1 += c2``.
+L4: ``measure_homodyne`` + ``ParamRef`` feedforward.
+"""
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -15,36 +22,76 @@ from cvsim.gaussian.gates import (
     squeeze,
     two_mode_squeeze,
 )
+from cvsim.gaussian.observables import homodyne_sample_and_condition
+
+
+@dataclass(frozen=True)
+class ParamRef:
+    """Reference to a homodyne measurement outcome, scaled by gain.
+
+    Used in circuit builder methods where a gate parameter depends on
+    a prior measurement result.
+
+    Usage::
+
+        c.measure_homodyne(1, phi=0, name='m_x')
+        c.displace(0, alpha=ParamRef('m_x', gain=0.5))
+    """
+    source: str
+    gain: float = 1.0
 
 
 class GaussianCircuit:
     """Declarative Gaussian circuit with parameter placeholders.
 
-    Parameters can be fixed (number) or symbolic (string name).
-    Symbolic parameters are resolved at ``run(**params)`` time.
+    Parameters can be fixed (number), symbolic (string name),
+    or feedforward (``ParamRef`` referencing a measurement).
 
-    Usage::
+    Measurement + feedforward (L4)::
 
         c = GaussianCircuit(2)
-        c.squeeze(0, r='r1')
-        c.cz(0, 1, weight='g')
-        c.beamsplitter(0, 1, theta=np.pi/4)
-        st = c.run(r1=0.5, g=0.3)   # run with specific values
+        c.squeeze(1, r=0.5)                       # ancilla
+        c.cz(0, 1, weight=1.0)                     # entangle
+        c.measure_homodyne(1, phi=np.pi/2, name='m_p')
+        c.displace(0, alpha=ParamRef('m_p', gain=0.5))  # feedback
+
+        state, results = c.run()
+        # results == {'m_p': -1.204...}
     """
 
     def __init__(self, nmode: int) -> None:
         if nmode < 1:
             raise ValueError("nmode must be >= 1")
         self.nmode = nmode
-        self._ops: list[tuple[str, tuple, dict, dict]] = []  # (name, modes, fixed, params)
+        # _ops entries: (name, orig_modes, fixed, params, refs)
+        self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
 
-    # -- builder methods -------------------------------------------------
+    # -- L3: circuit composition ------------------------------------------
+
+    def __iadd__(self, other: GaussianCircuit) -> GaussianCircuit:
+        if self.nmode != other.nmode:
+            raise ValueError(
+                f"nmode mismatch: {self.nmode} vs {other.nmode}"
+            )
+        self._ops.extend(other._ops)
+        return self
+
+    def __add__(self, other: GaussianCircuit) -> GaussianCircuit:
+        c = GaussianCircuit(self.nmode)
+        c._ops = list(self._ops)
+        c += other
+        return c
+
+    # -- builder methods --------------------------------------------------
 
     def squeeze(self, mode: int, r: float | str = 0.0) -> GaussianCircuit:
         self._ops.append(self._partition('squeeze', [mode], r=r))
         return self
 
-    def displace(self, mode: int, alpha: complex | str = 0.0) -> GaussianCircuit:
+    def displace(
+        self, mode: int,
+        alpha: complex | str | ParamRef = 0.0,
+    ) -> GaussianCircuit:
         self._ops.append(self._partition('displace', [mode], alpha=alpha))
         return self
 
@@ -94,37 +141,95 @@ class GaussianCircuit:
         )
         return self
 
-    # -- execution -------------------------------------------------------
+    def measure_homodyne(
+        self, mode: int, phi: float, name: str
+    ) -> GaussianCircuit:
+        """Ideal Homodyne measurement: sample + condition + remove mode.
 
-    def run(self, **params: float) -> GaussianState:
+        At ``run()``, this produces a random outcome stored in
+        ``results[name]``.  The measured mode is removed from the state;
+        subsequent gates see a shifted mode index for modes above *mode*.
+        """
+        self._ops.append(
+            self._partition(
+                'measure_homodyne', [mode],
+                _fixed_str_keys={'name'},
+                phi=phi, name=name,
+            )
+        )
+        return self
+
+    # -- execution --------------------------------------------------------
+
+    def run(
+        self,
+        *,
+        rng: np.random.Generator | None = None,
+        **params: float,
+    ) -> GaussianState | tuple[GaussianState, dict[str, float]]:
         """Execute circuit with given parameter values.
 
-        Each symbolic parameter name must be provided as a keyword argument.
+        Returns ``GaussianState`` if no measurements, else
+        ``(GaussianState, results)``.
+
+        *rng* seeds Homodyne sampling for reproducible measurements.
         """
         st = GaussianState.vacuum(self.nmode)
-        for op_name, modes, fixed, pnames in self._ops:
+        mapping = list(range(self.nmode))
+        results: dict[str, float] = {}
+
+        for op_name, modes, fixed, pnames, refs in self._ops:
             kwargs = dict(fixed)
             for k, v in pnames.items():
                 if v not in params:
                     raise ValueError(
-                        f"Missing parameter '{v}' for {op_name}, "
-                        f"provided: {list(params)}"
+                        f"Missing parameter '{v}' for {op_name}"
                     )
                 kwargs[k] = params[v]
 
-            st = self._apply(op_name, st, modes, **kwargs)
+            if op_name == 'measure_homodyne':
+                orig_mode = modes[0]
+                phys_mode = mapping[orig_mode]
+                phi_val = kwargs['phi']
+                val, st = homodyne_sample_and_condition(
+                    st, phys_mode, phi_val, rng=rng
+                )
+                results[kwargs['name']] = val
+                st = st.remove_mode(phys_mode)
+                # shift mappings for modes above the removed one
+                for i in range(len(mapping)):
+                    if mapping[i] > phys_mode:
+                        mapping[i] -= 1
+                mapping[orig_mode] = -1
+            else:
+                phys_modes = [mapping[m] for m in modes]
+                # resolve ParamRef → real value
+                for k, v in refs.items():
+                    if v.source not in results:
+                        raise ValueError(
+                            f"ParamRef '{k}' references '{v.source}' "
+                            f"which has not been measured yet"
+                        )
+                    kwargs[k] = complex(results[v.source] * v.gain)
+
+                st = self._apply(op_name, st, tuple(phys_modes), **kwargs)
+
+        if results:
+            return st, results
         return st
 
     # -- inspection -------------------------------------------------------
 
     def __repr__(self) -> str:
         lines = [f"GaussianCircuit({self.nmode})"]
-        for op_name, modes, fixed, pnames in self._ops:
+        for op_name, modes, fixed, pnames, refs in self._ops:
             args = [str(m) for m in modes]
             for k, v in fixed.items():
                 args.append(f"{k}={v}")
             for k, v in pnames.items():
                 args.append(f"{k}=${{{v}}}")
+            for k, v in refs.items():
+                args.append(f"{k}=${{{v.source}}}*{v.gain}")
             lines.append(f"  .{op_name}({', '.join(args)})")
         return "\n".join(lines)
 
@@ -135,16 +240,23 @@ class GaussianCircuit:
 
     @staticmethod
     def _partition(
-        op_name: str, modes: list[int], **kwargs: float | str
-    ) -> tuple[str, tuple, dict, dict]:
-        fixed = {}
-        params = {}
+        op_name: str,
+        modes: list[int],
+        *,
+        _fixed_str_keys: frozenset[str] = frozenset(),
+        **kwargs: float | str | ParamRef,
+    ) -> tuple[str, tuple, dict, dict, dict]:
+        fixed: dict = {}
+        params: dict = {}
+        refs: dict = {}
         for k, v in kwargs.items():
-            if isinstance(v, str):
+            if isinstance(v, ParamRef):
+                refs[k] = v
+            elif isinstance(v, str) and k not in _fixed_str_keys:
                 params[k] = v
             else:
                 fixed[k] = v
-        return (op_name, tuple(modes), fixed, params)
+        return (op_name, tuple(modes), fixed, params, refs)
 
     _DISPATCH = {
         'squeeze': lambda st, m, **kw: squeeze(st, kw['r'], m[0]),

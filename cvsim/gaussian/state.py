@@ -40,3 +40,18 @@ class GaussianState:
 
     def copy(self) -> GaussianState:
         return GaussianState(V=self.V.copy(), rbar=self.rbar.copy())
+
+    def remove_mode(self, mode: int) -> GaussianState:
+        """Return new state with specified physical mode removed.
+
+        In xxpp, drops row/col *mode* and *nmode+mode* from V,
+        and the same entries from rbar.
+        """
+        m = self.nmode
+        if not 0 <= mode < m:
+            raise IndexError(f"mode {mode} out of range for nmode={m}")
+        keep = [i for i in range(2 * m) if i != mode and i != m + mode]
+        return GaussianState(
+            V=self.V[np.ix_(keep, keep)],
+            rbar=self.rbar[keep],
+        )

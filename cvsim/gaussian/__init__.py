@@ -1,5 +1,5 @@
 from cvsim.gaussian.channels import loss
-from cvsim.gaussian.circuit import GaussianCircuit
+from cvsim.gaussian.circuit import GaussianCircuit, ParamRef
 from cvsim.gaussian.state import GaussianState
 from cvsim.gaussian.gates import (
     beamsplitter,
@@ -38,4 +38,5 @@ __all__ = [
     "homodyne_sample_and_condition",
     "homodyne_condition",
     "GaussianCircuit",
+    "ParamRef",
 ]
