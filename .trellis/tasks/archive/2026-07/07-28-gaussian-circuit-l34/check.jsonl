@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/07-28-gaussian-circuit-l34/prd.md", "reason": "Acceptance criteria: compose, measure+remove, ParamRef, run returns tuple, simple GKP-like circuit"}
+{"file": "cvsim/gaussian/circuit.py", "reason": "Check: run() handles measurement path, __add__/__iadd__ semantics, mode mapping, ParamRef resolution"}
