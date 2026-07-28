@@ -510,6 +510,229 @@ print("5 vacuum samples:", samples)
         md(
             r"""---
 
+## 5c. 参数化电路：定义一次，多次运行
+
+之前我们手动写 `for` 循环、每次重新构建门序列。`GaussianCircuit`
+提供一种更干净的方式：**分离"电路结构"和"参数值"**。
+
+核心规则：
+- 门参数是**数字** → 固定值
+- 门参数是**字符串**（如 `'g'`） → 参数占位，`run()` 时传入
+
+"""
+        ),
+        code(
+            r"""from cvsim.gaussian import GaussianCircuit
+
+# 定义电路：structure = once
+c = GaussianCircuit(2)
+c.squeeze(0, r=0.5)          # 固定 r=0.5
+c.phase(0, theta='theta')     # 参数占位
+c.cz(0, 1, weight='g')        # 参数占位
+c.beamsplitter(0, 1, theta=np.pi/4)
+
+print(repr(c))  # 看门序列：${} 标记参数占位
+
+# 扫描参数：run = many
+import numpy as np
+import matplotlib.pyplot as plt
+
+g_vals = np.linspace(0, 1.5, 30)
+n_vals = []
+for g in g_vals:
+    st = c.run(theta=0.3, g=g)
+    n_vals.append(mean_photon(st))
+
+fig, ax = plt.subplots()
+ax.plot(g_vals, n_vals, 'o-', markersize=4)
+ax.set_xlabel("CZ weight g")
+ax.set_ylabel(r"$\langle n\rangle$")
+ax.set_title("扫 CZ 权重 → 总光子数变化")
+fig.tight_layout()
+plt.show()
+"""
+        ),
+        md(
+            r"""对比旧方式（手动重复代码）：
+
+```python
+# 旧：结构混在循环里，改了易出错
+for g in g_vals:
+    st = GaussianState.vacuum(2)
+    st = squeeze(st, r=0.5, mode=0)
+    st = phase(st, theta=0.3, mode=0)
+    st = cz(st, weight=g, mode1=0, mode2=1)
+    st = beamsplitter(st, 0, 1, theta=np.pi/4)
+```
+
+新方式：**"这个电路长什么样"** 和 **"参数取什么值"** 完全解耦。
+对教学非常友好——一眼看出电路拓扑。
+
+### 电路组合：`+`
+
+把两个电路拼起来，复用子电路。
+
+"""
+        ),
+        code(
+            r"""# 子电路 A：制备挤压
+c1 = GaussianCircuit(2)
+c1.squeeze(0, r=0.5)
+
+# 子电路 B：纠缠 + 操作
+c2 = GaussianCircuit(2)
+c2.cz(0, 1, weight=0.4)
+c2.beamsplitter(0, 1, theta=np.pi/4)
+
+# 组合：A + B = 完整电路
+c_full = c1 + c2
+print(f"A has {len(c1)} ops, B has {len(c2)} ops, full has {len(c_full)} ops")
+
+# c1 不变（+ 返回新电路）
+print(f"c1 unchanged: {len(c1)} ops")
+
+# += 就地修改
+c1 += c2
+print(f"c1 after +=: {len(c1)} ops")
+"""
+        ),
+        md(
+            r"""小总结：`GaussianCircuit` 的关键价值
+
+| 概念 | 旧方式 | 新方式 |
+|------|--------|--------|
+| 电路定义 | 手动写代码行 | `c.squeeze(0, r=...)` 语义化 |
+| 参数 | 写死在代码里 | 字符串占位 → `run()` 传值 |
+| 复用 | 复制粘贴 | `c1 + c2` |
+| 可视 | 无 | `repr(c)` 打印门序列 |
+
+## 5d. 测量与前馈（通向 GKP 纠错）
+
+**核心想法**：电路不仅是"一堆门加上去"，还包括**中间测量**——
+测得的结果可以**前馈**(feedforward)到后续门的参数。
+
+这是做 GKP 纠错的基石：
+1. 纠缠数据模和 ancilla
+2. 测量 ancilla 的某个正交分量
+3. 根据测量结果，位移数据模来抵消噪声
+
+---
+
+"""
+        ),
+        md(
+            r"""### 单步测量：模式消除
+
+`measure_homodyne(mode, phi, name)` 做三件事：
+1. 从当前态**采样**一个 Homodyne 结果
+2. 将态**投影**（条件化）到对应本征态
+3. 将测量模**消除**（`nmode` 减 1）
+
+返回的 `results` 字典记录每次测量值。
+
+"""
+        ),
+        code(
+            r"""from cvsim.gaussian import GaussianCircuit, ParamRef
+
+# 简单例子：2模真空 → 挤压 → 测模1
+c = GaussianCircuit(2)
+c.squeeze(1, r=0.5)                       # ancilla 制备
+c.measure_homodyne(1, phi=0, name='m_x')  # 测 x 分量
+
+rng = np.random.default_rng(42)
+state, results = c.run(rng=rng)
+
+print(f"测量前 nmode=2 → 测量后 nmode={state.nmode}")
+print(f"测量结果: m_x = {results['m_x']:.4f}")
+print(f"剩余态的模式是原来的 mode 0（数据模）")
+"""
+        ),
+        md(
+            r"""### 前馈位移：`ParamRef`
+
+`ParamRef(source, gain)` 告诉电路："等 `source` 测完，用 `结果 × gain` 作为本门的参数"。
+
+下面演示一个迷你 GKP 式纠错序列：
+
+"""
+        ),
+        code(
+            r"""# 迷你 GKP 式纠错：squeeze → CZ → measure p → feedback
+c = GaussianCircuit(2)
+c.squeeze(0, r=0.3)                        # 数据模（模拟有噪声）
+c.squeeze(1, r=0.5)                        # ancilla 制备
+c.cz(0, 1, weight=1.0)                     # 纠缠
+c.measure_homodyne(1, phi=np.pi/2, name='m_p')  # 测 ancilla 的 p
+c.displace(0, alpha=ParamRef('m_p', gain=0.5))  # feedback
+
+rng = np.random.default_rng(42)
+st_fb, res = c.run(rng=rng)
+
+# 对比：同样电路，但 feedback gain=0（不做反馈）
+c_no_fb = GaussianCircuit(2)
+c_no_fb.squeeze(0, r=0.3)
+c_no_fb.squeeze(1, r=0.5)
+c_no_fb.cz(0, 1, weight=1.0)
+c_no_fb.measure_homodyne(1, phi=np.pi/2, name='m_p')
+c_no_fb.displace(0, alpha=ParamRef('m_p', gain=0.0))  # gain=0 = no feedback
+
+rng2 = np.random.default_rng(42)
+st_no, _ = c_no_fb.run(rng=rng2)
+
+print(f"测量结果 m_p = {res['m_p']:.4f}")
+print(f"有反馈: r̄₀ = {st_fb.rbar[0]:.4f} (x 分量)")
+print(f"无反馈: r̄₀ = {st_no.rbar[0]:.4f} (x 分量)")
+print(f"反馈贡献的位移量 ≈ {abs(st_fb.rbar[0] - st_no.rbar[0]):.4f}")
+print(f"  = |m_p| × gain × √2 = {abs(res['m_p']) * 0.5 * np.sqrt(2):.4f}  ← 吻合")
+"""
+        ),
+        md(
+            r"""### 这是什么意思？
+
+GKP 纠错的核心思想：
+
+1. **纠缠**数据模和 ancilla（CZ 门）
+2. 噪声在**两个模上都有印记**（纠缠的数学性质）
+3. **测量 ancilla** 提取噪声信息，同时**投影数据模**（量子 "纠错" 不是"消除"噪声，而是"平移"它）
+4. **根据测量结果平移数据模**，抵消噪声
+
+上面 `gain=0.5` 是故意选的子最优值——真正 GKP 的增益需要精确匹配压缩参数。
+教学目的：让你**看到反馈位移量的合理性**（不是魔法数）。
+
+### 多步测量
+
+三模起步，逐步测量 → 最终只剩一个模。
+
+"""
+        ),
+        code(
+            r"""# 三步测量：展示测量消模 + mode 索引偏移
+c = GaussianCircuit(3)
+c.squeeze(0, r=0.3)
+c.squeeze(1, r=0.5)
+c.squeeze(2, r=0.2)
+c.cz(0, 1, weight=0.5)         # 纠缠 (0,1)
+c.cz(1, 2, weight=0.3)         # 纠缠 (1,2)
+c.measure_homodyne(1, phi=0, name='mx1')   # 测中间模
+c.measure_homodyne(0, phi=np.pi/2, name='mp0')  # 测数据模 0
+# 剩余的是原来的 mode 2（现物理 index 0）
+
+rng = np.random.default_rng(7)
+st, res = c.run(rng=rng)
+
+print(f"起始 nmode=3 → 2步测量后 nmode={st.nmode}")
+print(f"测量值: { {k: round(v, 4) for k, v in res.items()} }")
+print(f"剩余态光子数: <n> = {mean_photon(st):.4f}")
+"""
+        ),
+        md(
+            r"""> **诚实标注**：`measure_homodyne` 后模式**消除**（A1 方案）。
+> 后续门需自行调整 mode 索引——本版本不做自动重映射 DSL（L5 规划）。
+> 对教学场景：两三个模式的手动索引管理完全够用。
+
+---
+
 ## 6. API 速查
 
 ### 态（State）
@@ -518,6 +741,7 @@ print("5 vacuum samples:", samples)
 |-----|------|
 | `GaussianState(V, rbar)` | 高斯态，nmode 模。`V` 协方差矩阵 $(2m\times 2m)$，`rbar` 均值向量 $(2m,)$ |
 | `GaussianState.vacuum(nmode)` | 工厂方法：nmode 真空 $V=I/2$，$\bar r=0$ |
+| `state.remove_mode(k)` | 返回移除物理模 k 后的新态（nmode-1）|
 
 ### 门（Gates）— 幺正、保纯
 
@@ -528,8 +752,23 @@ print("5 vacuum samples:", samples)
 | `phase` | `(state, theta, mode=0)` | 单模相位旋转 $R(\theta)$：$x,p$ 平面上转 $\theta$ |
 | `beamsplitter` | `(state, m1, m2, theta, phi=0)` | 双模分束器 BS$(\theta,\phi)$；$\theta=\pi/4$ = 50:50 |
 | `two_mode_squeeze` | `(state, r, m1, m2)` | 双模挤压 $S_2(r)$ — **产生 EPR 纠缠** |
+| `cz` | `(state, weight, m1, m2)` | CZ $=\exp(i\cdot g\cdot\hat x_1\hat x_2)$：$p_1\leftarrow p_1+g x_2$ |
+| `cx` | `(state, weight, m1, m2)` | CX $=\exp(-i\cdot g\cdot\hat x_1\hat p_2)$：$x_2\leftarrow x_2+g x_1$，$p_1\leftarrow p_1-g p_2$ |
 
 > 所有门返回**新 `GaussianState`**，不修改原态（函数式风格）。
+
+### 电路（Circuit）— 参数化 + 测量 + 前馈
+
+| API | 签名 | 作用 |
+|-----|------|------|
+| `GaussianCircuit(nmode)` | 构造空电路 | 定义门序列，支持参数占位 + 测量 |
+| `c.squeeze(mode, r)` | `r` 可为数（固定）或字符串（占位）| 添加挤压门 |
+| `c.measure_homodyne(mode, phi, name)` | `name` 为结果键名 | 采样+投影+消除 mode |
+| `c.displace(mode, alpha=ParamRef(...))` | `ParamRef('name', gain)` | 前馈：alpha = 测量值 × gain |
+| `c.run(rng=None, **params)` | 返回 `state` 或 `(state, results)` | 执行电路，有测量则返回测量字典 |
+| `c1 + c2` / `c1 += c2` | nmode 必须相同 | 电路拼接 |
+
+> 门函数 `squeeze(state, ...)` 和电路方法 `c.squeeze(...)` 并存——前者是函数式 API，后者是电路建造器。
 
 ### 通道（Channels）— 非幺正、可能增混
 
