@@ -9,6 +9,8 @@ from cvsim.symplectic import (
     S_beamsplitter,
     S_CX,
     S_CZ,
+    S_from_unitary,
+    S_mach_zehnder,
     S_phase,
     S_squeeze,
     S_two_mode_squeeze,
@@ -130,3 +132,69 @@ def cx(
     return apply_symplectic(
         state, S_CX(state.nmode, weight, mode1, mode2), validate=False
     )
+
+
+def fourier(state: GaussianState, mode: int = 0) -> GaussianState:
+    """Fourier gate: phase rotation by π/2 on ``mode`` (â → iâ in our S_phase sign)."""
+    return phase(state, 0.5 * np.pi, mode=mode)
+
+
+def mach_zehnder(
+    state: GaussianState,
+    mode1: int,
+    mode2: int,
+    theta: float,
+    phi: float = 0.0,
+) -> GaussianState:
+    """Mach–Zehnder: BS(θ) → phase(φ) on mode1 → BS(π/4).
+
+    See ``S_mach_zehnder`` for the fixed decomposition.
+    """
+    return apply_symplectic(
+        state,
+        S_mach_zehnder(state.nmode, mode1, mode2, theta, phi),
+        validate=False,
+    )
+
+
+def interferometer(
+    state: GaussianState,
+    U: np.ndarray,
+    *,
+    validate_u: bool = True,
+) -> GaussianState:
+    """Apply passive linear optics U (m×m unitary) to an m-mode Gaussian state."""
+    U = np.asarray(U, dtype=complex)
+    if U.shape != (state.nmode, state.nmode):
+        raise ValueError(
+            f"U shape {U.shape} incompatible with nmode={state.nmode}"
+        )
+    S = S_from_unitary(U, validate=validate_u)
+    return apply_symplectic(state, S, validate=False)
+
+
+# alias
+apply_interferometer = interferometer
+
+
+def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState:
+    """Apply Reck/Clements mesh ops (from ``clements_decomposition``) in order."""
+    from cvsim.symplectic import S_from_unitary, U_beamsplitter, embed_U_2mode
+
+    st = state
+    m = st.nmode
+    for op in ops:
+        kind = op[0]
+        if kind == "u2":
+            _, i, j, U2 = op
+            U = embed_U_2mode(m, i, j, U2)
+            st = apply_symplectic(st, S_from_unitary(U, validate=False), validate=False)
+        elif kind == "bs":
+            _, i, j, theta, phi = op
+            st = beamsplitter(st, i, j, theta, phi)
+        elif kind == "phase":
+            _, i, theta = op
+            st = phase(st, theta, mode=i)
+        else:
+            raise ValueError(f"unknown mesh op {kind!r}")
+    return st
