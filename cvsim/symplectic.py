@@ -8,6 +8,29 @@ from __future__ import annotations
 
 import numpy as np
 
+from cvsim.conventions import omega
+
+
+def is_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> bool:
+    """Return True if S Ω Sᵀ ≈ Ω (xxpp convention)."""
+    S = np.asarray(S, dtype=float)
+    if S.ndim != 2 or S.shape[0] != S.shape[1] or S.shape[0] % 2 != 0:
+        return False
+    m = S.shape[0] // 2
+    Om = omega(m)
+    return np.allclose(S @ Om @ S.T, Om, atol=atol)
+
+
+def validate_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> None:
+    """Raise ValueError if S is not symplectic."""
+    S = np.asarray(S, dtype=float)
+    if S.ndim != 2 or S.shape[0] != S.shape[1] or S.shape[0] % 2 != 0:
+        raise ValueError(
+            f"S must be square with even dimension, got shape {getattr(S, 'shape', None)}"
+        )
+    if not is_symplectic(S, atol=atol):
+        raise ValueError("S is not symplectic: S Ω Sᵀ ≠ Ω (xxpp)")
+
 
 def d_displace(nmode: int, alpha: complex, mode: int = 0) -> np.ndarray:
     """Displacement vector d: d_x=√2 Re α, d_p=√2 Im α."""

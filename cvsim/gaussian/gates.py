@@ -17,32 +17,60 @@ from cvsim.symplectic import (
 
 
 def apply_symplectic(
-    state: GaussianState, S: np.ndarray, d: np.ndarray | None = None
+    state: GaussianState,
+    S: np.ndarray,
+    d: np.ndarray | None = None,
+    *,
+    validate: bool = True,
 ) -> GaussianState:
-    """Apply r ↦ S r + d to a Gaussian state. Returns new state."""
+    """Apply r ↦ S r + d to a Gaussian state. Returns new state.
+
+    If validate=True (default), require S Ω Sᵀ = Ω (xxpp).
+    Named library gates pass validate=False (generators are trusted).
+    """
+    from cvsim.symplectic import validate_symplectic
+
     S = np.asarray(S, dtype=float)
+    m2 = 2 * state.nmode
+    if S.shape != (m2, m2):
+        raise ValueError(f"S shape {S.shape} incompatible with nmode={state.nmode}")
+    if validate:
+        validate_symplectic(S)
     if d is None:
-        d = np.zeros(state.rbar.shape[0])
+        d = np.zeros(m2, dtype=float)
     else:
         d = np.asarray(d, dtype=float)
+        if d.shape != (m2,):
+            raise ValueError(f"d shape {d.shape} incompatible with nmode={state.nmode}")
     V = S @ state.V @ S.T
+    # numerical hygiene: keep V symmetric
+    V = 0.5 * (V + V.T)
     rbar = S @ state.rbar + d
     return GaussianState(V=V, rbar=rbar)
 
 
 def squeeze(state: GaussianState, r: float, mode: int = 0) -> GaussianState:
     """Single-mode squeeze S(r) in xxpp."""
-    return apply_symplectic(state, S_squeeze(state.nmode, r, mode))
+    return apply_symplectic(
+        state, S_squeeze(state.nmode, r, mode), validate=False
+    )
 
 
 def displace(state: GaussianState, alpha: complex, mode: int = 0) -> GaussianState:
     """Single-mode displacement D(α)."""
-    return apply_symplectic(state, np.eye(2 * state.nmode), d_displace(state.nmode, alpha, mode))
+    return apply_symplectic(
+        state,
+        np.eye(2 * state.nmode),
+        d_displace(state.nmode, alpha, mode),
+        validate=False,
+    )
 
 
 def phase(state: GaussianState, theta: float, mode: int = 0) -> GaussianState:
     """Single-mode phase rotation R(θ)."""
-    return apply_symplectic(state, S_phase(state.nmode, theta, mode))
+    return apply_symplectic(
+        state, S_phase(state.nmode, theta, mode), validate=False
+    )
 
 
 def beamsplitter(
@@ -53,14 +81,22 @@ def beamsplitter(
     phi: float = 0.0,
 ) -> GaussianState:
     """Two-mode beam splitter BS(θ, φ)."""
-    return apply_symplectic(state, S_beamsplitter(state.nmode, mode1, mode2, theta, phi))
+    return apply_symplectic(
+        state,
+        S_beamsplitter(state.nmode, mode1, mode2, theta, phi),
+        validate=False,
+    )
 
 
 def two_mode_squeeze(
     state: GaussianState, r: float, mode1: int, mode2: int
 ) -> GaussianState:
     """Two-mode squeeze S₂(r) (real r)."""
-    return apply_symplectic(state, S_two_mode_squeeze(state.nmode, r, mode1, mode2))
+    return apply_symplectic(
+        state,
+        S_two_mode_squeeze(state.nmode, r, mode1, mode2),
+        validate=False,
+    )
 
 
 def cz(
@@ -70,7 +106,9 @@ def cz(
 
     p₁ → p₁ + weight·x₂, p₂ → p₂ + weight·x₁.
     """
-    return apply_symplectic(state, S_CZ(state.nmode, weight, mode1, mode2))
+    return apply_symplectic(
+        state, S_CZ(state.nmode, weight, mode1, mode2), validate=False
+    )
 
 
 def cx(
@@ -80,4 +118,6 @@ def cx(
 
     x₂ → x₂ + weight·x₁, p₁ → p₁ - weight·p₂.
     """
-    return apply_symplectic(state, S_CX(state.nmode, weight, mode1, mode2))
+    return apply_symplectic(
+        state, S_CX(state.nmode, weight, mode1, mode2), validate=False
+    )

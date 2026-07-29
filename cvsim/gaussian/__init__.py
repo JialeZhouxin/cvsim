@@ -2,6 +2,7 @@ from cvsim.gaussian.channels import loss
 from cvsim.gaussian.circuit import GaussianCircuit, ParamRef
 from cvsim.gaussian.state import GaussianState
 from cvsim.gaussian.gates import (
+    apply_symplectic,
     beamsplitter,
     cx,
     cz,
@@ -22,6 +23,7 @@ from cvsim.gaussian.observables import (
 
 __all__ = [
     "GaussianState",
+    "apply_symplectic",
     "squeeze",
     "displace",
     "phase",

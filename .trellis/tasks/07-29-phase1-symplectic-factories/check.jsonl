@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/07-29-phase1-symplectic-factories/prd.md", "reason": "Acceptance criteria"}
+{"file": "docs/vision-gaussian-simulator.md", "reason": "Math invariants for factories and symplectic"}
+{"file": "tests/test_gaussian_state_factories.py", "reason": "New factory tests if present"}
+{"file": "tests/test_symplectic_core.py", "reason": "New symplectic core tests if present"}

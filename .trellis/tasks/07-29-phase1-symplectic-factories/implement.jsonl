@@ -1,0 +1,8 @@
+{"file": "docs/vision-gaussian-simulator.md", "reason": "P0 specs F-SYMPLECTIC-CORE and F-STATE-FACTORY"}
+{"file": ".trellis/tasks/07-29-phase1-symplectic-factories/prd.md", "reason": "Task acceptance"}
+{"file": "cvsim/conventions.py", "reason": "omega, vacuum_cov — hard conventions"}
+{"file": "cvsim/symplectic.py", "reason": "Add is/validate_symplectic; existing S_* generators"}
+{"file": "cvsim/gaussian/gates.py", "reason": "apply_symplectic validate kwarg"}
+{"file": "cvsim/gaussian/state.py", "reason": "State factories"}
+{"file": "cvsim/gaussian/__init__.py", "reason": "Export apply_symplectic"}
+{"file": "tests/test_b1_symplectic.py", "reason": "Extend or pair with new tests"}
