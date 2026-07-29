@@ -222,6 +222,10 @@ def S_from_unitary(
              [Im U,  Re U]]
 
     Same layout as ``S_beamsplitter``'s 2-mode block.
+
+    Note: a *global* phase factor e^{iφ}U is **not** a no-op in this CV
+    embedding (collective phase appears in S). Do not drop global phases
+    by qubit-style "w.l.o.g." arguments.
     """
     U = np.asarray(U, dtype=complex)
     if validate:
@@ -338,10 +342,21 @@ def compose_unitary_mesh(m: int, ops: list[tuple]) -> np.ndarray:
 def clements_decomposition(
     U: np.ndarray, *, atol: float = 1e-10
 ) -> list[tuple]:
-    """Vision name: Phase-1 implements Reck mesh under this alias.
+    """ALIAS FOR RECK — not rectangular Clements hardware layout.
 
-    Rectangular Clements can replace the body later if ops stay compose-compatible.
+    Phase-1 name kept for vision sketch compatibility. Prefer
+    ``reck_decomposition``. A true Clements rectangular mesh will be a
+    **separate** API later; this function must not silently change semantics.
     """
+    import warnings
+
+    warnings.warn(
+        "clements_decomposition is a Phase-1 alias for reck_decomposition "
+        "(triangular Reck mesh), not rectangular Clements. "
+        "Prefer reck_decomposition().",
+        FutureWarning,
+        stacklevel=2,
+    )
     return reck_decomposition(U, atol=atol)
 
 

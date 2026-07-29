@@ -18,6 +18,9 @@ from cvsim.gaussian.gates import (
     cx,
     cz,
     displace,
+    fourier,
+    interferometer,
+    mach_zehnder,
     phase,
     squeeze,
     two_mode_squeeze,
@@ -99,6 +102,11 @@ class GaussianCircuit:
         self._ops.append(self._partition('phase', [mode], theta=theta))
         return self
 
+    def fourier(self, mode: int = 0) -> GaussianCircuit:
+        """Fourier gate on ``mode`` (phase by π/2)."""
+        self._ops.append(self._partition('fourier', [mode]))
+        return self
+
     def beamsplitter(
         self, mode1: int, mode2: int,
         theta: float | str = np.pi / 4,
@@ -130,6 +138,40 @@ class GaussianCircuit:
     ) -> GaussianCircuit:
         self._ops.append(
             self._partition('cx', [mode1, mode2], weight=weight)
+        )
+        return self
+
+    def mach_zehnder(
+        self,
+        mode1: int,
+        mode2: int,
+        theta: float | str = np.pi / 4,
+        phi: float | str = 0.0,
+    ) -> GaussianCircuit:
+        """Mach–Zehnder: BS(θ) → phase(φ) on mode1 → BS(π/4)."""
+        self._ops.append(
+            self._partition(
+                'mach_zehnder', [mode1, mode2], theta=theta, phi=phi
+            )
+        )
+        return self
+
+    def interferometer(self, U: np.ndarray) -> GaussianCircuit:
+        """Passive interferometer: full nmode×nmode unitary U."""
+        U = np.asarray(U, dtype=complex)
+        if U.shape != (self.nmode, self.nmode):
+            raise ValueError(
+                f"U shape {U.shape} incompatible with nmode={self.nmode}"
+            )
+        # Store U in fixed kwargs; modes = all logical modes (for mapping).
+        self._ops.append(
+            (
+                'interferometer',
+                tuple(range(self.nmode)),
+                {'U': U},
+                {},
+                {},
+            )
         )
         return self
 
@@ -262,7 +304,11 @@ class GaussianCircuit:
         'squeeze': lambda st, m, **kw: squeeze(st, kw['r'], m[0]),
         'displace': lambda st, m, **kw: displace(st, kw['alpha'], m[0]),
         'phase': lambda st, m, **kw: phase(st, kw['theta'], m[0]),
+        'fourier': lambda st, m, **kw: fourier(st, m[0]),
         'beamsplitter': lambda st, m, **kw: beamsplitter(
+            st, m[0], m[1], kw['theta'], kw.get('phi', 0.0)
+        ),
+        'mach_zehnder': lambda st, m, **kw: mach_zehnder(
             st, m[0], m[1], kw['theta'], kw.get('phi', 0.0)
         ),
         'two_mode_squeeze': lambda st, m, **kw: two_mode_squeeze(
@@ -270,6 +316,7 @@ class GaussianCircuit:
         ),
         'cz': lambda st, m, **kw: cz(st, kw['weight'], m[0], m[1]),
         'cx': lambda st, m, **kw: cx(st, kw['weight'], m[0], m[1]),
+        'interferometer': lambda st, m, **kw: interferometer(st, kw['U']),
         'loss': lambda st, m, **kw: loss(st, kw['T'], m[0], kw.get('nbar', 0.0)),
     }
 

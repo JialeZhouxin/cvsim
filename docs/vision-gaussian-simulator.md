@@ -330,7 +330,7 @@ def apply_symplectic(
 | `phase` | `theta`, `mode` | `S_phase` |
 | `fourier` | `mode` | `phase(theta=π/2)` alias |
 | `beamsplitter` | `m1,m2,theta,phi` | existing `S_beamsplitter` |
-| `mach_zehnder` | `m1,m2, theta, phi` | standard MZ = phase·BS·phase·BS decomposition **documented in code** |
+| `mach_zehnder` | `m1,m2, theta, phi` | **Canonical (code):** $S=S_{\mathrm{BS}}(\pi/4,0)\,S_{R}(\phi,m_1)\,S_{\mathrm{BS}}(\theta,0)$ i.e. state order BS$(\theta)$ → phase$(\phi)$ on $m_1$ → BS$(\pi/4)$. *Not* the four-factor phase·BS·phase·BS template; *not* assumed dual-50:50 textbook MZ unless $\theta=\pi/4$. |
 | `two_mode_squeeze` | `r, m1, m2` | `S_two_mode_squeeze` |
 | `cz` | `weight, m1, m2` | `S_CZ` — $p_i \mathrel{+}= g x_j$, $p_j \mathrel{+}= g x_i$ |
 | `cx` | `weight, m1, m2` | `S_CX` — $x_j \mathrel{+}= g x_i$, $p_i \mathrel{-}= g p_j$ |
@@ -371,12 +371,14 @@ $$
 
 **Sanity:** $U=I\Rightarrow S=I$; 50:50 BS matches library BS (up to documented phase convention).
 
-**Mesh compilation (Clements preferred; Reck acceptable as alt)**
+**Mesh compilation (Phase-1 status)**
 
 - **Input:** $U$ ($m\times m$ unitary).  
-- **Output:** list of native ops `(phase, beamsplitter, …)` **or** direct $S_U$.  
+- **Output:** list of mesh ops **or** direct $S_U$.  
 - Phase-1 **minimum:** `S_from_unitary(U)` + `apply_interferometer(state, U)`.  
-- Phase-1 **target:** `clements_decomposition(U) -> list[GateOp]` matching $U$ within atol.
+- Phase-1 **shipped decomposition:** **Reck** triangular mesh via `reck_decomposition(U) -> list[ops]`.  
+- **`clements_decomposition`** is a **documented alias of Reck only** (not rectangular Clements hardware layout). True Clements = **separate future API**; must not silently replace Reck semantics.  
+- Mesh ops include `("u2", i, j, U2)` and `("phase", i, theta)` (and `bs`); further split of `u2` → named BS+phase is optional later (R4).
 
 **API sketch**
 
@@ -384,7 +386,8 @@ $$
 def S_from_unitary(U: np.ndarray) -> np.ndarray: ...
 def apply_interferometer(state: GaussianState, U: np.ndarray) -> GaussianState: ...
 
-def clements_decomposition(U: np.ndarray) -> list[tuple]: ...
+def reck_decomposition(U: np.ndarray) -> list[tuple]: ...
+def clements_decomposition(U: np.ndarray) -> list[tuple]: ...  # ALIAS → reck (Phase-1)
 def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState: ...
 ```
 
@@ -392,13 +395,15 @@ def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState: ...
 
 - `S_from_unitary` result is symplectic.  
 - $U$ must be unitary: $U^\dagger U=I$ within atol (validate).  
-- Decomposition recomposed equals $U$ (operator norm / Frobenius).
+- Decomposition recomposed equals $U$ (operator norm / Frobenius).  
+- **Global phase:** $e^{i\phi}U$ is **not** a CV no-op (overall mode phase appears in $S_U$); do not drop global phases “w.l.o.g.” as in some qubit-only texts.
 
 **Tests**
 
-- Haar-random $U$ (via QR) for $m=2,4,8$.  
-- TMSV + balanced BS → known EPR correlations.  
-- Decomposition round-trip.
+- Haar-random $U$ (via QR) for $m=2,4,8$ (+ larger smoke).  
+- Homomorphism $S(U_2U_1)=S(U_2)S(U_1)$; passive $S^\top S=I$; $\det S=+1$.  
+- TMSV + balanced BS; total photon conservation under passive $U$.  
+- Decomposition round-trip; alias `clements_decomposition` ≡ Reck behavior.
 
 **Performance note:** applying $S_U$ as one matrix multiply is $O(m^3)$; preferred path under F-COMPILE when many passive layers exist.
 
@@ -780,5 +785,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | Version | Date | Change |
 |---------|------|--------|
 | 0.1 | 2026-07-28 | Initial vision from stack survey + grill decisions |
+| 0.1.1 | 2026-07-29 | Align MZ + Reck/Clements naming with interferometer implementation (review R1/R2) |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.

@@ -163,7 +163,13 @@ def interferometer(
     *,
     validate_u: bool = True,
 ) -> GaussianState:
-    """Apply passive linear optics U (m×m unitary) to an m-mode Gaussian state."""
+    """Apply passive linear optics U (m×m unitary) to an m-mode Gaussian state.
+
+    ``validate_u=True`` (default) rejects non-unitary U. Setting
+    ``validate_u=False`` is a **trusted escape hatch only**: a non-unitary U
+    yields a non-symplectic S and can silently break physicality. Do not use
+    on untrusted input.
+    """
     U = np.asarray(U, dtype=complex)
     if U.shape != (state.nmode, state.nmode):
         raise ValueError(
