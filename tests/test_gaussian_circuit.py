@@ -5,7 +5,19 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cvsim.gaussian import GaussianCircuit, ParamRef, det_cov, mean_photon
+from cvsim.gaussian import (
+    GaussianCircuit,
+    GaussianState,
+    ParamRef,
+    amplifier,
+    apply_gaussian_channel,
+    det_cov,
+    displace,
+    loss,
+    mean_photon,
+    phase_noise,
+    squeeze,
+)
 
 
 def test_basic_parameter_scan():
@@ -213,3 +225,128 @@ def test_repr_shows_measurement_and_paramref():
     assert 'measure_homodyne' in s
     assert 'name=mx' in s
     assert '${mx}*0.5' in s
+
+
+# --- channel builders (amplifier / phase_noise / gaussian_channel) ---------
+
+def test_circuit_amplifier_matches_functional():
+    c = GaussianCircuit(1)
+    c.displace(0, alpha=0.5 + 0.2j)
+    c.amplifier(0, G=2.0)
+    st = c.run()
+    direct = amplifier(displace(GaussianState.vacuum(1), 0.5 + 0.2j), 2.0, mode=0)
+    np.testing.assert_allclose(st.V, direct.V, atol=1e-12)
+    np.testing.assert_allclose(st.rbar, direct.rbar, atol=1e-12)
+    assert mean_photon(st) > 0
+
+
+def test_circuit_amplifier_all_modes_and_param():
+    c = GaussianCircuit(2)
+    c.displace(0, alpha=0.4)
+    c.displace(1, alpha=0.3j)
+    c.amplifier(G='gain')  # mode=None → all
+    st = c.run(gain=4.0)
+    base = displace(GaussianState.vacuum(2), 0.4, mode=0)
+    base = displace(base, 0.3j, mode=1)
+    direct = amplifier(base, 4.0)
+    np.testing.assert_allclose(st.V, direct.V, atol=1e-12)
+    np.testing.assert_allclose(st.rbar, direct.rbar, atol=1e-12)
+
+
+def test_circuit_phase_noise_matches_functional():
+    c = GaussianCircuit(1)
+    c.squeeze(0, r=0.6)
+    c.phase_noise(0, sigma=0.4)
+    st = c.run()
+    direct = phase_noise(squeeze(GaussianState.vacuum(1), 0.6), 0.4)
+    np.testing.assert_allclose(st.V, direct.V, atol=1e-12)
+
+
+def test_circuit_phase_noise_param_scan():
+    c = GaussianCircuit(1)
+    c.squeeze(0, r=0.5)
+    c.phase_noise(0, sigma='s')
+    st0 = c.run(s=0.0)
+    st1 = c.run(s=1.0)
+    # larger phase noise → closer to vacuum diag
+    assert abs(st1.V[0, 0] - 0.5) < abs(st0.V[0, 0] - 0.5) or np.isclose(
+        st0.V[0, 0], st1.V[0, 0]
+    )
+    assert st1.is_physical()
+
+
+def test_circuit_gaussian_channel_matches_functional():
+    T = 0.4
+    X = np.sqrt(T) * np.eye(2)
+    Y = (1 - T) * 0.5 * np.eye(2)
+    c = GaussianCircuit(1)
+    c.displace(0, alpha=0.7)
+    c.gaussian_channel(X, Y)
+    st = c.run()
+    direct = apply_gaussian_channel(
+        displace(GaussianState.vacuum(1), 0.7), X, Y, validate=False
+    )
+    np.testing.assert_allclose(st.V, direct.V, atol=1e-12)
+    np.testing.assert_allclose(st.rbar, direct.rbar, atol=1e-12)
+
+
+def test_circuit_gaussian_channel_with_d():
+    d = np.array([0.3, -0.1])
+    c = GaussianCircuit(1)
+    c.gaussian_channel(np.eye(2), np.zeros((2, 2)), d=d, validate=False)
+    st = c.run()
+    np.testing.assert_allclose(st.rbar, d, atol=1e-12)
+
+
+def test_circuit_gaussian_channel_rejects_after_measure():
+    """Full (X,Y) sized for original nmode fails after mode removal."""
+    X = np.eye(4)
+    Y = np.zeros((4, 4))
+    c = GaussianCircuit(2)
+    c.squeeze(0, r=0.3)
+    c.measure_homodyne(1, phi=0.0, name='m')
+    c.gaussian_channel(X, Y, validate=False)
+    with pytest.raises(ValueError, match="does not match"):
+        c.run(rng=np.random.default_rng(0))
+
+
+def test_circuit_gaussian_channel_ok_on_remaining_modes():
+    """(X,Y) sized for remaining nmode after measure works."""
+    X = np.sqrt(0.5) * np.eye(2)
+    Y = 0.25 * np.eye(2)
+    c = GaussianCircuit(2)
+    c.squeeze(0, r=0.4)
+    c.measure_homodyne(1, phi=0.0, name='m')
+    c.gaussian_channel(X, Y, validate=False)
+    st, res = c.run(rng=np.random.default_rng(1))
+    assert st.nmode == 1
+    assert 'm' in res
+
+
+def test_circuit_channel_chain_loss_amp_pn():
+    c = (
+        GaussianCircuit(1)
+        .squeeze(0, r=0.5)
+        .loss(0, T=0.8)
+        .amplifier(0, G=1.5)
+        .phase_noise(0, sigma=0.2)
+    )
+    st = c.run()
+    direct = squeeze(GaussianState.vacuum(1), 0.5)
+    direct = loss(direct, 0.8, mode=0)
+    direct = amplifier(direct, 1.5, mode=0)
+    direct = phase_noise(direct, 0.2, mode=0)
+    np.testing.assert_allclose(st.V, direct.V, atol=1e-12)
+    assert mean_photon(st) >= 0
+    assert st.is_physical()
+
+
+def test_circuit_repr_shows_channel_ops():
+    c = GaussianCircuit(1)
+    c.amplifier(0, G=2.0)
+    c.phase_noise(0, sigma=0.1)
+    c.gaussian_channel(np.eye(2), np.zeros((2, 2)), validate=False)
+    s = repr(c)
+    assert 'amplifier' in s
+    assert 'phase_noise' in s
+    assert 'gaussian_channel' in s

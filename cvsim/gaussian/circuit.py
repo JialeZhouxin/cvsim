@@ -11,7 +11,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from cvsim.gaussian.channels import loss
+from cvsim.gaussian.channels import (
+    amplifier,
+    apply_gaussian_channel,
+    loss,
+    phase_noise,
+)
 from cvsim.gaussian.state import GaussianState
 from cvsim.gaussian.gates import (
     beamsplitter,
@@ -183,6 +188,72 @@ class GaussianCircuit:
         )
         return self
 
+    def amplifier(
+        self,
+        mode: int | None = None,
+        G: float | str = 1.0,
+        nbar: float = 0.0,
+    ) -> GaussianCircuit:
+        """Phase-insensitive amplifier. ``mode=None`` ⇒ all logical modes."""
+        modes = [] if mode is None else [mode]
+        self._ops.append(
+            self._partition('amplifier', modes, G=G, nbar=nbar)
+        )
+        return self
+
+    def phase_noise(
+        self,
+        mode: int | None = None,
+        sigma: float | str = 0.0,
+    ) -> GaussianCircuit:
+        """Phase diffusion (rotation-average). ``mode=None`` ⇒ all modes."""
+        modes = [] if mode is None else [mode]
+        self._ops.append(
+            self._partition('phase_noise', modes, sigma=sigma)
+        )
+        return self
+
+    def gaussian_channel(
+        self,
+        X: np.ndarray,
+        Y: np.ndarray,
+        d: np.ndarray | None = None,
+        *,
+        validate: bool = True,
+    ) -> GaussianCircuit:
+        """General Gaussian CPTP map ``(X, Y, d)`` on the **current** mode count.
+
+        ``X, Y`` must be ``(2m, 2m)`` where ``m`` is the number of modes still
+        present at the point this op runs. After ``measure_homodyne`` removes
+        modes, ``m`` shrinks — a full-size matrix built for the original
+        ``nmode`` will raise at ``run()``. Prefer named ``loss`` / ``amplifier``
+        / ``phase_noise`` when only some modes are affected.
+        """
+        X = np.asarray(X, dtype=float)
+        Y = np.asarray(Y, dtype=float)
+        if X.ndim != 2 or X.shape[0] != X.shape[1] or X.shape[0] % 2 != 0:
+            raise ValueError(f"X must be (2m,2m); got {X.shape}")
+        if Y.shape != X.shape:
+            raise ValueError(f"Y shape {Y.shape} != X shape {X.shape}")
+        m_xy = X.shape[0] // 2
+        if d is not None:
+            d = np.asarray(d, dtype=float)
+            if d.shape != (2 * m_xy,):
+                raise ValueError(
+                    f"d must be ({2 * m_xy},); got {d.shape}"
+                )
+        # modes empty: full-state op; run() does not remap X/Y through mapping
+        self._ops.append(
+            (
+                'gaussian_channel',
+                (),
+                {'X': X, 'Y': Y, 'd': d, 'validate': validate},
+                {},
+                {},
+            )
+        )
+        return self
+
     def measure_homodyne(
         self, mode: int, phi: float, name: str
     ) -> GaussianCircuit:
@@ -243,8 +314,32 @@ class GaussianCircuit:
                     if mapping[i] > phys_mode:
                         mapping[i] -= 1
                 mapping[orig_mode] = -1
+            elif op_name == 'gaussian_channel':
+                # Full-state (X,Y): dimension must match modes still present.
+                X = kwargs['X']
+                if X.shape[0] != 2 * st.nmode:
+                    raise ValueError(
+                        f"gaussian_channel X/Y size {X.shape[0]} does not match "
+                        f"current 2*nmode={2 * st.nmode} (mode removed by "
+                        f"measurement? use loss/amplifier/phase_noise instead)"
+                    )
+                st = apply_gaussian_channel(
+                    st,
+                    X,
+                    kwargs['Y'],
+                    kwargs.get('d'),
+                    validate=kwargs.get('validate', True),
+                )
             else:
-                phys_modes = [mapping[m] for m in modes]
+                # mode-less presets (amplifier/phase_noise with mode=None)
+                if modes:
+                    phys_modes = [mapping[m] for m in modes]
+                    if any(p < 0 for p in phys_modes):
+                        raise ValueError(
+                            f"{op_name} references a mode already measured/removed"
+                        )
+                else:
+                    phys_modes = []
                 # resolve ParamRef → real value
                 for k, v in refs.items():
                     if v.source not in results:
@@ -318,6 +413,12 @@ class GaussianCircuit:
         'cx': lambda st, m, **kw: cx(st, kw['weight'], m[0], m[1]),
         'interferometer': lambda st, m, **kw: interferometer(st, kw['U']),
         'loss': lambda st, m, **kw: loss(st, kw['T'], m[0], kw.get('nbar', 0.0)),
+        'amplifier': lambda st, m, **kw: amplifier(
+            st, kw['G'], m[0] if m else None, kw.get('nbar', 0.0)
+        ),
+        'phase_noise': lambda st, m, **kw: phase_noise(
+            st, kw['sigma'], m[0] if m else None
+        ),
     }
 
     @staticmethod
