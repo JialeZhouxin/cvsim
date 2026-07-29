@@ -1,0 +1,4 @@
+{"file": "docs/vision-gaussian-simulator.md", "reason": "Phase 1 退出第 3 条 demo 要求 + §2 硬约定 (xxpp, Ω, V_vac=I/2, displace √2) + §4.1 五 P0 Feature API 形态来源"}
+{"file": ".trellis/tasks/07-29-phase1-exit-demo/design.md", "reason": "本任务手算对账清单 9 项 + BS x 变换锁定的 S 矩阵 + 风险与回滚点；实现唯一权威数学来源"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "通用 backend 代码质量规约 (类型/docstring/python 风格)；本脚本是纯 backend Python"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "demo 严禁引入新 API；本指南约束复用已有 cvsim 公开 API 的边界"}
