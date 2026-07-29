@@ -71,9 +71,9 @@ def apply_gaussian_channel(
         V ← X V Xᵀ + Y
 
     ``validate=True`` (default) rejects non-CP (X, Y) via the condition
-    ``Y + iΩ − i XΩXᵀ ≽ 0``. ``validate=False`` is a **trusted escape hatch
-    only**: a non-CP pair can silently break physicality. Do not use on
-    untrusted input.
+    ``Y + iΩ/2 − i XΩXᵀ/2 ≽ 0`` (matching the project's ``V_vac = I/2``
+    convention). ``validate=False`` is a **trusted escape hatch only**: a
+    non-CP pair can silently break physicality. Do not use on untrusted input.
     """
     X = np.asarray(X, dtype=float)
     Y = np.asarray(Y, dtype=float)

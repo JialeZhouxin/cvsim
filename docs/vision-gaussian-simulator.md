@@ -425,10 +425,10 @@ $$
 with $X,Y$ real $2m\times 2m$, $Y=Y^\mathsf T$, and **complete positivity / Gaussian physicality**:
 
 $$
-Y + i\Omega - i X\Omega X^\mathsf T \succeq 0
+Y + i\frac{\Omega}{2} - i X\frac{\Omega}{2}X^\mathsf T \succeq 0
 $$
 
-(Hermitian PSD in the complex sense; implement via numerical check on the Hermitian matrix).
+(Hermitian PSD in the complex sense; implement via numerical check on the Hermitian matrix). The $1/2$ matches the project's $V_{\text{vac}}=I/2$ convention.
 
 **Presets (must be special cases of $(X,Y)$)**
 
@@ -436,7 +436,7 @@ $$
 |--------|-----|-----|-------|
 | Identity | $I$ | $0$ | |
 | Loss / attenuator transmittance $T\in[0,1]$, env $\bar n$ | $\sqrt{T}I$ (per mode block) | $(1-T)(2\bar n+1)\frac12 I$ on affected modes | Match current `loss` |
-| Phase diffusion (approx Gaussian) | $R$ average or small-noise $X\approx I$, $Y$ phase-noise form | Document chosen model in code docstring | Phase-1: single agreed formula |
+| Phase diffusion (random rotation average) | $e^{-\sigma^2/2} I$ | $(1-e^{-\sigma^2})\tfrac12 I$ | Static random-phase average; Option B selected |
 | Amplifier gain $G\ge1$, $\bar n_{\mathrm{amp}}$ | $\sqrt{G}I$ | $(G-1)(2\bar n_{\mathrm{amp}}+1)\frac12 I$ | Quantum-limited default $\bar n=0$ |
 
 **Multi-mode loss:** default independent identical $T$ on listed modes; correlated loss is P1+ with explicit $X,Y$.
@@ -758,7 +758,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 
 ## 11. Open questions (resolve by amending this doc)
 
-1. Phase-noise Gaussian kernel: Ornstein–Uhlenbeck phase diffusion vs static random phase average—**pick one before F-CHANNEL-GENERAL preset**.  
+1. ~~Phase-noise Gaussian kernel: Ornstein–Uhlenbeck phase diffusion vs static random phase average—**pick one before F-CHANNEL-GENERAL preset**.~~ **Resolved:** static random-phase average (Option B) selected; implemented as `phase_noise`.  
 2. Threshold measurement: outcomes-only vs forced Fock backend.  
 3. Whether `GaussianCircuit` becomes generic `CVCircuit` in phase 5.  
 4. Exact fidelity formula reference implementation (Banchi et al. vs other).  
@@ -786,5 +786,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 |---------|------|--------|
 | 0.1 | 2026-07-28 | Initial vision from stack survey + grill decisions |
 | 0.1.1 | 2026-07-29 | Align MZ + Reck/Clements naming with interferometer implementation (review R1/R2) |
+| 0.1.2 | 2026-07-29 | CP condition uses Ω/2 (match V+iΩ/2); phase_noise Option B resolved |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.

@@ -20,10 +20,10 @@ $$
 with the **complete-positivity (CP) condition**
 
 $$
-Y + i\Omega - i\,X\Omega X^{\mathsf T} \succeq 0
+Y + i\frac{\Omega}{2} - i\,X\frac{\Omega}{2}X^{\mathsf T} \succeq 0
 $$
 
-(Hermitian PSD in the complex sense).
+(Hermitian PSD in the complex sense). The $1/2$ matches the project's $V_{\text{vac}}=I/2$ convention.
 
 ---
 
