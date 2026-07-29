@@ -1,5 +1,12 @@
 from cvsim.gaussian.analyse import is_physical, validate_state
-from cvsim.gaussian.channels import loss
+from cvsim.gaussian.channels import (
+    amplifier,
+    apply_gaussian_channel,
+    is_cp_channel,
+    loss,
+    phase_noise,
+    validate_channel,
+)
 from cvsim.gaussian.circuit import GaussianCircuit, ParamRef
 from cvsim.gaussian.state import GaussianState
 from cvsim.gaussian.gates import (
@@ -43,6 +50,11 @@ __all__ = [
     "apply_interferometer",
     "apply_mesh",
     "loss",
+    "amplifier",
+    "phase_noise",
+    "apply_gaussian_channel",
+    "is_cp_channel",
+    "validate_channel",
     "det_cov",
     "mean_photon",
     "homodyne_mean",
