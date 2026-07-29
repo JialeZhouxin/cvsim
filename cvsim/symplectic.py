@@ -12,17 +12,26 @@ from cvsim.conventions import omega
 
 
 def is_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> bool:
-    """Return True if S Ω Sᵀ ≈ Ω (xxpp convention)."""
+    """Return True if S Ω Sᵀ ≈ Ω (xxpp convention).
+
+    Uses component-wise absolute tolerance ``atol`` via ``numpy.allclose``
+    (rtol=0 effectively for the residual when entries are O(1)). This is an
+    *engineering default*: residuals of the form S Ω Sᵀ − Ω can be amplified
+    or attenuated depending on the perturbation direction and ‖S‖, so a matrix
+    that is "structurally almost symplectic" may pass or fail near the
+    boundary. Callers that need scale-aware checks should set ``atol``
+    explicitly (e.g. ``atol=1e-8 * max(1.0, ‖S‖²)``) or use a relative metric.
+    """
     S = np.asarray(S, dtype=float)
     if S.ndim != 2 or S.shape[0] != S.shape[1] or S.shape[0] % 2 != 0:
         return False
     m = S.shape[0] // 2
     Om = omega(m)
-    return np.allclose(S @ Om @ S.T, Om, atol=atol)
+    return np.allclose(S @ Om @ S.T, Om, atol=atol, rtol=0.0)
 
 
 def validate_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> None:
-    """Raise ValueError if S is not symplectic."""
+    """Raise ValueError if S is not symplectic (see ``is_symplectic`` for atol)."""
     S = np.asarray(S, dtype=float)
     if S.ndim != 2 or S.shape[0] != S.shape[1] or S.shape[0] % 2 != 0:
         raise ValueError(

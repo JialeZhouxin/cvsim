@@ -49,11 +49,20 @@ def apply_symplectic(
     return GaussianState(V=V, rbar=rbar)
 
 
-def squeeze(state: GaussianState, r: float, mode: int = 0) -> GaussianState:
-    """Single-mode squeeze S(r) in xxpp."""
-    return apply_symplectic(
-        state, S_squeeze(state.nmode, r, mode), validate=False
-    )
+def squeeze(
+    state: GaussianState, r: float, mode: int = 0, phi: float = 0.0
+) -> GaussianState:
+    """Single-mode squeeze S(r, φ)=R(φ)S(r)R(-φ) in xxpp.
+
+    ``phi`` is the squeezing angle (same convention as ``GaussianState.squeezed``).
+    """
+    n = state.nmode
+    S_r = S_squeeze(n, r, mode)
+    if phi == 0.0:
+        S = S_r
+    else:
+        S = S_phase(n, phi, mode) @ S_r @ S_phase(n, -phi, mode)
+    return apply_symplectic(state, S, validate=False)
 
 
 def displace(state: GaussianState, alpha: complex, mode: int = 0) -> GaussianState:

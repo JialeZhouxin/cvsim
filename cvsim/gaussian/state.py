@@ -29,10 +29,18 @@ class GaussianState:
             raise ValueError("V must be (2m,2m) and rbar (2m,)")
         if d % 2 != 0:
             raise ValueError("dimension must be even (2m)")
+        # Note: constructor does *not* enforce physicality (V + iΩ/2 ≽ 0).
+        # Use cvsim.gaussian.analyse.is_physical / validate_state when needed.
 
     @property
     def nmode(self) -> int:
         return self.V.shape[0] // 2
+
+    def is_physical(self, *, atol: float = 1e-10) -> bool:
+        """Uncertainty relation V + iΩ/2 ≽ 0 (ħ=1, xxpp)."""
+        from cvsim.gaussian.analyse import is_physical
+
+        return is_physical(self, atol=atol)
 
     # --- factories (F-STATE-FACTORY) ---
 
@@ -140,15 +148,14 @@ class GaussianState:
 
     @classmethod
     def product(cls, *states: GaussianState) -> GaussianState:
-        """Tensor product in xxpp ordering.
+        """Tensor product in xxpp ordering (always builds a new embed).
 
         Local mode k of a factor with m modes maps to a global slot;
-        x-block then p-block layout is preserved globally.
+        x-block then p-block layout is preserved globally. A single
+        argument still goes through the embed path (deep copy of arrays).
         """
         if not states:
             raise ValueError("product() requires at least one state")
-        if len(states) == 1:
-            return states[0].copy()
 
         ms = [s.nmode for s in states]
         M = sum(ms)

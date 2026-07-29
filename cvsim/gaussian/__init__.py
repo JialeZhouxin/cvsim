@@ -1,3 +1,4 @@
+from cvsim.gaussian.analyse import is_physical, validate_state
 from cvsim.gaussian.channels import loss
 from cvsim.gaussian.circuit import GaussianCircuit, ParamRef
 from cvsim.gaussian.state import GaussianState
@@ -39,6 +40,8 @@ __all__ = [
     "homodyne_sample",
     "homodyne_sample_and_condition",
     "homodyne_condition",
+    "is_physical",
+    "validate_state",
     "GaussianCircuit",
     "ParamRef",
 ]
