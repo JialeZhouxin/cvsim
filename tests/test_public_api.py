@@ -83,12 +83,22 @@ def test_examples_phase1_imports_public_only():
 
     path = Path(__file__).resolve().parents[1] / "examples" / "phase1_exit_demo.py"
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    banned_prefixes = ("_",)
     for node in ast.walk(tree):
+        # from cvsim... import _private
         if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith(
             "cvsim"
         ):
+            if any(part.startswith("_") for part in node.module.split(".")):
+                raise AssertionError(f"private module import: from {node.module}")
             for alias in node.names:
                 assert not alias.name.startswith(
-                    banned_prefixes
+                    "_"
                 ), f"private import {alias.name} from {node.module}"
+        # import cvsim._private  /  import cvsim.gaussian._x as y
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                parts = alias.name.split(".")
+                if parts and parts[0] == "cvsim":
+                    assert not any(
+                        p.startswith("_") for p in parts[1:]
+                    ), f"private import {alias.name}"

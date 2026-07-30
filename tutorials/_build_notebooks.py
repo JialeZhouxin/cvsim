@@ -1252,7 +1252,7 @@ $$
 \mu = \frac{1}{2\bar n+1},\quad
 S = (\bar n+1)\ln(\bar n+1) - \bar n\ln\bar n
 $$
-（$\bar n=0$ 时 $S=0$）"""
+（$\bar n=0$ 时取连续极限 $S=0$；手算时请写 `nbar > 0` 分支，避免 `0*log(0)` → NaN。库内 `entropy_vn` 已数值稳定。）"""
         ),
         code(
             r"""
@@ -1262,7 +1262,11 @@ print("reduced nmode", red.nmode)
 print("ν_red", symplectic_eigenvalues(red), "  expect", [nbar + 0.5])
 print("purity", purity(red), "  expect", 1.0 / (2 * nbar + 1))
 S = entropy_vn(red)
-S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
+# nbar=0 → S=0 by continuity (avoid 0*(-inf) NaN)
+if nbar > 0.0:
+    S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
+else:
+    S_closed = 0.0
 print("S_vn", S, "  closed", S_closed)
 # 纠缠熵：纯二分下 S(A)=S(B)
 assert abs(entropy_vn(partial_trace(st, [1])) - S) < 1e-12
@@ -1382,7 +1386,10 @@ assert nu.shape == (2,) and np.allclose(nu, 0.5, atol=1e-10)
 nbar = float(np.sinh(r) ** 2)
 red = partial_trace(st, [0])
 assert abs(purity(red) - 1.0 / (2 * nbar + 1)) < 1e-10
-S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
+if nbar > 0.0:
+    S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
+else:
+    S_closed = 0.0
 assert abs(entropy_vn(red) - S_closed) < 1e-10
 
 EN = log_negativity(st, 0)
