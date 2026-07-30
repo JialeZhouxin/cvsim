@@ -7,12 +7,14 @@ import pytest
 
 from cvsim.gaussian import (
     GaussianState,
+    entropy_vn,
     is_physical,
     loss,
+    partial_trace,
     purity,
     symplectic_eigenvalues,
 )
-from cvsim.gaussian.analyse import _as_cov
+from cvsim.gaussian.analyse import _as_cov, _bosonic_g
 
 
 ATOL = 1e-10
@@ -228,3 +230,101 @@ def test_r3_atol_affects_clip_floor():
     assert nu_loose[0] == pytest.approx(0.5 - eps, abs=1e-12)
     # different atol → different result (param is live)
     assert nu_default[0] != pytest.approx(nu_loose[0], abs=1e-15)
+
+
+# ---------------------------------------------------------------------------
+# F-ANALYSE-2: entropy_vn + partial_trace
+# ---------------------------------------------------------------------------
+
+
+def _thermal_entropy_closed(nbar: float) -> float:
+    if nbar <= 0.0:
+        return 0.0
+    return float((nbar + 1.0) * np.log(nbar + 1.0) - nbar * np.log(nbar))
+
+
+def test_entropy_vacuum_zero():
+    for m in (1, 2, 3):
+        assert entropy_vn(GaussianState.vacuum(m)) == pytest.approx(0.0, abs=ATOL)
+
+
+@pytest.mark.parametrize("nbar", [0.0, 0.5, 1.0, 2.0])
+def test_entropy_thermal_closed_form(nbar):
+    st = GaussianState.thermal(nbar, nmode=1, mode=0)
+    assert entropy_vn(st) == pytest.approx(_thermal_entropy_closed(nbar), abs=ATOL)
+
+
+def test_entropy_tmsv_pure_zero():
+    st = GaussianState.tmsv(0.6, nmode=2, mode1=0, mode2=1)
+    assert entropy_vn(st) == pytest.approx(0.0, abs=ATOL)
+
+
+def test_entropy_tmsv_reduced_equals_thermal():
+    r = 0.6
+    st = GaussianState.tmsv(r, nmode=2, mode1=0, mode2=1)
+    red = partial_trace(st, keep=[0])
+    nbar = float(np.sinh(r) ** 2)
+    assert entropy_vn(red) == pytest.approx(_thermal_entropy_closed(nbar), abs=ATOL)
+    # reduced single-mode is thermal: purity match
+    assert purity(red) == pytest.approx(1.0 / (2.0 * nbar + 1.0), abs=ATOL)
+
+
+def test_entropy_additive_for_product_thermals():
+    t1 = GaussianState.thermal(0.3, nmode=1, mode=0)
+    t2 = GaussianState.thermal(1.0, nmode=1, mode=0)
+    prod = GaussianState.product(t1, t2)
+    s_sum = entropy_vn(t1) + entropy_vn(t2)
+    assert entropy_vn(prod) == pytest.approx(s_sum, abs=ATOL)
+
+
+def test_entropy_bare_ndarray_and_validate():
+    V = GaussianState.thermal(0.5, nmode=1).V
+    assert entropy_vn(V) == pytest.approx(_thermal_entropy_closed(0.5), abs=ATOL)
+    V_sub = 0.4 * np.eye(2)
+    # default: may compute something; validate rejects
+    with pytest.raises(ValueError, match="non-physical"):
+        entropy_vn(V_sub, validate=True)
+
+
+def test_bosonic_g_at_half_is_zero():
+    assert _bosonic_g(np.array([0.5]))[0] == pytest.approx(0.0, abs=ATOL)
+
+
+def test_partial_trace_keep_all_identity():
+    st = GaussianState.tmsv(0.6, nmode=2)
+    out = partial_trace(st, keep=[0, 1])
+    assert out.nmode == 2
+    assert np.allclose(out.V, st.V)
+    assert np.allclose(out.rbar, st.rbar)
+
+
+def test_partial_trace_single_int_keep():
+    st = GaussianState.coherent(0.5 + 0.25j, nmode=2, mode=0)
+    out = partial_trace(st, keep=0)
+    assert out.nmode == 1
+    # displacement on mode 0 preserved (√2 scaling)
+    assert out.rbar[0] == pytest.approx(st.rbar[0], abs=ATOL)
+    assert out.rbar[1] == pytest.approx(st.rbar[2], abs=ATOL)  # p0 at index m+0=2
+
+
+def test_partial_trace_matches_remove_mode_uncorrelated():
+    """Uncorrelated product: ptrace keep [0] ≡ remove_mode(1)."""
+    a = GaussianState.thermal(0.2, nmode=1)
+    b = GaussianState.thermal(0.9, nmode=1)
+    prod = GaussianState.product(a, b)
+    via_pt = partial_trace(prod, keep=[0])
+    via_rm = prod.remove_mode(1)
+    assert via_pt.nmode == 1
+    assert np.allclose(via_pt.V, via_rm.V)
+    assert np.allclose(via_pt.rbar, via_rm.rbar)
+    assert np.allclose(via_pt.V, a.V)
+
+
+def test_partial_trace_empty_and_bad_index():
+    st = GaussianState.vacuum(2)
+    with pytest.raises(ValueError, match="at least one"):
+        partial_trace(st, keep=[])
+    with pytest.raises(IndexError):
+        partial_trace(st, keep=[0, 5])
+    with pytest.raises(TypeError):
+        partial_trace(np.eye(4), keep=[0])  # type: ignore[arg-type]

@@ -1,10 +1,12 @@
-"""Gaussian analysis helpers (physicality, symplectic spectrum, purity).
+"""Gaussian analysis helpers (physicality, spectrum, purity, entropy, ptrace).
 
-Phase 2 F-ANALYSE: physicality first, then symplectic eigenvalues and purity.
-Downstream (entropy_vn, log_negativity, fidelity, partial_trace) come later.
+Phase 2 F-ANALYSE: physicality, symplectic eigenvalues, purity, entropy_vn,
+partial_trace. Downstream: log_negativity, fidelity.
 """
 
 from __future__ import annotations
+
+from collections.abc import Iterable
 
 import numpy as np
 
@@ -160,3 +162,105 @@ def purity(
             f"det(V) ≤ 0 (slogdet sign={sign}): non-physical or singular covariance"
         )
     return float(np.exp(-0.5 * logdet) / (2**m))
+
+
+def _bosonic_g(nu: np.ndarray, *, eps: float = 1e-15) -> np.ndarray:
+    """Bosonic thermal entropy g(ν) in nats, elementwise.
+
+    With occupation n = ν - 1/2:
+
+        g = (n+1) ln(n+1) - n ln n
+
+    At ν = 1/2 (n = 0), g = 0 by continuity.
+    """
+    n = np.maximum(np.asarray(nu, dtype=float) - 0.5, 0.0)
+    out = np.zeros_like(n, dtype=float)
+    mask = n > eps
+    nm = n[mask]
+    out[mask] = (nm + 1.0) * np.log(nm + 1.0) - nm * np.log(nm)
+    return out
+
+
+def entropy_vn(
+    state: GaussianState | np.ndarray,
+    *,
+    validate: bool = False,
+) -> float:
+    """Von Neumann entropy S = Σⱼ g(νⱼ) in **nats** (ħ=1).
+
+    Symplectic eigenvalues νⱼ from ``symplectic_eigenvalues``; bosonic
+    thermal function
+
+        g(ν) = (n+1) ln(n+1) - n ln n,   n = ν - 1/2
+
+    with g(1/2) = 0. Pure Gaussians → S = 0.
+
+    Accepts ``GaussianState`` or bare covariance ``V``.
+    **Physicality is not checked by default**; pass ``validate=True`` to
+    reject non-physical input (same pattern as ``purity``).
+
+    References
+    ----------
+    - Vision §4.2 F-ANALYSE
+    - Serafini, *Quantum Continuous Variables* §3.3
+    - Weedbrook et al., Rev. Mod. Phys. 84, 621 (2012) §II.C
+    """
+    nu = symplectic_eigenvalues(state, validate=validate)
+    return float(np.sum(_bosonic_g(nu)))
+
+
+def partial_trace(
+    state: GaussianState,
+    keep: int | Iterable[int],
+) -> GaussianState:
+    """Partial trace onto subsystem ``keep`` (logical mode indices).
+
+    Drops all modes not in ``keep`` from ``V`` and ``r̄`` **without**
+    measurement collapse or conditioning. This is *not* the same as
+    mid-circuit Homodyne + ``remove_mode`` when outcomes condition the
+    remaining state; use measurement APIs for that.
+
+    Parameters
+    ----------
+    state :
+        Input Gaussian state (required; bare V alone cannot carry ``r̄``).
+    keep :
+        Mode index or iterable of indices in ``0 .. nmode-1``. Order does
+        not matter; output modes are sorted ascending.
+
+    Returns
+    -------
+    GaussianState
+        Reduced state on ``len(keep_unique)`` modes in xxpp order.
+
+    Raises
+    ------
+    TypeError
+        If ``state`` is not a ``GaussianState``.
+    ValueError
+        If ``keep`` is empty after normalization.
+    IndexError
+        If any index is outside ``0 .. nmode-1``.
+    """
+    if not isinstance(state, GaussianState):
+        raise TypeError(
+            f"partial_trace requires GaussianState, got {type(state).__name__}"
+        )
+    m = state.nmode
+    if isinstance(keep, (int, np.integer)):
+        keep_list = [int(keep)]
+    else:
+        keep_list = [int(k) for k in keep]
+    # unique, sorted — stable subsystem order
+    keep_u = sorted(set(keep_list))
+    if not keep_u:
+        raise ValueError("partial_trace requires at least one mode in keep")
+    for k in keep_u:
+        if not 0 <= k < m:
+            raise IndexError(f"mode {k} out of range for nmode={m}")
+
+    # xxpp: mode k → axes k (x) and m+k (p)
+    idx = keep_u + [m + k for k in keep_u]
+    V = np.asarray(state.V, dtype=float)
+    r = np.asarray(state.rbar, dtype=float)
+    return GaussianState(V=V[np.ix_(idx, idx)], rbar=r[idx])

@@ -1,5 +1,7 @@
 from cvsim.gaussian.analyse import (
+    entropy_vn,
     is_physical,
+    partial_trace,
     purity,
     symplectic_eigenvalues,
     validate_state,
@@ -71,6 +73,8 @@ __all__ = [
     "validate_state",
     "symplectic_eigenvalues",
     "purity",
+    "entropy_vn",
+    "partial_trace",
     "GaussianCircuit",
     "ParamRef",
 ]
