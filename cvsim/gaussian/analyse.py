@@ -1,7 +1,7 @@
 """Gaussian analysis helpers (physicality, spectrum, purity, entropy, ptrace).
 
 Phase 2 F-ANALYSE: physicality, symplectic eigenvalues, purity, entropy_vn,
-partial_trace, log_negativity. Downstream: fidelity.
+partial_trace, log_negativity, fidelity.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 import numpy as np
+from scipy.linalg import sqrtm
 
 from cvsim.conventions import omega
 from cvsim.gaussian.state import GaussianState
@@ -353,3 +354,110 @@ def log_negativity(
     # E_N = sum max(0, -log2(2 ν̃))
     contrib = -np.log2(np.maximum(2.0 * nu, 1e-300))
     return float(np.sum(np.maximum(contrib, 0.0)))
+
+
+def fidelity(
+    state1: GaussianState,
+    state2: GaussianState,
+    *,
+    rtol: float = 1e-5,
+    atol: float = 1e-8,
+) -> float:
+    """Uhlmann fidelity F(ρ₁, ρ₂) ∈ [0, 1] between two Gaussian states.
+
+    Multimode Banchi–Braunstein–Pirandola formula (PRL 115, 260501 (2015)),
+    implemented via the thewalrus / Brask transcription (arXiv:2102.05748
+    Eq. 112, squared form — this function returns that square, i.e. the
+    standard Uhlmann fidelity |⟨ψ|φ⟩|² on pure states).
+
+    Conventions: ħ=1, xxpp, V_vac = I/2. Means and covariances are converted
+    internally to the unit-ħσ variables of the reference implementation.
+
+    Freeze checks (tests):
+
+    - identical states → 1
+    - coherent: F = exp(-|α-β|²)
+    - thermal n,m: F = [√((n+1)(m+1)) - √(n m)]^{-2}
+    - squeezed vacuum vs vacuum: F = sech(r)
+
+    Parameters
+    ----------
+    state1, state2 :
+        Gaussian states on the **same** number of modes.
+    rtol, atol :
+        Tolerances for the early-exit identical-state check and for the
+        near-zero branch of ``sqrtm``.
+
+    Returns
+    -------
+    float
+        Fidelity in ``[0, 1]`` (real part taken if residual imag noise).
+
+    Raises
+    ------
+    TypeError
+        If either argument is not a ``GaussianState``.
+    ValueError
+        If the two states have different ``nmode``.
+    """
+    if not isinstance(state1, GaussianState):
+        raise TypeError(
+            f"fidelity requires GaussianState, got state1={type(state1).__name__}"
+        )
+    if not isinstance(state2, GaussianState):
+        raise TypeError(
+            f"fidelity requires GaussianState, got state2={type(state2).__name__}"
+        )
+    if state1.nmode != state2.nmode:
+        raise ValueError(
+            f"fidelity nmode mismatch: {state1.nmode} vs {state2.nmode}"
+        )
+
+    mu1 = np.asarray(state1.rbar, dtype=float).ravel()
+    mu2 = np.asarray(state2.rbar, dtype=float).ravel()
+    cov1 = 0.5 * (
+        np.asarray(state1.V, dtype=float) + np.asarray(state1.V, dtype=float).T
+    )
+    cov2 = 0.5 * (
+        np.asarray(state2.V, dtype=float) + np.asarray(state2.V, dtype=float).T
+    )
+
+    if np.allclose(mu1, mu2, rtol=rtol, atol=atol) and np.allclose(
+        cov1, cov2, rtol=rtol, atol=atol
+    ):
+        return 1.0
+
+    # thewalrus path: normalize to ħ=1 variables (our native ħ is already 1,
+    # so σ = V / ħ = V and δr = Δμ / √ħ = Δμ).
+    hbar = 1.0
+    sigma1 = cov1 / hbar
+    sigma2 = cov2 / hbar
+    deltar = (mu1 - mu2) / np.sqrt(hbar)
+    n0 = sigma1.shape[0]
+    m = n0 // 2
+    om = omega(m)
+
+    sigma = sigma1 + sigma2
+    sigma_inv = np.linalg.inv(sigma)
+    vaux = om.T @ sigma_inv @ (0.25 * om + sigma2 @ om @ sigma1)
+    sqrtm_arg = np.eye(n0) + 0.25 * np.linalg.inv(vaux @ om @ vaux @ om)
+
+    if np.allclose(sqrtm_arg, 0.0, rtol=rtol, atol=atol):
+        mat_sqrtm = np.zeros_like(sqrtm_arg)
+    else:
+        mat_sqrtm = sqrtm(sqrtm_arg)
+
+    det_arg = 2.0 * (mat_sqrtm + np.eye(n0)) @ vaux
+    # det may pick up tiny imag from sqrtm; take real parts of dets.
+    det_inv = np.linalg.det(sigma_inv)
+    det_da = np.linalg.det(det_arg)
+    pref = np.sqrt(np.real_if_close(det_inv * det_da))
+    exp_term = np.exp(-0.5 * deltar @ sigma_inv @ deltar)
+    F = pref * exp_term
+    F = float(np.real_if_close(F))
+    # Numerical guard: clip tiny excursions outside [0, 1]
+    if -1e-12 < F < 0.0:
+        F = 0.0
+    if 1.0 < F < 1.0 + 1e-12:
+        F = 1.0
+    return F

@@ -1,5 +1,6 @@
 from cvsim.gaussian.analyse import (
     entropy_vn,
+    fidelity,
     is_physical,
     log_negativity,
     partial_trace,
@@ -77,6 +78,7 @@ __all__ = [
     "entropy_vn",
     "partial_trace",
     "log_negativity",
+    "fidelity",
     "GaussianCircuit",
     "ParamRef",
 ]

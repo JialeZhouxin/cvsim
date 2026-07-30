@@ -8,6 +8,7 @@ import pytest
 from cvsim.gaussian import (
     GaussianState,
     entropy_vn,
+    fidelity,
     is_physical,
     log_negativity,
     loss,
@@ -406,3 +407,73 @@ def test_logneg_high_loss_tmsv_baseline():
     assert en < -np.log2(np.exp(-2.0 * r))
     # Baseline lock (float64 path); loosen slightly for platform noise.
     assert en == pytest.approx(0.014232686489028258, rel=1e-6, abs=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# F-ANALYSE-4: fidelity
+# ---------------------------------------------------------------------------
+
+
+def _thermal_fidelity_closed(n: float, m: float) -> float:
+    return 1.0 / (np.sqrt((n + 1.0) * (m + 1.0)) - np.sqrt(n * m)) ** 2
+
+
+def test_fidelity_identical_one():
+    for factory in (
+        lambda: GaussianState.vacuum(2),
+        lambda: GaussianState.thermal(1.5, nmode=1),
+        lambda: GaussianState.tmsv(0.7, nmode=2),
+        lambda: GaussianState.coherent(0.3 - 0.2j, nmode=1),
+    ):
+        st = factory()
+        assert fidelity(st, st) == pytest.approx(1.0, abs=ATOL)
+
+
+def test_fidelity_coherent_overlap():
+    a = 1.0 + 0.0j
+    b = 0.5 + 0.5j
+    s1 = GaussianState.coherent(a, nmode=1)
+    s2 = GaussianState.coherent(b, nmode=1)
+    expected = float(np.exp(-abs(a - b) ** 2))
+    assert fidelity(s1, s2) == pytest.approx(expected, abs=1e-10)
+    assert fidelity(s1, GaussianState.vacuum(1)) == pytest.approx(
+        np.exp(-abs(a) ** 2), abs=1e-10
+    )
+
+
+@pytest.mark.parametrize(
+    "n,m",
+    [(0.0, 1.0), (1.0, 2.0), (0.5, 1.5), (3.0, 0.2), (0.0, 0.0), (2.0, 2.0)],
+)
+def test_fidelity_thermal_closed_form(n, m):
+    s1 = GaussianState.thermal(n, nmode=1)
+    s2 = GaussianState.thermal(m, nmode=1)
+    assert fidelity(s1, s2) == pytest.approx(_thermal_fidelity_closed(n, m), abs=1e-10)
+
+
+def test_fidelity_squeezed_vs_vacuum_sech():
+    r = 0.6
+    sq = GaussianState.squeezed(r, 0.0, nmode=1)
+    vac = GaussianState.vacuum(1)
+    assert fidelity(sq, vac) == pytest.approx(1.0 / np.cosh(r), abs=1e-10)
+
+
+def test_fidelity_symmetric():
+    s1 = GaussianState.thermal(0.8, nmode=1)
+    s2 = GaussianState.coherent(0.4 + 0.1j, nmode=1)
+    assert fidelity(s1, s2) == pytest.approx(fidelity(s2, s1), abs=1e-12)
+
+
+def test_fidelity_tmsv_vs_vacuum_in_unit_interval():
+    tm = GaussianState.tmsv(0.5, nmode=2)
+    vac = GaussianState.vacuum(2)
+    f = fidelity(tm, vac)
+    assert 0.0 < f < 1.0
+    assert f == pytest.approx(fidelity(vac, tm), abs=1e-12)
+
+
+def test_fidelity_nmode_mismatch_and_type():
+    with pytest.raises(ValueError, match="nmode"):
+        fidelity(GaussianState.vacuum(1), GaussianState.vacuum(2))
+    with pytest.raises(TypeError):
+        fidelity(np.eye(2), GaussianState.vacuum(1))  # type: ignore[arg-type]
