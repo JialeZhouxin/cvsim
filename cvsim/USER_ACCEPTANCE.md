@@ -2,7 +2,8 @@
 
 > 工程验收文档（可指 API）。理论笔记仍纯物理，不绑本包。  
 > 能力边界：三表示独立闭环 + G/B condition·sample·loss + F 1–2 模 BS/Kerr/PNRD + F 1 模 loss→ρ/门 + **Fock Wigner** + B 矩/`gkp0`/Wigner + sample_and_condition。  
-> 版本锚点：pytest **139** passed（切片后请改本数）。
+> 版本锚点：pytest **368+** passed（Phase 2 F-ANALYSE + Heterodyne；以本地/CI 全绿为准）。  
+> API 稳定性：[`docs/api-stability.md`](../docs/api-stability.md)；公开面冻结 `tests/test_public_api.py`。
 
 ---
 
@@ -21,7 +22,7 @@
 
 | 表示 | 当前闭环（摘要） |
 |------|------------------|
-| **Gaussian** | 门 D/R/S/BS/S₂ → `loss(T, nbar=0)` → 边缘 / **sample** / 条件 Homodyne → 矩 |
+| **Gaussian** | factories → 门/干涉仪/S₂ → loss·amp·phase_noise → Homodyne/**Heterodyne** → analyse（purity/log_neg/fidelity/…）→ **GaussianCircuit** |
 | **Fock** | 1–2 模；D/R/S/Kerr/BS/**S₂** → PNRD / norm / ⟨n⟩；**1 模 Homodyne mean/var/sample/condition**（投影截断 X 本征态，≠G Kalman）；**1–2 模 `loss→FockDensity`**；**1 模 ρ 上 D/R/S**；**单模 Wigner** |
 | **Bosonic** | cat / `gkp0` / **`gkp1`** → 门 → ∑w 加权矩 → `loss(T, nbar=0)` → **sample** / **condition（复仿射）** / **sample_and_condition** |
 

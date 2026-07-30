@@ -16,18 +16,20 @@ uv pip install numpy scipy
 
 ## 能力矩阵（当前）
 
-| 表示 | 初态 | 门 | 通道 | 测量 / 矩 |
-|------|------|----|------|-----------|
-| **Gaussian** | 真空 | D/R/S/BS/**S₂** | **`loss(T, nbar=0)`** | det / ⟨n⟩ / Homodyne 边缘 / **sample** / **条件** / **sample_and_condition** |
+| 表示 | 初态 | 门 | 通道 | 测量 / 分析 |
+|------|------|----|------|-------------|
+| **Gaussian** | vacuum / coherent / thermal / squeezed / displaced_squeezed / tmsv / product | D/R/S/BS/**S₂**/Fourier/MZ/CZ/CX/interferometer | **loss** / amplifier / phase_noise / general `(X,Y)` | Homodyne + **Heterodyne**；F-ANALYSE（purity / ν / entropy_vn / ptrace / log_neg / fidelity）；**`GaussianCircuit`** |
 | **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`（1–2 模）** | D/R/S/**Kerr** / **BS** / **S₂** / **1 模 ρ 上 D/R/S** | **`loss(T, mode=)`（1–2 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ / **Wigner** / **Homodyne mean·var·sample·condition** |
 | **Bosonic** | 真空 / **cat** / **`gkp0`/`gkp1`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T, nbar=0)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
 
-辛矩阵只在 **`cvsim/symplectic.py`**（G/B 共享地基；`gaussian.symplectic` 为兼容 re-export）。无 Circuit DSL。B **不** import G 包。
+辛矩阵只在 **`cvsim/symplectic.py`**（G/B 共享地基）。Gaussian 有 **`GaussianCircuit`**（含 Homodyne/Heterodyne + feedforward）。B **不** import G 包。
+
+**API 稳定性政策**（公开面 / semver / 硬约定）：[`docs/api-stability.md`](../docs/api-stability.md)。公开导出以 `cvsim.gaussian.__all__` 为准，由 `tests/test_public_api.py` 冻结。
 
 ### 概念闭环
 
 ```text
-G: 真空 → 门(+S₂) → [loss] → condition Homodyne → 矩
+G: factories → 门/干涉仪 → channel → Homodyne|Heterodyne → analyse (purity/log_neg/…)
 F: 1–2 模 → D/R/S/Kerr/BS → PNRD
 B: cat|gkp0 → 门 → [loss] → 加权矩
 ```
@@ -69,8 +71,10 @@ python -m cvsim.demos.m4_cross_rep          # 跨表示：T4挤 / T1 loss / T5 S
 
 ```bash
 uv pip install pytest
-python -m pytest tests -q   # 当前锚点：139
+python -m pytest tests -q   # Phase 2 锚点：≈368+（以 CI/本地全绿为准）
 ```
+
+Phase 1 退出 demo：`examples/phase1_exit_demo.py`（4-mode TMSV → BS → loss → homodyne var）。
 
 ## 包结构
 
@@ -78,7 +82,7 @@ python -m pytest tests -q   # 当前锚点：139
 cvsim/
   conventions.py   # ħ, xxpp, Ω, vacuum
   symplectic.py    # shared S/d (G+B gates only)
-  gaussian/        # state, gates, channels.loss, observables(+condition); symplectic shim
+  gaussian/        # state, gates, channels, observables, analyse, circuit
   fock/            # 1–2 模；独立，不依赖 G/B
   bosonic/         # Component, cat, gkp0, gates→symplectic, loss, moments
   wigner.py        # 跨表示门面（故意）

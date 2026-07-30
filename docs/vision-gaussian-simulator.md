@@ -742,14 +742,17 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 
 | Feature | Now | Gap |
 |---------|-----|-----|
-| Conventions xxpp ħ=1 | Done | Freeze |
-| vacuum factory | Done | Extend factories |
-| Named gates + CZ/CX | Done | phi-squeeze, Fourier, MZ, interferometer |
-| apply_symplectic | Partial | validate + d + public guarantee |
-| loss | Done | General $(X,Y)$, amp, phase noise |
-| Homodyne + FF circuit | Done | Heterodyne, serialize, compile |
-| Analyse | det_cov, mean_photon | Full F-ANALYSE |
-| Compile merge S | Missing | F-COMPILE |
+| Conventions xxpp ħ=1 | Done | Freeze (api-stability.md) |
+| State factories | Done | — |
+| Named gates + CZ/CX + Fourier/MZ | Done | — |
+| Interferometer / mesh | Done | true Clements layout = future |
+| apply_symplectic | Done | — |
+| Channels loss/amp/phase_noise/(X,Y) | Done | — |
+| Homodyne + Heterodyne + FF circuit | Done | serialize |
+| F-ANALYSE (purity…fidelity) | Done | — |
+| API stability policy | Done | `docs/api-stability.md` + `test_public_api` |
+| TMSV teaching notebook (purity/log_neg) | Partial | beginner nb exists; dedicated TMSV tutorial optional |
+| Compile merge S | Missing | F-COMPILE (Phase 3) |
 | GBS | Out | Adapter phase 3 |
 | AD | Out | Phase 4 |
 | Fock/Bosonic | Teaching MVP | Bridges phase 5 |
@@ -761,7 +764,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 1. ~~Phase-noise Gaussian kernel: Ornstein–Uhlenbeck phase diffusion vs static random phase average—**pick one before F-CHANNEL-GENERAL preset**.~~ **Resolved:** static random-phase average (Option B) selected; implemented as `phase_noise`.  
 2. Threshold measurement: outcomes-only vs forced Fock backend.  
 3. Whether `GaussianCircuit` becomes generic `CVCircuit` in phase 5.  
-4. Exact fidelity formula reference implementation (Banchi et al. vs other).  
+4. ~~Exact fidelity formula reference implementation (Banchi et al. vs other).~~ **Resolved:** Banchi–Braunstein–Pirandola / thewalrus–Brask transcription; freeze tests in `test_analyse.py`.  
 5. CI wall-time budget for $m=100$ benchmark on available runners.
 
 ---
@@ -788,5 +791,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1.1 | 2026-07-29 | Align MZ + Reck/Clements naming with interferometer implementation (review R1/R2) |
 | 0.1.2 | 2026-07-29 | CP condition uses Ω/2 (match V+iΩ/2); phase_noise Option B resolved |
 | 0.1.3 | 2026-07-30 | Log-negativity: max-per-term form (TMSV freeze); was cancelling sum over all ν̃ |
+| 0.1.4 | 2026-07-30 | Phase 2 API stability policy (`docs/api-stability.md`); gap table refreshed post F-ANALYSE + Heterodyne |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.

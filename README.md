@@ -62,7 +62,8 @@
 6. **跨表示同一套数**（工程 demo `m4`）：单模挤 / 相干+loss / S₂ / 热 n̄ / Homodyne 均值对照
 
 工程落地与**最终用户验收**（目标 / U1–U5+U7+U8 / 能力矩阵）见：
-[`cvsim/README.md`](./cvsim/README.md) · [`cvsim/USER_ACCEPTANCE.md`](./cvsim/USER_ACCEPTANCE.md) · `python -m cvsim.demos.user_acceptance`
+[`cvsim/README.md`](./cvsim/README.md) · [`cvsim/USER_ACCEPTANCE.md`](./cvsim/USER_ACCEPTANCE.md) · `python -m cvsim.demos.user_acceptance`  
+Gaussian 路线图 / 硬约定 / **API 稳定性**：[`docs/vision-gaussian-simulator.md`](./docs/vision-gaussian-simulator.md) · [`docs/api-stability.md`](./docs/api-stability.md)
 
 **新手 Jupyter（三表示各一本）**：[tutorials/README.md](./tutorials/README.md)
 
