@@ -1,0 +1,4 @@
+{"file": "docs/vision-gaussian-simulator.md", "reason": "§4.2 F-ANALYSE 数学定义 (purity μ=1/(2^m√detV), symplectic eigvals ν_j≥1/2) + §7 slogdet 稳定性要求 + §2 硬约定"}
+{"file": ".trellis/tasks/07-30-phase2-analyse-eigs-purity/design.md", "reason": "Cholesky-Williamson 算法 8 步锁定 + API 签名 + 测试对账点 + [::2] 陷阱；实现唯一权威来源"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "backend 代码质量规约"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复用 is_physical 的 isinstance 模式抽 _as_cov；不重复造 omega/conventions"}

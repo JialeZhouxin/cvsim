@@ -1,4 +1,9 @@
-from cvsim.gaussian.analyse import is_physical, validate_state
+from cvsim.gaussian.analyse import (
+    is_physical,
+    purity,
+    symplectic_eigenvalues,
+    validate_state,
+)
 from cvsim.gaussian.channels import (
     amplifier,
     apply_gaussian_channel,
@@ -64,6 +69,8 @@ __all__ = [
     "homodyne_condition",
     "is_physical",
     "validate_state",
+    "symplectic_eigenvalues",
+    "purity",
     "GaussianCircuit",
     "ParamRef",
 ]
