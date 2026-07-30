@@ -751,7 +751,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | Homodyne + Heterodyne + FF circuit | Done | serialize |
 | F-ANALYSE (purity…fidelity) | Done | — |
 | API stability policy | Done | `docs/api-stability.md` + `test_public_api` |
-| TMSV teaching notebook (purity/log_neg) | Partial | beginner nb exists; dedicated TMSV tutorial optional |
+| TMSV teaching notebook (purity/log_neg) | Done | `tutorials/04_tmsv_analyse.ipynb` + `tests/test_tmsv_tutorial.py` |
 | Compile merge S | Missing | F-COMPILE (Phase 3) |
 | GBS | Out | Adapter phase 3 |
 | AD | Out | Phase 4 |
@@ -792,5 +792,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1.2 | 2026-07-29 | CP condition uses Ω/2 (match V+iΩ/2); phase_noise Option B resolved |
 | 0.1.3 | 2026-07-30 | Log-negativity: max-per-term form (TMSV freeze); was cancelling sum over all ν̃ |
 | 0.1.4 | 2026-07-30 | Phase 2 API stability policy (`docs/api-stability.md`); gap table refreshed post F-ANALYSE + Heterodyne |
+| 0.1.5 | 2026-07-30 | Phase 2 TMSV analyse tutorial (`tutorials/04_tmsv_analyse.ipynb`); teach exit criterion |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.

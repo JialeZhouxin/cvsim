@@ -9,6 +9,7 @@
 | 1 | [01_gaussian_beginner.ipynb](./01_gaussian_beginner.ipynb) | 真空·挤·位移·BS·loss·Homodyne |
 | 2 | [02_fock_beginner.ipynb](./02_fock_beginner.ipynb) | 截断·PNRD·loss→ρ·Wigner |
 | 3 | [03_bosonic_beginner.ipynb](./03_bosonic_beginner.ipynb) | cat·GKP·权重·Gram |
+| 4 | [04_tmsv_analyse.ipynb](./04_tmsv_analyse.ipynb) | **TMSV**·purity·entropy·ptrace·log_neg·Heterodyne 导引（Phase 2） |
 
 理论笔记仍建议：术语表 → 00 → **02 Gaussian** → 01 Fock → 03 Bosonic。
 

@@ -1163,4 +1163,243 @@ print("T3 self-check OK")
     ],
 )
 
+# ---------------------------------------------------------------------------
+# T4 TMSV + F-ANALYSE (Phase 2 teach)
+# ---------------------------------------------------------------------------
+write(
+    "04_tmsv_analyse.ipynb",
+    [
+        md(
+            r"""# 04 · TMSV 与高斯分析量
+
+Phase 2 教学本：用 **双模挤压真空（TMSV）** 串起
+
+`purity` · `symplectic_eigenvalues` · `entropy_vn` · `partial_trace` · `log_negativity` · `heterodyne`
+
+配套：`docs/vision-gaussian-simulator.md` §4.2 F-ANALYSE；`docs/api-stability.md`。
+先完成本目录 `01_gaussian_beginner.ipynb` 再来。"""
+        ),
+        md(
+            r"""## 1. 这是啥 / 为啥用
+
+- TMSV 是连续变量里最标准的 **双模纠缠源**（EPR 光）。
+- 整体是 **纯高斯态**；任一单模约化是 **热态** $\bar n=\sinh^2 r$。
+- 分析量有闭式，最适合核对模拟器：
+
+| 量 | TMSV 期望 |
+|----|-----------|
+| 整体 purity | $1$ |
+| 整体 $S_{\mathrm{vN}}$ | $0$（nats） |
+| 约化热态 purity | $1/(2\bar n+1)$ |
+| 对数负性 $\mathcal E_N$ | $-\log_2(e^{-2r})=2r/\ln 2$（bits） |
+| Heterodyne 导引 | 测 A 得 $\beta$ → B 为 $\lvert\tanh r\,\beta^*\rangle$ |"""
+        ),
+        md(
+            r"""## 2. 约定（与全库一致）
+
+| 项 | 值 |
+|----|-----|
+| $\hbar$ | 1 |
+| 正交序 | **xxpp** |
+| 真空 | $V=I/2$ |
+| `entropy_vn` | **nats**（$\ln$） |
+| `log_negativity` | **bits**（$\log_2$） |
+| Heterodyne $\beta$ | $(x+ip)/\sqrt{2}$ |"""
+        ),
+        code(BOOT),
+        code(
+            r"""
+from cvsim.gaussian import (
+    GaussianState,
+    entropy_vn,
+    heterodyne_condition,
+    log_negativity,
+    loss,
+    mean_photon,
+    partial_trace,
+    purity,
+    symplectic_eigenvalues,
+)
+"""
+        ),
+        md(
+            r"""## 3. 建造 TMSV 并确认「整体纯」
+
+工厂：`GaussianState.tmsv(r, nmode=2)`。
+
+纯高斯 ⟺ 全部辛本征值 $\nu_j=1/2$ ⟺ $\mu=1$ ⟺ $S=0$。"""
+        ),
+        code(
+            r"""
+r = 0.6
+st = GaussianState.tmsv(r, nmode=2, mode1=0, mode2=1)
+print("nmode", st.nmode)
+print("ν =", symplectic_eigenvalues(st))
+print("purity", purity(st))
+print("S_vn (nats)", entropy_vn(st))
+print("<n> total", mean_photon(st), "  2 sinh^2 r =", 2 * np.sinh(r) ** 2)
+"""
+        ),
+        md(
+            r"""## 4. 偏迹 → 单模热态
+
+`partial_trace(state, keep)`：**无测量**地丢掉子系统（≠ Homodyne/Heterodyne conditioning）。
+
+TMSV 对一模偏迹：
+
+$$
+\bar n = \sinh^2 r,\quad
+\mu = \frac{1}{2\bar n+1},\quad
+S = (\bar n+1)\ln(\bar n+1) - \bar n\ln\bar n
+$$
+（$\bar n=0$ 时 $S=0$）"""
+        ),
+        code(
+            r"""
+red = partial_trace(st, keep=[0])
+nbar = float(np.sinh(r) ** 2)
+print("reduced nmode", red.nmode)
+print("ν_red", symplectic_eigenvalues(red), "  expect", [nbar + 0.5])
+print("purity", purity(red), "  expect", 1.0 / (2 * nbar + 1))
+S = entropy_vn(red)
+S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
+print("S_vn", S, "  closed", S_closed)
+# 纠缠熵：纯二分下 S(A)=S(B)
+assert abs(entropy_vn(partial_trace(st, [1])) - S) < 1e-12
+print("S(A)=S(B) OK")
+"""
+        ),
+        md(
+            r"""## 5. 对数负性（bits）
+
+对子系统 A 做 partial transpose（翻 $p_A$），再对 PT 协方差取 **raw** 辛谱（允许 $\tilde\nu<1/2$）：
+
+$$
+\mathcal E_N = \sum_j \max\{0, -\log_2(2\tilde\nu_j)\}
+$$
+
+TMSV 闭式（vision freeze）：
+
+$$
+\mathcal E_N = -\log_2(e^{-2r}) = \frac{2r}{\ln 2}
+$$
+
+可分态（如热态直积）→ $\mathcal E_N=0$。"""
+        ),
+        code(
+            r"""
+EN = log_negativity(st, modes_A=0)
+EN_closed = -np.log2(np.exp(-2 * r))
+print("E_N", EN, "  closed", EN_closed)
+print("symmetric A|B", log_negativity(st, [1]))
+
+prod = GaussianState.product(
+    GaussianState.thermal(0.5, nmode=1),
+    GaussianState.thermal(1.0, nmode=1),
+)
+print("separable E_N", log_negativity(prod, 0), "  (expect 0)")
+"""
+        ),
+        md(
+            r"""### 小图：E_N 随 r 增长"""
+        ),
+        code(
+            r"""
+rs = np.linspace(0.0, 1.2, 25)
+EN_num = [log_negativity(GaussianState.tmsv(ri, nmode=2), 0) for ri in rs]
+EN_th = -np.log2(np.exp(-2 * rs))
+
+fig, ax = plt.subplots(figsize=(5, 3.2))
+ax.plot(rs, EN_th, "k-", lw=2, label=r"$-\log_2(e^{-2r})$")
+ax.plot(rs, EN_num, "o", ms=4, alpha=0.8, label="cvsim")
+ax.set_xlabel(r"squeeze $r$")
+ax.set_ylabel(r"$\mathcal{E}_N$ (bits)")
+ax.legend()
+ax.set_title("TMSV log-negativity")
+fig.tight_layout()
+plt.show()
+"""
+        ),
+        md(
+            r"""## 6. Heterodyne 导引
+
+对 A 做 Heterodyne（POVM $\lvert\beta\rangle\langle\beta\rvert/\pi$）并 **删掉 A** 后，B 被导引到纯相干态：
+
+$$
+\lvert\psi_B\rangle = \lvert \tanh(r)\,\beta^*\rangle
+$$
+
+（标准 TMSV 的 $p$ 反关联 → 复数共轭。）"""
+        ),
+        code(
+            r"""
+beta = 0.4 + 0.2j
+red_h = heterodyne_condition(st, mode=0, outcome=beta)
+print("nmode after hetero", red_h.nmode)
+print("purity", purity(red_h), "  (expect 1)")
+beta_B = complex((red_h.rbar[0] + 1j * red_h.rbar[1]) / np.sqrt(2.0))
+expect = np.tanh(r) * np.conjugate(beta)
+print("beta_B", beta_B, "  expect", expect)
+"""
+        ),
+        md(
+            r"""## 7. 损耗会吃掉纠缠
+
+对 TMSV 两模同时加 `loss(T)` 后，$\mathcal E_N$ 下降（无简单万能闭式；这里只看单调性）。"""
+        ),
+        code(
+            r"""
+Ts = [1.0, 0.8, 0.5, 0.2, 0.05]
+print(f"{'T':>6}  {'E_N':>10}")
+for T in Ts:
+    noisy = loss(st, T)  # all modes
+    print(f"{T:6.2f}  {log_negativity(noisy, 0):10.6f}")
+"""
+        ),
+        md(
+            r"""## 8. 诚实边界
+
+- `entropy_vn` 是 **nats**；若要 bits，自己 `/ np.log(2)`。
+- `log_negativity` 的 PT 谱 **不能**走带 vacuum-clip 的 `symplectic_eigenvalues`（内部用 raw 谱）。
+- `partial_trace` ≠ 测量后的 `remove_mode`（无 outcome conditioning）。
+- 公开 API 列表见 `cvsim.gaussian.__all__` / `docs/api-stability.md`。
+
+**下一步**
+
+- Phase 1 电路 demo：`examples/phase1_exit_demo.py`
+- Phase 3 方向：compile 合并辛矩阵、批量采样、Walrus 适配"""
+        ),
+        md("## 自检（Run-All 应全绿）"),
+        code(
+            r"""
+r = 0.6
+st = GaussianState.tmsv(r, nmode=2)
+assert abs(purity(st) - 1.0) < 1e-10
+assert abs(entropy_vn(st)) < 1e-10
+nu = symplectic_eigenvalues(st)
+assert nu.shape == (2,) and np.allclose(nu, 0.5, atol=1e-10)
+
+nbar = float(np.sinh(r) ** 2)
+red = partial_trace(st, [0])
+assert abs(purity(red) - 1.0 / (2 * nbar + 1)) < 1e-10
+S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
+assert abs(entropy_vn(red) - S_closed) < 1e-10
+
+EN = log_negativity(st, 0)
+assert abs(EN - (-np.log2(np.exp(-2 * r)))) < 1e-10
+assert abs(log_negativity(st, 1) - EN) < 1e-12
+
+beta = 0.4 + 0.2j
+red_h = heterodyne_condition(st, 0, beta)
+assert abs(purity(red_h) - 1.0) < 1e-10
+beta_B = (red_h.rbar[0] + 1j * red_h.rbar[1]) / np.sqrt(2.0)
+assert abs(beta_B - np.tanh(r) * np.conjugate(beta)) < 1e-10
+
+assert log_negativity(loss(st, 0.5), 0) < EN
+print("T4 TMSV analyse self-check OK")
+"""
+        ),
+    ],
+)
+
 print("done")
