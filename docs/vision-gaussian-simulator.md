@@ -36,7 +36,7 @@ Primary near-term readers of implementations derived from this doc are **AI agen
 | Item | Default | Unlock condition |
 |------|---------|------------------|
 | Hardware / cloud device backend | Out of scope | Explicit hardware phase |
-| GUI circuit editor | Out of scope | Explicit UX phase |
+| GUI circuit editor | **UX phase unlocked (local Gaussian lab only)** | See [`docs/vision-gaussian-lab-ui.md`](./vision-gaussian-lab-ui.md); still **no** cloud/multi-user/Fock GUI |
 | Replacing The Walrus as a Hafnian kernel | Avoid | Only if adapter insufficient and benchmarks demand |
 | Breaking hard conventions (§2) for “compatibility” | Forbidden | Adapter layer only (§8) |
 
@@ -753,6 +753,8 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | API stability policy | Done | `docs/api-stability.md` + `test_public_api` |
 | TMSV teaching notebook (purity/log_neg) | Done | `tutorials/04_tmsv_analyse.ipynb` + `tests/test_tmsv_tutorial.py` |
 | Compile merge S | Missing | F-COMPILE (Phase 3) |
+| Circuit serialize IR | Missing | Phase 3; Lab `circuit_v0` may probe early |
+| Local Gaussian Lab UI | Spec locked | [`docs/vision-gaussian-lab-ui.md`](./vision-gaussian-lab-ui.md) (L0–L3) |
 | GBS | Out | Adapter phase 3 |
 | AD | Out | Phase 4 |
 | Fock/Bosonic | Teaching MVP | Bridges phase 5 |
@@ -793,5 +795,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1.3 | 2026-07-30 | Log-negativity: max-per-term form (TMSV freeze); was cancelling sum over all ν̃ |
 | 0.1.4 | 2026-07-30 | Phase 2 API stability policy (`docs/api-stability.md`); gap table refreshed post F-ANALYSE + Heterodyne |
 | 0.1.5 | 2026-07-30 | Phase 2 TMSV analyse tutorial (`tutorials/04_tmsv_analyse.ipynb`); teach exit criterion |
+| 0.1.6 | 2026-07-30 | Unlock local Gaussian Lab UI phase; SoT `docs/vision-gaussian-lab-ui.md` (grill-me lock) |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.

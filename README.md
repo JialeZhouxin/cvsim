@@ -63,7 +63,8 @@
 
 工程落地与**最终用户验收**（目标 / U1–U5+U7+U8 / 能力矩阵）见：
 [`cvsim/README.md`](./cvsim/README.md) · [`cvsim/USER_ACCEPTANCE.md`](./cvsim/USER_ACCEPTANCE.md) · `python -m cvsim.demos.user_acceptance`  
-Gaussian 路线图 / 硬约定 / **API 稳定性**：[`docs/vision-gaussian-simulator.md`](./docs/vision-gaussian-simulator.md) · [`docs/api-stability.md`](./docs/api-stability.md)
+Gaussian 路线图 / 硬约定 / **API 稳定性**：[`docs/vision-gaussian-simulator.md`](./docs/vision-gaussian-simulator.md) · [`docs/api-stability.md`](./docs/api-stability.md)  
+本地高斯实验室 UI（图形化光路，愿景）：[`docs/vision-gaussian-lab-ui.md`](./docs/vision-gaussian-lab-ui.md)
 
 **新手 Jupyter（三表示各一本）**：[tutorials/README.md](./tutorials/README.md)
 
@@ -83,3 +84,29 @@ cv-photonic-notes/
 └── 04-Fock四问详解与Gaussian模拟器原理.md
 
 *公式主约定 \(\hbar=1\)。*
+
+---
+
+## 工程化 & 贡献指南
+
+| 文件 | 用途 |
+|------|------|
+| [CODE_REVIEW_GUIDE.md](./CODE_REVIEW_GUIDE.md) | 代码审查标准、物理正确性验证、��模式清单 |
+| [pyproject.toml](./pyproject.toml) | 项目元数据、ruff/mypy/pytest 配置 |
+| [scripts/](./scripts/) | 一次性验证/分析脚本（非 API） |
+
+### 快速命令
+
+```bash
+# 安装开发依赖
+pip install -e ".[dev]"
+
+# 运行全部测试
+python -m pytest tests/ -q
+
+# 代码风格检查
+ruff check cvsim/
+
+# 类型检查
+mypy cvsim/
+```
