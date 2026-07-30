@@ -178,3 +178,53 @@ def test_as_cov_helper():
     V = _as_cov(st)
     assert V.shape == (2, 2)
     assert np.allclose(V, 0.5 * np.eye(2))
+
+
+# ---------------------------------------------------------------------------
+# Review R1–R3 regressions (docs/review-07-30-phase2-analyse-eigs-purity.md)
+# ---------------------------------------------------------------------------
+
+
+def test_r1_purity_symmetrizes_asymmetric_v():
+    """R1: purity must symmetrize so μ matches ∏ 1/(2ν) on asymmetric V."""
+    V_therm = 1.5 * np.eye(2)
+    V_asym = V_therm.copy()
+    V_asym[0, 1] += 0.4
+    V_asym[1, 0] -= 0.4
+    nu = symplectic_eigenvalues(V_asym)
+    mu = purity(V_asym)
+    mu_cross = float(np.prod(1.0 / (2.0 * nu)))
+    assert mu == pytest.approx(mu_cross, abs=ATOL)
+    assert mu == pytest.approx(1.0 / 3.0, abs=ATOL)  # thermal nbar=0.5
+
+
+def test_r2_nonphysical_silent_by_default_validate_raises():
+    """R2: default allows non-physical; validate=True rejects."""
+    V_sub = 0.4 * np.eye(2)
+    assert is_physical(V_sub) is False
+    # default: no raise, but μ > 1 is possible
+    assert purity(V_sub) == pytest.approx(1.25, abs=ATOL)
+    nu = symplectic_eigenvalues(V_sub)
+    assert nu.shape == (1,)
+    # validate=True must raise
+    with pytest.raises(ValueError, match="non-physical"):
+        purity(V_sub, validate=True)
+    with pytest.raises(ValueError, match="non-physical"):
+        symplectic_eigenvalues(V_sub, validate=True)
+
+
+def test_r3_atol_affects_clip_floor():
+    """R3: atol must change the vacuum-floor clip (no longer a dead param)."""
+    # Construct V whose raw symplectic eig is slightly below 0.5
+    # V = (0.5 - 1e-8) * I → ν_raw ≈ 0.5 - 1e-8
+    eps = 1e-8
+    V = (0.5 - eps) * np.eye(2)
+    # default atol=1e-10: floor = 0.5 - 1e-10 ≈ 0.5, so clip up to ~0.5
+    nu_default = symplectic_eigenvalues(V, atol=1e-10)
+    assert nu_default[0] == pytest.approx(0.5 - 1e-10, abs=1e-15)
+    # large atol=1e-6: floor = 0.5 - 1e-6; raw ν ≈ 0.5-1e-8 > floor → no clip to 0.5
+    nu_loose = symplectic_eigenvalues(V, atol=1e-6)
+    # raw should pass through near 0.5 - eps (above 0.5 - 1e-6)
+    assert nu_loose[0] == pytest.approx(0.5 - eps, abs=1e-12)
+    # different atol → different result (param is live)
+    assert nu_default[0] != pytest.approx(nu_loose[0], abs=1e-15)
