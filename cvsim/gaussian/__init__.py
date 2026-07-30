@@ -35,6 +35,11 @@ from cvsim.gaussian.gates import (
 )
 from cvsim.gaussian.observables import (
     det_cov,
+    heterodyne_condition,
+    heterodyne_cov_xp,
+    heterodyne_mean,
+    heterodyne_sample,
+    heterodyne_sample_and_condition,
     homodyne_condition,
     homodyne_mean,
     homodyne_sample,
@@ -71,6 +76,11 @@ __all__ = [
     "homodyne_sample",
     "homodyne_sample_and_condition",
     "homodyne_condition",
+    "heterodyne_mean",
+    "heterodyne_cov_xp",
+    "heterodyne_sample",
+    "heterodyne_sample_and_condition",
+    "heterodyne_condition",
     "is_physical",
     "validate_state",
     "symplectic_eigenvalues",

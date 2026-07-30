@@ -2,7 +2,7 @@
 
 L2: define once, run with different parameters.
 L3: ``c1 + c2``, ``c1 += c2``.
-L4: ``measure_homodyne`` + ``ParamRef`` feedforward.
+L4: ``measure_homodyne`` / ``measure_heterodyne`` + ``ParamRef`` feedforward.
 """
 
 from __future__ import annotations
@@ -30,7 +30,10 @@ from cvsim.gaussian.gates import (
     squeeze,
     two_mode_squeeze,
 )
-from cvsim.gaussian.observables import homodyne_sample_and_condition
+from cvsim.gaussian.observables import (
+    heterodyne_sample_and_condition,
+    homodyne_sample_and_condition,
+)
 
 
 @dataclass(frozen=True)
@@ -272,6 +275,23 @@ class GaussianCircuit:
         )
         return self
 
+    def measure_heterodyne(
+        self, mode: int, name: str
+    ) -> GaussianCircuit:
+        """Ideal Heterodyne measurement: sample β + condition + remove mode.
+
+        POVM |β⟩⟨β|/π. Outcome stored in ``results[name]`` as ``complex``.
+        Measured mode is removed (same mapping shift as Homodyne).
+        """
+        self._ops.append(
+            self._partition(
+                'measure_heterodyne', [mode],
+                _fixed_str_keys={'name'},
+                name=name,
+            )
+        )
+        return self
+
     # -- execution --------------------------------------------------------
 
     def run(
@@ -310,6 +330,18 @@ class GaussianCircuit:
                 results[kwargs['name']] = val
                 st = st.remove_mode(phys_mode)
                 # shift mappings for modes above the removed one
+                for i in range(len(mapping)):
+                    if mapping[i] > phys_mode:
+                        mapping[i] -= 1
+                mapping[orig_mode] = -1
+            elif op_name == 'measure_heterodyne':
+                orig_mode = modes[0]
+                phys_mode = mapping[orig_mode]
+                # heterodyne_condition already removes the measured mode
+                val, st = heterodyne_sample_and_condition(
+                    st, phys_mode, rng=rng
+                )
+                results[kwargs['name']] = val
                 for i in range(len(mapping)):
                     if mapping[i] > phys_mode:
                         mapping[i] -= 1

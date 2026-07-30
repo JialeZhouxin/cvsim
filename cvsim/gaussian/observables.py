@@ -1,4 +1,4 @@
-"""Gaussian observables and ideal Homodyne conditional update."""
+"""Gaussian observables: Homodyne + Heterodyne (sample / condition)."""
 
 from __future__ import annotations
 
@@ -95,6 +95,167 @@ def homodyne_sample_and_condition(
     """Sample Homodyne outcome then condition. Thin combo; no new physics."""
     o = homodyne_sample(state, mode, phi, rng=rng)
     return o, homodyne_condition(state, mode, phi, o)
+
+
+def _xp_indices(nmode: int, mode: int) -> list[int]:
+    """xxpp indices of (x_k, p_k) for logical mode k."""
+    return [mode, nmode + mode]
+
+
+def _as_beta(outcome: complex | float | np.ndarray) -> complex:
+    """Normalize heterodyne outcome to complex β."""
+    if isinstance(outcome, np.ndarray):
+        if outcome.shape != (2,):
+            raise ValueError(
+                f"heterodyne real outcome must be shape (2,) [x,p], got {outcome.shape}"
+            )
+        return complex((outcome[0] + 1j * outcome[1]) / np.sqrt(2.0))
+    return complex(outcome)
+
+
+def _beta_to_xp(beta: complex) -> np.ndarray:
+    """Map β → (x, p) with x = √2 Re β, p = √2 Im β (ħ=1)."""
+    b = complex(beta)
+    return np.array([np.sqrt(2.0) * b.real, np.sqrt(2.0) * b.imag], dtype=float)
+
+
+def heterodyne_mean(state: GaussianState, mode: int = 0) -> complex:
+    """Expected heterodyne outcome ⟨β⟩ = (⟨x⟩ + i⟨p⟩)/√2 on ``mode``.
+
+    Matches coherent-state labelling: a coherent |α⟩ has ⟨β⟩ = α.
+    """
+    m = _check_mode(state, mode)
+    ix, ip = _xp_indices(m, mode)
+    return complex((state.rbar[ix] + 1j * state.rbar[ip]) / np.sqrt(2.0))
+
+
+def heterodyne_cov_xp(state: GaussianState, mode: int = 0) -> np.ndarray:
+    """2×2 outcome covariance of (x, p) for heterodyne on ``mode``.
+
+    POVM |β⟩⟨β|/π (Husimi): Gaussian states give
+
+        Σ = V_{xp,xp} + I₂/2
+
+    (ħ=1, vacuum block I/2 → vacuum outcomes have Σ = I).
+    """
+    m = _check_mode(state, mode)
+    idx = _xp_indices(m, mode)
+    Vblk = np.asarray(state.V, dtype=float)[np.ix_(idx, idx)]
+    Vblk = 0.5 * (Vblk + Vblk.T)
+    return Vblk + 0.5 * np.eye(2)
+
+
+def heterodyne_sample(
+    state: GaussianState,
+    mode: int = 0,
+    *,
+    rng: np.random.Generator | None = None,
+) -> complex:
+    """Sample heterodyne outcome β without conditioning.
+
+    Draws (x, p) ~ N(r̄_xp, V_xp + I/2), returns β = (x + i p)/√2.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    m = _check_mode(state, mode)
+    idx = _xp_indices(m, mode)
+    mu = np.asarray(state.rbar, dtype=float)[idx]
+    Sigma = heterodyne_cov_xp(state, mode)
+    # PSD guard for float noise
+    Sigma = 0.5 * (Sigma + Sigma.T)
+    w, vec = np.linalg.eigh(Sigma)
+    if np.min(w) <= _EPS:
+        raise ValueError(
+            f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}"
+        )
+    z = rng.multivariate_normal(mu, Sigma)
+    return complex((z[0] + 1j * z[1]) / np.sqrt(2.0))
+
+
+def heterodyne_condition(
+    state: GaussianState,
+    mode: int,
+    outcome: complex | float | np.ndarray,
+) -> GaussianState:
+    """Condition on heterodyne outcome and **remove** the measured mode.
+
+    Dual-quadrature POVM |β⟩⟨β|/π completely measures one mode. Unlike
+    ``homodyne_condition`` (which leaves a singular mode in place), the
+    returned state lives on ``nmode-1`` modes.
+
+    Let A = measured mode, B = the rest, Σ_A = V_A + I/2, C = cov(B,A)
+    (rows B, cols A). With outcome z = (x, p) from β:
+
+        V_B' = V_B - C Σ_A^{-1} Cᵀ
+        r̄_B' = r̄_B + C Σ_A^{-1} (z - r̄_A)
+
+    Math: vision §4 F-MEASURE-FULL; Weedbrook RMP §III.B (heterodyne).
+    """
+    m = _check_mode(state, mode)
+    beta = _as_beta(outcome)
+    z = _beta_to_xp(beta)
+
+    V = 0.5 * (
+        np.asarray(state.V, dtype=float) + np.asarray(state.V, dtype=float).T
+    )
+    r = np.asarray(state.rbar, dtype=float).copy()
+    idx_A = _xp_indices(m, mode)
+    idx_B = [i for i in range(2 * m) if i not in idx_A]
+
+    # Single-mode state: measurement leaves vacuum-on-nothing → nmode=0
+    if not idx_B:
+        return GaussianState(V=np.zeros((0, 0)), rbar=np.zeros(0))
+
+    VA = V[np.ix_(idx_A, idx_A)]
+    VB = V[np.ix_(idx_B, idx_B)]
+    # C = cov(B, A): shape (2m-2, 2)
+    C = V[np.ix_(idx_B, idx_A)]
+    rA = r[idx_A]
+    rB = r[idx_B]
+
+    Sigma = VA + 0.5 * np.eye(2)
+    Sigma = 0.5 * (Sigma + Sigma.T)
+    try:
+        invS = np.linalg.inv(Sigma)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("heterodyne Σ_A = V_A + I/2 is singular") from exc
+
+    innov = z - rA
+    VB_n = VB - C @ invS @ C.T
+    rB_n = rB + C @ invS @ innov
+    VB_n = 0.5 * (VB_n + VB_n.T)
+
+    # Reorder B indices back to xxpp on the reduced mode set.
+    # idx_B lists remaining axes in original xxpp order: all x's then all p's
+    # of surviving modes, but *not* packed as xxpp for nmode-1 yet.
+    # Example nmode=2 measure 0: idx_B = [1, 3] (x1, p1) — already xxpp for 1 mode.
+    # Example nmode=3 measure 1: idx_B = [0, 2, 3, 5] (x0,x2,p0,p2) — need pack
+    # → [x0,x2,p0,p2] is already xxpp for modes sorted [0,2]. Good if we keep
+    # mode order sorted by original index.
+    keep_modes = sorted(i for i in range(m) if i != mode)
+    # Build packed order: xs of keep_modes then ps of keep_modes
+    pack = []
+    for k in keep_modes:
+        pack.append(k)  # x_k original index
+    for k in keep_modes:
+        pack.append(m + k)  # p_k original index
+    # Map original axis → position in idx_B slice
+    pos = {ax: j for j, ax in enumerate(idx_B)}
+    perm = [pos[ax] for ax in pack]
+    VB_n = VB_n[np.ix_(perm, perm)]
+    rB_n = rB_n[perm]
+    return GaussianState(V=VB_n, rbar=rB_n)
+
+
+def heterodyne_sample_and_condition(
+    state: GaussianState,
+    mode: int = 0,
+    *,
+    rng: np.random.Generator | None = None,
+) -> tuple[complex, GaussianState]:
+    """Sample heterodyne β then condition (measured mode removed)."""
+    beta = heterodyne_sample(state, mode, rng=rng)
+    return beta, heterodyne_condition(state, mode, beta)
 
 
 def mean_photon(state: GaussianState, mode: int | None = None) -> float:
