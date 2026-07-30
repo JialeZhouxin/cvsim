@@ -388,3 +388,21 @@ def test_logneg_four_mode_one_tmsv_pair():
     assert log_negativity(st, [0]) == pytest.approx(expected, abs=1e-9)
     # A={2}: vacuum side only → 0
     assert log_negativity(st, [2]) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_logneg_high_loss_tmsv_baseline():
+    """Review §5.1: strong squeeze + heavy loss — finite, nonnegative E_N.
+
+    Locks a numerical baseline for the raw |eig(iΩV)| path on a near-PPT
+    boundary (lossy TMSV). Not an analytic freeze; guards regressions.
+    """
+    r = 2.0
+    st = GaussianState.tmsv(r, nmode=2, mode1=0, mode2=1)
+    st = loss(st, 0.01, nbar=0.0)
+    en = log_negativity(st, modes_A=0)
+    assert en >= 0.0
+    assert np.isfinite(en)
+    # Pure TMSV at r=2 would be ~5.77 bits; heavy loss suppresses E_N a lot.
+    assert en < -np.log2(np.exp(-2.0 * r))
+    # Baseline lock (float64 path); loosen slightly for platform noise.
+    assert en == pytest.approx(0.014232686489028258, rel=1e-6, abs=1e-9)

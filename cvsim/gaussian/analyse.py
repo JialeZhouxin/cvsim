@@ -306,12 +306,17 @@ def log_negativity(
 
     Only ν̃_j < 1/2 contribute. This matches the TMSV freeze
     E_N = -log₂(e^{-2r}) = 2r / ln(2) and standard CV references
-    (Weedbrook RMP §III.D; Adesso et al.).
+    (Weedbrook RMP §III.D; Adesso et al.; Vidal & Werner 2002).
 
-    Note: vision §4.2 writes max{0, -Σ_j log₂(2ν̃_j)} over *all* j; that
-    literal sum cancels on TMSV (positive and negative log terms). The
-    implemented form is the literature PPT-log-negativity and the formula
-    frozen by the vision test line for TMSV.
+    Note (vision history): prior to vision v0.1.3 the formula was written as
+    max{0, -Σ_j log₂(2ν̃_j)} (max over the *full* sum). That form cancels on
+    TMSV and is incorrect for general multimode states. Vision v0.1.3 and this
+    implementation use the per-term PPT log-negativity
+    Σ_j max{0, -log₂(2ν̃_j)}.
+
+    Numerics: ``log2`` is guarded with floor ``2ν̃ ≥ 1e-300`` only to avoid
+    ``log2(0)`` from float noise. Exact ν̃ = 0 is not a physical PT outcome
+    here; the guard is not a physics cutoff.
 
     Parameters
     ----------
