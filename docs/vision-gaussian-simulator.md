@@ -485,7 +485,7 @@ def phase_noise(state, sigma: float, modes=None) -> GaussianState: ...  # docume
 | Symplectic eigenvalues | eigenvalues $\nu_j\ge1/2$ of spectrum from $\lvert i\Omega V\rvert$ standard algorithm |
 | von Neumann entropy | $\sum g(\nu_j)$ with $g$ the bosonic thermal entropy function |
 | Fidelity (two Gaussians) | Marian–Marian / Banchi–Braunstein–Pirandola formula (cite in code) |
-| Log negativity | $\mathcal E_N=\max\{0,-\sum_j\log_2(2\tilde\nu_j)\}$ on partial transpose |
+| Log negativity | $\mathcal E_N=\sum_j\max\{0,-\log_2(2\tilde\nu_j)\}$ on partial transpose (only $\tilde\nu_j<1/2$ contribute). *Amended 2026-07-30:* literal $-\sum_j\log_2(2\tilde\nu_j)$ over all $j$ cancels on TMSV; freeze $E_N=-\log_2(e^{-2r})$ requires the max-per-term form (Weedbrook/Adesso). |
 | Partial trace | drop modes from $V,\bar r$ **without** measurement collapse (≠ post-measure `remove_mode` only when no correlations conditioning) |
 
 **API:** `is_physical`, `purity`, `symplectic_eigenvalues`, `entropy_vn`, `fidelity`, `log_negativity(state, modes_A)`, `partial_trace(state, keep)`.
@@ -787,5 +787,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1 | 2026-07-28 | Initial vision from stack survey + grill decisions |
 | 0.1.1 | 2026-07-29 | Align MZ + Reck/Clements naming with interferometer implementation (review R1/R2) |
 | 0.1.2 | 2026-07-29 | CP condition uses Ω/2 (match V+iΩ/2); phase_noise Option B resolved |
+| 0.1.3 | 2026-07-30 | Log-negativity: max-per-term form (TMSV freeze); was cancelling sum over all ν̃ |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.

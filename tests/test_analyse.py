@@ -9,6 +9,7 @@ from cvsim.gaussian import (
     GaussianState,
     entropy_vn,
     is_physical,
+    log_negativity,
     loss,
     partial_trace,
     purity,
@@ -328,3 +329,62 @@ def test_partial_trace_empty_and_bad_index():
         partial_trace(st, keep=[0, 5])
     with pytest.raises(TypeError):
         partial_trace(np.eye(4), keep=[0])  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# F-ANALYSE-3: log_negativity
+# ---------------------------------------------------------------------------
+
+
+def test_logneg_vacuum_zero():
+    st = GaussianState.vacuum(2)
+    assert log_negativity(st, modes_A=0) == pytest.approx(0.0, abs=ATOL)
+
+
+def test_logneg_separable_thermals_zero():
+    prod = GaussianState.product(
+        GaussianState.thermal(0.5, nmode=1),
+        GaussianState.thermal(1.0, nmode=1),
+    )
+    assert log_negativity(prod, modes_A=[0]) == pytest.approx(0.0, abs=ATOL)
+
+
+@pytest.mark.parametrize("r", [0.3, 0.6, 1.0])
+def test_logneg_tmsv_analytic(r):
+    """Freeze: E_N(TMSV) = -log2(e^{-2r}) = 2r / ln(2)."""
+    st = GaussianState.tmsv(r, nmode=2, mode1=0, mode2=1)
+    expected = -np.log2(np.exp(-2.0 * r))
+    assert log_negativity(st, modes_A=0) == pytest.approx(expected, abs=1e-9)
+    assert log_negativity(st, modes_A=1) == pytest.approx(expected, abs=1e-9)
+
+
+def test_logneg_bipartite_symmetry():
+    st = GaussianState.tmsv(0.7, nmode=2)
+    assert log_negativity(st, [0]) == pytest.approx(log_negativity(st, [1]), abs=ATOL)
+
+
+def test_logneg_empty_or_full_party_zero():
+    st = GaussianState.tmsv(0.5, nmode=2)
+    assert log_negativity(st, []) == 0.0
+    assert log_negativity(st, [0, 1]) == 0.0
+
+
+def test_logneg_bad_mode_and_type():
+    st = GaussianState.vacuum(2)
+    with pytest.raises(IndexError):
+        log_negativity(st, modes_A=5)
+    with pytest.raises(TypeError):
+        log_negativity(np.eye(4), modes_A=0)  # type: ignore[arg-type]
+
+
+def test_logneg_four_mode_one_tmsv_pair():
+    """Only modes (0,1) entangled; cut 0|rest should see TMSV log-neg."""
+    r = 0.6
+    pair = GaussianState.tmsv(r, nmode=2)
+    vac = GaussianState.vacuum(2)
+    st = GaussianState.product(pair, vac)
+    expected = -np.log2(np.exp(-2.0 * r))
+    # A={0}: B includes partner mode1 → full TMSV entanglement across cut
+    assert log_negativity(st, [0]) == pytest.approx(expected, abs=1e-9)
+    # A={2}: vacuum side only → 0
+    assert log_negativity(st, [2]) == pytest.approx(0.0, abs=1e-9)

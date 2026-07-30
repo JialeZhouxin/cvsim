@@ -1,7 +1,7 @@
 """Gaussian analysis helpers (physicality, spectrum, purity, entropy, ptrace).
 
 Phase 2 F-ANALYSE: physicality, symplectic eigenvalues, purity, entropy_vn,
-partial_trace. Downstream: log_negativity, fidelity.
+partial_trace, log_negativity. Downstream: fidelity.
 """
 
 from __future__ import annotations
@@ -264,3 +264,87 @@ def partial_trace(
     V = np.asarray(state.V, dtype=float)
     r = np.asarray(state.rbar, dtype=float)
     return GaussianState(V=V[np.ix_(idx, idx)], rbar=r[idx])
+
+
+def _partial_transpose_cov(
+    V: np.ndarray,
+    nmode: int,
+    modes_A: list[int],
+) -> np.ndarray:
+    """Partial transpose on p-quadratures of modes_A (xxpp): V ↦ Λ V Λ."""
+    lam = np.ones(2 * nmode, dtype=float)
+    for k in modes_A:
+        lam[nmode + k] = -1.0
+    L = np.diag(lam)
+    return L @ V @ L
+
+
+def _symplectic_eigenvalues_raw(V: np.ndarray) -> np.ndarray:
+    """Symplectic spectrum without vacuum-floor clip (for PT / log-neg).
+
+    Uses |eig(i Ω V)| directly so non-physical PT covariances with ν̃ < 1/2
+    are preserved. Cholesky-Williamson is unsuitable: PT V is typically not PD.
+    """
+    V = 0.5 * (V + V.T)
+    m = V.shape[0] // 2
+    ev = np.linalg.eigvals(1j * omega(m) @ V)
+    nu_all = np.sort(np.abs(ev.real))
+    return nu_all[::2].astype(float)
+
+
+def log_negativity(
+    state: GaussianState,
+    modes_A: int | Iterable[int],
+) -> float:
+    """Logarithmic negativity E_N of a bipartition (bits).
+
+    Partial-transpose the covariance on subsystem ``modes_A`` (flip each
+    selected mode's *p* quadrature in xxpp), compute raw symplectic
+    eigenvalues ν̃_j of the PT matrix, then
+
+        E_N = Σ_j max{0, -log₂(2 ν̃_j)}
+
+    Only ν̃_j < 1/2 contribute. This matches the TMSV freeze
+    E_N = -log₂(e^{-2r}) = 2r / ln(2) and standard CV references
+    (Weedbrook RMP §III.D; Adesso et al.).
+
+    Note: vision §4.2 writes max{0, -Σ_j log₂(2ν̃_j)} over *all* j; that
+    literal sum cancels on TMSV (positive and negative log terms). The
+    implemented form is the literature PPT-log-negativity and the formula
+    frozen by the vision test line for TMSV.
+
+    Parameters
+    ----------
+    state :
+        Multipartite Gaussian state.
+    modes_A :
+        Mode index or iterable defining party A. Party B is the complement.
+        Empty A or A = all modes → E_N = 0 (no cut).
+
+    Returns
+    -------
+    float
+        E_N ≥ 0 in bits.
+    """
+    if not isinstance(state, GaussianState):
+        raise TypeError(
+            f"log_negativity requires GaussianState, got {type(state).__name__}"
+        )
+    m = state.nmode
+    if isinstance(modes_A, (int, np.integer)):
+        A = [int(modes_A)]
+    else:
+        A = sorted({int(k) for k in modes_A})
+    for k in A:
+        if not 0 <= k < m:
+            raise IndexError(f"mode {k} out of range for nmode={m}")
+    if not A or len(A) == m:
+        return 0.0
+
+    V = np.asarray(state.V, dtype=float)
+    V = 0.5 * (V + V.T)
+    Vp = _partial_transpose_cov(V, m, A)
+    nu = _symplectic_eigenvalues_raw(Vp)
+    # E_N = sum max(0, -log2(2 ν̃))
+    contrib = -np.log2(np.maximum(2.0 * nu, 1e-300))
+    return float(np.sum(np.maximum(contrib, 0.0)))
