@@ -69,34 +69,6 @@ function renderMatrix(table, rows, cols, head, cell) {
   table.innerHTML = html + "</tbody>";
 }
 
-/* Center cross (dashed) + ±lim/2 ticks, drawn over the heatmap.
-   Ice-cyan from tokens (--color-axis): complementary to inferno, readable
-   on both dark vacuum (black) and bright peaks (yellow). */
-function drawAxes(n) {
-  const ctx = canvas.getContext("2d");
-  const axis = getComputedStyle(document.documentElement)
-    .getPropertyValue("--color-axis").trim() || "rgba(190, 240, 255, 0.8)";
-  const c = (n - 1) / 2;
-  const h = (n - 1) / 4; // ±lim/2 tick positions
-  ctx.strokeStyle = axis;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(c, 0); ctx.lineTo(c, n);
-  ctx.moveTo(0, c); ctx.lineTo(n, c);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  for (const f of [-1, 1]) {
-    const x = c + f * h;
-    ctx.beginPath();
-    ctx.moveTo(x, c - 3); ctx.lineTo(x, c + 3);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(c - 3, x); ctx.lineTo(c + 3, x);
-    ctx.stroke();
-  }
-}
-
 function drawHeatmap(W) {
   if (!Array.isArray(W) || W.length < 2 || W.length > 512 ||
       W.some((row) => !Array.isArray(row) || row.length !== W.length ||
@@ -122,7 +94,6 @@ function drawHeatmap(W) {
     }
   }
   ctx.putImageData(img, 0, 0);
-  drawAxes(n);
   /* colorbar */
   const cb = colorbar.getContext("2d");
   for (let k = 0; k < 128; k++) {
@@ -132,13 +103,73 @@ function drawHeatmap(W) {
   }
 }
 
+/* SVG overlay axes — drawn at display resolution (canvas is 64 physical px
+   scaled up, so canvas strokes would blur/thicken). Solid 1px lines in
+   ice-cyan (--color-axis, complementary to inferno), values in ink with a
+   paper halo (paint-order: stroke) so they read on any heatmap region. */
+const SVG_NS = "http://www.w3.org/2000/svg";
+let lastLim = 5;
+
+function axisVal(v) {
+  if (!Number.isFinite(v)) return "—";
+  let s = v.toPrecision(3);
+  if (s.includes(".")) s = s.replace(/\.?0+$/, "");
+  return s;
+}
+
+function drawAxes(lim) {
+  lastLim = lim;
+  const svg = $("axis-svg");
+  const w = canvas.clientWidth || 1;
+  const h = canvas.clientHeight || 1;
+  svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+  svg.replaceChildren();
+
+  const style = getComputedStyle(document.documentElement);
+  const axis = style.getPropertyValue("--color-axis").trim() || "#7fe0ff";
+  const ink = style.getPropertyValue("--color-ink").trim();
+  const paper = style.getPropertyValue("--color-paper").trim();
+  const el = (tag, attrs) => {
+    const e = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+    return e;
+  };
+  const cx = w / 2;
+  const cy = h / 2;
+
+  svg.append(
+    el("line", { x1: cx, y1: 0, x2: cx, y2: h, stroke: axis, "stroke-width": 1 }),
+    el("line", { x1: 0, y1: cy, x2: w, y2: cy, stroke: axis, "stroke-width": 1 }),
+  );
+
+  const vals = [-lim, -lim / 2, 0, lim / 2, lim];
+  const frac = [0, 0.25, 0.5, 0.75, 1];
+  for (let i = 0; i < 5; i++) {
+    const x = frac[i] * w;
+    const y = frac[i] * h;
+    const label = axisVal(vals[i]);
+    const mkText = (tx, ty, anchor) => {
+      const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: ink });
+      t.setAttribute("stroke", `${paper} / 0.92`);
+      t.setAttribute("stroke-width", 3);
+      t.textContent = label;
+      return t;
+    };
+    /* x ticks on the horizontal center line, values below */
+    svg.append(el("line", { x1: x, y1: cy - 3, x2: x, y2: cy + 3, stroke: axis, "stroke-width": 1 }));
+    svg.append(mkText(x, cy + 13, "middle"));
+    /* y ticks on the vertical center line, values to the left */
+    svg.append(el("line", { x1: cx - 3, y1: y, x2: cx + 3, y2: y, stroke: axis, "stroke-width": 1 }));
+    svg.append(mkText(cx - 7, y + 3.5, "end"));
+  }
+}
+
+new ResizeObserver(() => drawAxes(lastLim)).observe(canvas);
+
 function render(result, mode) {
   const { x, p, W } = result.wigner;
   drawHeatmap(W);
-  $("axis-x-min").textContent = fmt(x[0], 3);
-  $("axis-x-max").textContent = fmt(x[x.length - 1], 3);
-  $("axis-y-min").textContent = fmt(p[0], 3);
-  $("axis-y-max").textContent = fmt(p[p.length - 1], 3);
+  drawAxes(x[x.length - 1]); // lim = +x max
 
   const m = result.meters;
   $("m-purity").textContent = fmt(m.purity);

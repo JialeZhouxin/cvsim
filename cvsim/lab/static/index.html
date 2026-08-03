@@ -52,9 +52,10 @@
     </div>
     <div class="wigner">
       <div class="wigner__frame">
-        <div class="wigner__axis wigner__axis--y"><span id="axis-y-min"></span><span id="axis-y-max"></span></div>
-        <canvas id="wigner-canvas" width="64" height="64" role="img" aria-label="Wigner 函数热图">Wigner 热图（数值见 meters 与下方表格）</canvas>
-        <div class="wigner__axis wigner__axis--x"><span id="axis-x-min"></span><span id="axis-x-max"></span></div>
+        <div class="wigner__plot">
+          <canvas id="wigner-canvas" width="64" height="64" role="img" aria-label="Wigner 函数热图">Wigner 热图（数值见 meters 与下方表格）</canvas>
+          <svg id="axis-svg" class="axis-svg" aria-hidden="true"></svg>
+        </div>
       </div>
       <div class="wigner__colorbar" aria-hidden="true"><canvas id="colorbar-canvas" width="8" height="128"></canvas><span class="mono">max</span></div>
     </div>

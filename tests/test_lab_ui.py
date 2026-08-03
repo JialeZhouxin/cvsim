@@ -59,10 +59,13 @@ def test_key_elements_present():
 
 def test_offline_guard_no_external_urls():
     """Local workbench hard constraint: zero external network references.
-    Case-insensitive schemes (no protocol-relative / URL() forms allowed)."""
+    Case-insensitive schemes (no protocol-relative / URL() forms allowed).
+    SVG namespace URI (http://www.w3.org/2000/svg) is a constant, not a
+    network reference."""
     for name in ("index.html", "tokens.css", "style.css", "app.js"):
         src = (STATIC_DIR / name).read_text(encoding="utf-8")
-        assert not re.search(r"(?i)https?://|@import", src), f"{name}: external ref"
+        stripped = src.replace("http://www.w3.org/2000/svg", "")
+        assert not re.search(r"(?i)https?://|@import", stripped), f"{name}: external ref"
 
 
 def test_lut_clamp_guard():
