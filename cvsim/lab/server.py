@@ -6,9 +6,11 @@ Import boundary (vision §6.2): only ``cvsim.lab`` (which itself only imports
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 
 from cvsim.lab import SCHEMA, CircuitV0Error, RunResult, load_circuit, run_circuit
 
@@ -53,3 +55,9 @@ def run(body: dict[str, Any]) -> dict[str, Any]:
         # np.linalg.LinAlgError is a ValueError subclass) → user-error 422.
         raise HTTPException(status_code=422, detail=str(e)) from e
     return _payload(result)
+
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+if _STATIC_DIR.is_dir():
+    # Mount last so API routes keep precedence (FastAPI prefix swallowing).
+    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")

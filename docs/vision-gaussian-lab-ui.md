@@ -336,3 +336,4 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 |-----|------|------|
 | 0.1.0 | 2026-07-30 | Initial lock from grill-me: user A/电路图/Wigner 灵魂/本地 Web/双轨测量；adopt recommended whitelist & 12b slice |
 | 0.2.0 | 2026-08-03 | **L0 landed**: `cvsim.lab` — `circuit_v0` IR (validation + compile-and-run, ordered-node semantics, runtime mode remap after heterodyne), FastAPI `/run` + `/health`, Wigner+ptrace payload, meters; golden equivalence + A4/A8/A9 guards (24 tests); lab extra in pyproject. No frontend / `/sample` (L1–L3). |
+| 0.3.0 | 2026-08-03 | **L1 landed**: static workbench page (JSON edit → `/run` → canvas Wigner heatmap + meters + r̄/V tables), FastAPI `StaticFiles` mount + `python -m cvsim.lab` entry; Hallmark design pass (genre=modern-minimal · theme=Cobalt · macrostructure=Workbench, offline system-font substitution); zero external deps/CDN (offline guard test); 5 UI tests (suite 409). No drag editor (L2) / save-load-sampling (L3). |

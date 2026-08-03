@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gaussian Lab · circuit_v0</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="lite">
+  <div class="lite__brand">
+    <span class="wordmark">Gaussian Lab</span>
+    <span class="badge">circuit_v0</span>
+  </div>
+  <div class="lite__meta">
+    <span id="version-tag" class="mono">cvsim —</span>
+  </div>
+</header>
+
+<main class="workbench">
+  <section class="panel editor" aria-label="电路 JSON 编辑">
+    <div class="panel__head">
+      <h1>电路 JSON</h1>
+      <div class="panel__actions">
+        <button id="reset-btn" type="button" class="btn btn--ghost">重置示例</button>
+        <button id="run-btn" type="button" class="btn btn--primary">运行</button>
+      </div>
+    </div>
+    <label class="sr-only" for="json-input">circuit_v0 JSON</label>
+    <textarea id="json-input" class="editor__field" spellcheck="false" aria-describedby="json-hint"></textarea>
+    <p id="json-hint" class="hint">参数改完点运行。view 随 JSON 提交：<span class="mono">wigner_mode / lim / n</span>。</p>
+  </section>
+
+  <section class="panel result" aria-label="运行结果">
+    <div class="panel__head">
+      <h1>Wigner 热图</h1>
+      <span id="wigner-mode-label" class="mono panel__meta">mode —</span>
+    </div>
+    <div class="wigner">
+      <div class="wigner__frame">
+        <canvas id="wigner-canvas" width="64" height="64" aria-label="Wigner 函数热图"></canvas>
+        <div class="wigner__axis wigner__axis--x"><span id="axis-x-min"></span><span id="axis-x-max"></span></div>
+        <div class="wigner__axis wigner__axis--y"><span id="axis-y-min"></span><span id="axis-y-max"></span></div>
+      </div>
+      <div class="wigner__colorbar" aria-hidden="true"><canvas id="colorbar-canvas" width="8" height="128"></canvas><span class="mono">max</span></div>
+    </div>
+
+    <div class="meters" id="meters-panel">
+      <div class="meter"><span class="meter__label">purity</span><span id="m-purity" class="meter__value mono">—</span></div>
+      <div class="meter"><span class="meter__label">mean&nbsp;photon</span><span id="m-nbar" class="meter__value mono">—</span></div>
+      <div class="meter"><span class="meter__label">log&nbsp;neg</span><span id="m-logneg" class="meter__value mono">—</span></div>
+    </div>
+
+    <div class="state-grid">
+      <div class="state-block">
+        <h2>均值 r̄ <span id="nmode-tag" class="mono panel__meta"></span></h2>
+        <table class="mat" id="rbar-table"><caption class="sr-only">各模式均值</caption></table>
+      </div>
+      <div class="state-block">
+        <h2>协方差 V <span class="mono panel__meta">xxpp</span></h2>
+        <div class="mat-scroll"><table class="mat" id="v-table"><caption class="sr-only">协方差矩阵</caption></table></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="statusbar">
+  <div id="status" class="statusbar__msg mono" role="status" aria-live="polite">就绪</div>
+  <div class="statusbar__tail mono">local workbench · cvsim</div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
