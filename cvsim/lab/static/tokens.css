@@ -17,6 +17,8 @@
   --color-error: oklch(55% 0.2 25);
   --color-error-soft: oklch(96% 0.015 25);
   --color-success: oklch(58% 0.15 155);
+  /* canvas overlay axis — ice-cyan: complementary to inferno LUT (no cyan in it) */
+  --color-axis: oklch(85% 0.09 210);
 
   /* type — 2+1: display / body / mono(outlier: JSON, tables, meters) */
   --font-display: "Bahnschrift", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;

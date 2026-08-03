@@ -69,6 +69,34 @@ function renderMatrix(table, rows, cols, head, cell) {
   table.innerHTML = html + "</tbody>";
 }
 
+/* Center cross (dashed) + ±lim/2 ticks, drawn over the heatmap.
+   Ice-cyan from tokens (--color-axis): complementary to inferno, readable
+   on both dark vacuum (black) and bright peaks (yellow). */
+function drawAxes(n) {
+  const ctx = canvas.getContext("2d");
+  const axis = getComputedStyle(document.documentElement)
+    .getPropertyValue("--color-axis").trim() || "rgba(190, 240, 255, 0.8)";
+  const c = (n - 1) / 2;
+  const h = (n - 1) / 4; // ±lim/2 tick positions
+  ctx.strokeStyle = axis;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(c, 0); ctx.lineTo(c, n);
+  ctx.moveTo(0, c); ctx.lineTo(n, c);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  for (const f of [-1, 1]) {
+    const x = c + f * h;
+    ctx.beginPath();
+    ctx.moveTo(x, c - 3); ctx.lineTo(x, c + 3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(c - 3, x); ctx.lineTo(c + 3, x);
+    ctx.stroke();
+  }
+}
+
 function drawHeatmap(W) {
   if (!Array.isArray(W) || W.length < 2 || W.length > 512 ||
       W.some((row) => !Array.isArray(row) || row.length !== W.length ||
@@ -94,6 +122,7 @@ function drawHeatmap(W) {
     }
   }
   ctx.putImageData(img, 0, 0);
+  drawAxes(n);
   /* colorbar */
   const cb = colorbar.getContext("2d");
   for (let k = 0; k < 128; k++) {
