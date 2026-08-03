@@ -1,5 +1,8 @@
-/* Gaussian Lab workbench — state flow, zero deps. */
+/* Gaussian Lab workbench — L1 render pipeline + L2 editor wiring. */
 "use strict";
+
+import { initEditor } from "./editor.js";
+import { toCircuitJson } from "./ops.js";
 
 const DEFAULT_JSON = {
   schema: "circuit_v0",
@@ -40,12 +43,11 @@ function buildLut() {
 const LUT = buildLut();
 
 const $ = (id) => document.getElementById(id);
-const jsonInput = $("json-input");
-const runBtn = $("run-btn");
-const resetBtn = $("reset-btn");
 const canvas = $("wigner-canvas");
 const colorbar = $("colorbar-canvas");
 const statusEl = $("status");
+const runBtn = $("run-btn");
+const modeSelect = $("wigner-mode-select");
 
 function setStatus(text, ok = true) {
   statusEl.textContent = text;
@@ -108,7 +110,6 @@ function render(result, mode) {
   $("axis-x-max").textContent = fmt(x[x.length - 1], 3);
   $("axis-y-min").textContent = fmt(p[0], 3);
   $("axis-y-max").textContent = fmt(p[p.length - 1], 3);
-  $("wigner-mode-label").textContent = "mode " + (mode ?? "—");
 
   const m = result.meters;
   $("m-purity").textContent = fmt(m.purity);
@@ -120,55 +121,87 @@ function render(result, mode) {
   const modeHead = (i) => `mode ${Math.floor(i / 2)}·${i % 2 === 0 ? "x" : "p"}`;
   renderMatrix($("rbar-table"), nm * 2, 1, modeHead, (r) => fmt(result.rbar[r]));
   renderMatrix($("v-table"), nm * 2, nm * 2, modeHead, (r, c) => fmt(result.V[r][c]));
+
+  /* mode selector: rebuild options to nmode */
+  modeSelect.replaceChildren();
+  for (let k = 0; k < nm; k++) {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = `mode ${k}`;
+    if (k === Number(mode)) opt.selected = true;
+    modeSelect.appendChild(opt);
+  }
 }
 
-async function run() {
-  let circuit;
-  try {
-    circuit = JSON.parse(jsonInput.value);
-  } catch (e) {
-    setStatus("JSON 语法错误: " + e.message, false);
-    return;
-  }
-  runBtn.disabled = true;
-  resetBtn.disabled = true;
-  runBtn.setAttribute("aria-busy", "true");
+/* ── run pipeline: debounce (120ms) + seq guard ────────── */
+let latestSeq = 0;
+let debounceTimer = null;
+let busy = false;
+
+function setBusy(b) {
+  busy = b;
+  runBtn.disabled = b;
+  runBtn.setAttribute("aria-busy", String(b));
+}
+
+async function doRun(circuitJson, seq) {
+  setBusy(true);
   const t0 = performance.now();
   try {
     const resp = await fetch("/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(circuit),
+      body: JSON.stringify(circuitJson),
     });
     const body = await resp.json();
+    if (seq !== latestSeq) return; // stale response: drop
     if (!resp.ok) {
       setStatus(resp.status + " · " + (body.detail || "运行失败"), false);
       return;
     }
-    render(body, circuit.view?.wigner_mode);
+    render(body, circuitJson.view?.wigner_mode);
     setStatus(`ok · ${(performance.now() - t0).toFixed(0)} ms`);
   } catch (e) {
+    if (seq !== latestSeq) return;
     setStatus("网络错误: " + e.message, false);
   } finally {
-    runBtn.disabled = false;
-    resetBtn.disabled = false;
-    runBtn.removeAttribute("aria-busy");
+    setBusy(false);
   }
 }
 
-function reset() {
-  jsonInput.value = JSON.stringify(DEFAULT_JSON, null, 2);
-  run();
+function scheduleRun(circuitJson, seq) {
+  latestSeq = seq;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => doRun(circuitJson, seq), 120);
 }
+
+/* ── editor wiring ─────────────────────────────────────── */
+const editor = initEditor(document.querySelector(".workbench"), {
+  defaultScene: DEFAULT_JSON,
+  onRun: scheduleRun,
+  onState: () => { /* state mirroring lives in the JSON textarea */ },
+  onStatus: setStatus,
+});
+
+runBtn.addEventListener("click", () => {
+  const payload = toCircuitJson(editor.getState());
+  payload.view.wigner_mode = Number(modeSelect.value) || 0;
+  latestSeq++;
+  doRun(payload, latestSeq); // manual run: immediate, no debounce
+});
+
+modeSelect.addEventListener("change", () => {
+  const payload = toCircuitJson(editor.getState());
+  payload.view.wigner_mode = Number(modeSelect.value) || 0;
+  scheduleRun(payload, ++latestSeq);
+});
 
 async function init() {
   try {
     const h = await (await fetch("/health")).json();
     $("version-tag").textContent = "cvsim " + h.cvsim + " · " + h.schema;
   } catch { /* offline header keeps the — */ }
-  resetBtn.addEventListener("click", reset);
-  runBtn.addEventListener("click", run);
-  reset();
+  editor.render();
 }
 
 init();

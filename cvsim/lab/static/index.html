@@ -11,7 +11,7 @@
 <header class="lite">
   <div class="lite__brand">
     <span class="wordmark">Gaussian Lab</span>
-    <span class="badge">circuit_v0</span>
+    <span class="badge">circuit_v0 · editor</span>
   </div>
   <div class="lite__meta">
     <span id="version-tag" class="mono">cvsim —</span>
@@ -19,23 +19,36 @@
 </header>
 
 <main class="workbench">
-  <section class="panel editor" aria-label="电路 JSON 编辑">
+  <section class="panel palette" aria-label="操作托盘">
     <div class="panel__head">
-      <h1>电路 JSON</h1>
+      <h1>托盘</h1>
+      <span class="hint">拖入列表或点击添加</span>
+    </div>
+    <div id="palette" class="palette__grid"></div>
+  </section>
+
+  <section class="panel seq" aria-label="电路序列">
+    <div class="panel__head">
+      <h1>电路序列</h1>
       <div class="panel__actions">
         <button id="reset-btn" type="button" class="btn btn--ghost">重置示例</button>
         <button id="run-btn" type="button" class="btn btn--primary">运行</button>
       </div>
     </div>
-    <label class="sr-only" for="json-input">circuit_v0 JSON</label>
+    <div id="node-list" class="node-list" aria-live="polite"></div>
+    <p class="hint">节点按序执行；拖入追加到尾部。mode 由参数面板指定。</p>
+    <label class="sr-only" for="json-input">circuit_v0 JSON（与图形双向同步）</label>
     <textarea id="json-input" class="editor__field" spellcheck="false" aria-describedby="json-hint"></textarea>
-    <p id="json-hint" class="hint">参数改完点运行。view 随 JSON 提交：<span class="mono">wigner_mode / lim / n</span>。</p>
+    <p id="json-hint" class="hint">JSON 与图形双向同步：<span class="mono">view.wigner_mode / lim / n</span> 随电路提交。</p>
   </section>
 
   <section class="panel result" aria-label="运行结果">
     <div class="panel__head">
       <h1>Wigner 热图</h1>
-      <span id="wigner-mode-label" class="mono panel__meta">mode —</span>
+      <div class="panel__actions">
+        <label class="hint" for="wigner-mode-select">mode</label>
+        <select id="wigner-mode-select" class="select mono"></select>
+      </div>
     </div>
     <div class="wigner">
       <div class="wigner__frame">
@@ -70,6 +83,6 @@
   <div class="statusbar__tail mono">local workbench · cvsim</div>
 </footer>
 
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

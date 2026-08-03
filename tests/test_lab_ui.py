@@ -87,3 +87,22 @@ def test_view_bounds_enforced():
     assert client.post("/run", json=big).status_code == 422
     wide = dict(base, view={**base["view"], "lim": 999})
     assert client.post("/run", json=wide).status_code == 422
+
+
+def test_a3_logneg_freeze():
+    """A3: T=1 TMSV log_negativity ≈ -log2(e^(-2r)) = 2r/ln(2).
+    Editor slider range r∈[-3,3]; frontend displays this value."""
+    import math
+
+    r = 0.6
+    payload = {
+        "schema": "circuit_v0",
+        "nodes": [{"id": "s", "op": "tmsv", "params": {"r": r}}],
+        "edges": [],
+        "view": {"wigner_mode": 0, "lim": 5.0, "n": 64},
+    }
+    resp = client.post("/run", json=payload)
+    assert resp.status_code == 200
+    got = resp.json()["meters"]["log_negativity"]
+    want = 2 * r / math.log(2)  # -log2(e^(-2r))
+    assert abs(got - want) < 1e-3
