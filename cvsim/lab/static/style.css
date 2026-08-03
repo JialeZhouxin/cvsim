@@ -124,8 +124,8 @@ body {
 /* ── editor ────────────────────────────────────────────── */
 .editor__field {
   width: 100%;
-  min-height: 12vh;
-  min-height: 12dvh;
+  min-height: 16vh;
+  min-height: 16dvh;
   resize: vertical;
   padding: var(--space-lg);
   background: var(--color-paper-2);

@@ -193,6 +193,7 @@ function render(result, mode) {
 }
 
 /* ── run pipeline: debounce (120ms) + seq guard ────────── */
+let seqCounter = 0; // sole sequence source (OCR: editor's own seq was colliding)
 let latestSeq = 0;
 let debounceTimer = null;
 let busy = false;
@@ -224,14 +225,14 @@ async function doRun(circuitJson, seq) {
     if (seq !== latestSeq) return;
     setStatus("网络错误: " + e.message, false);
   } finally {
-    setBusy(false);
+    if (seq === latestSeq) setBusy(false); // stale request must not clear busy
   }
 }
 
-function scheduleRun(circuitJson, seq) {
-  latestSeq = seq;
+function scheduleRun(circuitJson) {
+  latestSeq = ++seqCounter;
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => doRun(circuitJson, seq), 120);
+  debounceTimer = setTimeout(() => doRun(circuitJson, latestSeq), 120);
 }
 
 /* ── editor wiring ─────────────────────────────────────── */
@@ -243,16 +244,17 @@ const editor = initEditor(document.querySelector(".workbench"), {
 });
 
 runBtn.addEventListener("click", () => {
+  clearTimeout(debounceTimer); // manual run supersedes pending debounced payload
+  debounceTimer = null;
   const payload = toCircuitJson(editor.getState());
   payload.view.wigner_mode = Number(modeSelect.value) || 0;
-  latestSeq++;
+  latestSeq = ++seqCounter;
   doRun(payload, latestSeq); // manual run: immediate, no debounce
 });
 
 modeSelect.addEventListener("change", () => {
-  const payload = toCircuitJson(editor.getState());
-  payload.view.wigner_mode = Number(modeSelect.value) || 0;
-  scheduleRun(payload, ++latestSeq);
+  // route through editor so JSON textarea stays in sync (OCR finding)
+  editor.setView({ wigner_mode: Number(modeSelect.value) || 0 });
 });
 
 async function init() {

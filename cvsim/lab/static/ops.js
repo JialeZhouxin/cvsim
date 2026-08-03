@@ -61,6 +61,7 @@ export const OP_NAMES = Object.keys(OPS);
 
 /** Default params object for an op (advanced params included, for JSON fidelity). */
 export function paramsFromOp(op) {
+  if (!Object.hasOwn(OPS, op)) throw new TypeError(`Unknown op: ${op}`); // OCR guard
   const out = {};
   for (const [k, d] of Object.entries(OPS[op].params)) out[k] = d.def;
   return out;
@@ -76,14 +77,20 @@ export function sourceModes(nodes) {
   return total;
 }
 
-let _seq = 0;
-function nextId() {
-  return "n" + _seq++;
+/** Next id = max existing numeric id + 1 (OCR: importing n0 then adding
+    must not produce a duplicate). */
+function nextId(nodes) {
+  let max = -1;
+  for (const n of nodes) {
+    const m = /^n(\d+)$/.exec(n.id);
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return "n" + (max + 1);
 }
 
 /** Append a node to the circuit list. mode defaults: 0 (single), [0,1] (two). */
 export function addNode(nodes, op) {
-  const node = { id: nextId(), op, params: paramsFromOp(op) };
+  const node = { id: nextId(nodes), op, params: paramsFromOp(op) };
   if (OPS[op].kind === "single") node.mode = 0;
   if (OPS[op].kind === "two") node.modes = [0, 1];
   return [...nodes, node];
@@ -93,10 +100,12 @@ export function removeNode(nodes, id) {
   return nodes.filter((n) => n.id !== id);
 }
 
-/** Move a node up (-1) or down (+1) within bounds. */
+/** Move a node up (-1) or down (+1) within bounds. Non-integer steps rejected. */
 export function moveNode(nodes, id, dir) {
+  const step = Number(dir);
+  if (!Number.isInteger(step) || Math.abs(step) !== 1) return nodes; // OCR guard
   const i = nodes.findIndex((n) => n.id === id);
-  const j = i + dir;
+  const j = i + step;
   if (i < 0 || j < 0 || j >= nodes.length) return nodes;
   const out = [...nodes];
   [out[i], out[j]] = [out[j], out[i]];
@@ -104,7 +113,10 @@ export function moveNode(nodes, id, dir) {
 }
 
 export function updateParam(node, key, value) {
-  return { ...node, params: { ...node.params, [key]: value } };
+  const d = OPS[node.op]?.params?.[key];
+  const v = Number(value);
+  if (!d || !Number.isFinite(v)) return node; // OCR: unknown key / NaN rejected
+  return { ...node, params: { ...node.params, [key]: Math.min(Math.max(v, d.min), d.max) } };
 }
 
 export function updateMode(node, mode) {

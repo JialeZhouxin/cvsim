@@ -21,30 +21,56 @@ export function stateFromJson(payload) {
   if (payload.schema !== "circuit_v0") return { error: "schema 必须是 circuit_v0" };
   if (!Array.isArray(payload.nodes)) return { error: "nodes 必须是数组" };
   const nodes = [];
+  const seenIds = new Set();
   for (let i = 0; i < payload.nodes.length; i++) {
     const n = payload.nodes[i];
     if (!n || typeof n !== "object") return { error: `nodes[${i}] 非法` };
+    // Object.hasOwn: __proto__/constructor are inherited OPS keys (OCR)
+    if (!Object.hasOwn(OPS, n.op)) return { error: `nodes[${i}]: 未知 op ${n.op}` };
     const meta = OPS[n.op];
-    if (!meta) return { error: `nodes[${i}]: 未知 op ${n.op}` };
-    const node = { id: n.id || `n${i}`, op: n.op, params: {} };
+    if (typeof n.id !== "string" || n.id.length === 0 || seenIds.has(n.id)) {
+      return { error: `nodes[${i}]: id 必须是非空唯一字符串` };
+    }
+    seenIds.add(n.id);
+    const node = { id: n.id, op: n.op, params: {} };
     for (const [k, d] of Object.entries(meta.params)) {
       const v = n.params?.[k];
-      node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
+      if (d.advanced) {
+        // optional param (e.g. loss nbar): fill default when absent
+        node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
+        continue;
+      }
+      // malformed values freeze the graph instead of silently defaulting (OCR)
+      if (typeof v !== "number" || !Number.isFinite(v)) {
+        return { error: `nodes[${i}].params.${k} 必须是有限数值` };
+      }
+      node.params[k] = v;
     }
-    if (meta.kind === "single") node.mode = Number.isInteger(n.mode) && n.mode >= 0 ? n.mode : 0;
+    if (meta.kind === "single") {
+      if (!Number.isInteger(n.mode) || n.mode < 0) {
+        return { error: `nodes[${i}].mode 必须是非负整数` };
+      }
+      node.mode = n.mode;
+    }
     if (meta.kind === "two") {
-      node.modes = Array.isArray(n.modes) && n.modes.length === 2 && n.modes.every((m) => Number.isInteger(m) && m >= 0)
-        ? [...n.modes] : [0, 1];
+      if (!Array.isArray(n.modes) || n.modes.length !== 2 || n.modes.some((m) => !Number.isInteger(m) || m < 0)) {
+        return { error: `nodes[${i}].modes 必须是两个非负整数` };
+      }
+      node.modes = [...n.modes];
     }
     nodes.push(node);
   }
-  const view = payload.view && typeof payload.view === "object"
-    ? {
-        wigner_mode: Number.isInteger(payload.view.wigner_mode) ? payload.view.wigner_mode : 0,
-        lim: typeof payload.view.lim === "number" ? payload.view.lim : 5.0,
-        n: typeof payload.view.n === "number" ? payload.view.n : 64,
-      }
-    : { wigner_mode: 0, lim: 5.0, n: 64 };
+  const rawView = payload.view && typeof payload.view === "object" ? payload.view : {};
+  if (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0) {
+    return { error: "view.wigner_mode 必须是非负整数" };
+  }
+  if (typeof rawView.lim !== "number" || !Number.isFinite(rawView.lim) || rawView.lim <= 0 || rawView.lim > 50) {
+    return { error: "view.lim 必须是 (0, 50] 的数值" };
+  }
+  if (typeof rawView.n !== "number" || !Number.isFinite(rawView.n) || rawView.n < 2 || rawView.n > 512) {
+    return { error: "view.n 必须在 [2, 512]" };
+  }
+  const view = { wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n };
   return { state: { nodes, view, ui: {} } };
 }
 
@@ -89,11 +115,17 @@ export function initEditor(root, hooks) {
     card.draggable = true;
     card.dataset.op = op;
     card.textContent = OPS[op].label;
-    card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", op));
-    card.addEventListener("click", () => {
+    const tryAdd = () => {
+      const meta = OPS[op];
+      if (meta.kind === "two" && sourceModes(state.nodes) < 2) {
+        hooks.onStatus("分束器需要至少 2 个模式（先添加 TMSV 或多源）", false);
+        return;
+      }
       state = { ...state, nodes: addNode(state.nodes, op) };
       render();
-    });
+    };
+    card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", op));
+    card.addEventListener("click", tryAdd);
     dom.palette.appendChild(card);
   }
 
@@ -101,7 +133,12 @@ export function initEditor(root, hooks) {
   dom.list.addEventListener("drop", (e) => {
     e.preventDefault();
     const op = e.dataTransfer.getData("text/plain");
-    if (OPS[op]) {
+    if (Object.hasOwn(OPS, op)) {
+      const meta = OPS[op];
+      if (meta.kind === "two" && sourceModes(state.nodes) < 2) {
+        hooks.onStatus("分束器需要至少 2 个模式（先添加 TMSV 或多源）", false);
+        return;
+      }
       state = { ...state, nodes: addNode(state.nodes, op) };
       render();
     }
@@ -133,8 +170,7 @@ export function initEditor(root, hooks) {
       }
       state = parsed.state;
       lastGood = JSON.stringify(toCircuitJson(state));
-      hooks.onState(state);
-      emit(toCircuitJson(state), "json");
+      render(); // re-render node rows too (OCR: import left rows stale)
     }, 400);
   });
 
@@ -223,6 +259,10 @@ export function initEditor(root, hooks) {
 
   return {
     getState: () => state,
+    setView: (patch) => {
+      state = { ...state, view: { ...state.view, ...patch } };
+      render(); // syncs JSON textarea + rows + emits debounced run
+    },
     render,
   };
 }

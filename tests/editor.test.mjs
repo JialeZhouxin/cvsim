@@ -60,6 +60,46 @@ test("updateParam / updateMode", () => {
   assert.equal(updateMode(nodes[0], -2).mode, 1); // invalid rejected
 });
 
+test("OCR guards: clamp, dir type, unknown keys", () => {
+  let nodes = addNode([], "loss");
+  // out-of-range clamped to metadata bounds
+  assert.equal(updateParam(nodes[0], "T", 99).params.T, 1);
+  assert.equal(updateParam(nodes[0], "T", -5).params.T, 0.01);
+  // NaN / unknown key rejected (no change)
+  assert.equal(updateParam(nodes[0], "T", NaN).params.T, 0.8);
+  assert.equal(updateParam(nodes[0], "nope", 1).params.T, 0.8);
+  // non-integer move step rejected
+  nodes = [addNode([], "tmsv")[0], addNode([], "loss")[0]];
+  assert.equal(moveNode(nodes, nodes[0].id, "1").length, 2);
+  assert.deepEqual(moveNode(nodes, nodes[0].id, "1").map((n) => n.op), ["loss", "tmsv"]);
+  assert.equal(moveNode(nodes, nodes[0].id, 0.5).length, 2);
+  // unknown op rejected
+  assert.throws(() => paramsFromOp("mach_zehnder"), TypeError);
+});
+
+test("OCR guards: id collision after import, proto keys, dup ids", () => {
+  const payload = toCircuitJson({
+    nodes: [{ id: "n0", op: "tmsv", params: { r: 0.6 } }],
+    view: { wigner_mode: 0, lim: 5.0, n: 64 },
+    ui: {},
+  });
+  const { state } = stateFromJson(payload);
+  const grown = addNode(state.nodes, "loss");
+  assert.equal(grown[1].id, "n1"); // no duplicate n0
+  // __proto__ / constructor must not pass the whitelist
+  assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "__proto__", params: {} }] }).error);
+  assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "constructor", params: {} }] }).error);
+  // duplicate ids rejected
+  const dup = { schema: "circuit_v0", nodes: [
+    { id: "a", op: "tmsv", params: { r: 0.5 } },
+    { id: "a", op: "loss", params: { T: 0.9 }, mode: 0 },
+  ] };
+  assert.ok(stateFromJson(dup).error);
+  // malformed param freezes instead of silently defaulting
+  const bad = { schema: "circuit_v0", nodes: [{ id: "a", op: "squeeze", params: { r: "x" } }] };
+  assert.ok(stateFromJson(bad).error);
+});
+
 test("toCircuitJson: L0-compatible payload", () => {
   let nodes = [];
   nodes = addNode(nodes, "tmsv");
@@ -93,8 +133,8 @@ test("stateFromJson: rejects unknown op / wrong schema", () => {
   assert.ok(stateFromJson({ schema: "circuit_v0", nodes: "nope" }).error);
 });
 
-test("stateFromJson: missing params filled with defaults", () => {
-  const { state } = stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "squeeze", params: {} }] });
-  assert.equal(state.nodes[0].params.r, 0.4);
-  assert.equal(state.nodes[0].params.phi, 0);
+test("stateFromJson: missing params freeze (frozen-graph policy)", () => {
+  const { error } = stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "squeeze", params: {} }] });
+  assert.ok(error);
+  assert.ok(error.includes("r"));
 });
