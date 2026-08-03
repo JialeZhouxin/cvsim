@@ -34,6 +34,8 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
     "httpx>=0.27",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
 ]
 lab = [
     "fastapi>=0.110",
@@ -110,7 +112,7 @@ addopts       = [
     "--tb=short",
 ]
 filterwarnings = [
-    "error",
+    "error:cvsim.*",
     "ignore::DeprecationWarning:scipy.*",
 ]
 

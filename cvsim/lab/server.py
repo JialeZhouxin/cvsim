@@ -48,6 +48,8 @@ def run(body: dict[str, Any]) -> dict[str, Any]:
     try:
         circuit = load_circuit(body)
         result = run_circuit(circuit)
-    except CircuitV0Error as e:
+    except (CircuitV0Error, ValueError) as e:
+        # ValueError covers library-side guards (loss T range, wigner_grid,
+        # np.linalg.LinAlgError is a ValueError subclass) → user-error 422.
         raise HTTPException(status_code=422, detail=str(e)) from e
     return _payload(result)

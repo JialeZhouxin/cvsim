@@ -66,6 +66,21 @@ def test_run_422_bad_view():
     assert "wigner_mode" in r.json()["detail"]
 
 
+def test_run_422_library_guard_value_error():
+    """Library-side guards (loss T out of range) must map to 422, not 500."""
+    data = {
+        "schema": "circuit_v0",
+        "nodes": [
+            {"id": "s", "op": "vacuum", "params": {}},
+            {"id": "l", "op": "loss", "params": {"T": 1.5}, "mode": 0},
+        ],
+        "edges": [],
+        "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
+    }
+    r = client.post("/run", json=data)
+    assert r.status_code == 422
+
+
 def test_wigner_vacuum_matches_direct():  # A4: Wigner(vacuum) == direct wigner_grid
     data = {
         "schema": "circuit_v0",
