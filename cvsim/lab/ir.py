@@ -153,11 +153,11 @@ def load_circuit(data: dict[str, Any]) -> CircuitV0:
         raise CircuitV0Error("view must be an object")
     wigner_mode = _as_pos_int(raw_view.get("wigner_mode", 0), "view.wigner_mode")
     lim = raw_view.get("lim", 5.0)
-    if not isinstance(lim, (int, float)) or isinstance(lim, bool) or lim <= 0:
-        raise CircuitV0Error("view.lim must be a positive number")
+    if not isinstance(lim, (int, float)) or isinstance(lim, bool) or lim <= 0 or lim > 50:
+        raise CircuitV0Error("view.lim must be a positive number <= 50")
     n = raw_view.get("n", 64)
-    if not isinstance(n, int) or isinstance(n, bool) or n < 2:
-        raise CircuitV0Error("view.n must be an int >= 2")
+    if not isinstance(n, int) or isinstance(n, bool) or n < 2 or n > 512:
+        raise CircuitV0Error("view.n must be an int in [2, 512]")
     view = View(wigner_mode=wigner_mode, lim=float(lim), n=n)
 
     edges = data.get("edges", [])

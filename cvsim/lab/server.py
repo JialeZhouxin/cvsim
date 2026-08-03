@@ -58,6 +58,7 @@ def run(body: dict[str, Any]) -> dict[str, Any]:
 
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
-if _STATIC_DIR.is_dir():
-    # Mount last so API routes keep precedence (FastAPI prefix swallowing).
-    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")
+if not _STATIC_DIR.is_dir():
+    raise RuntimeError(f"Missing packaged lab assets: {_STATIC_DIR}")
+# Mount last so API routes keep precedence (FastAPI prefix swallowing).
+app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")

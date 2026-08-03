@@ -27,7 +27,8 @@ function buildLut() {
   const lut = new Uint8Array(256 * 3);
   const last = LUT_ANCHORS.length - 2;
   for (let i = 0; i < 256; i++) {
-    const t = (i / 255) * last;
+    // scale over len-1 so the final sample reaches the last anchor (f = 1)
+    const t = (i / 255) * (LUT_ANCHORS.length - 1);
     const k = Math.min(Math.floor(t), last);
     const f = t - k;
     for (let c = 0; c < 3; c++) {
@@ -67,6 +68,11 @@ function renderMatrix(table, rows, cols, head, cell) {
 }
 
 function drawHeatmap(W) {
+  if (!Array.isArray(W) || W.length < 2 || W.length > 512 ||
+      W.some((row) => !Array.isArray(row) || row.length !== W.length ||
+        row.some((v) => !Number.isFinite(v)))) {
+    throw new Error("Invalid Wigner grid");
+  }
   const n = W.length;
   canvas.width = n;
   canvas.height = n;
@@ -95,14 +101,14 @@ function drawHeatmap(W) {
   }
 }
 
-function render(result) {
+function render(result, mode) {
   const { x, p, W } = result.wigner;
   drawHeatmap(W);
   $("axis-x-min").textContent = fmt(x[0], 3);
   $("axis-x-max").textContent = fmt(x[x.length - 1], 3);
   $("axis-y-min").textContent = fmt(p[0], 3);
   $("axis-y-max").textContent = fmt(p[p.length - 1], 3);
-  $("wigner-mode-label").textContent = "mode — view.wigner_mode";
+  $("wigner-mode-label").textContent = "mode " + (mode ?? "—");
 
   const m = result.meters;
   $("m-purity").textContent = fmt(m.purity);
@@ -125,6 +131,7 @@ async function run() {
     return;
   }
   runBtn.disabled = true;
+  resetBtn.disabled = true;
   runBtn.setAttribute("aria-busy", "true");
   const t0 = performance.now();
   try {
@@ -135,15 +142,16 @@ async function run() {
     });
     const body = await resp.json();
     if (!resp.ok) {
-      setStatus("422 · " + (body.detail || "运行失败"), false);
+      setStatus(resp.status + " · " + (body.detail || "运行失败"), false);
       return;
     }
-    render(body);
+    render(body, circuit.view?.wigner_mode);
     setStatus(`ok · ${(performance.now() - t0).toFixed(0)} ms`);
   } catch (e) {
     setStatus("网络错误: " + e.message, false);
   } finally {
     runBtn.disabled = false;
+    resetBtn.disabled = false;
     runBtn.removeAttribute("aria-busy");
   }
 }

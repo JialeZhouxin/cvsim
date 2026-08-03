@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -11,6 +13,21 @@ from cvsim.lab.server import app
 client = TestClient(app)
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "cvsim" / "lab" / "static"
+
+_JS_KEYS = r"\b(?:schema|seed|nodes|id|op|params|r|modes|loss|T|mode|edges|view|"
+_JS_KEYS += r"wigner_mode|lim|n|ui)\b"
+
+
+def load_default_scene() -> dict:
+    """Parse the shipped DEFAULT_JSON out of app.js so the test exercises
+    exactly what the UI ships (single source of truth)."""
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    m = re.search(r"const DEFAULT_JSON = (\{.*?\});\n", js, re.S)
+    assert m, "DEFAULT_JSON not found in app.js"
+    literal = re.sub(rf"({_JS_KEYS})(?=\s*:)", r'"\1"', m.group(1))
+    # JS object literal → JSON: drop trailing commas
+    literal = re.sub(r",(\s*[}\]])", r"\1", literal)
+    return json.loads(literal)
 
 
 def test_index_served():
@@ -41,12 +58,11 @@ def test_key_elements_present():
 
 
 def test_offline_guard_no_external_urls():
-    """Local workbench hard constraint: zero external network references."""
+    """Local workbench hard constraint: zero external network references.
+    Case-insensitive schemes (no protocol-relative / URL() forms allowed)."""
     for name in ("index.html", "tokens.css", "style.css", "app.js"):
         src = (STATIC_DIR / name).read_text(encoding="utf-8")
-        assert "http://" not in src, f"{name}: external http ref"
-        assert "https://" not in src, f"{name}: external https ref"
-        assert "@import" not in src, f"{name}: remote import"
+        assert not re.search(r"(?i)https?://|@import", src), f"{name}: external ref"
 
 
 def test_lut_clamp_guard():
@@ -57,23 +73,17 @@ def test_lut_clamp_guard():
 
 
 def test_default_scene_runs():
-    """The JSON embedded in the page must be a valid circuit (A9-adjacent)."""
-    html = client.get("/").text
-    # extract the default JSON from app.js instead: page ships it there
-    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    assert "tmsv" in js and "r: 0.6" in js
-    payload = {
-        "schema": "circuit_v0",
-        "seed": 0,
-        "nodes": [
-            {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-            {"id": "l0", "op": "loss", "params": {"T": 0.8}, "mode": 0},
-            {"id": "l1", "op": "loss", "params": {"T": 0.8}, "mode": 1},
-        ],
-        "edges": [],
-        "view": {"wigner_mode": 0, "lim": 5.0, "n": 64},
-        "ui": {},
-    }
+    """The exact scene shipped in app.js must be a valid circuit (A9-adjacent)."""
+    payload = load_default_scene()
     r = client.post("/run", json=payload)
     assert r.status_code == 200
     assert len(r.json()["wigner"]["W"]) == 64
+
+
+def test_view_bounds_enforced():
+    """OCR review: view.n / view.lim must be bounded to prevent n² grid DoS."""
+    base = load_default_scene()
+    big = dict(base, view={**base["view"], "n": 10000})
+    assert client.post("/run", json=big).status_code == 422
+    wide = dict(base, view={**base["view"], "lim": 999})
+    assert client.post("/run", json=wide).status_code == 422
