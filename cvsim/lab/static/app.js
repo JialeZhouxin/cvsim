@@ -127,7 +127,6 @@ function drawAxes(lim) {
 
   const style = getComputedStyle(document.documentElement);
   const axis = style.getPropertyValue("--color-axis").trim() || "#7fe0ff";
-  const ink = style.getPropertyValue("--color-ink").trim();
   const paper = style.getPropertyValue("--color-paper").trim();
   const el = (tag, attrs) => {
     const e = document.createElementNS(SVG_NS, tag);
@@ -147,9 +146,9 @@ function drawAxes(lim) {
   for (let i = 0; i < 5; i++) {
     const x = frac[i] * w;
     const y = frac[i] * h;
-    const label = axisVal(vals[i]);
+    const label = vals[i] === 0 ? null : axisVal(vals[i]); // no label at origin
     const mkText = (tx, ty, anchor) => {
-      const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: ink });
+      const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: axis });
       t.setAttribute("stroke", `${paper} / 0.92`);
       t.setAttribute("stroke-width", 3);
       t.textContent = label;
@@ -157,10 +156,10 @@ function drawAxes(lim) {
     };
     /* x ticks on the horizontal center line, values below */
     svg.append(el("line", { x1: x, y1: cy - 3, x2: x, y2: cy + 3, stroke: axis, "stroke-width": 1 }));
-    svg.append(mkText(x, cy + 13, "middle"));
+    if (label !== null) svg.append(mkText(x, cy + 13, "middle"));
     /* y ticks on the vertical center line, values to the left */
     svg.append(el("line", { x1: cx - 3, y1: y, x2: cx + 3, y2: y, stroke: axis, "stroke-width": 1 }));
-    svg.append(mkText(cx - 7, y + 3.5, "end"));
+    if (label !== null) svg.append(mkText(cx - 7, y + 3.5, "end"));
   }
 }
 
