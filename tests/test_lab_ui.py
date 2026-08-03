@@ -49,6 +49,13 @@ def test_offline_guard_no_external_urls():
         assert "@import" not in src, f"{name}: remote import"
 
 
+def test_lut_clamp_guard():
+    """Regression: buildLut must clamp anchor index (was reading [16] →
+    undefined → top-level crash → blank page, no /run ever fired)."""
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "Math.min(Math.floor(t), last)" in js
+
+
 def test_default_scene_runs():
     """The JSON embedded in the page must be a valid circuit (A9-adjacent)."""
     html = client.get("/").text

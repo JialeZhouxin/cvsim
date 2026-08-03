@@ -25,9 +25,10 @@ const LUT_ANCHORS = [
 
 function buildLut() {
   const lut = new Uint8Array(256 * 3);
+  const last = LUT_ANCHORS.length - 2;
   for (let i = 0; i < 256; i++) {
-    const t = (i / 255) * (LUT_ANCHORS.length - 1);
-    const k = Math.floor(t);
+    const t = (i / 255) * last;
+    const k = Math.min(Math.floor(t), last);
     const f = t - k;
     for (let c = 0; c < 3; c++) {
       lut[i * 3 + c] = Math.round(LUT_ANCHORS[k][c] + f * (LUT_ANCHORS[k + 1][c] - LUT_ANCHORS[k][c]));
