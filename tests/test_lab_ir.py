@@ -89,6 +89,12 @@ def test_rejects_bad_view():
         load_circuit(data)
 
 
+def test_rejects_negative_seed():
+    data = dict(MAIN_SCENE, seed=-1)
+    with pytest.raises(CircuitV0Error, match="seed"):
+        load_circuit(data)
+
+
 def test_source_must_be_first():
     data = {
         "schema": "circuit_v0",

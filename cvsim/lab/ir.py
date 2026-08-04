@@ -170,8 +170,8 @@ def load_circuit(data: dict[str, Any]) -> CircuitV0:
     if not isinstance(ui, dict):
         raise CircuitV0Error("ui must be an object")
     seed = data.get("seed", 0)
-    if not isinstance(seed, int) or isinstance(seed, bool):
-        raise CircuitV0Error("seed must be an int")
+    if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
+        raise CircuitV0Error("seed must be a non-negative int")
     return CircuitV0(schema=schema, seed=seed, nodes=nodes, edges=edges, view=view, ui=ui)
 
 
