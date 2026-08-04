@@ -1,0 +1,264 @@
+[ocr]   ✘ file_read failed: file "cvsim/lab/static/index.html  " not found: git show 3768721:cvsim/lab/static/index.html  : exit status 128: fatal: path 'cvsim/lab/static/index.html  ' exists on disk, but not in '3768721'
+
+[ocr]   ✘ file_read failed: file "cvsim/gaussian/measurements.py" not found: git show 3768721:cvsim/gaussian/measurements.py: exit status 128: fatal: path 'cvsim/gaussian/measurements.py' does not exist in '3768721'
+
+[ocr] Summary: 8 file(s) reviewed, 18 comment(s), ~1084945 token(s) used (input: ~968990, output: ~115955), 10m1s elapsed
+Review partially complete: 18 finding(s); 1 of 8 selected item(s) failed.
+
+[2m─── cvsim/lab/static/style.css:399-401 ───[0m
+[93m[other · medium][0m Desktop JSON editor now gets only `12dvh` minimum, roughly 92px at 768px including
+padding. Multi-node JSON exceeds this immediately, so users lose editing context and must scroll
+constantly. Keep editor usable with larger/content-driven minimum or make JSON area independently
+scrollable.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   .editor__field {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     min-height: 12dvh;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     min-height: min(60dvh, 32rem);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   }[0m[0m
+
+
+[2m─── cvsim/lab/static/style.css:499-502 ───[0m
+[94m[other · low][0m Range and numeric input keep fixed widths inside one `.param`; `.node-row__params`
+wraps only between parameters. Narrow mobile rows can exceed available content width, while
+`overflow-x: clip` hides controls. Let controls wrap or shrink at narrow widths.
+
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m .param {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   min-width: 0;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   flex-wrap: wrap;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m }[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m [0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m .param input[type="range"] {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   width: 8rem;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   width: min(8rem, 100%);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   accent-color: var(--color-accent);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m }[0m[0m
+
+
+[2m─── tests/editor.test.mjs:5-9 ───[0m
+[93m[test · medium][0m `node --test tests/editor.test.mjs` cannot reliably load these `.js` modules without
+Node ESM configuration. Repository has no `package.json`/`type: module` configuration; on Node
+versions without syntax detection, import parsing fails at `export`. Add ESM configuration or run
+this command with `--experimental-default-type=module`, then keep CI using same command.
+
+
+
+[2m─── cvsim/lab/static/app.js:167-169 ───[0m
+[93m[bug · medium][0m Stale request still clears busy state. When newer request is active, older `finally`
+re-enables Run and removes `aria-busy`, allowing overlapping submissions and misreporting request
+state. Guard cleanup with current sequence.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   } finally {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     setBusy(false);[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     if (seq === latestSeq) setBusy(false);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   }[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:186-191 ───[0m
+[93m[performance · medium][0m Manual run leaves pending debounce timer alive. Click during 120 ms debounce
+starts immediate request, then timer sends duplicate older payload to `/run`; sequence guard drops
+response but server work remains. Cancel timer before immediate run.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m runBtn.addEventListener("click", () => {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   clearTimeout(debounceTimer);[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   debounceTimer = null;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   const payload = toCircuitJson(editor.getState());[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   payload.view.wigner_mode = Number(modeSelect.value) || 0;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   latestSeq++;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   doRun(payload, latestSeq); // manual run: immediate, no debounce[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   doRun(payload, ++latestSeq); // manual run: immediate, no debounce[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m });[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:172-176 ───[0m
+[93m[bug · medium][0m App and editor generate sequence numbers independently. Example: manual run uses
+`latestSeq = 2`, then next editor change emits editor `seq = 2`; old manual response matches
+`latestSeq` and can render stale payload over newer state. Allocate sequence only in app scheduler;
+ignore callback-provided sequence and remove caller-side increments.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m function scheduleRun(circuitJson, seq) {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   latestSeq = seq;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m function scheduleRun(circuitJson) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const seq = ++latestSeq;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   clearTimeout(debounceTimer);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   debounceTimer = setTimeout(() => doRun(circuitJson, seq), 120);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m }[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:139-142 ───[0m
+[94m[maintainability · low][0m `busy` is assigned but never read. Remove dead state; `runBtn.disabled` and
+`aria-busy` already hold UI state.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m let busy = false;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m [0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m function setBusy(b) {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   busy = b;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   runBtn.disabled = b;[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:193-197 ───[0m
+[93m[bug · medium][0m Mode selector updates only run payload and leaves JSON textarea stale. Since
+`editor.getState()`/`toCircuitJson()` share `view`, later graph edits may serialize selected mode
+while textarea still shows old mode; editing that stale JSON then rebuilds state and silently resets
+selection. Update editor state and rerender JSON before scheduling one run.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m modeSelect.addEventListener("change", () => {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   const payload = toCircuitJson(editor.getState());[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   payload.view.wigner_mode = Number(modeSelect.value) || 0;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   scheduleRun(payload, ++latestSeq);[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const state = editor.getState();[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   state.view = { ...state.view, wigner_mode: Number(modeSelect.value) || 0 };[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   editor.render();[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m });[0m[0m
+
+
+[2m─── cvsim/lab/static/ops.js:63-67 ───[0m
+[93m[bug · medium][0m Whitelist check missing. `paramsFromOp('unknown')` throws through `OPS[op].params`,
+and `addNode()` repeats unguarded lookup; callers can crash editor helpers with unsupported op.
+Reject unknown keys explicitly before dereference.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m export function paramsFromOp(op) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   if (!Object.hasOwn(OPS, op)) throw new TypeError(`Unknown op: ${op}`);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   const out = {};[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   for (const [k, d] of Object.entries(OPS[op].params)) out[k] = d.def;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   return out;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m }[0m[0m
+
+
+[2m─── cvsim/lab/static/ops.js:79-82 ───[0m
+[93m[bug · medium][0m `nextId()` ignores existing node IDs. Importing circuit with `n0`, then calling
+`addNode()` while `_seq` is still zero creates duplicate `n0`; remove controls and DOM `data-id`
+bindings then target ambiguous nodes. Generate ID against current `nodes` or advance sequence on
+import.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m let _seq = 0;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m function nextId() {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   return "n" + _seq++;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m function nextId(nodes) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const used = new Set(nodes.map((n) => n.id));[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   let id;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   do id = "n" + _seq++; while (used.has(id));[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   return id;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m }[0m[0m
+
+
+[2m─── cvsim/lab/static/ops.js:87-88 ───[0m
+[93m[bug · medium][0m Two-mode default assumes modes 0 and 1 always exist. Coherent source contributes one
+mode; heterodyne can remove modes, yet no routing validation blocks `[0, 1]`. `/run` then rejects
+circuit or executes wrong topology. Validate available live modes before adding and before
+serialization; reject invalid pair.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   if (OPS[op].kind === "single") node.mode = 0;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   if (OPS[op].kind === "two") node.modes = [0, 1];[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   if (OPS[op].kind === "two") {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     if (sourceModes(nodes) < 2) return nodes;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     node.modes = [0, 1];[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   }[0m[0m
+
+
+[2m─── cvsim/lab/static/ops.js:97-99 ───[0m
+[93m[bug · medium][0m `moveNode()` treats `dir` as numeric without normalization. `moveNode(nodes, id,
+"1")` computes string index `"01"`, swaps with `undefined`, and corrupts node list. Normalize and
+require integer step before index arithmetic.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m export function moveNode(nodes, id, dir) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const step = Number(dir);[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   if (!Number.isInteger(step) || Math.abs(step) !== 1) return nodes;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   const i = nodes.findIndex((n) => n.id === id);[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   const j = i + dir;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const j = i + step;[0m[0m
+
+
+[2m─── cvsim/lab/static/ops.js:106-108 ───[0m
+[93m[bug · medium][0m `updateParam()` accepts unknown keys, `NaN`, infinities, and values outside metadata
+range. Number input can produce `NaN`; `toCircuitJson()` forwards it, while JSON import also accepts
+finite out-of-range values. Backend rejects payload or receives wrong settings. Validate key, finite
+number, and min/max before storing; apply same rule during serialization/import.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m export function updateParam(node, key, value) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const d = OPS[node.op]?.params?.[key];[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   if (!d || typeof value !== "number" || !Number.isFinite(value) || value < d.min || value > d.max) return node;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   return { ...node, params: { ...node.params, [key]: value } };[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m }[0m[0m
+
+
+[2m─── cvsim/lab/static/editor.js:134-137 ───[0m
+[93m[bug · medium][0m Valid JSON import updates `state` but never rerenders node rows. Imported circuit
+stays invisible, and existing row handlers remain bound to old IDs/values; later move/delete/slider
+actions can target stale nodes. Call `renderRows()` after parsing, without calling `render()` to
+avoid duplicate run scheduling.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m       state = parsed.state;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m       lastGood = JSON.stringify(toCircuitJson(state));[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       renderRows();[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m       hooks.onState(state);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m       emit(toCircuitJson(state), "json");[0m[0m
+
+
+[2m─── cvsim/lab/static/editor.js:27-28 ───[0m
+[93m[bug · medium][0m `constructor` and `__proto__` are inherited keys on `OPS`, so these values bypass
+unknown-op validation and make `meta.params` access throw. Browser catch then misreports valid JSON
+as syntax error. Require string own key before indexing.
+
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     if (typeof n.op !== "string" || !Object.hasOwn(OPS, n.op)) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       return { error: `nodes[${i}]: 未知 op ${n.op}` };[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     }[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m     const meta = OPS[n.op];[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     if (!meta) return { error: `nodes[${i}]: 未知 op ${n.op}` };[0m[0m
+
+
+[2m─── cvsim/lab/static/editor.js:29-29 ───[0m
+[93m[bug · medium][0m Parser accepts duplicate and non-string IDs. Row updates, move, and delete use strict
+ID matching; duplicate IDs update/remove multiple nodes, while numeric IDs later fail backend schema
+validation. Preserve generated IDs only when field absent; reject malformed or duplicate IDs.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     const node = { id: n.id || `n${i}`, op: n.op, params: {} };[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     const id = n.id === undefined ? `n${i}` : n.id;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     if (typeof id !== "string" || !id || nodes.some((x) => x.id === id)) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       return { error: `nodes[${i}].id 非法或重复` };[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     }[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     const node = { id, op: n.op, params: {} };[0m[0m
+
+
+[2m─── cvsim/lab/static/editor.js:30-33 ───[0m
+[93m[bug · medium][0m Present malformed parameter values silently become defaults. Textarea still shows
+user value while emitted state uses different value, so invalid JSON edits do not freeze graph and
+can hide data loss. Keep defaults only for absent fields; reject non-numbers, non-finite values, and
+values outside metadata bounds.
+
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     if (n.params !== undefined && (!n.params || typeof n.params !== "object" || Array.isArray(n.params))) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       return { error: `nodes[${i}].params 必须是对象` };[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     }[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m     for (const [k, d] of Object.entries(meta.params)) {[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m       const v = n.params?.[k];[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m       node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       if (v === undefined) node.params[k] = d.def;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       else if (typeof v !== "number" || !Number.isFinite(v) || v < d.min || v > d.max) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m         return { error: `nodes[${i}].params.${k} 非法` };[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       } else node.params[k] = v;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m     }[0m[0m
+
+
+[2m─── cvsim/lab/static/editor.js:41-47 ───[0m
+[93m[bug · medium][0m Invalid view values normalize to defaults instead of freezing graph. Inputs such as
+`lim: 999`, `n: 10000`, negative `wigner_mode`, or non-object `view` reach `/run` and fail backend
+validation after parser reports success. Validate frontend bounds before constructing state.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   const view = payload.view && typeof payload.view === "object"[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     ? {[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m         wigner_mode: Number.isInteger(payload.view.wigner_mode) ? payload.view.wigner_mode : 0,[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m         lim: typeof payload.view.lim === "number" ? payload.view.lim : 5.0,[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m         n: typeof payload.view.n === "number" ? payload.view.n : 64,[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const rawView = payload.view === undefined ? {} : payload.view;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   if (!rawView || typeof rawView !== "object" || Array.isArray(rawView) ||[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       (rawView.wigner_mode !== undefined && (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0)) ||[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       (rawView.lim !== undefined && (!Number.isFinite(rawView.lim) || rawView.lim <= 0 || rawView.lim > 50)) ||[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       (rawView.n !== undefined && (!Number.isInteger(rawView.n) || rawView.n < 2 || rawView.n > 512))) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     return { error: "view 参数非法" };[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m       }[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     : { wigner_mode: 0, lim: 5.0, n: 64 };[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   const view = {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     wigner_mode: rawView.wigner_mode ?? 0,[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     lim: rawView.lim ?? 5.0,[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     n: rawView.n ?? 64,[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   };[0m[0m
+
