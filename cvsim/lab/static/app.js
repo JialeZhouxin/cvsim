@@ -444,6 +444,8 @@ function drawScanCurve(body) {
 }
 
 async function doScan() {
+  latestSeq = ++seqCounter; // supersede pending run/sample/scan; stale responses dropped
+  const seq = latestSeq;
   const state = editor.getState();
   const node = state.nodes.find((n) => n.id === scanNode.value);
   const param = scanParam.value;
@@ -477,6 +479,7 @@ async function doScan() {
       body: JSON.stringify(payload),
     });
     const body = await resp.json();
+    if (seq !== latestSeq) return; // stale scan response: drop
     if (!resp.ok) {
       setStatus(resp.status + " · " + (body.detail || "扫描失败"), false);
       return;
@@ -486,7 +489,7 @@ async function doScan() {
   } catch (e) {
     setStatus("网络错误: " + e.message, false);
   } finally {
-    refreshScanModesA(); // restore enabled state per current circuit
+    if (seq === latestSeq) refreshScanModesA(); // stale request must not touch UI
   }
 }
 

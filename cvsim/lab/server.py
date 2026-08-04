@@ -94,6 +94,8 @@ def scan(body: dict[str, Any]) -> dict[str, Any]:
 
     Body = circuit_v0 + ``sweep`` segment (UI-session config, not part of the
     circuit_v0 schema). All domain errors → 422 with a UI-safe detail.
+    (Note: LinAlgError is NOT a ValueError subclass — always list it explicitly
+    in except tuples.)
     """
     try:
         circuit = load_circuit(body)

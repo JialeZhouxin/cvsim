@@ -10,7 +10,7 @@ import { stateFromJson, loadJson } from "../cvsim/lab/static/editor.js";
 
 const EXPECTED_OPS = ["tmsv", "coherent", "squeeze", "phase", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze"];
 
-test("ops metadata: 11 whitelist-subset ops", () => {
+test("ops metadata: 12 whitelist-subset ops", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
 });
 

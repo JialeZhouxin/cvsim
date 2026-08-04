@@ -1,4 +1,4 @@
-/* Gaussian Lab L4 — op metadata (11 ops: whitelist subset, mirrors ir.py).
+/* Gaussian Lab L4 — op metadata (12 ops: whitelist subset, mirrors ir.py).
    `sweep: [min, max]` marks a real-numeric param as sweepable by /scan with
    an adaptive default range (mirrors ir.py SWEEPABLE_PARAMS); params without
    `sweep` (alpha, nmode…) are not sweepable. */

@@ -371,7 +371,8 @@ def _state_after(circuit: CircuitV0) -> GaussianState:
 def _safe_logneg(state: GaussianState, modes_A: list[int]) -> float | None:
     """E_N on the current state; None when undefined (singular etc.), never fabricated."""
     try:
-        return float(log_negativity(state, modes_A=modes_A))
+        v = float(log_negativity(state, modes_A=modes_A))
+        return v if math.isfinite(v) else None
     except (ValueError, FloatingPointError, np.linalg.LinAlgError):
         return None
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -306,3 +308,19 @@ def test_scan_does_not_mutate_circuit():
     sweep = {"node_id": "s0", "param": "r", "min": 0.1, "max": 1.0, "n": 5, "modes_A": [0]}
     scan_circuit(c, sweep)
     assert {n.id: dict(n.params) for n in c.nodes} == before
+
+
+def test_scan_extreme_g_never_leaks_nan():
+    """Reviewer finding: non-finite logneg (e.g. G→1e300 noise) must become null,
+    never NaN (NaN would 500 through Starlette's allow_nan=False)."""
+    body = _circuit([
+        TMSV,
+        {"id": "a0", "op": "amplifier", "params": {"G": 1.0}, "mode": 0},
+    ])
+    body["sweep"] = {
+        "node_id": "a0", "param": "G", "min": 1.0, "max": 1e300, "n": 5, "modes_A": [0]
+    }
+    r = client.post("/scan", json=body)
+    assert r.status_code == 200
+    for y in r.json()["ys"]:
+        assert y is None or (isinstance(y, float) and math.isfinite(y))
