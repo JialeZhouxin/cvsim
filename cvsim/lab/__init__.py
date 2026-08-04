@@ -1,7 +1,7 @@
 """Gaussian Lab: local workbench backend (circuit_v0 IR + thin API).
 
-Vision: ``docs/vision-gaussian-lab-ui.md``. L0 scope only — IR + ``/run``;
-frontend/editor (L2), save/load and sampling (L3) are later slices.
+Vision: ``docs/vision-gaussian-lab-ui.md``. L0: IR + ``/run``; L2: frontend
+editor; L3: save/load (A5) + ``/sample`` true sampling (A6).
 """
 
 from cvsim.lab.ir import (
@@ -13,6 +13,7 @@ from cvsim.lab.ir import (
     View,
     load_circuit,
     run_circuit,
+    sample_circuit,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "View",
     "load_circuit",
     "run_circuit",
+    "sample_circuit",
 ]

@@ -7,6 +7,7 @@ import { OPS, addNode, moveNode, paramsFromOp, removeNode, sourceModes, toCircui
 
 /* ── state ─────────────────────────────────────────────── */
 const defaultState = () => ({
+  seed: 0,
   nodes: [],
   view: { wigner_mode: 0, lim: 5.0, n: 64 },
   ui: {},
@@ -20,6 +21,8 @@ export function stateFromJson(payload) {
   if (!payload || typeof payload !== "object") return { error: "circuit 必须是对象" };
   if (payload.schema !== "circuit_v0") return { error: "schema 必须是 circuit_v0" };
   if (!Array.isArray(payload.nodes)) return { error: "nodes 必须是数组" };
+  const seed = payload.seed === undefined ? 0 : payload.seed;
+  if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
   const nodes = [];
   const seenIds = new Set();
   for (let i = 0; i < payload.nodes.length; i++) {
@@ -37,6 +40,11 @@ export function stateFromJson(payload) {
       const v = n.params?.[k];
       if (d.advanced) {
         // optional param (e.g. loss nbar): fill default when absent
+        node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
+        continue;
+      }
+      if (d.optional) {
+        // L3 homodyne phi: optional in JSON, defaults like the backend
         node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
         continue;
       }
@@ -71,7 +79,14 @@ export function stateFromJson(payload) {
     return { error: "view.n 必须在 [2, 512]" };
   }
   const view = { wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n };
-  return { state: { nodes, view, ui: {} } };
+  return { state: { seed, nodes, view, ui: {} } };
+}
+
+/** Load entry: validate a saved JSON file into editor state (pure).
+    Never mutates the current state; failures return {error} only. */
+export function loadJson(state, payload) {
+  const res = stateFromJson(payload);
+  return res.error ? { error: res.error } : { state: res.state };
 }
 
 /* ── DOM wiring (browser only) ─────────────────────────── */
@@ -262,6 +277,12 @@ export function initEditor(root, hooks) {
     setView: (patch) => {
       state = { ...state, view: { ...state.view, ...patch } };
       render(); // syncs JSON textarea + rows + emits debounced run
+    },
+    setState: (next) => {
+      // Load success: replace whole state, freeze, re-render (auto-run via emit)
+      state = next;
+      lastGood = JSON.stringify(toCircuitJson(state));
+      render();
     },
     render,
   };

@@ -1,4 +1,4 @@
-/* Gaussian Lab L2 — op metadata (8 ops: whitelist subset, mirrors ir.py). */
+/* Gaussian Lab L3 — op metadata (9 ops: whitelist subset, mirrors ir.py). */
 "use strict";
 
 export const TAU = 2 * Math.PI;
@@ -54,6 +54,11 @@ export const OPS = {
     label: "外差测量",
     kind: "single",
     params: {},
+  },
+  homodyne: {
+    label: "零差测量",
+    kind: "single",
+    params: { phi: { min: 0, max: TAU, step: 0.01, def: 0, optional: true } },
   },
 };
 
@@ -129,7 +134,7 @@ export function updateMode(node, mode) {
 export function toCircuitJson(state) {
   return {
     schema: "circuit_v0",
-    seed: 0,
+    seed: Number.isInteger(state.seed) ? state.seed : 0,
     nodes: state.nodes.map((n) => {
       const out = { id: n.id, op: n.op, params: n.params };
       if (n.mode !== undefined) out.mode = n.mode;

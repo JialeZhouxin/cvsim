@@ -53,8 +53,21 @@ def test_key_elements_present():
         "v-table",
         "rbar-table",
         "status",
+        "save-btn",
+        "load-input",
+        "seed-input",
+        "sample-btn",
+        "measurement-panel",
     ):
         assert f'id="{el}"' in html, el
+
+
+def test_l3_homodyne_in_palette_contract():
+    """ops.js ↔ ir.py contract: homodyne present, phi default 0."""
+    ops = (STATIC_DIR / "ops.js").read_text(encoding="utf-8")
+    assert "homodyne:" in ops
+    assert "零差测量" in ops
+    assert "def: 0" in ops and "max: TAU" in ops
 
 
 def test_offline_guard_no_external_urls():

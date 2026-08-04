@@ -1,7 +1,7 @@
 /* Gaussian Lab workbench — L1 render pipeline + L2 editor wiring. */
 "use strict";
 
-import { initEditor } from "./editor.js";
+import { initEditor, loadJson } from "./editor.js";
 import { toCircuitJson } from "./ops.js";
 
 const DEFAULT_JSON = {
@@ -48,6 +48,15 @@ const colorbar = $("colorbar-canvas");
 const statusEl = $("status");
 const runBtn = $("run-btn");
 const modeSelect = $("wigner-mode-select");
+const saveBtn = $("save-btn");
+const loadInput = $("load-input");
+const seedInput = $("seed-input");
+const sampleBtn = $("sample-btn");
+const measurementPanel = $("measurement-panel");
+const mSeed = $("m-seed");
+const mOutcomes = $("m-outcomes");
+const mSingularNote = $("m-singular-note");
+const wignerNote = $("wigner-note");
 
 function setStatus(text, ok = true) {
   statusEl.textContent = text;
@@ -166,9 +175,20 @@ function drawAxes(lim) {
 new ResizeObserver(() => drawAxes(lastLim)).observe(canvas);
 
 function render(result, mode) {
-  const { x, p, W } = result.wigner;
-  drawHeatmap(W);
-  drawAxes(x[x.length - 1]); // lim = +x max
+  if (!result.wigner) {
+    // singular conditional state: no finite Wigner, never fabricated
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const cb = colorbar.getContext("2d");
+    cb.clearRect(0, 0, 8, 128);
+    $("axis-svg").replaceChildren();
+    wignerNote.hidden = false;
+  } else {
+    wignerNote.hidden = true;
+    const { x, p, W } = result.wigner;
+    drawHeatmap(W);
+    drawAxes(x[x.length - 1]); // lim = +x max
+  }
 
   const m = result.meters;
   $("m-purity").textContent = fmt(m.purity);
@@ -201,7 +221,29 @@ let busy = false;
 function setBusy(b) {
   busy = b;
   runBtn.disabled = b;
+  sampleBtn.disabled = b;
   runBtn.setAttribute("aria-busy", String(b));
+  sampleBtn.setAttribute("aria-busy", String(b));
+}
+
+function hideMeasurement() {
+  measurementPanel.hidden = true;
+}
+
+function showMeasurement(body) {
+  mSeed.textContent = String(body.seed);
+  mSingularNote.hidden = !(body.meters && body.meters.singular);
+  mOutcomes.replaceChildren();
+  for (const m of body.measured || []) {
+    const li = document.createElement("li");
+    const out = Array.isArray(m.outcome)
+      ? `(${m.outcome.map((v) => Number(v).toFixed(4)).join(", ")})`
+      : Number(m.outcome).toFixed(4);
+    const phi = m.phi !== undefined ? ` φ=${Number(m.phi).toFixed(3)}` : "";
+    li.textContent = `${m.op} · mode ${m.mode}${phi} → ${out}`;
+    mOutcomes.appendChild(li);
+  }
+  measurementPanel.hidden = false;
 }
 
 async function doRun(circuitJson, seq) {
@@ -220,7 +262,43 @@ async function doRun(circuitJson, seq) {
       return;
     }
     render(body, circuitJson.view?.wigner_mode);
+    hideMeasurement(); // analytic view: manual run / param change leaves sample view
     setStatus(`ok · ${(performance.now() - t0).toFixed(0)} ms`);
+  } catch (e) {
+    if (seq !== latestSeq) return;
+    setStatus("网络错误: " + e.message, false);
+  } finally {
+    if (seq === latestSeq) setBusy(false); // stale request must not clear busy
+  }
+}
+
+async function doSample(seq) {
+  setBusy(true);
+  const t0 = performance.now();
+  try {
+    const payload = toCircuitJson(editor.getState());
+    payload.view.wigner_mode = Number(modeSelect.value) || 0;
+    payload.seed = Number(seedInput.value);
+    if (!Number.isInteger(payload.seed) || payload.seed < 0) {
+      if (seq !== latestSeq) return;
+      setStatus("seed 必须是非负整数", false);
+      return;
+    }
+    const resp = await fetch("/sample", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await resp.json();
+    if (seq !== latestSeq) return; // stale response: drop
+    if (!resp.ok) {
+      setStatus(resp.status + " · " + (body.detail || "抽样失败"), false);
+      return;
+    }
+    render(body, payload.view.wigner_mode);
+    showMeasurement(body);
+    seedInput.value = body.seed;
+    setStatus(`sampled · seed ${body.seed} · ${(performance.now() - t0).toFixed(0)} ms`);
   } catch (e) {
     if (seq !== latestSeq) return;
     setStatus("网络错误: " + e.message, false);
@@ -250,6 +328,54 @@ runBtn.addEventListener("click", () => {
   payload.view.wigner_mode = Number(modeSelect.value) || 0;
   latestSeq = ++seqCounter;
   doRun(payload, latestSeq); // manual run: immediate, no debounce
+});
+
+sampleBtn.addEventListener("click", () => {
+  clearTimeout(debounceTimer); // sample supersedes pending debounced run
+  debounceTimer = null;
+  latestSeq = ++seqCounter;
+  doSample(latestSeq); // Measure once: immediate
+});
+
+/* ── Save / Load (A5) ──────────────────────────────────── */
+saveBtn.addEventListener("click", () => {
+  const payload = toCircuitJson(editor.getState());
+  payload.view.wigner_mode = Number(modeSelect.value) || 0;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "circuit_v0.json";
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus("已保存 circuit_v0.json");
+});
+
+loadInput.addEventListener("change", async () => {
+  const file = loadInput.files && loadInput.files[0];
+  if (!file) {
+    setStatus("载入失败: 未选择文件", false);
+    return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch {
+    setStatus("载入失败: JSON 解析错误", false);
+    loadInput.value = "";
+    return;
+  }
+  const res = loadJson(editor.getState(), payload);
+  if (res.error) {
+    setStatus("载入失败: " + res.error, false); // current circuit untouched
+    loadInput.value = "";
+    return;
+  }
+  seedInput.value = res.state.seed;
+  modeSelect.value = String(res.state.view.wigner_mode);
+  editor.setState(res.state); // renders + auto /run (debounced)
+  loadInput.value = "";
+  setStatus("载入成功，自动运行");
 });
 
 modeSelect.addEventListener("change", () => {

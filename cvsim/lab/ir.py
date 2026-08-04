@@ -18,6 +18,9 @@ from cvsim.gaussian import (
     fourier,
     heterodyne_condition,
     heterodyne_mean,
+    heterodyne_sample_and_condition,
+    homodyne_mean,
+    homodyne_sample_and_condition,
     log_negativity,
     loss,
     mean_photon,
@@ -75,7 +78,7 @@ class RunResult:
     nmode: int
     rbar: np.ndarray
     V: np.ndarray
-    wigner: tuple[np.ndarray, np.ndarray, np.ndarray]  # (X, P, W) grids
+    wigner: tuple[np.ndarray, np.ndarray, np.ndarray] | None  # None: singular view
     meters: dict[str, Any]
     measured: list[dict[str, Any]]
 
@@ -196,8 +199,15 @@ def _check_mode(state: GaussianState, mode: int, where: str) -> None:
         )
 
 
-def _apply(node: Node, state: GaussianState) -> tuple[GaussianState, dict[str, Any] | None]:
-    """Apply one non-source op. Returns (new_state, measured_entry or None)."""
+def _apply(
+    node: Node, state: GaussianState, *, rng: np.random.Generator | None = None
+) -> tuple[GaussianState, dict[str, Any] | None]:
+    """Apply one non-source op. Returns (new_state, measured_entry or None).
+
+    ``rng is None`` → mean path (deterministic, no RNG); ``rng`` given → every
+    measurement node is truly sampled (non-measurement ops never touch the
+    generator).
+    """
     op, p, where = node.op, node.params, f"nodes[{node.id}]"
     if op in SINGLE_MODE_OPS:
         mode = node.mode
@@ -218,11 +228,19 @@ def _apply(node: Node, state: GaussianState) -> tuple[GaussianState, dict[str, A
             nbar = _num(p.get("nbar", 0.0), where, "nbar")
             return loss(state, T, mode, nbar), None
         if op == "homodyne":
-            # v0: no sampling; condition semantics keep the mode, state unchanged.
-            return state, {"op": "homodyne", "mode": mode, "outcome": None}
+            phi = _num(p.get("phi", 0.0), where, "phi")
+            if rng is None:
+                # mean path: record edge mean, do NOT condition / delete mode
+                return state, {"op": "homodyne", "mode": mode, "phi": phi,
+                               "outcome": homodyne_mean(state, mode, phi)}
+            o, st = homodyne_sample_and_condition(state, mode, phi, rng=rng)
+            return st, {"op": "homodyne", "mode": mode, "phi": phi, "outcome": o}
         if op == "heterodyne":
-            outcome = heterodyne_mean(state, mode)
-            st = heterodyne_condition(state, mode, outcome)
+            if rng is None:
+                outcome = heterodyne_mean(state, mode)
+                st = heterodyne_condition(state, mode, outcome)
+            else:
+                outcome, st = heterodyne_sample_and_condition(state, mode, rng=rng)
             entry: dict[str, Any] = {
                 "op": "heterodyne",
                 "mode": mode,
@@ -252,8 +270,62 @@ def _num(v: Any, where: str, name: str) -> float:
     return float(v)
 
 
-def run_circuit(circuit: CircuitV0) -> RunResult:
-    """Compile + run: ordered nodes → final GaussianState, Wigner view, meters."""
+def _meters(state: GaussianState, singular: bool) -> dict[str, Any]:
+    """meters; purity/log_neg are undefined on singular conditional states
+    (det V = 0) → None, never fabricated. mean_photon stays (computable;
+    negative values shown honestly)."""
+    m = state.nmode
+
+    def safe(fn):
+        try:
+            return fn()
+        except (ValueError, FloatingPointError, ZeroDivisionError, np.linalg.LinAlgError):
+            return None
+
+    meters: dict[str, Any] = {
+        "purity": safe(lambda: purity(state)),
+        "mean_photon": mean_photon(state),
+    }
+    meters["mean_photon_per_mode"] = [mean_photon(state, mode=i) for i in range(m)]
+    if m >= 2:
+        meters["log_negativity"] = safe(lambda: log_negativity(state, modes_A=[0]))
+    meters["singular"] = singular
+    return meters
+
+
+def _build_result(
+    state: GaussianState, view: View, measured: list[dict[str, Any]]
+) -> RunResult:
+    """Assemble RunResult: Wigner view + meters. A singular conditional state
+    (homodyne-conditioned mode, det(2V)=0) has no finite Wigner: report
+    wigner=None + meters.singular instead of fabricating data."""
+    if view.wigner_mode >= state.nmode:
+        raise CircuitV0Error(
+            f"view.wigner_mode {view.wigner_mode} out of range (nmode={state.nmode})"
+        )
+    wigner: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+    singular = False
+    try:
+        keep = partial_trace(state, keep=[view.wigner_mode])
+        X, P, W = wigner_grid(keep, lim=view.lim, n=view.n)
+        wigner = (X, P, W)
+    except ValueError:  # wigner_grid: det(2V) <= 0 → singular homodyne view
+        singular = True
+    return RunResult(
+        nmode=state.nmode,
+        rbar=state.rbar,
+        V=state.V,
+        wigner=wigner,
+        meters=_meters(state, singular),
+        measured=measured,
+    )
+
+
+def _execute(
+    circuit: CircuitV0, *, rng: np.random.Generator | None = None
+) -> RunResult:
+    """Shared execution core: ordered nodes → final GaussianState + result.
+    rng=None → mean path (/run); rng given → sample every measurement node."""
     state: GaussianState | None = None
     measured: list[dict[str, Any]] = []
     for node in circuit.nodes:
@@ -268,24 +340,19 @@ def run_circuit(circuit: CircuitV0) -> RunResult:
                 raise CircuitV0Error(
                     f"nodes[{node.id}]: op {node.op!r} requires a source node first"
                 )
-            state, entry = _apply(node, state)
+            state, entry = _apply(node, state, rng=rng)
             if entry is not None:
                 measured.append(entry)
     assert state is not None
+    return _build_result(state, circuit.view, measured)
 
-    view = circuit.view
-    if view.wigner_mode >= state.nmode:
-        raise CircuitV0Error(
-            f"view.wigner_mode {view.wigner_mode} out of range (nmode={state.nmode})"
-        )
-    keep = partial_trace(state, keep=[view.wigner_mode])
-    X, P, W = wigner_grid(keep, lim=view.lim, n=view.n)
 
-    m = state.nmode
-    meters: dict[str, Any] = {"purity": purity(state), "mean_photon": mean_photon(state)}
-    meters["mean_photon_per_mode"] = [mean_photon(state, mode=i) for i in range(m)]
-    if m >= 2:
-        meters["log_negativity"] = log_negativity(state, modes_A=[0])
-    return RunResult(
-        nmode=m, rbar=state.rbar, V=state.V, wigner=(X, P, W), meters=meters, measured=measured
-    )
+def run_circuit(circuit: CircuitV0) -> RunResult:
+    """Compile + run (mean path): ordered nodes → result. Pure, no RNG."""
+    return _execute(circuit, rng=None)
+
+
+def sample_circuit(circuit: CircuitV0, rng: np.random.Generator) -> RunResult:
+    """Compile + run with true sampling of every measurement node, in node
+    order; each measurement conditions the state for the next one."""
+    return _execute(circuit, rng=rng)

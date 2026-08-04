@@ -529,6 +529,46 @@ body {
   outline-offset: 1px;
 }
 
+.input {
+  width: 6rem;
+  padding: 2px var(--space-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-size: var(--text-xs);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+/* ── Measure once panel ───────────────────────────────── */
+.measurement {
+  margin-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+  padding-top: var(--space-md);
+}
+
+.measurement h2 {
+  font-size: var(--text-md);
+  margin: 0 0 var(--space-sm);
+}
+
+.measurement__note {
+  color: var(--color-warn, var(--color-accent));
+  margin: 0 0 var(--space-sm);
+}
+
+.measurement__list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+}
+
 @media (max-width: 59.99rem) {
   .palette__grid {
     grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));

@@ -113,6 +113,47 @@ def test_run_heterodyne_removes_mode_and_remaps_view():
     assert body["measured"][0]["op"] == "heterodyne"
 
 
+def test_sample_endpoint_reproduces_same_seed():
+    body = dict(MAIN_SCENE, nodes=[
+        {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
+        {"id": "h", "op": "heterodyne", "params": {}, "mode": 0},
+    ], seed=7)
+    r1 = client.post("/sample", json=body)
+    r2 = client.post("/sample", json=body)
+    assert r1.status_code == 200 and r2.status_code == 200
+    j1, j2 = r1.json(), r2.json()
+    assert j1["measured"] == j2["measured"]
+    assert j1["seed"] == 7
+    assert j1["sampled"] is True
+    assert "sampled" not in client.post("/run", json=body).json()
+
+
+def test_sample_endpoint_singular_homodyne_wigner_null():
+    body = dict(MAIN_SCENE, nodes=[
+        {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
+        {"id": "h", "op": "homodyne", "params": {}, "mode": 0},
+    ], seed=3, view={"wigner_mode": 0, "lim": 4.0, "n": 32})
+    r = client.post("/sample", json=body)
+    assert r.status_code == 200
+    j = r.json()
+    assert j["wigner"] is None
+    assert j["meters"]["singular"] is True
+    assert j["meters"]["purity"] is None
+
+
+def test_sample_endpoint_422_bad_seed():
+    body = dict(MAIN_SCENE, seed="x")
+    r = client.post("/sample", json=body)
+    assert r.status_code == 422
+    assert "seed" in r.json()["detail"]
+
+
+def test_sample_endpoint_422_bad_circuit():
+    body = {"schema": "circuit_v0", "nodes": [{"id": "x", "op": "cz", "params": {}}]}
+    r = client.post("/sample", json=body)
+    assert r.status_code == 422
+
+
 def test_a8_no_private_or_other_rep_imports():
     """Vision §6.2 hard boundary: no private / Fock / Bosonic imports in lab."""
     root = Path(__file__).resolve().parents[1]

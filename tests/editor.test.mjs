@@ -6,11 +6,11 @@ import {
   OPS, OP_NAMES, TAU, paramsFromOp, sourceModes,
   addNode, removeNode, moveNode, updateParam, updateMode, toCircuitJson,
 } from "../cvsim/lab/static/ops.js";
-import { stateFromJson } from "../cvsim/lab/static/editor.js";
+import { stateFromJson, loadJson } from "../cvsim/lab/static/editor.js";
 
-const EXPECTED_OPS = ["tmsv", "coherent", "squeeze", "phase", "displace", "loss", "beamsplitter", "heterodyne"];
+const EXPECTED_OPS = ["tmsv", "coherent", "squeeze", "phase", "displace", "loss", "beamsplitter", "heterodyne", "homodyne"];
 
-test("ops metadata: 8 whitelist-subset ops", () => {
+test("ops metadata: 9 whitelist-subset ops", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
 });
 
@@ -131,6 +131,70 @@ test("stateFromJson: rejects unknown op / wrong schema", () => {
   assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "mach_zehnder", params: {} }] }).error);
   assert.ok(stateFromJson(null).error);
   assert.ok(stateFromJson({ schema: "circuit_v0", nodes: "nope" }).error);
+});
+
+test("L3: homodyne visible with phi default 0 / max TAU", () => {
+  assert.ok(OPS.homodyne);
+  assert.equal(OPS.homodyne.kind, "single");
+  assert.equal(OPS.homodyne.params.phi.def, 0);
+  assert.equal(OPS.homodyne.params.phi.max, TAU);
+  assert.deepEqual(paramsFromOp("homodyne"), { phi: 0 });
+  const node = addNode([], "homodyne");
+  assert.equal(node[0].mode, 0);
+  assert.equal(node[0].params.phi, 0);
+});
+
+test("L3: toCircuitJson preserves top-level seed", () => {
+  const payload = toCircuitJson({
+    seed: 42,
+    nodes: addNode([], "tmsv"),
+    view: { wigner_mode: 0, lim: 5.0, n: 64 },
+    ui: {},
+  });
+  assert.equal(payload.seed, 42);
+});
+
+test("L3: stateFromJson accepts seed + homodyne optional phi", () => {
+  const payload = {
+    schema: "circuit_v0",
+    seed: 7,
+    nodes: [
+      { id: "a", op: "tmsv", params: { r: 0.6 } },
+      { id: "b", op: "homodyne", params: { phi: 1.5 }, mode: 0 },
+      { id: "c", op: "homodyne", params: {}, mode: 1 },
+    ],
+    view: { wigner_mode: 0, lim: 5.0, n: 64 },
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  assert.equal(state.seed, 7);
+  assert.equal(state.nodes[1].params.phi, 1.5);
+  assert.equal(state.nodes[2].params.phi, 0); // missing phi → default 0
+  // round-trip
+  const rt = stateFromJson(toCircuitJson(state));
+  assert.equal(rt.error, undefined);
+  assert.equal(rt.state.seed, 7);
+  assert.equal(rt.state.nodes[1].params.phi, 1.5);
+});
+
+test("L3: stateFromJson rejects invalid seed", () => {
+  const base = { schema: "circuit_v0", seed: 0, nodes: [{ id: "a", op: "tmsv", params: { r: 0.5 } }], view: { wigner_mode: 0, lim: 5, n: 64 } };
+  assert.ok(stateFromJson({ ...base, seed: -1 }).error);
+  assert.ok(stateFromJson({ ...base, seed: 1.5 }).error);
+  assert.ok(stateFromJson({ ...base, seed: "x" }).error);
+});
+
+test("L3: loadJson validates without mutating old state", () => {
+  const good = { schema: "circuit_v0", seed: 3, nodes: [{ id: "a", op: "tmsv", params: { r: 0.5 } }], view: { wigner_mode: 0, lim: 5, n: 64 } };
+  const bad = { schema: "nope", nodes: [] };
+  const old = { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} };
+  const ok = loadJson(old, good);
+  assert.equal(ok.error, undefined);
+  assert.equal(ok.state.seed, 3);
+  assert.deepEqual(old, { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  const badRes = loadJson(old, bad);
+  assert.ok(badRes.error);
+  assert.deepEqual(old, { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
 });
 
 test("stateFromJson: missing params freeze (frozen-graph policy)", () => {

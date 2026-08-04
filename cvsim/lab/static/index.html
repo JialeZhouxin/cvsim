@@ -31,6 +31,11 @@
     <div class="panel__head">
       <h1>电路序列</h1>
       <div class="panel__actions">
+        <button id="save-btn" type="button" class="btn btn--ghost">保存 JSON</button>
+        <label class="btn btn--ghost" for="load-input">载入 JSON<input id="load-input" type="file" accept=".json,application/json" class="sr-only"></label>
+        <label class="hint" for="seed-input">seed</label>
+        <input id="seed-input" type="number" min="0" step="1" class="input mono" value="0" title="抽样随机种子">
+        <button id="sample-btn" type="button" class="btn btn--primary">Measure once</button>
         <button id="reset-btn" type="button" class="btn btn--ghost">重置示例</button>
         <button id="run-btn" type="button" class="btn btn--primary">运行</button>
       </div>
@@ -56,6 +61,7 @@
           <canvas id="wigner-canvas" width="64" height="64" role="img" aria-label="Wigner 函数热图">Wigner 热图（数值见 meters 与下方表格）</canvas>
           <svg id="axis-svg" class="axis-svg" aria-hidden="true"></svg>
         </div>
+        <p id="wigner-note" class="hint" hidden>理想本征态，无有限 Wigner（不伪造数据）</p>
       </div>
       <div class="wigner__colorbar" aria-hidden="true"><canvas id="colorbar-canvas" width="8" height="128"></canvas><span class="mono">max</span></div>
     </div>
@@ -76,6 +82,12 @@
         <div class="mat-scroll"><table class="mat" id="v-table"><caption class="sr-only">协方差矩阵</caption></table></div>
       </div>
     </div>
+
+    <section id="measurement-panel" class="measurement" hidden aria-label="抽样结果">
+      <h2>Measure once <span class="hint">seed <span id="m-seed" class="mono"></span></span></h2>
+      <p id="m-singular-note" class="measurement__note" hidden>理想本征态，无有限 Wigner（不伪造数据）</p>
+      <ol id="m-outcomes" class="measurement__list mono"></ol>
+    </section>
   </section>
 </main>
 
