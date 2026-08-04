@@ -1,0 +1,170 @@
+[ocr] Summary: 9 file(s) reviewed, 14 comment(s), ~619284 token(s) used (input: ~530415, output: ~88869), 7m39s elapsed
+Review complete: 14 finding(s) across 9 selected item(s).
+
+[2m─── cvsim/lab/server.py:60-63 ───[0m
+[93m[bug · medium][0m Installed wheels may omit `cvsim/lab/static` because package data is not declared.
+Then `_STATIC_DIR.is_dir()` is false, this block silently skips mounting, and `/` returns 404 even
+though source-tree tests pass. Include static assets in package data; fail fast here instead of
+silently disabling UI.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m _STATIC_DIR = Path(__file__).resolve().parent / "static"[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m if _STATIC_DIR.is_dir():[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     # Mount last so API routes keep precedence (FastAPI prefix swallowing).[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m if not _STATIC_DIR.is_dir():[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     raise RuntimeError(f"Missing packaged lab assets: {_STATIC_DIR}")[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m     app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="static")[0m[0m
+
+
+[2m─── cvsim/lab/static/tokens.css:27-27 ───[0m
+[94m[maintainability · low][0m `--text-xs` resolves to 10.24px and is used for essential labels/status
+metadata, reducing readability and making small-screen UI harder to scan. Raise minimum UI text size
+or reserve this token for nonessential metadata.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   --text-xs: 0.64rem;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   --text-xs: 0.75rem;[0m[0m
+
+
+[2m─── tests/test_lab_ui.py:54-57 ───[0m
+[93m[test · medium][0m Test does not exercise shipped default scene. `DEFAULT_JSON` can be malformed or
+wired incorrectly while these assertions still pass because POST uses independent hard-coded
+payload. Derive payload from same default fixture used by UI, or run browser-side initialization
+before asserting `/run`.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     html = client.get("/").text[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     # extract the default JSON from app.js instead: page ships it there[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     assert "tmsv" in js and "r: 0.6" in js[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     # Load default circuit from shared fixture used by UI; do not duplicate payload here.[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     payload = load_shared_default_fixture(STATIC_DIR)[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     r = client.post("/run", json=payload)[0m[0m
+
+
+[2m─── tests/test_lab_ui.py:47-49 ───[0m
+[93m[test · medium][0m Offline guard misses uppercase schemes, protocol-relative URLs, and URLs assembled
+at runtime. A static asset can gain external network dependency while this test still passes.
+Normalize source and reject URL forms beyond exact lowercase literals; cover dynamic fetch
+construction separately if allowed.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m         assert "http://" not in src, f"{name}: external http ref"[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m         assert "https://" not in src, f"{name}: external https ref"[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m         assert "@import" not in src, f"{name}: remote import"[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m         assert not re.search(r"(?i)(?:https?:)?//|@import", src), f"{name}: external ref"[0m[0m
+
+
+[2m─── tests/test_lab_ui.py:29-29 ───[0m
+[94m[test · low][0m Unused `html` assignment performs an extra request and contributes no assertion. Remove
+it; current test validates only `app.js` text and hard-coded payload.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     html = client.get("/").text[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     # Remove unused page fetch.[0m[0m
+
+
+[2m─── cvsim/lab/static/index.html:31-31 ───[0m
+[93m[security · medium][0m JSON editor accepts user-controlled `view.n` and `view.lim`; unrestricted values
+can make backend allocate and serialize an `n²` Wigner grid, exhausting CPU or memory. Enforce
+finite upper bounds at API validation boundary before computation.
+
+
+
+[2m─── cvsim/lab/static/index.html:42-42 ───[0m
+[94m[other · low][0m Canvas exposes only generic label; heatmap values, axis spans, and color scale have no
+text fallback for screen readers or unavailable canvas. Add hidden summary updated with grid range
+and scale, then reference it with `aria-describedby`.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m         <canvas id="wigner-canvas" width="64" height="64" aria-label="Wigner 函数热图"></canvas>[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m         <canvas id="wigner-canvas" width="64" height="64" aria-label="Wigner 函数热图" aria-describedby="wigner-summary"></canvas>[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m         <p id="wigner-summary" class="sr-only">运行后显示 Wigner 热图数据摘要。</p>[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:30-31 ───[0m
+[91m[bug · high][0m `i === 255` makes `k === 15`; `LUT_ANCHORS[k + 1]` is undefined. `const LUT =
+buildLut()` throws during script load, so event handlers and initial run never execute. Clamp `k` to
+last valid segment or handle endpoint explicitly.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m     const k = Math.floor(t);[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     const k = Math.min(Math.floor(t), LUT_ANCHORS.length - 2);[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m     const f = t - k;[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:68-71 ───[0m
+[93m[performance · medium][0m `W.length` controls canvas allocation and `n²` iteration without bounds or
+shape checks. Backend accepts any `view.n >= 2`, so editor input can request huge grids and freeze
+server/browser; malformed rows or non-finite values also corrupt rendering. Validate square, finite
+grid and enforce same maximum before POST.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m function drawHeatmap(W) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   if (!Array.isArray(W)) throw new Error("Invalid Wigner grid");[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   const n = W.length;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   if (n < 2 || n > 512 ||[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m       W.some((row) => !Array.isArray(row) || row.length !== n ||[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m         row.some((v) => !Number.isFinite(v)))) {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m     throw new Error("Invalid Wigner grid");[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   }[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   canvas.width = n;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   canvas.height = n;[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:126-127 ───[0m
+[93m[bug · medium][0m `resetBtn` stays enabled while `/run` is pending. Reset during active request starts
+overlapping fetches; older response can render after newer reset result and overwrite status/UI.
+Disable reset for request lifetime or cancel/sequence requests.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   runBtn.disabled = true;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   resetBtn.disabled = true;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   runBtn.setAttribute("aria-busy", "true");[0m[0m
+
+
+[2m─── cvsim/lab/static/app.js:104-104 ───[0m
+[94m[other · low][0m Label stays literal `mode — view.wigner_mode`, so rendered mode remains unknown when
+`wigner_mode` changes. Pass parsed mode into `render` and display its numeric value.
+
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   $("wigner-mode-label").textContent = "mode — view.wigner_mode";[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   $("wigner-mode-label").textContent = `mode ${wignerMode}`;[0m[0m
+
+
+[2m─── cvsim/lab/static/style.css:12-15 ───[0m
+[93m[bug · medium][0m Non-wrapping rows plus root `overflow-x: clip` hide content on narrow viewports.
+Header metadata, panel actions, or meter values can extend past viewport with no recovery scroll.
+Allow these flex rows to wrap or stack before clipping overflow.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m html,[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m body {[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   overflow-x: clip;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m }[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m [0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m .lite,[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m .panel__head,[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m .meters,[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m .statusbar {[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   flex-wrap: wrap;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m }[0m[0m
+
+
+[2m─── cvsim/lab/static/style.css:248-255 ───[0m
+[93m[bug · medium][0m Fixed `gap: 2rem` keeps y-axis labels centered as one small group, independent of
+canvas size. Min/max labels do not align with heatmap boundaries and can overlay its left edge. Give
+axis dedicated gutter and canvas-sized height; use `justify-content: space-between` instead.
+
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m .wigner__axis--y {[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   flex-direction: column;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   position: absolute;[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   top: 50%;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   top: var(--space-sm);[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   bottom: calc(var(--space-sm) + var(--text-xs) * 1.5 + var(--space-xs));[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   left: var(--space-xs);[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   transform: translateY(-50%);[0m[0m
+[91m[48;2;70;0;0m-[0m[48;2;70;0;0m   gap: 2rem;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   justify-content: space-between;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   gap: 0;[0m[0m
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   transform: none;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m }[0m[0m
+
+
+[2m─── cvsim/lab/static/style.css:119-119 ───[0m
+[94m[other · low][0m Only dynamic viewport units define editor height. Browsers without `dvh` support drop
+these declarations and leave textarea near UA default height; desktop `60dvh` and body `100dvh` have
+same gap. Add `vh` fallbacks before each `dvh` declaration.
+
+[92m[48;2;0;60;0m+[0m[48;2;0;60;0m   min-height: 42vh;[0m[0m
+[2m[48;2;38;38;38m [0m[48;2;38;38;38m   min-height: 42dvh;[0m[0m
+
