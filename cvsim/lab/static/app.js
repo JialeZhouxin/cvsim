@@ -365,7 +365,7 @@ loadInput.addEventListener("change", async () => {
     loadInput.value = "";
     return;
   }
-  const res = loadJson(editor.getState(), payload);
+  const res = loadJson(payload);
   if (res.error) {
     setStatus("载入失败: " + res.error, false); // current circuit untouched
     loadInput.value = "";

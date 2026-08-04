@@ -38,13 +38,8 @@ export function stateFromJson(payload) {
     const node = { id: n.id, op: n.op, params: {} };
     for (const [k, d] of Object.entries(meta.params)) {
       const v = n.params?.[k];
-      if (d.advanced) {
-        // optional param (e.g. loss nbar): fill default when absent
-        node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
-        continue;
-      }
-      if (d.optional) {
-        // L3 homodyne phi: optional in JSON, defaults like the backend
+      if (d.advanced || d.optional) {
+        // optional param (loss nbar / homodyne phi): fill default when absent
         node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
         continue;
       }
@@ -84,7 +79,7 @@ export function stateFromJson(payload) {
 
 /** Load entry: validate a saved JSON file into editor state (pure).
     Never mutates the current state; failures return {error} only. */
-export function loadJson(state, payload) {
+export function loadJson(payload) {
   const res = stateFromJson(payload);
   return res.error ? { error: res.error } : { state: res.state };
 }

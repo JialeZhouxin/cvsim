@@ -179,6 +179,7 @@ test("L3: stateFromJson accepts seed + homodyne optional phi", () => {
 
 test("L3: stateFromJson rejects invalid seed", () => {
   const base = { schema: "circuit_v0", seed: 0, nodes: [{ id: "a", op: "tmsv", params: { r: 0.5 } }], view: { wigner_mode: 0, lim: 5, n: 64 } };
+  assert.equal(stateFromJson(base).error, undefined); // seed 0 is valid (positive baseline)
   assert.ok(stateFromJson({ ...base, seed: -1 }).error);
   assert.ok(stateFromJson({ ...base, seed: 1.5 }).error);
   assert.ok(stateFromJson({ ...base, seed: "x" }).error);
@@ -188,11 +189,11 @@ test("L3: loadJson validates without mutating old state", () => {
   const good = { schema: "circuit_v0", seed: 3, nodes: [{ id: "a", op: "tmsv", params: { r: 0.5 } }], view: { wigner_mode: 0, lim: 5, n: 64 } };
   const bad = { schema: "nope", nodes: [] };
   const old = { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} };
-  const ok = loadJson(old, good);
+  const ok = loadJson(good);
   assert.equal(ok.error, undefined);
   assert.equal(ok.state.seed, 3);
   assert.deepEqual(old, { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
-  const badRes = loadJson(old, bad);
+  const badRes = loadJson(bad);
   assert.ok(badRes.error);
   assert.deepEqual(old, { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
 });

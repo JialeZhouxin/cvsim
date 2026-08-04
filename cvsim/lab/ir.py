@@ -309,7 +309,7 @@ def _build_result(
         keep = partial_trace(state, keep=[view.wigner_mode])
         X, P, W = wigner_grid(keep, lim=view.lim, n=view.n)
         wigner = (X, P, W)
-    except ValueError:  # wigner_grid: det(2V) <= 0 → singular homodyne view
+    except (ValueError, FloatingPointError, np.linalg.LinAlgError):  # singular view
         singular = True
     return RunResult(
         nmode=state.nmode,
