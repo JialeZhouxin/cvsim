@@ -161,6 +161,7 @@ Out of B3: S₂ phase φ, Fock TMS.
 |------|----------|
 | `homodyne_condition` | ideal; no mode delete; `V'=V−vvᵀ/σ`, `r̄'=r̄+v(outcome−μ)/σ`; same `u` as edge API |
 | singular V | measured direction var → 0; OK |
+| Lab singular view | homodyne-conditioned `det V=0` → `wigner: null` + `meters.singular`, purity/log_neg `None`; **never** regularize/fake data |
 | `loss(T)` | `channels.py`; `0≤T≤1`; `X=√T`, `Y=(1−T)I/2` on acted quads (align `V_vac=I/2`) |
 | `T=1` / `T=0` | identity / vacuum on acted modes |
 | coherent + loss | `⟨n⟩ ≈ T\|α\|²` |

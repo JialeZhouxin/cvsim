@@ -22,7 +22,7 @@ The lab splits into three JS modules with a strict separation: **pure logic vs D
 `OPS` is the single source of truth for the palette, sliders, and JSON validation. It **mirrors `cvsim/lab/ir.py`** (comment: "whitelist subset, mirrors ir.py"):
 
 - `kind`: `source | single | two` (drives palette sections and source-mode counting via `sourceModes()`).
-- `params.<k>`: `{min, max, step, def}`; `advanced: true` marks optional params (e.g. loss `nbar`) that default when absent in JSON.
+- `params.<k>`: `{min, max, step, def}`; `advanced: true` marks optional params (e.g. loss `nbar`) that default when absent in JSON. `optional: true` is the same contract (homodyne `phi`, L3); treat them identically in `stateFromJson`.
 - Changing an op means updating **both** `ops.js` and `ir.py` — they are two views of one contract.
 
 ## Validation & Security Patterns
