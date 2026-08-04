@@ -17,6 +17,7 @@ Simulator package `cvsim/` implements three CV representations from pure theory 
 | [Directory Structure](./directory-structure.md) | `cvsim/` layout, notes isolation | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Physics contracts, tests, forbidden patterns | Filled |
 | [Error Handling](./error-handling.md) | ValueError fail-fast + CircuitV0Error → 422 | Filled |
+| [Scan API](./scan-api.md) | `POST /scan` sweep contract (L4) | Filled |
 | [Output & Debugging](./logging-guidelines.md) | Library zero-output; demos print; server framework defaults | Filled |
 
 ---

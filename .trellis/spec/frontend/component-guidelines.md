@@ -23,7 +23,8 @@ The lab splits into three JS modules with a strict separation: **pure logic vs D
 
 - `kind`: `source | single | two` (drives palette sections and source-mode counting via `sourceModes()`).
 - `params.<k>`: `{min, max, step, def}`; `advanced: true` marks optional params (e.g. loss `nbar`) that default when absent in JSON. `optional: true` is the same contract (homodyne `phi`, L3); treat them identically in `stateFromJson`.
-- Changing an op means updating **both** `ops.js` and `ir.py` — they are two views of one contract.
+- `sweep: [min, max]` marks a **real-numeric sweepable** param + adaptive default range for the scan panel (L4). Params without it (e.g. complex `alpha`) are never sweepable. Mirrors `SWEEPABLE_PARAMS` in ir.py.
+- Changing an op means updating **all three**: `ops.js`, `ir.py`, and vision §4 whitelist (`docs/vision-gaussian-lab-ui.md`) — three views of one contract.
 
 ## Validation & Security Patterns
 
