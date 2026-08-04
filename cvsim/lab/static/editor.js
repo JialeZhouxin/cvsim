@@ -3,7 +3,7 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, moveNode, paramsFromOp, removeNode, toCircuitJson, updateMode, updateParam } from "./ops.js";
+import { OPS, addNode, moveNode, paramsFromOp, removeNode, sourceModes, toCircuitJson, updateMode, updateParam } from "./ops.js";
 
 /* ── state ─────────────────────────────────────────────── */
 const defaultState = () => ({
