@@ -72,6 +72,27 @@
       <div class="meter"><span class="meter__label">log&nbsp;neg</span><span id="m-logneg" class="meter__value mono">—</span></div>
     </div>
 
+    <section id="scan-panel" class="scan" aria-label="参数扫描">
+      <h2>参数扫描 E_N</h2>
+      <div class="scan__controls">
+        <label class="hint" for="scan-node">节点</label>
+        <select id="scan-node" class="select mono"></select>
+        <label class="hint" for="scan-param">参数</label>
+        <select id="scan-param" class="select mono"></select>
+        <label class="hint" for="scan-min">min</label>
+        <input id="scan-min" type="number" class="input mono" step="any">
+        <label class="hint" for="scan-max">max</label>
+        <input id="scan-max" type="number" class="input mono" step="any">
+        <label class="hint" for="scan-n">n</label>
+        <input id="scan-n" type="number" class="input mono" min="2" max="200" step="1">
+        <label class="hint" for="scan-modes-a">modes_A</label>
+        <select id="scan-modes-a" class="select mono" title="A 组模式个数（B = 其余模式）"></select>
+        <button id="scan-btn" type="button" class="btn btn--primary">Scan</button>
+      </div>
+      <svg id="scan-svg" class="scan__plot" role="img" aria-label="E_N 扫描曲线"></svg>
+      <p id="scan-note" class="hint" hidden></p>
+    </section>
+
     <div class="state-grid">
       <div class="state-block">
         <h2>均值 r̄ <span id="nmode-tag" class="mono panel__meta"></span></h2>

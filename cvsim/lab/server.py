@@ -20,6 +20,7 @@ from cvsim.lab import (
     load_circuit,
     run_circuit,
     sample_circuit,
+    scan_circuit,
 )
 
 app = FastAPI(title="cvsim Gaussian Lab", version="0.1.0")
@@ -85,6 +86,23 @@ def sample(body: dict[str, Any]) -> dict[str, Any]:
     except (CircuitV0Error, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return _payload(result, seed=circuit.seed, sampled=True)
+
+
+@app.post("/scan")
+def scan(body: dict[str, Any]) -> dict[str, Any]:
+    """F-LAB-SCAN: single-param sweep → E_N curve (pure, no RNG).
+
+    Body = circuit_v0 + ``sweep`` segment (UI-session config, not part of the
+    circuit_v0 schema). All domain errors → 422 with a UI-safe detail.
+    """
+    try:
+        circuit = load_circuit(body)
+        sweep = body.get("sweep")
+        if not isinstance(sweep, dict):
+            raise CircuitV0Error("sweep must be an object")
+        return scan_circuit(circuit, sweep)
+    except (CircuitV0Error, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"

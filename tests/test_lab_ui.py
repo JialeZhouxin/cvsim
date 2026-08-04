@@ -58,6 +58,15 @@ def test_key_elements_present():
         "seed-input",
         "sample-btn",
         "measurement-panel",
+        "scan-panel",
+        "scan-node",
+        "scan-param",
+        "scan-min",
+        "scan-max",
+        "scan-n",
+        "scan-modes-a",
+        "scan-btn",
+        "scan-svg",
     ):
         assert f'id="{el}"' in html, el
 
@@ -69,6 +78,17 @@ def test_l3_homodyne_in_palette_contract():
     assert "零差测量" in ops
     assert "def: 0" in ops and "max: TAU" in ops
 
+
+def test_l4_amp_mz_in_palette_contract():
+    """ops.js ↔ ir.py contract (L4): amplifier + mz present with sweep metadata;
+    alpha stays sweep-less."""
+    ops = (STATIC_DIR / "ops.js").read_text(encoding="utf-8")
+    assert "amplifier:" in ops and "放大" in ops
+    assert "mz:" in ops and "马赫-曾德尔" in ops
+    assert "sweep: [1, 4]" in ops
+    assert "advanced: true" in ops  # nbar advanced (loss + amplifier)
+    ir = (STATIC_DIR / ".." / "ir.py").read_text(encoding="utf-8")
+    assert '"amplifier"' in ir and '"mz"' in ir
 
 def test_offline_guard_no_external_urls():
     """Local workbench hard constraint: zero external network references.

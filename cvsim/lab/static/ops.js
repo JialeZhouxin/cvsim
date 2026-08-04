@@ -1,4 +1,7 @@
-/* Gaussian Lab L3 — op metadata (9 ops: whitelist subset, mirrors ir.py). */
+/* Gaussian Lab L4 — op metadata (11 ops: whitelist subset, mirrors ir.py).
+   `sweep: [min, max]` marks a real-numeric param as sweepable by /scan with
+   an adaptive default range (mirrors ir.py SWEEPABLE_PARAMS); params without
+   `sweep` (alpha, nmode…) are not sweepable. */
 "use strict";
 
 export const TAU = 2 * Math.PI;
@@ -8,7 +11,7 @@ export const OPS = {
     label: "TMSV",
     kind: "source",
     modes: 2,
-    params: { r: { min: -3, max: 3, step: 0.01, def: 0.6 } },
+    params: { r: { min: -3, max: 3, step: 0.01, def: 0.6, sweep: [0, 2] } },
   },
   coherent: {
     label: "相干态",
@@ -20,14 +23,14 @@ export const OPS = {
     label: "压缩",
     kind: "single",
     params: {
-      r: { min: -3, max: 3, step: 0.01, def: 0.4 },
+      r: { min: -3, max: 3, step: 0.01, def: 0.4, sweep: [0, 2] },
       phi: { min: 0, max: TAU, step: 0.01, def: 0 },
     },
   },
   phase: {
     label: "相位",
     kind: "single",
-    params: { phi: { min: 0, max: TAU, step: 0.01, def: Math.PI / 2 } },
+    params: { phi: { min: 0, max: TAU, step: 0.01, def: Math.PI / 2, sweep: [0, Math.PI] } },
   },
   displace: {
     label: "位移",
@@ -38,7 +41,15 @@ export const OPS = {
     label: "损耗",
     kind: "single",
     params: {
-      T: { min: 0.01, max: 1, step: 0.01, def: 0.8 },
+      T: { min: 0.01, max: 1, step: 0.01, def: 0.8, sweep: [0, 1] },
+      nbar: { min: 0, max: 5, step: 0.1, def: 0, advanced: true },
+    },
+  },
+  amplifier: {
+    label: "放大",
+    kind: "single",
+    params: {
+      G: { min: 1, max: 8, step: 0.05, def: 2, sweep: [1, 4] },
       nbar: { min: 0, max: 5, step: 0.1, def: 0, advanced: true },
     },
   },
@@ -46,9 +57,22 @@ export const OPS = {
     label: "分束器",
     kind: "two",
     params: {
-      theta: { min: 0, max: TAU, step: 0.01, def: Math.PI / 4 },
+      theta: { min: 0, max: TAU, step: 0.01, def: Math.PI / 4, sweep: [0, Math.PI] },
       phi: { min: 0, max: TAU, step: 0.01, def: 0 },
     },
+  },
+  mz: {
+    label: "马赫-曾德尔",
+    kind: "two",
+    params: {
+      theta: { min: 0, max: Math.PI, step: 0.01, def: Math.PI / 4, sweep: [0, Math.PI] },
+      phi: { min: 0, max: Math.PI, step: 0.01, def: Math.PI / 2, sweep: [0, Math.PI] },
+    },
+  },
+  two_mode_squeeze: {
+    label: "双模压缩",
+    kind: "two",
+    params: { r: { min: -3, max: 3, step: 0.01, def: 0.4, sweep: [0, 2] } },
   },
   heterodyne: {
     label: "外差测量",

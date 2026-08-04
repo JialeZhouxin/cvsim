@@ -14,6 +14,7 @@ from cvsim.lab.ir import (
     load_circuit,
     run_circuit,
     sample_circuit,
+    scan_circuit,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "load_circuit",
     "run_circuit",
     "sample_circuit",
+    "scan_circuit",
 ]

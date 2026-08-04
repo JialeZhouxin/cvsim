@@ -5,9 +5,9 @@
 > **Physics / API SoT remains:** [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md) + [`api-stability.md`](./api-stability.md).  
 > **This doc wins** for UI scope, interaction, and v0 acceptance. If it conflicts with simulator vision on **math/conventions**, simulator vision wins and this doc must be amended.
 
-**Last updated:** 2026-07-30  
-**Status:** Locked direction after grilling (user chose “按推荐走”)  
-**Codebase today:** no Lab UI package yet; backend will call public `cvsim.gaussian` + `cvsim.wigner` only.
+**Last updated:** 2026-08-04  
+**Status:** Locked direction after grilling (user chose “按推荐走”); L0–L4 landed (L4 = F-LAB-SCAN + amp/MZ whitelist, undo separate task)
+**Codebase today:** Lab UI package landed through L4; backend calls public `cvsim.gaussian` + `cvsim.wigner` only.
 
 ---
 
@@ -90,22 +90,24 @@ Exceeding these counts requires amending this doc first.
 | `coherent` | `displaced_squeezed` |
 | `tmsv` | explicit `product` node（多源 + 线拼接） |
 
-### 4.2 Gates（≤6）
+### 4.2 Gates（≤7）
 
 | ✅ v0 | ❌ defer |
 |-------|----------|
-| `displace` | `mach_zehnder` |
-| `phase` | `cz` / `cx` |
-| `squeeze` | `interferometer` / mesh / 任意 U |
+| `displace` | `cz` / `cx` |
+| `phase` | `interferometer` / mesh / 任意 U |
+| `squeeze` | |
 | `fourier` | |
 | `beamsplitter` | |
 | `two_mode_squeeze` | |
+| `mz`（马赫-曾德尔：`BS(θ)→phase(φ,m0)→BS(θ)` 组合，lab 层不新增门） | |
 
-### 4.3 Channels（≤1 in strict v0）
+### 4.3 Channels（≤2）
 
 | ✅ v0 | P0.5 | ❌ defer |
 |-------|------|----------|
-| `loss` | `amplifier`（主剧本不需要可不做） | `phase_noise`, generic `(X,Y)` |
+| `loss` | — | `phase_noise`, generic `(X,Y)` |
+| `amplifier`（`G` 主参，`nbar` advanced 缺省 0 = 量子极限） | | |
 
 ### 4.4 Measurements（≤2）
 
@@ -122,7 +124,7 @@ Exceeding these counts requires amending this doc first.
 | **P0** | 态摘要：`nmode`、physical 标志（可选 `is_physical`） |
 | **P0.5** | meters：`mean_photon`、`purity`、`log_negativity`（`modes_A` 选择） |
 | **P0.5** | **Measure once**（`homodyne_sample` / `heterodyne_sample` + condition 路径） |
-| **P1** | 参数扫描曲线（如 \(E_N(r)\)）；撤销栈；多文档 |
+| **P1** | 参数扫描曲线（如 \(E_N(r)\)，**landed L4**）；撤销栈；多文档 |
 
 ### 4.6 Wigner policy
 
@@ -152,7 +154,7 @@ Exceeding these counts requires amending this doc first.
 8. **Save JSON → 刷新页面 → Load** → 拓扑与读数一致。
 
 做不到 1–6+8 = v0 未完成。  
-主剧本不需要的托盘项（MZ、CZ、interferometer、amp…）**不得**为了「完整」塞进 v0。
+主剧本不需要的托盘项（CZ、interferometer…）**不得**为了「完整」塞进 v0。
 
 ---
 
@@ -283,7 +285,7 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 - [ ] **A4** Wigner(vacuum) 中心峰值与 `wigner_grid` 直调一致  
 - [ ] **A5** Save → reload → 拓扑与 meters 一致  
 - [ ] **A6** Measure once：显示 seed；同 seed 可复现  
-- [ ] **A7** 仍无：账号、云、Fock、3D、扫参工作室、手机布局、非白名单 op  
+- [ ] **A7** 仍无：账号、云、Fock、3D、多参数扫参工作室、手机布局、非白名单 op  
 - [ ] **A8** 后端 grep：无 `cvsim.gaussian._` private import  
 - [ ] **A9** 至少 1 个 golden：JSON fixture → `V,rbar` vs 脚本电路  
 
@@ -297,7 +299,7 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 | **L1** | 结果只读页 + 参数 query/JSON 编辑 | 主剧本无 BS 版可看热图 |
 | **L2** | 拖拽编辑器 + 白名单 + 主剧本全通 | A2、A3 |
 | **L3** | Save/Load + Measure once | A5、A6 |
-| **L4 / P1** | \(E_N(r)\) 扫参、amp、MZ、undo… | 另开任务修订本文 |
+| **L4 / P1** | \(E_N(r)\) 扫参（F-LAB-SCAN）、amp、MZ（undo 独立任务） | A7–A11 |
 
 **Recommended implement order:** L0 → L2 可部分并行（IR 先于皮），但 **不可** 先做漂亮壳后接物理。
 
@@ -314,7 +316,7 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 | **F-LAB-EDITOR** | Whitelist graph editor | L2 |
 | **F-LAB-IO** | Save/Load JSON | L3 |
 | **F-LAB-SHOT** | Measure once + seed | L3 |
-| **F-LAB-SCAN** | Param sweep curves（P1） | L4 |
+| **F-LAB-SCAN** | Param sweep curves — \(E_N(r)\) 单曲线（P1） | L4（landed） |
 
 每个实现任务必须映射到上表；超白名单 = 先 amend 本文。
 
@@ -339,3 +341,4 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 | 0.3.0 | 2026-08-03 | **L1 landed**: static workbench page (JSON edit → `/run` → canvas Wigner heatmap + meters + r̄/V tables), FastAPI `StaticFiles` mount + `python -m cvsim.lab` entry; Hallmark design pass (genre=modern-minimal · theme=Cobalt · macrostructure=Workbench, offline system-font substitution); zero external deps/CDN (offline guard test); 5 UI tests (suite 409). No drag editor (L2) / save-load-sampling (L3). |
 | 0.4.0 | 2026-08-03 | **L2 landed**: sequence editor — palette DnD (8 ops: tmsv/coherent/squeeze/phase/displace/loss/beamsplitter/heterodyne) appends nodes, per-node param sliders (debounce 120ms + seq guard), ↑/↓/delete, JSON⇄graph two-way sync (400ms rebuild, frozen-graph on invalid), wigner_mode selector; A3 T=1 TMSV log_neg = -log₂(e⁻²ʳ) verified; 10 node tests + suite 412. No canvas/edges (ordered-node semantics kept), no modes_A selector (2-mode unique bipartition; add with 3-mode circuits), no undo (P1) / save-load-sampling (L3). |
 | 0.5.0 | 2026-08-04 | **L3 landed**: Save/Load (A5) + Measure once (A6) — `POST /sample` with explicit `seed` (`np.random.default_rng`), true sampling of all measurement nodes in node order with conditioning chain (homodyne `homodyne_sample_and_condition` keeps mode, heterodyne removes mode), homodyne op + `phi` param (default 0) in IR/ops/palette; browser Save (download `circuit_v0.json`, seed only, no outcomes) / Load (FileReader → double validation → rebuild → auto `/run`, invalid keeps current circuit); conditional-state view (outcomes + seed + singular marker; homodyne singular view → `wigner: null` + meters.singular, no fabricated data; purity/log_neg → None, mean_photon honest); `/run` stays pure (no RNG, L2-identical); 12 backend L3 tests + 4 API + 5 node + 2 UI (suite 429, node 17). No seed write-back to JSON, no localStorage, no undo / batch sampling / sweep (L4). |
+| 0.6.0 | 2026-08-04 | **L4 landed**: F-LAB-SCAN `POST /scan` — sweep `{node_id, param, min, max, n, modes_A}` over real-numeric params only (`alpha`/`nmode` excluded; per-op sweepable set mirrors ops.js `sweep` metadata), measurement-node circuits rejected 422 (E_N undefined on conditional states), per-point `log_negativity(state, modes_A)` (singular → `null`), pure no-RNG, `n ∈ [2,200]`, linear `xs`; whitelist §4 amended + ir.py WHITELIST + ops.js palette: `amplifier` (`G` main, `nbar` advanced default 0 = quantum-limited, G<1/nbar<0 → 422 via library guard) and `mz` (`BS(θ)→phase(φ,m0)→BS(θ)` lab composition, two-mode op, unitary → E_N preserved, equivalence tests atol 1e-12); scan panel (node/param selects + min/max/n + modes_A 1..nmode-1 default [0] + zero-dep SVG polyline with null breaks; sweep config is UI-session state, never written back to circuit_v0). Suite 467, node 20. No undo (separate task), no multi-param scan, no scan persistence, no new backend gates. |

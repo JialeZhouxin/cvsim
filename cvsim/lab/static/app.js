@@ -2,7 +2,7 @@
 "use strict";
 
 import { initEditor, loadJson } from "./editor.js";
-import { toCircuitJson } from "./ops.js";
+import { OPS, sourceModes, toCircuitJson } from "./ops.js";
 
 const DEFAULT_JSON = {
   schema: "circuit_v0",
@@ -57,6 +57,15 @@ const mSeed = $("m-seed");
 const mOutcomes = $("m-outcomes");
 const mSingularNote = $("m-singular-note");
 const wignerNote = $("wigner-note");
+const scanNode = $("scan-node");
+const scanParam = $("scan-param");
+const scanMin = $("scan-min");
+const scanMax = $("scan-max");
+const scanN = $("scan-n");
+const scanModesA = $("scan-modes-a");
+const scanBtn = $("scan-btn");
+const scanSvg = $("scan-svg");
+const scanNote = $("scan-note");
 
 function setStatus(text, ok = true) {
   statusEl.textContent = text;
@@ -119,6 +128,12 @@ function drawHeatmap(W) {
 const SVG_NS = "http://www.w3.org/2000/svg";
 let lastLim = 5;
 
+function el(tag, attrs) {
+  const e = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+
 function axisVal(v) {
   if (!Number.isFinite(v)) return "—";
   let s = v.toPrecision(3);
@@ -137,11 +152,6 @@ function drawAxes(lim) {
   const style = getComputedStyle(document.documentElement);
   const axis = style.getPropertyValue("--color-axis").trim() || "#7fe0ff";
   const paper = style.getPropertyValue("--color-paper").trim();
-  const el = (tag, attrs) => {
-    const e = document.createElementNS(SVG_NS, tag);
-    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-    return e;
-  };
   const cx = w / 2;
   const cy = h / 2;
 
@@ -314,13 +324,183 @@ function scheduleRun(circuitJson) {
   debounceTimer = setTimeout(() => doRun(circuitJson, latestSeq), 120);
 }
 
+/* ── scan panel (L4, F-LAB-SCAN) ──────────────────────── */
+function refreshScanNodes() {
+  const nodes = editor.getState().nodes.filter((n) =>
+    Object.values(OPS[n.op]?.params || {}).some((d) => Array.isArray(d.sweep)));
+  const prev = scanNode.value;
+  scanNode.replaceChildren();
+  for (const n of nodes) {
+    const opt = document.createElement("option");
+    opt.value = n.id;
+    opt.textContent = `${n.id} · ${OPS[n.op].label}`;
+    if (n.id === prev) opt.selected = true;
+    scanNode.appendChild(opt);
+  }
+  if (nodes.length && !scanNode.value) scanNode.value = nodes[0].id;
+  refreshScanParams();
+  refreshScanModesA();
+}
+
+function refreshScanParams() {
+  const node = editor.getState().nodes.find((n) => n.id === scanNode.value);
+  const meta = node && OPS[node.op];
+  const keys = meta
+    ? Object.keys(meta.params).filter((k) => Array.isArray(meta.params[k].sweep))
+    : [];
+  const prev = scanParam.value;
+  scanParam.replaceChildren();
+  for (const k of keys) {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = k;
+    if (k === prev) opt.selected = true;
+    scanParam.appendChild(opt);
+  }
+  if (keys.length && !scanParam.value) scanParam.value = keys[0];
+  if (scanParam.value !== prev) applyScanDefaults(); // (re)selected param → adaptive range
+}
+
+function applyScanDefaults() {
+  const node = editor.getState().nodes.find((n) => n.id === scanNode.value);
+  const d = node && OPS[node.op]?.params?.[scanParam.value];
+  if (!d || !Array.isArray(d.sweep)) return;
+  scanMin.value = d.sweep[0];
+  scanMax.value = d.sweep[1];
+  scanN.value = 50;
+}
+
+function refreshScanModesA() {
+  const nmode = sourceModes(editor.getState().nodes);
+  const prev = scanModesA.value;
+  scanModesA.replaceChildren();
+  for (let k = 1; k <= nmode - 1; k++) {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = `[0..${k - 1}]`;
+    if (String(k) === prev) opt.selected = true;
+    scanModesA.appendChild(opt);
+  }
+  if (!scanModesA.value && scanModesA.options.length) scanModesA.options[0].selected = true;
+  scanNote.hidden = nmode >= 2;
+  if (nmode < 2) scanNote.textContent = "E_N 需要至少 2 个模式（先添加 TMSV 或多模源）";
+  scanBtn.disabled = nmode < 2 || !scanNode.options.length;
+}
+
+function drawScanCurve(body) {
+  const xs = body.xs;
+  const ys = body.ys;
+  const W = 320, H = 150, padL = 34, padR = 10, padT = 10, padB = 18;
+  const finite = [];
+  for (let i = 0; i < ys.length; i++) {
+    if (typeof ys[i] === "number" && Number.isFinite(ys[i])) finite.push([xs[i], ys[i]]);
+  }
+  if (!finite.length) {
+    scanSvg.replaceChildren();
+    scanNote.hidden = false;
+    scanNote.textContent = "E_N 无定义（扫描范围内没有有限值）";
+    return;
+  }
+  scanNote.hidden = true;
+  const ymin = Math.min(...finite.map(([, y]) => y));
+  const ymax = Math.max(...finite.map(([, y]) => y));
+  const ylo = ymin === ymax ? ymin - 0.5 : ymin - (ymax - ymin) * 0.1;
+  const yhi = ymin === ymax ? ymin + 0.5 : ymax + (ymax - ymin) * 0.1;
+  const x0 = xs[0], x1 = xs[xs.length - 1];
+  const X = (x) => padL + ((x - x0) / (x1 - x0)) * (W - padL - padR);
+  const Y = (y) => padT + (1 - (y - ylo) / (yhi - ylo)) * (H - padT - padB);
+  const style = getComputedStyle(document.documentElement);
+  const rule = style.getPropertyValue("--color-rule").trim();
+  const ink = style.getPropertyValue("--color-ink").trim();
+  const accent = style.getPropertyValue("--color-accent").trim();
+  scanSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  scanSvg.replaceChildren();
+  for (let i = 0; i <= 4; i++) { // grid
+    const gx = padL + (i / 4) * (W - padL - padR);
+    scanSvg.append(el("line", { x1: gx, y1: padT, x2: gx, y2: H - padB, stroke: rule, "stroke-width": 1 }));
+    const gy = padT + (i / 4) * (H - padT - padB);
+    scanSvg.append(el("line", { x1: padL, y1: gy, x2: W - padR, y2: gy, stroke: rule, "stroke-width": 1 }));
+  }
+  let seg = ""; // null ys → break the polyline (curve gap)
+  for (let i = 0; i < ys.length; i++) {
+    if (typeof ys[i] !== "number" || !Number.isFinite(ys[i])) {
+      if (seg) { scanSvg.append(el("polyline", { points: seg, fill: "none", stroke: accent, "stroke-width": 1.5 })); seg = ""; }
+      continue;
+    }
+    seg += (seg ? " " : "") + X(xs[i]).toFixed(2) + "," + Y(ys[i]).toFixed(2);
+  }
+  if (seg) scanSvg.append(el("polyline", { points: seg, fill: "none", stroke: accent, "stroke-width": 1.5 }));
+  const label = (tx, ty, anchor, text) => {
+    const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: ink });
+    t.textContent = text;
+    return t;
+  };
+  scanSvg.append(
+    label(padL, H - 4, "start", axisVal(x0)),
+    label(W - padR, H - 4, "end", axisVal(x1)),
+    label(padL - 6, padT + 4, "end", axisVal(yhi)),
+    label(padL - 6, H - padB, "end", axisVal(ylo)),
+  );
+}
+
+async function doScan() {
+  const state = editor.getState();
+  const node = state.nodes.find((n) => n.id === scanNode.value);
+  const param = scanParam.value;
+  const d = node && OPS[node.op]?.params?.[param];
+  if (!node || !d || !Array.isArray(d.sweep)) {
+    setStatus("扫参：请先选择有可扫参数的节点", false);
+    return;
+  }
+  const pmin = Number(scanMin.value);
+  const pmax = Number(scanMax.value);
+  const n = Number(scanN.value);
+  if (!Number.isFinite(pmin) || !Number.isFinite(pmax) || pmin >= pmax) {
+    setStatus("扫参：min 必须是有限数且 < max", false);
+    return;
+  }
+  if (!Number.isInteger(n) || n < 2 || n > 200) {
+    setStatus("扫参：n 必须是 2–200 的整数", false);
+    return;
+  }
+  const k = Number(scanModesA.value) || 1;
+  const modesA = Array.from({ length: k }, (_, i) => i);
+  const payload = toCircuitJson(state);
+  payload.view.wigner_mode = Number(modeSelect.value) || 0;
+  payload.sweep = { node_id: node.id, param, min: pmin, max: pmax, n, modes_A: modesA };
+  scanBtn.disabled = true;
+  const t0 = performance.now();
+  try {
+    const resp = await fetch("/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await resp.json();
+    if (!resp.ok) {
+      setStatus(resp.status + " · " + (body.detail || "扫描失败"), false);
+      return;
+    }
+    drawScanCurve(body);
+    setStatus(`scan ok · ${body.ys.length} 点 · ${(performance.now() - t0).toFixed(0)} ms`);
+  } catch (e) {
+    setStatus("网络错误: " + e.message, false);
+  } finally {
+    refreshScanModesA(); // restore enabled state per current circuit
+  }
+}
+
 /* ── editor wiring ─────────────────────────────────────── */
 const editor = initEditor(document.querySelector(".workbench"), {
   defaultScene: DEFAULT_JSON,
   onRun: scheduleRun,
-  onState: () => { /* state mirroring lives in the JSON textarea */ },
+  onState: () => { refreshScanNodes(); }, // sweep selects mirror the graph
   onStatus: setStatus,
 });
+
+scanNode.addEventListener("change", refreshScanParams);
+scanParam.addEventListener("change", applyScanDefaults);
+scanBtn.addEventListener("click", doScan);
 
 runBtn.addEventListener("click", () => {
   clearTimeout(debounceTimer); // manual run supersedes pending debounced payload
@@ -390,6 +570,7 @@ async function init() {
     $("version-tag").textContent = "cvsim " + h.cvsim + " · " + h.schema;
   } catch { /* offline header keeps the — */ }
   editor.render();
+  refreshScanNodes();
 }
 
 init();

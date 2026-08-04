@@ -8,9 +8,9 @@ import {
 } from "../cvsim/lab/static/ops.js";
 import { stateFromJson, loadJson } from "../cvsim/lab/static/editor.js";
 
-const EXPECTED_OPS = ["tmsv", "coherent", "squeeze", "phase", "displace", "loss", "beamsplitter", "heterodyne", "homodyne"];
+const EXPECTED_OPS = ["tmsv", "coherent", "squeeze", "phase", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze"];
 
-test("ops metadata: 9 whitelist-subset ops", () => {
+test("ops metadata: 11 whitelist-subset ops", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
 });
 
@@ -196,6 +196,59 @@ test("L3: loadJson validates without mutating old state", () => {
   const badRes = loadJson(bad);
   assert.ok(badRes.error);
   assert.deepEqual(old, { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+});
+
+test("L4: amplifier + mz metadata", () => {
+  assert.equal(OPS.amplifier.kind, "single");
+  assert.equal(OPS.amplifier.params.G.min, 1);
+  assert.equal(OPS.amplifier.params.G.def, 2);
+  assert.deepEqual(OPS.amplifier.params.G.sweep, [1, 4]);
+  assert.equal(OPS.amplifier.params.nbar.advanced, true);
+  assert.equal(OPS.amplifier.params.nbar.sweep, undefined); // advanced, not sweepable
+  assert.equal(OPS.mz.kind, "two");
+  assert.deepEqual(OPS.mz.params.theta.sweep, [0, Math.PI]);
+  assert.deepEqual(OPS.mz.params.phi.sweep, [0, Math.PI]);
+  const a = addNode([], "amplifier");
+  assert.equal(a[0].mode, 0);
+  assert.equal(a[0].params.G, 2);
+  assert.equal(a[0].params.nbar, 0);
+  const m = addNode([], "mz");
+  assert.deepEqual(m[0].modes, [0, 1]);
+  assert.equal(m[0].params.theta, Math.PI / 4);
+  assert.equal(m[0].params.phi, Math.PI / 2);
+});
+
+test("L4: sweep metadata — alpha excluded, real numerics included", () => {
+  assert.equal(OPS.coherent.params.alpha.sweep, undefined);
+  assert.equal(OPS.displace.params.alpha.sweep, undefined);
+  assert.deepEqual(OPS.tmsv.params.r.sweep, [0, 2]);
+  assert.deepEqual(OPS.squeeze.params.r.sweep, [0, 2]);
+  assert.deepEqual(OPS.loss.params.T.sweep, [0, 1]);
+  assert.deepEqual(OPS.beamsplitter.params.theta.sweep, [0, Math.PI]);
+  assert.deepEqual(OPS.phase.params.phi.sweep, [0, Math.PI]);
+  assert.deepEqual(OPS.two_mode_squeeze.params.r.sweep, [0, 2]);
+});
+
+test("L4: stateFromJson accepts amplifier/mz", () => {
+  const payload = {
+    schema: "circuit_v0",
+    seed: 0,
+    nodes: [
+      { id: "s", op: "tmsv", params: { r: 0.6 } },
+      { id: "a", op: "amplifier", params: { G: 2 }, mode: 0 },
+      { id: "m", op: "mz", params: { theta: 0.5, phi: 0.3 }, modes: [0, 1] },
+    ],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  assert.equal(state.nodes[1].params.nbar, 0); // advanced default filled
+  assert.equal(state.nodes[2].params.theta, 0.5);
+  const rt = stateFromJson(toCircuitJson(state));
+  assert.equal(rt.error, undefined);
+  // missing required G freezes
+  const noG = { ...payload, nodes: [{ id: "a", op: "amplifier", params: {}, mode: 0 }] };
+  assert.ok(stateFromJson(noG).error);
 });
 
 test("stateFromJson: missing params freeze (frozen-graph policy)", () => {

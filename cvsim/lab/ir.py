@@ -6,13 +6,15 @@ No fastapi dependency here (see ``server.py``).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import math
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
 
 from cvsim.gaussian import (
     GaussianState,
+    amplifier,
     beamsplitter,
     displace,
     fourier,
@@ -34,13 +36,27 @@ from cvsim.wigner import wigner_grid
 
 SCHEMA = "circuit_v0"
 
-#: vision-gaussian-lab-ui.md §4 whitelist (complete v0 set, frozen at L0).
+#: vision-gaussian-lab-ui.md §4 whitelist (frozen L0, amended L4: amplifier + mz).
 SOURCE_OPS = frozenset({"vacuum", "coherent", "tmsv"})
 SINGLE_MODE_OPS = frozenset(
-    {"displace", "phase", "squeeze", "fourier", "loss", "homodyne", "heterodyne"}
+    {"displace", "phase", "squeeze", "fourier", "loss", "amplifier", "homodyne", "heterodyne"}
 )
-TWO_MODE_OPS = frozenset({"beamsplitter", "two_mode_squeeze"})
+TWO_MODE_OPS = frozenset({"beamsplitter", "two_mode_squeeze", "mz"})
+MEASUREMENT_OPS = frozenset({"homodyne", "heterodyne"})
 WHITELIST = SOURCE_OPS | SINGLE_MODE_OPS | TWO_MODE_OPS
+
+#: real-numeric params sweepable by /scan (mirrors ops.js `sweep` metadata).
+#: complex params (alpha) and structural params (nmode) are excluded.
+SWEEPABLE_PARAMS: dict[str, frozenset[str]] = {
+    "tmsv": frozenset({"r"}),
+    "squeeze": frozenset({"r"}),
+    "phase": frozenset({"phi"}),
+    "loss": frozenset({"T"}),
+    "beamsplitter": frozenset({"theta"}),
+    "two_mode_squeeze": frozenset({"r"}),
+    "amplifier": frozenset({"G"}),
+    "mz": frozenset({"theta", "phi"}),
+}
 
 
 class CircuitV0Error(ValueError):
@@ -227,6 +243,11 @@ def _apply(
             T = _num(p.get("T"), where, "T")
             nbar = _num(p.get("nbar", 0.0), where, "nbar")
             return loss(state, T, mode, nbar), None
+        if op == "amplifier":
+            G = _num(p.get("G"), where, "G")
+            nbar = _num(p.get("nbar", 0.0), where, "nbar")
+            # G<1 / nbar<0: library ValueError → 422 at the API boundary.
+            return amplifier(state, G, mode, nbar), None
         if op == "homodyne":
             phi = _num(p.get("phi", 0.0), where, "phi")
             if rng is None:
@@ -260,6 +281,13 @@ def _apply(
         if op == "two_mode_squeeze":
             r = _num(p.get("r"), where, "r")
             return two_mode_squeeze(state, r, modes[0], modes[1]), None
+        if op == "mz":
+            # Mach–Zehnder as lab composition (vision §4): BS(θ) → phase(φ, m0) → BS(θ).
+            theta = _num(p.get("theta"), where, "theta")
+            phi = _num(p.get("phi", 0.0), where, "phi")
+            st = beamsplitter(state, modes[0], modes[1], theta, 0.0)
+            st = phase(st, phi, modes[0])
+            return beamsplitter(st, modes[0], modes[1], theta, 0.0), None
         raise CircuitV0Error(f"{where}: unsupported two-mode op {op!r}")  # pragma: no cover
     raise CircuitV0Error(f"{where}: unsupported op {op!r}")  # pragma: no cover
 
@@ -319,6 +347,106 @@ def _build_result(
         meters=_meters(state, singular),
         measured=measured,
     )
+
+
+def _state_after(circuit: CircuitV0) -> GaussianState:
+    """Final GaussianState for a circuit without measurement nodes (scan path)."""
+    state: GaussianState | None = None
+    for node in circuit.nodes:
+        if node.op in SOURCE_OPS:
+            if state is not None:
+                raise CircuitV0Error(
+                    f"nodes[{node.id}]: source op must be first (state already exists)"
+                )
+            state = _source(node.op, node)
+        else:
+            if state is None:
+                raise CircuitV0Error(
+                    f"nodes[{node.id}]: op {node.op!r} requires a source node first"
+                )
+            state, _ = _apply(node, state, rng=None)
+    assert state is not None
+    return state
+
+def _safe_logneg(state: GaussianState, modes_A: list[int]) -> float | None:
+    """E_N on the current state; None when undefined (singular etc.), never fabricated."""
+    try:
+        return float(log_negativity(state, modes_A=modes_A))
+    except (ValueError, FloatingPointError, np.linalg.LinAlgError):
+        return None
+
+def scan_circuit(circuit: CircuitV0, sweep: dict[str, Any]) -> dict[str, Any]:
+    """F-LAB-SCAN: single-param sweep of one node's real-numeric param → E_N curve.
+
+    Pure function (no RNG): same request → same response. Each point rebuilds
+    the circuit with ``param`` replaced and evaluates ``log_negativity`` with
+    the requested ``modes_A``; undefined (singular) points are ``None`` (curve
+    break, frontend skips). Measurement nodes anywhere in the circuit → 422
+    (E_N is not defined on conditional states; honest rejection).
+    """
+    node_id = _require(sweep, "node_id", str, "sweep")
+    param = _require(sweep, "param", str, "sweep")
+    pmin = _num(sweep.get("min"), "sweep.min", "min")
+    pmax = _num(sweep.get("max"), "sweep.max", "max")
+    if not (math.isfinite(pmin) and math.isfinite(pmax)):
+        raise CircuitV0Error(f"sweep: min/max must be finite (got {pmin}, {pmax})")
+    if not pmin < pmax:
+        raise CircuitV0Error(f"sweep: min must be < max (got {pmin}, {pmax})")
+    n = sweep.get("n")
+    if not isinstance(n, int) or isinstance(n, bool) or not 2 <= n <= 200:
+        raise CircuitV0Error("sweep.n must be an int in [2, 200]")
+
+    node = next((nd for nd in circuit.nodes if nd.id == node_id), None)
+    if node is None:
+        raise CircuitV0Error(f"sweep: unknown node_id {node_id!r}")
+    if param not in SWEEPABLE_PARAMS.get(node.op, frozenset()):
+        raise CircuitV0Error(
+            f"sweep: param {param!r} is not sweepable for op {node.op!r}"
+        )
+    for nd in circuit.nodes:
+        if nd.op in MEASUREMENT_OPS:
+            raise CircuitV0Error(
+                f"sweep: measurement node {nd.id!r} ({nd.op}) — E_N undefined on "
+                "conditional states"
+            )
+
+    nmode = _state_after(circuit).nmode  # also validates the circuit runs
+    modes_A = sweep.get("modes_A", [0])
+    if not isinstance(modes_A, list) or not modes_A:
+        raise CircuitV0Error("sweep.modes_A must be a non-empty list of ints")
+    if len(modes_A) > nmode - 1:
+        raise CircuitV0Error(
+            f"sweep.modes_A: at most nmode-1={nmode - 1} modes (got {len(modes_A)})"
+        )
+    if len(set(modes_A)) != len(modes_A):
+        raise CircuitV0Error("sweep.modes_A: duplicate mode indices")
+    for m in modes_A:
+        if not isinstance(m, int) or isinstance(m, bool) or m < 0 or m >= nmode:
+            raise CircuitV0Error(f"sweep.modes_A: mode {m} out of range (nmode={nmode})")
+
+    xs = np.linspace(pmin, pmax, n)
+    ys: list[float | None] = []
+    for x in xs:
+        nodes = []
+        for nd in circuit.nodes:
+            params = dict(nd.params)
+            if nd.id == node_id:
+                params[param] = float(x)
+            nodes.append(
+                Node(id=nd.id, op=nd.op, params=params, mode=nd.mode, modes=nd.modes)
+            )
+        st = _state_after(replace(circuit, nodes=nodes))
+        ys.append(_safe_logneg(st, list(modes_A)))
+    return {
+        "node_id": node_id,
+        "param": param,
+        "min": float(pmin),
+        "max": float(pmax),
+        "n": n,
+        "modes_A": list(modes_A),
+        "xs": xs.tolist(),
+        "ys": ys,
+    }
 
 
 def _execute(

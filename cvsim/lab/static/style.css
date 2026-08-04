@@ -544,6 +544,35 @@ body {
   outline-offset: 1px;
 }
 
+/* ── Scan panel (L4) ──────────────────────────────────── */
+.scan {
+  margin-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+  padding-top: var(--space-md);
+}
+
+.scan h2 {
+  font-size: var(--text-md);
+  margin: 0 0 var(--space-sm);
+}
+
+.scan__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.scan__plot {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: var(--space-md);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+}
+
 /* ── Measure once panel ───────────────────────────────── */
 .measurement {
   margin-top: var(--space-lg);
