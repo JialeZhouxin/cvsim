@@ -16,9 +16,8 @@ Simulator package `cvsim/` implements three CV representations from pure theory 
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | `cvsim/` layout, notes isolation | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Physics contracts, tests, forbidden patterns | Filled |
-| [Database Guidelines](./database-guidelines.md) | N/A for this project | Placeholder |
-| [Error Handling](./error-handling.md) | TBD | Placeholder |
-| [Logging Guidelines](./logging-guidelines.md) | TBD | Placeholder |
+| [Error Handling](./error-handling.md) | ValueError fail-fast + CircuitV0Error → 422 | Filled |
+| [Output & Debugging](./logging-guidelines.md) | Library zero-output; demos print; server framework defaults | Filled |
 
 ---
 
