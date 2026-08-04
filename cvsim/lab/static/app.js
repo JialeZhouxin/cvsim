@@ -244,6 +244,7 @@ function showMeasurement(body) {
     mOutcomes.appendChild(li);
   }
   measurementPanel.hidden = false;
+  measurementPanel.scrollIntoView({ block: "nearest" }); // panel sits below V table; bring it into view
 }
 
 async function doRun(circuitJson, seq) {
