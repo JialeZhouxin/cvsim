@@ -43,6 +43,39 @@ body {
   white-space: nowrap;
 }
 
+/* ── collapsible blocks (above-the-fold: scan + state tables fold away) ── */
+.fold summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
+  padding: var(--space-sm) 0;
+  user-select: none;
+}
+
+.fold summary::marker {
+  content: "";
+}
+
+.fold summary::after {
+  content: "▸";
+  display: inline-block;
+  margin-left: var(--space-sm);
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.fold[open] summary::after {
+  transform: rotate(90deg);
+}
+
+/* author display rules (e.g. .scan__controls { display: flex }) would
+   override the UA's details-collapse display:none — restore it explicitly */
+.fold:not([open]) > *:not(summary) {
+  display: none;
+}
+
 .mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -99,12 +132,16 @@ body {
   margin-inline: auto;
 }
 
+/* workbench is a full-width workspace: in the 3-column layout the columns
+   themselves bound line length (13rem + 1fr + 1.2fr), so no max-width cap
+   is needed — the centered gutter on ultrawide screens is wasted space. */
+
 .panel__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-sm);
 }
 
 .panel__head h1 {
@@ -124,8 +161,8 @@ body {
 /* ── editor ────────────────────────────────────────────── */
 .editor__field {
   width: 100%;
-  min-height: 16vh;
-  min-height: 16dvh;
+  min-height: 4vh;
+  min-height: 4dvh;
   resize: vertical;
   padding: var(--space-lg);
   background: var(--color-paper-2);
@@ -152,6 +189,12 @@ body {
 .panel__actions {
   display: flex;
   gap: var(--space-sm);
+  flex-wrap: wrap;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.panel__actions > * {
   flex-shrink: 0;
 }
 
@@ -240,6 +283,8 @@ body {
 #wigner-canvas {
   display: block;
   width: 100%;
+  max-width: calc(100dvh - 31rem);
+  margin-inline: auto;
   aspect-ratio: 1;
   image-rendering: pixelated;
   border: 1px solid var(--color-rule);
@@ -304,10 +349,17 @@ body {
 }
 
 /* ── state tables ──────────────────────────────────────── */
+.state-fold {
+  margin-top: var(--space-lg);
+  border-top: 1px solid var(--color-rule);
+  padding-top: var(--space-sm);
+}
+
 .state-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-2xl);
+  margin-top: var(--space-md);
 }
 
 .state-block h2 {
@@ -378,14 +430,35 @@ body {
 }
 
 /* ── responsive · content-driven ───────────────────────── */
-@media (min-width: 60rem) {
+@media (min-width: 80rem) {
+  html,
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
   .workbench {
     grid-template-columns: 13rem minmax(0, 1fr) minmax(0, 1.2fr);
-    align-items: start;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    max-width: none;
+    min-height: 0;
+  }
+
+  /* .panel overflow is intentionally internal-only: content is compressed so
+     columns fit one viewport (folded defaults) — see design-system.md */
+  .panel {
+    min-height: 0;
+  }
+
+  /* expanding a fold (scan / state tables) may exceed the column — the column
+     then scrolls, so expanded content stays reachable */
+  .panel:has(.fold[open]) {
+    overflow-y: auto;
   }
 
   .editor__field {
-    min-height: 12dvh;
+    min-height: 4dvh;
   }
 
   .state-grid {
@@ -435,15 +508,15 @@ body {
 .node-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  margin-bottom: var(--space-lg);
+  gap: 4px;
+  margin-bottom: 4px;
 }
 
 .node-row {
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
   background: var(--color-paper-2);
-  padding: var(--space-md);
+  padding: 6px;
 }
 
 .node-row__head {
@@ -451,13 +524,13 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
+  margin-bottom: 2px;
 }
 
 .node-row__title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
 }
 
 .node-row__mode {
@@ -468,7 +541,7 @@ body {
 .node-row__params {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   align-items: center;
 }
 
@@ -507,7 +580,7 @@ body {
 .node-row__controls {
   display: flex;
   gap: var(--space-sm);
-  margin-top: var(--space-md);
+  margin-top: var(--space-sm);
 }
 
 .btn--sm {
@@ -548,12 +621,11 @@ body {
 .scan {
   margin-top: var(--space-lg);
   border-top: 1px solid var(--color-rule);
-  padding-top: var(--space-md);
+  padding-top: var(--space-sm);
 }
 
-.scan h2 {
-  font-size: var(--text-md);
-  margin: 0 0 var(--space-sm);
+.scan summary {
+  margin-bottom: var(--space-sm);
 }
 
 .scan__controls {
