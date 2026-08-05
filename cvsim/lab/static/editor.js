@@ -3,7 +3,8 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, moveNode, paramsFromOp, removeNode, sourceModes, toCircuitJson, updateMode, updateParam } from "./ops.js";
+import { OPS, addNode, completePlacing, moveNodeX, paramsFromOp, placeSingle, removeNode, sourceModes, toCircuitJson, updateParam } from "./ops.js";
+import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
 const defaultState = () => ({
@@ -25,6 +26,7 @@ export function stateFromJson(payload) {
   if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
   const nodes = [];
   const seenIds = new Set();
+  let gateIdx = 0; // legacy layout: gates get grid columns in array order, sources excluded
   for (let i = 0; i < payload.nodes.length; i++) {
     const n = payload.nodes[i];
     if (!n || typeof n !== "object") return { error: `nodes[${i}] 非法` };
@@ -61,6 +63,14 @@ export function stateFromJson(payload) {
       }
       node.modes = [...n.modes];
     }
+    // L5 staff layout x — honor ui.x when present, else array index (legacy/hand-written
+    // JSON falls back to grid columns, never errors). Sources stay layout-free.
+    const rawUi = n.ui && typeof n.ui === "object" ? n.ui : {};
+    if (meta.kind === "source") {
+      node.ui = Number.isFinite(rawUi.x) ? { x: rawUi.x } : undefined;
+    } else {
+      node.ui = Number.isFinite(rawUi.x) ? { x: rawUi.x } : { x: gateIdx++ };
+    }
     nodes.push(node);
   }
   const rawView = payload.view && typeof payload.view === "object" ? payload.view : {};
@@ -88,7 +98,7 @@ export function loadJson(payload) {
 export function initEditor(root, hooks) {
   const dom = {
     palette: root.querySelector("#palette"),
-    list: root.querySelector("#node-list"),
+    staff: root.querySelector("#staff"),
     json: root.querySelector("#json-input"),
     runBtn: root.querySelector("#run-btn"),
     resetBtn: root.querySelector("#reset-btn"),
@@ -112,14 +122,47 @@ export function initEditor(root, hooks) {
   }
 
   function render() {
-    renderRows();
+    staff.render();
     renderJson();
     hooks.onState(state);
     emit(toCircuitJson(state), "graph");
   }
 
-  /* palette: DnD + click fallback */
+  const staff = initStaff(dom.staff, {
+    getState: () => state,
+    onPlace: (op, mode, x) => {
+      state = { ...state, nodes: placeSingle(state.nodes, op, mode, x) };
+      render();
+    },
+    onCompletePlacing: (placing, modeB) => {
+      const res = completePlacing(state.nodes, placing, modeB);
+      if (res.ok) {
+        state = { ...state, nodes: res.nodes };
+        render();
+      }
+      return res;
+    },
+    onMove: (id, x) => {
+      state = { ...state, nodes: moveNodeX(state.nodes, id, x) };
+      render();
+    },
+    onDelete: (id) => {
+      state = { ...state, nodes: removeNode(state.nodes, id) };
+      render();
+    },
+    onParam: (id, key, value) => {
+      state = { ...state, nodes: state.nodes.map((x) => (x.id === id ? updateParam(x, key, value) : x)) };
+      renderJson();
+      hooks.onState(state);
+      emit(toCircuitJson(state), "graph");
+    },
+    onPickSweep: (id) => hooks.onPickSweep?.(id),
+    onStatus: (msg, ok) => hooks.onStatus(msg, ok),
+  });
+
+  /* palette: DnD + click fallback（palette:false 的 op 不出托盘，如 legacy tmsv） */
   for (const op of Object.keys(OPS)) {
+    if (OPS[op].palette === false) continue;
     const card = document.createElement("div");
     card.className = "palette__item";
     card.draggable = true;
@@ -138,21 +181,6 @@ export function initEditor(root, hooks) {
     card.addEventListener("click", tryAdd);
     dom.palette.appendChild(card);
   }
-
-  dom.list.addEventListener("dragover", (e) => e.preventDefault());
-  dom.list.addEventListener("drop", (e) => {
-    e.preventDefault();
-    const op = e.dataTransfer.getData("text/plain");
-    if (Object.hasOwn(OPS, op)) {
-      const meta = OPS[op];
-      if (meta.kind === "two" && sourceModes(state.nodes) < 2) {
-        hooks.onStatus("分束器需要至少 2 个模式（先添加 TMSV 或多源）", false);
-        return;
-      }
-      state = { ...state, nodes: addNode(state.nodes, op) };
-      render();
-    }
-  });
 
   dom.resetBtn.addEventListener("click", () => {
     const parsed = hooks.defaultScene ? stateFromJson(hooks.defaultScene) : null;
@@ -180,98 +208,15 @@ export function initEditor(root, hooks) {
       }
       state = parsed.state;
       lastGood = JSON.stringify(toCircuitJson(state));
-      render(); // re-render node rows too (OCR: import left rows stale)
+      render(); // re-render staff + JSON (OCR: import left rows stale)
     }, 400);
   });
-
-  /* node list: rows with param sliders + move/delete */
-  function renderRows() {
-    dom.list.replaceChildren();
-    state.nodes.forEach((n, i) => {
-      const meta = OPS[n.op];
-      const row = document.createElement("div");
-      row.className = "node-row";
-      row.dataset.id = n.id;
-
-      const head = document.createElement("div");
-      head.className = "node-row__head";
-
-      const title = document.createElement("span");
-      title.className = "node-row__title";
-      title.textContent = `${i + 1}. ${meta.label}`;
-      const mode = document.createElement("span");
-      mode.className = "node-row__mode mono";
-      if (meta.kind === "source") mode.textContent = `+${meta.modes} 模`;
-      else if (meta.kind === "single") mode.textContent = `mode ${n.mode}`;
-      else mode.textContent = `modes ${n.modes.join(",")}`;
-      head.append(title, mode);
-
-      const params = document.createElement("div");
-      params.className = "node-row__params";
-      for (const [k, d] of Object.entries(meta.params)) {
-        if (d.advanced) continue; // nbar: advanced, JSON-only for now
-        const wrap = document.createElement("label");
-        wrap.className = "param";
-        const lab = document.createElement("span");
-        lab.className = "param__name mono";
-        lab.textContent = k;
-        const range = document.createElement("input");
-        range.type = "range";
-        range.min = d.min;
-        range.max = d.max;
-        range.step = d.step;
-        range.value = n.params[k];
-        const num = document.createElement("input");
-        num.type = "number";
-        num.className = "param__num mono";
-        num.step = d.step;
-        num.value = n.params[k];
-        range.addEventListener("input", () => {
-          num.value = range.value;
-          state = { ...state, nodes: state.nodes.map((x) => (x.id === n.id ? updateParam(x, k, Number(range.value)) : x)) };
-          renderJson();
-          hooks.onState(state);
-          emit(toCircuitJson(state), "graph");
-        });
-        num.addEventListener("change", () => {
-          range.value = num.value;
-          state = { ...state, nodes: state.nodes.map((x) => (x.id === n.id ? updateParam(x, k, Number(num.value)) : x)) };
-          render();
-        });
-        wrap.append(lab, range, num);
-        params.appendChild(wrap);
-      }
-
-      const controls = document.createElement("div");
-      controls.className = "node-row__controls";
-      const mk = (label, fn) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "btn btn--ghost btn--sm";
-        b.textContent = label;
-        b.addEventListener("click", () => {
-          state = fn(state);
-          render();
-        });
-        return b;
-      };
-      const up = mk("↑", (s) => ({ ...s, nodes: moveNode(s.nodes, n.id, -1) }));
-      const down = mk("↓", (s) => ({ ...s, nodes: moveNode(s.nodes, n.id, +1) }));
-      const del = mk("删除", (s) => ({ ...s, nodes: removeNode(s.nodes, n.id) }));
-      up.disabled = i === 0;
-      down.disabled = i === state.nodes.length - 1;
-      controls.append(up, down, del);
-
-      row.append(head, params, controls);
-      dom.list.appendChild(row);
-    });
-  }
 
   return {
     getState: () => state,
     setView: (patch) => {
       state = { ...state, view: { ...state.view, ...patch } };
-      render(); // syncs JSON textarea + rows + emits debounced run
+      render(); // syncs JSON textarea + staff + emits debounced run
     },
     setState: (next) => {
       // Load success: replace whole state, freeze, re-render (auto-run via emit)
@@ -280,5 +225,6 @@ export function initEditor(root, hooks) {
       render();
     },
     render,
+    isPlacing: () => staff.isPlacing(),
   };
 }

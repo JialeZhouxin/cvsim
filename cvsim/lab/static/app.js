@@ -499,6 +499,13 @@ const editor = initEditor(document.querySelector(".workbench"), {
   onRun: scheduleRun,
   onState: () => { refreshScanNodes(); }, // sweep selects mirror the graph
   onStatus: setStatus,
+  onPickSweep: (id) => {
+    // L5: opening a sweepable gate's param card syncs the scan target
+    if (scanNode.querySelector(`option[value="${id}"]`)) {
+      scanNode.value = id;
+      refreshScanParams();
+    }
+  },
 });
 
 scanNode.addEventListener("change", refreshScanParams);

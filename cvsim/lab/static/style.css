@@ -505,82 +505,135 @@ body {
   outline-offset: 2px;
 }
 
-.node-list {
+/* L5: seq panel is a column so the staff canvas flexes to fill it */
+.seq {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 4px;
+  min-height: 0;
 }
 
-.node-row {
+.staff {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
   background: var(--color-paper-2);
-  padding: 6px;
+  outline: none;
+  position: relative;
 }
 
-.node-row__head {
+.staff__grid {
+  position: relative;
+}
+
+.staff__row {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  margin-bottom: 2px;
+  height: 56px;
 }
 
-.node-row__title {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--text-sm);
+.staff__row::before {
+  /* lane wire: drawn across the whole row, source column included */
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 27px;
+  border-top: 1px solid color-mix(in srgb, var(--color-rule) 60%, transparent);
+  pointer-events: none;
 }
 
-.node-row__mode {
+.staff__source {
+  flex: none;
+  width: 132px;
+  padding: 4px var(--space-sm);
   font-size: var(--text-xs);
   color: var(--color-muted);
-}
-
-.node-row__params {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  align-items: center;
-}
-
-.param {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--text-sm);
-}
-
-.param__name {
-  color: var(--color-muted);
-  min-width: 1.5rem;
-}
-
-.param input[type="range"] {
-  width: 8rem;
-  accent-color: var(--color-accent);
-}
-
-.param__num {
-  width: 5.5rem;
-  padding: 2px var(--space-sm);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-sm);
+  border-right: 1px dashed var(--color-rule);
   background: var(--color-paper);
-  color: var(--color-ink);
-  font-size: var(--text-xs);
-}
-
-.param__num:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
-
-.node-row__controls {
   display: flex;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
+  align-items: center;
+  justify-content: flex-end;
+  text-align: right;
+  gap: 4px;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.staff__source--cont {
+  /* continuation rows of a multi-mode source: no label, no click */
+  pointer-events: none;
+  background: var(--color-paper-2);
+}
+
+.staff__source--arm,
+.staff__lane--arm {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.staff__lane {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.gate {
+  position: absolute;
+  width: 60px;
+  height: 44px;
+  margin-top: 6px;
+  border: 1.5px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-paper-2));
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+  cursor: grab;
+  user-select: none;
+  z-index: 2;
+}
+
+.gate--two {
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-paper-2));
+}
+
+.gate--preview {
+  border-style: dashed;
+  opacity: 0.55;
+  cursor: default;
+  z-index: 3;
+}
+
+.gate:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+.gate__del {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: var(--text-xs);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-micro) var(--ease-out);
+}
+
+.gate:hover .gate__del {
+  opacity: 1;
 }
 
 .btn--sm {
@@ -684,4 +737,74 @@ body {
   .palette__item {
     transition: none;
   }
+}
+
+/* ── L5: param card float ─────────────────────────────── */
+.gate-card {
+  position: absolute;
+  z-index: 5;
+  min-width: 15rem;
+  max-width: 17rem;
+  padding: var(--space-md);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.gate-card__head {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.gate-card__params {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.gate-card__none {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+}
+
+/* ── L5: JSON editor folds under a details (staff-first layout) ── */
+.json-fold {
+  margin-top: var(--space-sm);
+  border-top: 1px solid var(--color-rule);
+}
+
+.json-fold summary {
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  padding: var(--space-sm) 0;
+  user-select: none;
+}
+
+.json-fold summary::marker {
+  content: "";
+}
+
+/* ── L5: compact palette (icon chips, two per column) ─── */
+.palette__grid {
+  grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr));
+  gap: var(--space-xs);
+}
+
+.palette__item {
+  padding: var(--space-sm) 2px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

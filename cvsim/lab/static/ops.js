@@ -7,10 +7,19 @@
 export const TAU = 2 * Math.PI;
 
 export const OPS = {
+  /* L5: 源重构 — tmsv 出托盘（palette:false，后端 IR 保留兼容，旧 JSON 仍可载入）;
+     纠缠由 vacuum + two_mode_squeeze 门构建。 */
+  vacuum: {
+    label: "真空模",
+    kind: "source",
+    modes: 1,
+    params: { nmode: { min: 1, max: 16, step: 1, def: 1, advanced: true } },
+  },
   tmsv: {
     label: "TMSV",
     kind: "source",
     modes: 2,
+    palette: false,
     params: { r: { min: -3, max: 3, step: 0.01, def: 0.6, sweep: [0, 2] } },
   },
   coherent: {
@@ -96,14 +105,34 @@ export function paramsFromOp(op) {
   return out;
 }
 
-/** Source modes contributed so far (tmsv=2, coherent=1). */
+/** Source modes contributed so far (vacuum nmode / coherent=1; tmsv=2 legacy). */
 export function sourceModes(nodes) {
   let total = 0;
   for (const n of nodes) {
     const meta = OPS[n.op];
-    if (meta && meta.kind === "source") total += meta.modes;
+    if (!meta || meta.kind !== "source") continue;
+    total += n.op === "vacuum" ? (n.params.nmode ?? 1) : meta.modes;
   }
   return total;
+}
+
+/* ── L5 staff ordering ─────────────────────────────── */
+/** Horizontal x of a node (source = -Infinity: always leftmost). */
+export function xOf(n) {
+  if (OPS[n.op]?.kind === "source") return -Infinity;
+  return n.ui && Number.isFinite(n.ui.x) ? n.ui.x : 0;
+}
+
+/** Sort key within one x column: mode ascending (two-mode uses modes[0]). */
+export function modeKeyOf(n) {
+  const meta = OPS[n.op];
+  if (meta?.kind === "source") return -Infinity;
+  return meta?.kind === "two" ? n.modes[0] : n.mode;
+}
+
+/** Execution order = array order = stable sort by (x, modeKey). */
+export function sortNodes(nodes) {
+  return [...nodes].sort((a, b) => xOf(a) - xOf(b) || modeKeyOf(a) - modeKeyOf(b));
 }
 
 /** Next id = max existing numeric id + 1 (OCR: importing n0 then adding
@@ -117,28 +146,88 @@ function nextId(nodes) {
   return "n" + (max + 1);
 }
 
-/** Append a node to the circuit list. mode defaults: 0 (single), [0,1] (two). */
+/** Append a node to the circuit tail (palette click fallback).
+    x = max existing gate x + 1; mode defaults: 0 (single), [0,1] (two). */
 export function addNode(nodes, op) {
   const node = { id: nextId(nodes), op, params: paramsFromOp(op) };
   if (OPS[op].kind === "single") node.mode = 0;
   if (OPS[op].kind === "two") node.modes = [0, 1];
-  return [...nodes, node];
+  const maxX = nodes.reduce((m, n) => Math.max(m, n.ui?.x ?? -Infinity), -Infinity);
+  if (OPS[op].kind !== "source") node.ui = { x: Number.isFinite(maxX) ? maxX + 1 : 0 };
+  return sortNodes([...nodes, node]);
 }
 
 export function removeNode(nodes, id) {
   return nodes.filter((n) => n.id !== id);
 }
 
-/** Move a node up (-1) or down (+1) within bounds. Non-integer steps rejected. */
-export function moveNode(nodes, id, dir) {
-  const step = Number(dir);
-  if (!Number.isInteger(step) || Math.abs(step) !== 1) return nodes; // OCR guard
-  const i = nodes.findIndex((n) => n.id === id);
-  const j = i + step;
-  if (i < 0 || j < 0 || j >= nodes.length) return nodes;
-  const out = [...nodes];
-  [out[i], out[j]] = [out[j], out[i]];
-  return out;
+/** Place a single-mode gate on a lane at x (staff drag-drop). */
+export function placeSingle(nodes, op, mode, x) {
+  const v = Number(mode);
+  const p = Number(x);
+  if (!Object.hasOwn(OPS, op) || OPS[op].kind !== "single") return nodes;
+  if (!Number.isInteger(v) || v < 0 || !Number.isFinite(p)) return nodes;
+  const node = { id: nextId(nodes), op, params: paramsFromOp(op), mode: v, ui: { x: Math.max(0, p) } };
+  return sortNodes([...nodes, node]);
+}
+
+/** Finish a two-mode placement after the user picks lane B.
+    Returns {ok:true, nodes} or {ok:false, reason}. */
+export function completePlacing(nodes, placing, modeB) {
+  const v = Number(modeB);
+  if (!placing || !Object.hasOwn(OPS, placing.op) || OPS[placing.op].kind !== "two") {
+    return { ok: false, reason: "非法放置状态" };
+  }
+  if (!Number.isInteger(v) || v < 0) return { ok: false, reason: "非法模式" };
+  if (v === placing.modeA) return { ok: false, reason: "双模操作需要两个不同模式" };
+  const node = {
+    id: nextId(nodes), op: placing.op, params: paramsFromOp(placing.op),
+    modes: [placing.modeA, v], ui: { x: Math.max(0, Number(placing.x) || 0) },
+  };
+  return { ok: true, nodes: sortNodes([...nodes, node]) };
+}
+
+/** Drag an existing gate: change x, re-sort (order follows (x, mode)). */
+export function moveNodeX(nodes, id, x) {
+  const v = Number(x);
+  if (!Number.isFinite(v)) return nodes;
+  const out = nodes.map((n) => (n.id === id ? { ...n, ui: { ...n.ui, x: Math.max(0, v) } } : n));
+  return sortNodes(out);
+}
+
+/** Source → lane mapping. Each row: {srcId, op, modeStart, modeEnd, params}.
+    vacuum nmode>1 contributes n lanes (JSON-legacy); tmsv 2 lanes. */
+export function sourceRows(nodes) {
+  const rows = [];
+  let m = 0;
+  for (const n of nodes) {
+    const meta = OPS[n.op];
+    if (!meta || meta.kind !== "source") continue;
+    const k = n.op === "vacuum" && Number.isInteger(n.params?.nmode) ? n.params.nmode : meta.modes;
+    rows.push({ srcId: n.id, op: n.op, modeStart: m, modeEnd: m + k, params: n.params });
+    m += k;
+  }
+  return rows;
+}
+
+/** Delete a source + all gates acting on its lanes (backend would reject
+    out-of-range modes). Returns {nodes, removed}. */
+export function removeSource(nodes, srcId) {
+  const row = sourceRows(nodes).find((r) => r.srcId === srcId);
+  if (!row) return { nodes, removed: [] };
+  const removed = [srcId];
+  const keep = [];
+  for (const n of nodes) {
+    const meta = OPS[n.op];
+    if (n.id === srcId) continue;
+    if (!meta || meta.kind === "source") { keep.push(n); continue; }
+    const hits = meta.kind === "two"
+      ? (n.modes[0] >= row.modeStart && n.modes[0] < row.modeEnd)
+        || (n.modes[1] >= row.modeStart && n.modes[1] < row.modeEnd)
+      : n.mode >= row.modeStart && n.mode < row.modeEnd;
+    if (hits) removed.push(n.id); else keep.push(n);
+  }
+  return { nodes: keep, removed };
 }
 
 export function updateParam(node, key, value) {
@@ -163,6 +252,7 @@ export function toCircuitJson(state) {
       const out = { id: n.id, op: n.op, params: n.params };
       if (n.mode !== undefined) out.mode = n.mode;
       if (n.modes !== undefined) out.modes = n.modes;
+      if (n.ui && Number.isFinite(n.ui.x)) out.ui = { x: n.ui.x }; // staff layout (backend ignores)
       return out;
     }),
     edges: [],

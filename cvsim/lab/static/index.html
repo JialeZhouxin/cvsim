@@ -22,7 +22,7 @@
   <section class="panel palette" aria-label="操作托盘">
     <div class="panel__head">
       <h1>托盘</h1>
-      <span class="hint">拖入列表或点击添加</span>
+      <span class="hint">拖到轨道放置</span>
     </div>
     <div id="palette" class="palette__grid"></div>
   </section>
@@ -40,11 +40,14 @@
         <button id="run-btn" type="button" class="btn btn--primary">运行</button>
       </div>
     </div>
-    <div id="node-list" class="node-list" aria-live="polite"></div>
-    <p class="hint">节点按序执行；拖入追加到尾部。mode 由参数面板指定。</p>
-    <label class="sr-only" for="json-input">circuit_v0 JSON（与图形双向同步）</label>
-    <textarea id="json-input" class="editor__field" spellcheck="false" aria-describedby="json-hint"></textarea>
-    <p id="json-hint" class="hint">JSON 与图形双向同步：<span class="mono">view.wigner_mode / lim / n</span> 随电路提交。</p>
+    <div id="staff" class="staff" aria-live="polite" aria-label="五线谱电路编辑区"></div>
+    <p class="hint">拖动器件到轨道放置；水平位置 = 时序；双模器件拖到第一条轨道后点击第二条轨道。</p>
+    <details class="json-fold">
+      <summary>circuit_v0 JSON（与图形双向同步）</summary>
+      <label class="sr-only" for="json-input">circuit_v0 JSON（与图形双向同步）</label>
+      <textarea id="json-input" class="editor__field" spellcheck="false" aria-describedby="json-hint"></textarea>
+      <p id="json-hint" class="hint">编辑 JSON → 五线谱同步；<span class="mono">ui.x</span> 为轨道位置，可留空。</p>
+    </details>
   </section>
 
   <section class="panel result" aria-label="运行结果">
