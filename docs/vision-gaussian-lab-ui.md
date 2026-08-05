@@ -5,7 +5,7 @@
 > **Physics / API SoT remains:** [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md) + [`api-stability.md`](./api-stability.md).  
 > **This doc wins** for UI scope, interaction, and v0 acceptance. If it conflicts with simulator vision on **math/conventions**, simulator vision wins and this doc must be amended.
 
-**Last updated:** 2026-08-04  
+**Last updated:** 2026-08-05  
 **Status:** Locked direction after grilling (user chose “按推荐走”); L0–L4 landed (L4 = F-LAB-SCAN + amp/MZ whitelist, undo separate task)
 **Codebase today:** Lab UI package landed through L4; backend calls public `cvsim.gaussian` + `cvsim.wigner` only.
 
@@ -88,7 +88,7 @@ Exceeding these counts requires amending this doc first.
 |-------|----------|
 | `vacuum` | `thermal` as source |
 | `coherent` | `displaced_squeezed` |
-| `tmsv` | explicit `product` node（多源 + 线拼接） |
+| `tmsv`（**L5: JSON-only**，出托盘 `palette:false`，后端/IR 保留兼容；纠缠由 `two_mode_squeeze` 门构建） | explicit `product` node（多源 + 线拼接） |
 
 ### 4.2 Gates（≤7）
 
@@ -125,6 +125,7 @@ Exceeding these counts requires amending this doc first.
 | **P0.5** | meters：`mean_photon`、`purity`、`log_negativity`（`modes_A` 选择） |
 | **P0.5** | **Measure once**（`homodyne_sample` / `heterodyne_sample` + condition 路径） |
 | **P1** | 参数扫描曲线（如 \(E_N(r)\)，**landed L4**）；撤销栈；多文档 |
+| **L5** | **五线谱式电路编辑器**（landed）：每模一轨道、拖放放置、双模两步选择、水平 x=时序、参数浮层 |
 
 ### 4.6 Wigner policy
 
@@ -342,3 +343,4 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 | 0.4.0 | 2026-08-03 | **L2 landed**: sequence editor — palette DnD (8 ops: tmsv/coherent/squeeze/phase/displace/loss/beamsplitter/heterodyne) appends nodes, per-node param sliders (debounce 120ms + seq guard), ↑/↓/delete, JSON⇄graph two-way sync (400ms rebuild, frozen-graph on invalid), wigner_mode selector; A3 T=1 TMSV log_neg = -log₂(e⁻²ʳ) verified; 10 node tests + suite 412. No canvas/edges (ordered-node semantics kept), no modes_A selector (2-mode unique bipartition; add with 3-mode circuits), no undo (P1) / save-load-sampling (L3). |
 | 0.5.0 | 2026-08-04 | **L3 landed**: Save/Load (A5) + Measure once (A6) — `POST /sample` with explicit `seed` (`np.random.default_rng`), true sampling of all measurement nodes in node order with conditioning chain (homodyne `homodyne_sample_and_condition` keeps mode, heterodyne removes mode), homodyne op + `phi` param (default 0) in IR/ops/palette; browser Save (download `circuit_v0.json`, seed only, no outcomes) / Load (FileReader → double validation → rebuild → auto `/run`, invalid keeps current circuit); conditional-state view (outcomes + seed + singular marker; homodyne singular view → `wigner: null` + meters.singular, no fabricated data; purity/log_neg → None, mean_photon honest); `/run` stays pure (no RNG, L2-identical); 12 backend L3 tests + 4 API + 5 node + 2 UI (suite 429, node 17). No seed write-back to JSON, no localStorage, no undo / batch sampling / sweep (L4). |
 | 0.6.0 | 2026-08-04 | **L4 landed**: F-LAB-SCAN `POST /scan` — sweep `{node_id, param, min, max, n, modes_A}` over real-numeric params only (`alpha`/`nmode` excluded; per-op sweepable set mirrors ops.js `sweep` metadata), measurement-node circuits rejected 422 (E_N undefined on conditional states), per-point `log_negativity(state, modes_A)` (singular → `null`), pure no-RNG, `n ∈ [2,200]`, linear `xs`; whitelist §4 amended + ir.py WHITELIST + ops.js palette: `amplifier` (`G` main, `nbar` advanced default 0 = quantum-limited, G<1/nbar<0 → 422 via library guard) and `mz` (`BS(θ)→phase(φ,m0)→BS(θ)` lab composition, two-mode op, unitary → E_N preserved, equivalence tests atol 1e-12); scan panel (node/param selects + min/max/n + modes_A 1..nmode-1 default [0] + zero-dep SVG polyline with null breaks; sweep config is UI-session state, never written back to circuit_v0). Suite 469, node 20. No undo (separate task), no multi-param scan, no scan persistence, no new backend gates. |
+| 0.7.0 | 2026-08-05 | **L5 landed**: staff 五线谱编辑器（替换列表式前端；`circuit_v0` IR + 后端零改动）。每模一横向轨道（行序 = mode 升序），水平 x = 时序；执行序 = 数组序 = 按 **(x, 模序号)** 稳定排序（双模取 `modes[0]`；源恒前）；单模门拖到轨道落定 `mode`；双模门（BS/MZ/双模压缩）两步放置——拖到轨道 A → 半透明预览 + 高亮 + 状态提示 → 点击轨道 B 落定，Esc/空白取消、同模拒绝；`ui.x` 持久化于节点 `ui` 字段（旧 JSON 无 `ui.x` 按数组序排格子，源无布局）；源重构：palette = `vacuum`(+1 模，`nmode` advanced JSON-only) + `coherent`，`tmsv` 出托盘（JSON-only 兼容，旧文件可载入运行），删源连带删除作用其模上的门（先确认）；参数编辑 = 点击门/源弹浮层卡（滑块+数字，实时 JSON 同步 + 就地重跑）；门拖动改 x 重排、悬停 × 删除；可扫门浮层自动同步 scan 目标；JSON 文本域收为折叠区（双向同步 + frozen-graph 保留）；托盘图标化两列紧凑。Suite 470, node 28, staff probe 16/16 headless CDP。No undo, no parallel columns（IR 线性顺序语义保留）, no 双模门拖放改 modes。 |

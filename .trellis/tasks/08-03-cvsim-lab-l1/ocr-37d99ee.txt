@@ -1,2 +1,0 @@
-[ocr] Summary: 2 file(s) reviewed, 0 comment(s), ~59638 token(s) used (input: ~55574, output: ~4064), 1m5s elapsed
-Review complete: 0 finding(s) across 2 selected item(s).
