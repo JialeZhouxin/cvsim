@@ -70,7 +70,7 @@ function evalJs(ws, expression) {
   });
 }
 
-const server = spawn("uv", ["run", "uvicorn", "cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"], {
+const server = spawn(process.cwd() + "/.venv/Scripts/uvicorn.exe", ["cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"], {
   cwd: process.cwd(), stdio: "ignore",
 });
 const edge = spawn(EDGE, [
@@ -95,6 +95,9 @@ try {
     }
   };
   await send(ws, "Runtime.enable");
+
+  /* folds start collapsed (above-the-fold design); open scan for the scan flow */
+  await evalJs(ws, `(async () => { while (!document.getElementById("scan-panel")) await new Promise((r) => setTimeout(r, 50)); document.getElementById("scan-panel").open = true; return true; })()`);
 
   /* 1. panel renders with adaptive defaults for the default TMSV scene */
   const panel = await waitEval(ws, `(() => {
@@ -177,6 +180,52 @@ try {
   })()`);
   check("amplifier + mz palette cards add nodes", pal.rows.some((t) => t.includes("放大")) && pal.rows.some((t) => t.includes("马赫-曾德尔")), JSON.stringify(pal.rows));
   check("/run ok with amplifier + mz circuit", pal.status.includes("ok") && !pal.status.includes("timeout"), pal.status);
+
+  /* 5. hit-test every interactive control across viewport widths — no element
+        may be covered by another (e.g. the Wigner canvas overlapping toolbar
+        buttons when the 3-column grid makes the seq panel too narrow). */
+  const HIT = `(() => {
+    const els = [...document.querySelectorAll("button, select, input:not(.sr-only), label.btn")];
+    const bad = [];
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      const cx = Math.round(r.left + r.width / 2), cy = Math.round(r.top + r.height / 2);
+      if (cx < 0 || cy < 0 || cx > innerWidth || cy > innerHeight) continue;
+      const hit = document.elementFromPoint(cx, cy);
+      if (!(hit === el || el.contains(hit) || (hit && hit.contains(el))))
+        bad.push((el.id || el.textContent || "").trim() + "@" + cx + "," + cy + " hit " + (hit ? hit.id || hit.tagName : "null"));
+    }
+    return bad;
+  })()`;
+  const hitFailures = [];
+  const scrollFailures = [];
+  const barFailures = [];
+  for (const w of [1920, 1280, 640]) {
+    await send(ws, "Emulation.setDeviceMetricsOverride", { width: w, height: 900, deviceScaleFactor: 1, mobile: false });
+    await sleep(300);
+    // reset any leftover column scroll; collapse folds to the default view
+    await evalJs(ws, `window.scrollTo(0, 0); document.querySelectorAll(".panel").forEach((p) => (p.scrollTop = 0)); document.querySelectorAll(".fold").forEach((f) => (f.open = false))`);
+    if (w >= 1280) {
+      // user-visible scrollbars must not exist in the default (folded) view
+      const bars = await evalJs(ws, `[...document.querySelectorAll(".panel")].filter((p) => p.scrollHeight > p.clientHeight + 1).map((p) => p.className + " sh=" + p.scrollHeight + " ch=" + p.clientHeight)`);
+      if (bars.length) barFailures.push(w + "px: " + bars.join(" | "));
+    }
+    const bad = await evalJs(ws, HIT);
+    if (bad.length) hitFailures.push(w + "px: " + bad.join(" | "));
+    if (w >= 1280) {
+      // Real user behavior: a wheel event must not move the page (scrollTo can
+      // programmatically scroll even overflow:hidden containers — wrong proxy).
+      await evalJs(ws, `window.scrollTo(0, 0)`);
+      await send(ws, "Input.dispatchMouseEvent", { type: "mouseWheel", x: 600, y: 450, deltaX: 0, deltaY: 2000 });
+      await sleep(200);
+      const sy = await evalJs(ws, `Math.round(window.scrollY)`);
+      if (sy !== 0) scrollFailures.push(w + "px: wheel scrolled " + sy + "px (columns must scroll internally)");
+    }
+  }
+  check("no control covered by another element (1920/1280/640 hit-test)", hitFailures.length === 0, hitFailures.join(" ; "));
+  check("3-column page fits one viewport, no page scroll (1920/1280)", scrollFailures.length === 0, scrollFailures.join(" ; "));
+  check("no column scrollbar in folded default view (1920/1280)", barFailures.length === 0, barFailures.join(" ; "));
 
   console.log(failures.length ? `\n${failures.length} probe(s) FAILED` : "\nall probes PASS");
 } catch (e) {
