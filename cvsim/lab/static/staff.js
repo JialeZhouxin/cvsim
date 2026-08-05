@@ -28,13 +28,13 @@ export function staffLayout(state) {
     const two = meta.kind === "two";
     const modeA = two ? n.modes[0] : n.mode;
     const modeB = two ? n.modes[1] : n.mode;
-    gates.push({ node: n, two, modeA, modeB, span: modeB - modeA + 1, x: n.ui?.x ?? 0 });
+    gates.push({ node: n, two, modeA, modeB, span: Math.abs(modeB - modeA) + 1, top: Math.min(modeA, modeB), x: n.ui?.x ?? 0 });
   }
   return { rows, gates, nmode: rows.length };
 }
 
 /** DOM wiring (browser only). api: {getState, onPlace, onCompletePlacing,
-    onMove, onDelete, onOpen, onStatus}. */
+    onMove, onDelete, onParam, onPickSweep, onStatus}. */
 export function initStaff(root, api) {
   let placing = null; // {op, modeA, x} — two-mode "pick second lane" state
 
@@ -85,7 +85,7 @@ export function initStaff(root, api) {
       el.className = `gate gate--${g.two ? "two" : "single"}`;
       el.dataset.id = g.node.id;
       el.style.left = `${SRC_W + g.x * GATE_W}px`;
-      el.style.top = `${g.modeA * ROW_H}px`;
+      el.style.top = `${g.top * ROW_H}px`;
       if (g.two) el.style.height = `${g.span * ROW_H}px`;
       const title = document.createElement("span");
       title.className = "gate__title";
@@ -190,7 +190,7 @@ export function initStaff(root, api) {
     const g = layout.gates.find((x) => x.node.id === node.id);
     const row = g ? null : layout.rows.find((r) => r.srcId === node.id);
     const left = g ? SRC_W + g.x * GATE_W : 8;
-    const top = g ? g.modeA * ROW_H : row ? row.mode * ROW_H : 8;
+    const top = g ? g.top * ROW_H : row ? row.mode * ROW_H : 8;
     card = document.createElement("div");
     card.className = "gate-card";
     card.style.left = `${Math.max(4, left - 74)}px`;
@@ -225,6 +225,8 @@ export function initStaff(root, api) {
       const num = document.createElement("input");
       num.type = "number";
       num.className = "param__num mono";
+      num.min = d.min;
+      num.max = d.max;
       num.step = d.step;
       num.value = node.params[k];
       const push = (v) => {

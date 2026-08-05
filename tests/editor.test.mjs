@@ -139,6 +139,26 @@ test("L5: sourceRows — vacuum nmode lanes, coherent/tmsv legacy", () => {
   assert.equal(sourceModes(nodes), 5);
 });
 
+test("L5: staffLayout — reversed two-mode (modeB<modeA) spans correctly", async () => {
+  const { staffLayout } = await import("../cvsim/lab/static/staff.js");
+  const state = {
+    nodes: [
+      { id: "v0", op: "vacuum", params: {} },
+      { id: "v1", op: "vacuum", params: {} },
+      { id: "v2", op: "vacuum", params: {} },
+      { id: "bs", op: "beamsplitter", params: { theta: 0.5 }, modes: [2, 0], ui: { x: 1 } },
+    ],
+    view: {}, ui: {},
+  };
+  const { rows, gates } = staffLayout(state);
+  assert.equal(rows.length, 3);
+  assert.equal(gates.length, 1);
+  assert.equal(gates[0].span, 3); // |2-0|+1
+  assert.equal(gates[0].top, 0);
+  assert.equal(gates[0].modeA, 2); // JSON order preserved
+  assert.equal(gates[0].modeB, 0);
+});
+
 test("L5: removeSource — cascades gates on its lanes only", () => {
   const nodes = [
     { id: "v0", op: "vacuum", params: {} },                    // lane 0
