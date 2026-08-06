@@ -51,6 +51,7 @@ Handlers never mutate `state.nodes` directly from event listeners; they call the
 - State changes only through exported pure functions — keeps node:test possible and diffable.
 - Circuit state (`nodes`) stays separate from view state (`view`/`ui`); JSON sync covers `nodes` only.
 - Reset by reassigning from the factory, never by clearing fields in place.
+- **Drag window emit suppression** (editor.js `suppressEmit`): during palette→staff DnD (`dragstart`…`dragend`, both palette cards and staff gate moves) `render()` skips `emit(onRun)` — per-move/per-dragover states would each trigger a debounced backend run. `dragend` (including cancel) clears the flag and emits exactly once. Non-drag paths (undo/redo, JSON edit, buttons, param cards) never go through the suppression flag. New drag sources must wire both `onDragStart`/`onDragEnd` hooks; a drop that re-renders the source element out of the DOM still fires `dragend` on Chromium/Edge/Firefox (known WebKit caveat — accepted for the local workbench target).
 
 ## Anti-Patterns
 

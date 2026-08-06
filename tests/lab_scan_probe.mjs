@@ -95,6 +95,12 @@ try {
     }
   };
   await send(ws, "Runtime.enable");
+  /* stale-cache guard: the persistent Edge profile may serve a cached
+     index.html from an earlier run — clear the HTTP cache and reload so
+     the probe always exercises the current static files (lab UI polish #6/#8) */
+  await send(ws, "Network.enable");
+  await send(ws, "Network.clearBrowserCache");
+  await send(ws, "Page.reload");
 
   /* folds start collapsed (above-the-fold design); open scan for the scan flow */
   await evalJs(ws, `(async () => { while (!document.getElementById("scan-panel")) await new Promise((r) => setTimeout(r, 50)); document.getElementById("scan-panel").open = true; return true; })()`);
@@ -170,6 +176,14 @@ try {
   check("scan completes with ok status", scan.ok, scan.status);
   check("SVG curve drawn (1 polyline, 20 points)", scan.ok && scan.polylines === 1 && scan.points === 20, `polylines=${scan.polylines} points=${scan.points}`);
 
+  /* 2b. #8: fold-title scan summary — one line with the max E_N value */
+  const summary = await evalJs(ws, `(() => {
+    const s = document.getElementById("scan-summary");
+    const m = /^E_N 最大 (.+) @ r=/.exec(s.textContent || "");
+    return { hidden: s.hidden, text: s.textContent, ok: !s.hidden && !!m && Number.isFinite(Number(m[1])) && Number(m[1]) > 0 };
+  })()`);
+  check("scan summary: E_N 最大 value in fold title (#8)", summary.ok, JSON.stringify(summary));
+
   /* 3. E_N curve vs analytic 2r/ln2 (page-side fetch, mirrors A7) */
   const analytic = await evalJs(ws, `(async () => {
     const state = { schema: "circuit_v0", seed: 0,
@@ -203,6 +217,20 @@ try {
   })()`);
   check("amplifier + mz palette cards add gates (L5 staff)", pal.gates >= 2, JSON.stringify(pal));
   check("/run ok with amplifier + mz circuit", pal.status.includes("ok") && !pal.status.includes("timeout"), pal.status);
+
+  /* 4b. #8: a new run invalidates the stale scan summary */
+  const stale = await evalJs(ws, `(() => { const s = document.getElementById("scan-summary"); return { hidden: s.hidden, text: s.textContent }; })()`);
+  check("new run clears stale scan summary (#8)", stale.hidden && stale.text === "", JSON.stringify(stale));
+
+  /* 4c. #6: colorbar min/max tick labels render finite numbers (max >= min) */
+  const cb = await evalJs(ws, `(() => {
+    const g = (id) => document.getElementById(id);
+    const hi = Number(g("colorbar-max").textContent);
+    const lo = Number(g("colorbar-min").textContent);
+    return { max: g("colorbar-max").textContent, min: g("colorbar-min").textContent,
+             ok: Number.isFinite(hi) && Number.isFinite(lo) && hi >= lo };
+  })()`);
+  check("colorbar min/max tick labels rendered (#6)", cb.ok, JSON.stringify(cb));
 
   /* 5. hit-test every interactive control across viewport widths — no element
         may be covered by another (e.g. the Wigner canvas overlapping toolbar
@@ -249,6 +277,23 @@ try {
   check("no control covered by another element (1920/1280/640 hit-test)", hitFailures.length === 0, hitFailures.join(" ; "));
   check("3-column page fits one viewport, no page scroll (1920/1280)", scrollFailures.length === 0, scrollFailures.join(" ; "));
   check("no column scrollbar in folded default view (1920/1280)", barFailures.length === 0, barFailures.join(" ; "));
+
+  /* 5b. #14: palette groups are <details> — collapse/expand works in the
+      single-column layout too (loop above ends at 640px < 80rem) */
+  const fold = await evalJs(ws, `(async () => {
+    const g = document.querySelector(".palette__group");
+    if (!g) return { ok: false, reason: "no group" };
+    const sum = g.querySelector("summary");
+    const grid = g.querySelector(".palette__grid");
+    const items = g.querySelectorAll(".palette__item").length;
+    const disp = () => getComputedStyle(grid).display;
+    const open0 = g.open, d0 = disp();
+    sum.click(); await new Promise((r) => setTimeout(r, 60));
+    const open1 = g.open, d1 = disp();
+    sum.click(); await new Promise((r) => setTimeout(r, 60));
+    return { ok: open0 && d0 === "grid" && !open1 && d1 === "none" && g.open, d0, d1, items, w: innerWidth };
+  })()`);
+  check("palette group details collapse/expand at 640px (#14)", fold.ok, JSON.stringify(fold));
 
   console.log(failures.length ? `\n${failures.length} probe(s) FAILED` : "\nall probes PASS");
 } catch (e) {

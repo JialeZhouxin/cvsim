@@ -12,9 +12,7 @@
   <div class="lite__brand">
     <span class="wordmark">Gaussian Lab</span>
     <span class="badge">circuit_v0 · editor</span>
-  </div>
-  <div class="lite__meta">
-    <span id="version-tag" class="mono">cvsim —</span>
+    <span id="version-tag" class="mono lite__meta">cvsim —</span>
   </div>
 </header>
 
@@ -42,8 +40,8 @@
         <button id="run-btn" type="button" class="btn btn--primary">运行</button>
       </div>
     </div>
-    <div id="staff" class="staff" aria-live="polite" aria-label="五线谱电路编辑区"></div>
     <p class="hint">拖动器件到轨道放置；水平位置 = 时序；双模器件拖到第一条轨道后点击第二条轨道。</p>
+    <div id="staff" class="staff" aria-live="polite" aria-label="五线谱电路编辑区"></div>
     <details class="json-fold">
       <summary>circuit_v0 JSON（与图形双向同步）</summary>
       <label class="sr-only" for="json-input">circuit_v0 JSON（与图形双向同步）</label>
@@ -68,17 +66,17 @@
         </div>
         <p id="wigner-note" class="hint" hidden>理想本征态，无有限 Wigner（不伪造数据）</p>
       </div>
-      <div class="wigner__colorbar" aria-hidden="true"><canvas id="colorbar-canvas" width="8" height="128"></canvas><span class="mono">max</span></div>
+      <div class="wigner__colorbar" aria-hidden="true"><span id="colorbar-max" class="mono">—</span><canvas id="colorbar-canvas" width="8" height="128"></canvas><span id="colorbar-min" class="mono">—</span></div>
     </div>
 
     <div class="meters" id="meters-panel">
-      <div class="meter"><span class="meter__label">purity</span><span id="m-purity" class="meter__value mono">—</span></div>
-      <div class="meter"><span class="meter__label">mean&nbsp;photon</span><span id="m-nbar" class="meter__value mono">—</span></div>
-      <div class="meter"><span class="meter__label">log&nbsp;neg</span><span id="m-logneg" class="meter__value mono">—</span></div>
+      <div class="meter"><span class="meter__label">纯度</span><span id="m-purity" class="meter__value mono">—</span></div>
+      <div class="meter"><span class="meter__label">平均光子数</span><span id="m-nbar" class="meter__value mono">—</span></div>
+      <div class="meter"><span class="meter__label">对数负度</span><span id="m-logneg" class="meter__value mono">—</span></div>
     </div>
 
     <details id="scan-panel" class="scan fold" aria-label="参数扫描">
-      <summary>参数扫描 E_N</summary>
+      <summary>参数扫描 E_N <span id="scan-summary" class="scan__summary" hidden></span></summary>
       <div class="scan__controls">
         <label class="hint" for="scan-node">节点</label>
         <select id="scan-node" class="select mono"></select>
@@ -99,7 +97,7 @@
     </details>
 
     <details id="state-grid" class="fold state-fold">
-      <summary>均值 r̄ / 协方差 V</summary>
+      <summary>均值 r̄ / 协方差 V <span id="state-summary" class="scan__summary" hidden></span></summary>
       <div class="state-grid">
         <div class="state-block">
           <h2>均值 r̄ <span id="nmode-tag" class="mono panel__meta"></span></h2>

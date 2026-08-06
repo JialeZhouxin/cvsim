@@ -227,11 +227,11 @@ body {
 }
 
 .btn--primary:hover {
-  background: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 85%, var(--color-paper));
 }
 
 .btn--primary:active {
-  transform: translateY(1px);
+  transform: translateY(2px);
 }
 
 .btn--primary:disabled {
@@ -248,10 +248,12 @@ body {
 
 .btn--ghost:hover {
   background: var(--color-paper-2);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .btn--ghost:active {
-  transform: translateY(1px);
+  transform: translateY(2px);
 }
 
 .btn--ghost:disabled {
@@ -340,7 +342,6 @@ body {
   font-size: var(--text-xs);
   color: var(--color-muted);
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .meter__value {
@@ -416,6 +417,12 @@ body {
   overflow-wrap: anywhere;
 }
 
+.statusbar__msg[data-state="ok"]::before {
+  content: "✓";
+  color: var(--color-success);
+  margin-right: var(--space-xs);
+}
+
 .statusbar__msg[data-state="error"] {
   color: var(--color-error);
   background: var(--color-error-soft);
@@ -438,7 +445,7 @@ body {
   }
 
   .workbench {
-    grid-template-columns: 13rem minmax(0, 1fr) minmax(0, 1.2fr);
+    grid-template-columns: 13rem minmax(0, 1fr) minmax(0, 1.1fr);
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
     max-width: none;
@@ -477,8 +484,37 @@ body {
 .palette__group-title {
   font-size: var(--text-xs);
   letter-spacing: 0.08em;
-  color: color-mix(in srgb, var(--color-ink) 55%, transparent);
+  color: color-mix(in srgb, var(--color-ink) 75%, transparent);
   padding-inline: var(--space-2xs);
+}
+
+/* L5: palette groups are collapsible <details> (default open) — UA collapse
+   would be overridden by author display rules (.palette__grid), restore it */
+.palette__group > summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.palette__group > summary::marker {
+  content: "";
+}
+
+.palette__group > summary::after {
+  content: "▸";
+  display: inline-block;
+  margin-left: var(--space-xs);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+
+.palette__group[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+.palette__group:not([open]) > *:not(summary) {
+  display: none;
 }
 
 .palette__grid {
@@ -526,6 +562,11 @@ body {
   min-height: 0;
 }
 
+/* L5: drag hint sits above the staff (panel__head → staff) */
+.seq > .hint {
+  margin: 0 0 var(--space-sm);
+}
+
 .staff {
   flex: 1;
   min-height: 0;
@@ -551,7 +592,8 @@ body {
 
 .staff__row {
   display: flex;
-  height: 56px;
+  position: relative; /* lane wire ::before resolves per row, not the grid */
+  height: 44px;
 }
 
 .staff__row::before {
@@ -560,7 +602,7 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  top: 27px;
+  top: 21.5px;
   border-top: 1px solid color-mix(in srgb, var(--color-rule) 60%, transparent);
   pointer-events: none;
 }
@@ -620,7 +662,7 @@ body {
 .gate {
   position: absolute;
   width: 60px;
-  height: 44px;
+  height: 32px;
   margin-top: 6px;
   border: 1.5px solid var(--color-accent);
   border-radius: var(--radius-md);
@@ -736,7 +778,15 @@ body {
   outline-offset: 1px;
 }
 
-/* ── Scan panel (L4) ──────────────────────────────────── */
+.scan__summary {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--color-muted);
+  margin-left: var(--space-sm);
+}
+
+/* ── scan panel (L4) ──────────────────────────────────── */
 .scan {
   margin-top: var(--space-lg);
   border-top: 1px solid var(--color-rule);

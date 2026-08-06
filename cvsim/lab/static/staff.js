@@ -6,7 +6,7 @@
 import { OPS, cellOccupied, sourceRows } from "./ops.js";
 
 export const GATE_W = 72;   // px per x unit (gate cell width)
-export const ROW_H = 56;    // px per lane
+export const ROW_H = 44;    // px per lane
 export const SRC_W = 132;   // px source column
 
 /** Pure: state → staff geometry. rows: one per mode (lane), each tagged with
@@ -137,11 +137,12 @@ export function initStaff(root, api) {
       el.addEventListener("click", () => openCard(g.node));
       el.draggable = true;
       el.addEventListener("dragstart", (e) => {
+        api.onDragStart?.();
         e.dataTransfer.setData("text/plain", `move:${g.node.id}`);
         e.dataTransfer.effectAllowed = "move";
         dragPayload = { kind: "move", id: g.node.id };
       });
-      el.addEventListener("dragend", () => { dragPayload = null; });
+      el.addEventListener("dragend", () => { dragPayload = null; api.onDragEnd?.(); });
       gatesEl.appendChild(el);
     }
 

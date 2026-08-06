@@ -102,6 +102,9 @@ function drawHeatmap(W) {
   let wmin = Infinity, wmax = -Infinity;
   for (const row of W) for (const v of row) { if (v < wmin) wmin = v; if (v > wmax) wmax = v; }
   const span = wmax - wmin || 1;
+  /* #6: colorbar min/max 刻度（axisVal 格式，与坐标轴一致） */
+  $("colorbar-max").textContent = axisVal(wmax);
+  $("colorbar-min").textContent = axisVal(wmin);
   const img = ctx.createImageData(n, n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -187,12 +190,18 @@ function drawAxes(lim) {
 new ResizeObserver(() => drawAxes(lastLim)).observe(canvas);
 
 function render(result, mode) {
+  /* #8: 新 run 使旧 scan 摘要失效——折叠摘要清空 */
+  const scanSummary = $("scan-summary");
+  scanSummary.hidden = true;
+  scanSummary.textContent = "";
   if (!result.wigner) {
     // singular conditional state: no finite Wigner, never fabricated
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const cb = colorbar.getContext("2d");
     cb.clearRect(0, 0, 8, 128);
+    $("colorbar-max").textContent = "—";
+    $("colorbar-min").textContent = "—";
     $("axis-svg").replaceChildren();
     wignerNote.hidden = false;
   } else {
@@ -403,11 +412,23 @@ function drawScanCurve(body) {
     scanSvg.replaceChildren();
     scanNote.hidden = false;
     scanNote.textContent = "E_N 无定义（扫描范围内没有有限值）";
+    const sum = $("scan-summary");
+    sum.hidden = true;
+    sum.textContent = "";
     return;
   }
   scanNote.hidden = true;
   const ymin = Math.min(...finite.map(([, y]) => y));
   const ymax = Math.max(...finite.map(([, y]) => y));
+  /* #8: 折叠摘要一行结果（折叠后仍可见） */
+  const iMax = finite.findIndex(([, y]) => y === ymax);
+  const sum = $("scan-summary");
+  if (iMax >= 0) {
+    sum.hidden = false;
+    sum.textContent = `E_N 最大 ${axisVal(ymax)} @ ${scanParam.value}=${axisVal(finite[iMax][0])}`;
+  } else {
+    sum.hidden = true;
+  }
   const ylo = ymin === ymax ? ymin - 0.5 : ymin - (ymax - ymin) * 0.1;
   const yhi = ymin === ymax ? ymin + 0.5 : ymax + (ymax - ymin) * 0.1;
   const x0 = xs[0], x1 = xs[xs.length - 1];
@@ -474,6 +495,10 @@ async function doScan() {
   const payload = toCircuitJson(state);
   payload.view.wigner_mode = Number(modeSelect.value) || 0;
   payload.sweep = { node_id: node.id, param, min: pmin, max: pmax, n, modes_A: modesA };
+  /* #8: scan 前置为空（旧摘要失效） */
+  const scanSummary = $("scan-summary");
+  scanSummary.hidden = true;
+  scanSummary.textContent = "";
   scanBtn.disabled = true;
   const t0 = performance.now();
   try {

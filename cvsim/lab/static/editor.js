@@ -146,6 +146,7 @@ export function initEditor(root, hooks) {
     : defaultState();
   let lastGood = JSON.stringify(toCircuitJson(state)); // frozen-graph policy
   let suppress = false; // graph→JSON writes don't echo-trigger rebuild
+  let suppressEmit = false; // #13: dragstart→dragend 期间抑制 emit，drop/取消后单次
   let seq = 0; // stale-response guard
 
   /* ── undo/redo: state is immutable (every mutation builds a new object),
@@ -193,7 +194,7 @@ export function initEditor(root, hooks) {
     hooks.onState(state);
     if (dom.undoBtn) dom.undoBtn.disabled = !hist.canUndo();
     if (dom.redoBtn) dom.redoBtn.disabled = !hist.canRedo();
-    emit(toCircuitJson(state), "graph");
+    if (!suppressEmit) emit(toCircuitJson(state), "graph");
   }
 
   const staff = initStaff(dom.staff, {
@@ -246,6 +247,12 @@ export function initEditor(root, hooks) {
     },
     onPickSweep: (id) => hooks.onPickSweep?.(id),
     onStatus: (msg, ok) => hooks.onStatus(msg, ok),
+    /* #13: drag window — suppress per-move emits; drop/cancel emits once */
+    onDragStart: () => { suppressEmit = true; },
+    onDragEnd: () => {
+      suppressEmit = false;
+      emit(toCircuitJson(state), "graph");
+    },
   });
 
   /* palette: DnD + click fallback, grouped by category（palette:false 的 op 不出托盘） */
@@ -258,9 +265,10 @@ export function initEditor(root, hooks) {
   for (const [gid, title] of PALETTE_GROUPS) {
     const ops = Object.keys(OPS).filter((op) => opGroup(op) === gid);
     if (!ops.length) continue;
-    const group = document.createElement("div");
+    const group = document.createElement("details");
     group.className = "palette__group";
-    const h = document.createElement("div");
+    group.open = true; // L5: collapsible group, default expanded
+    const h = document.createElement("summary");
     h.className = "palette__group-title";
     h.textContent = title;
     group.appendChild(h);
@@ -272,6 +280,7 @@ export function initEditor(root, hooks) {
       card.draggable = true;
       card.dataset.op = op;
       card.textContent = OPS[op].label;
+      card.title = OPS[op].tip || ""; // #3: hover 提示物理含义
       const tryAdd = () => {
         const meta = OPS[op];
         if (meta.kind === "two" && sourceModes(state.nodes) < 2) {
@@ -283,10 +292,15 @@ export function initEditor(root, hooks) {
         render();
       };
       card.addEventListener("dragstart", (e) => {
+        suppressEmit = true;
         e.dataTransfer.setData("text/plain", op);
         staff.setDragPayload({ kind: "op", op });
       });
-      card.addEventListener("dragend", () => staff.setDragPayload(null));
+      card.addEventListener("dragend", () => {
+        staff.setDragPayload(null);
+        suppressEmit = false;
+        emit(toCircuitJson(state), "graph"); // drop/取消后单次 emit
+      });
       card.addEventListener("click", tryAdd);
       items.appendChild(card);
     }
