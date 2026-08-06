@@ -423,12 +423,9 @@ function drawScanCurve(body) {
   /* #8: 折叠摘要一行结果（折叠后仍可见） */
   const iMax = finite.findIndex(([, y]) => y === ymax);
   const sum = $("scan-summary");
-  if (iMax >= 0) {
-    sum.hidden = false;
-    sum.textContent = `E_N 最大 ${axisVal(ymax)} @ ${scanParam.value}=${axisVal(finite[iMax][0])}`;
-  } else {
-    sum.hidden = true;
-  }
+  // OCR: finite 非空已提前 return，ymax 取自同一数组 → findIndex 必命中，无 else 分支
+  sum.hidden = false;
+  sum.textContent = `E_N 最大 ${axisVal(ymax)} @ ${scanParam.value}=${axisVal(finite[iMax][0])}`;
   const ylo = ymin === ymax ? ymin - 0.5 : ymin - (ymax - ymin) * 0.1;
   const yhi = ymin === ymax ? ymin + 0.5 : ymax + (ymax - ymin) * 0.1;
   const x0 = xs[0], x1 = xs[xs.length - 1];
