@@ -31,6 +31,8 @@
     <div class="panel__head">
       <h1>电路序列</h1>
       <div class="panel__actions">
+        <button id="undo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Z">撤销</button>
+        <button id="redo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Shift+Z / Ctrl+Y">重做</button>
         <button id="save-btn" type="button" class="btn btn--ghost">保存 JSON</button>
         <label class="btn btn--ghost" for="load-input">载入 JSON<input id="load-input" type="file" accept=".json,application/json" class="sr-only"></label>
         <label class="hint" for="seed-input">seed</label>

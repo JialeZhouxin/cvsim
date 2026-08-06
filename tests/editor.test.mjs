@@ -8,11 +8,11 @@ import {
   sortNodes, sourceRows, removeSource, updateParam, updateMode, toCircuitJson,
   cellOccupied,
 } from "../cvsim/lab/static/ops.js";
-import { stateFromJson, loadJson } from "../cvsim/lab/static/editor.js";
+import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
 
-const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze"];
+const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze"];
 
-test("ops metadata: 13 ops (tmsv kept for JSON compat, palette:false)", () => {
+test("ops metadata: 14 ops (tmsv kept for JSON compat, palette:false)", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
   assert.equal(OPS.tmsv.palette, false); // legacy source: loadable, not in palette
   assert.equal(OPS.coherent.palette, false); // L5.5: unified into vacuum + displace gate
@@ -24,6 +24,7 @@ test("UX: opGroup — source/gate/channel/measure, palette:false → null", () =
   assert.equal(opGroup("coherent"), null); // palette:false
   assert.equal(opGroup("squeeze"), "gate");
   assert.equal(opGroup("phase"), "gate");
+  assert.equal(opGroup("fourier"), "gate");
   assert.equal(opGroup("displace"), "gate");
   assert.equal(opGroup("beamsplitter"), "gate");
   assert.equal(opGroup("mz"), "gate");
@@ -455,4 +456,58 @@ test("stateFromJson: missing params freeze (frozen-graph policy)", () => {
   const { error } = stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "squeeze", params: {} }] });
   assert.ok(error);
   assert.ok(error.includes("r"));
+});
+
+test("fourier gate: palette-visible gate, JSON round-trip loadable", () => {
+  assert.equal(opGroup("fourier"), "gate");
+  assert.deepEqual(Object.keys(OPS.fourier.params), []); // no knobs
+  const payload = {
+    schema: "circuit_v0", seed: 0,
+    nodes: [
+      { id: "s", op: "vacuum", params: { nmode: 1 } },
+      { id: "f", op: "fourier", params: {}, mode: 0, ui: { x: 0 } },
+    ],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  assert.equal(state.nodes[1].op, "fourier");
+  assert.equal(state.nodes[1].ui.x, 0);
+  const rt = stateFromJson(toCircuitJson(state)); // save → load round-trip
+  assert.equal(rt.error, undefined);
+  assert.equal(rt.state.nodes[1].op, "fourier");
+});
+
+test("undo/redo: push → undo → redo round-trips state references", () => {
+  const h = createHistory(50);
+  const s0 = { n: 0 }, s1 = { n: 1 }, s2 = { n: 2 };
+  h.push(s0); h.push(s1); // edits: s0 → s1 → s2
+  assert.equal(h.canUndo(), true);
+  assert.equal(h.undo(s2), s1);
+  assert.equal(h.undo(s1), s0);
+  assert.equal(h.undo(s0), null); // empty: no-op
+  assert.equal(h.canRedo(), true);
+  assert.equal(h.redo(s0), s1);
+  assert.equal(h.redo(s1), s2);
+  assert.equal(h.redo(s2), null);
+});
+
+test("undo/redo: new edit clears redo; clear() empties both; max caps history", () => {
+  const h = createHistory(2);
+  const a2 = { a: 2 }, a3 = { a: 3 }, a4 = { a: 4 };
+  h.push({ a: 1 }); h.push(a2); h.push(a3);
+  assert.equal(h.canRedo(), false); // push cleared redo
+  // oldest ({a:1}) was shifted out: only {a:2},{a:3} remain; current = {a:4}
+  assert.equal(h.undo(a4), a3);
+  assert.equal(h.undo(a3), a2);
+  assert.equal(h.undo(a2), null);
+  const h2 = createHistory(3);
+  h2.push({ a: 1 }); h2.push({ a: 2 });
+  h2.undo({ a: 2 });
+  assert.equal(h2.canRedo(), true);
+  h2.push({ a: 3 }); // new edit after undo
+  assert.equal(h2.canRedo(), false);
+  h2.clear();
+  assert.equal(h2.canUndo(), false);
+  assert.equal(h2.canRedo(), false);
 });

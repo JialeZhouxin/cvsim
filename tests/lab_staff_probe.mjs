@@ -358,8 +358,8 @@ try {
   }))()`);
   check("palette: 4 groups 源/门/通道/测量, op order kept, palette:false hidden",
     JSON.stringify(groups.titles) === JSON.stringify(["源", "门", "通道", "测量"]) &&
-    groups.items.length === 11 && !groups.items.includes("tmsv") && !groups.items.includes("coherent") &&
-    groups.inGroup[0] === 1 && groups.inGroup[1] === 6 && groups.inGroup[2] === 2 && groups.inGroup[3] === 2,
+    groups.items.length === 12 && !groups.items.includes("tmsv") && !groups.items.includes("coherent") &&
+    groups.inGroup[0] === 1 && groups.inGroup[1] === 7 && groups.inGroup[2] === 2 && groups.inGroup[3] === 2,
     JSON.stringify(groups));
 
   /* 8c. Fitts: delete button ≥ 24px hit area (visual 18px circle drawn

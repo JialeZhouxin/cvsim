@@ -42,6 +42,11 @@ export const OPS = {
     kind: "single",
     params: { phi: { min: 0, max: TAU, step: 0.01, def: Math.PI / 2, sweep: [0, Math.PI] } },
   },
+  fourier: {
+    label: "傅里叶",
+    kind: "single",
+    params: {},
+  },
   displace: {
     label: "位移",
     kind: "single",

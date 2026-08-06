@@ -95,6 +95,38 @@ export function loadJson(payload) {
   return res.error ? { error: res.error } : { state: res.state };
 }
 
+/** Immutable-state history factory (pure): stores state references, so it
+    is O(1) per edit and safe because every editor mutation builds a new
+    state object (the old one is never touched again).
+    - push(state): record the current state before a mutation; clears redo
+    - undo(current): returns the previous state, or null when empty
+    - redo(current): returns the state that was undone, or null when empty
+    - clear(): drop everything (e.g. after direct JSON editing) */
+export function createHistory(max = 50) {
+  const stack = [];
+  const redoStack = [];
+  return {
+    push(state) {
+      stack.push(state);
+      if (stack.length > max) stack.shift();
+      redoStack.length = 0; // new edit invalidates redo
+    },
+    undo(current) {
+      if (!stack.length) return null;
+      redoStack.push(current);
+      return stack.pop();
+    },
+    redo(current) {
+      if (!redoStack.length) return null;
+      stack.push(current);
+      return redoStack.pop();
+    },
+    clear() { stack.length = 0; redoStack.length = 0; },
+    canUndo: () => stack.length > 0,
+    canRedo: () => redoStack.length > 0,
+  };
+}
+
 /* ── DOM wiring (browser only) ─────────────────────────── */
 export function initEditor(root, hooks) {
   const dom = {
@@ -103,14 +135,47 @@ export function initEditor(root, hooks) {
     json: root.querySelector("#json-input"),
     runBtn: root.querySelector("#run-btn"),
     resetBtn: root.querySelector("#reset-btn"),
+    undoBtn: root.querySelector("#undo-btn"),
+    redoBtn: root.querySelector("#redo-btn"),
     status: root.querySelector("#status"),
   };
+  dom.undoBtn?.addEventListener("click", undo);
+  dom.redoBtn?.addEventListener("click", redo);
   let state = hooks.defaultScene
     ? (stateFromJson(hooks.defaultScene).state ?? defaultState())
     : defaultState();
   let lastGood = JSON.stringify(toCircuitJson(state)); // frozen-graph policy
   let suppress = false; // graph→JSON writes don't echo-trigger rebuild
   let seq = 0; // stale-response guard
+
+  /* ── undo/redo: state is immutable (every mutation builds a new object),
+     so the stacks can hold plain state references — zero copies ── */
+  const hist = createHistory(50);
+
+  function pushHistory() {
+    hist.push(state);
+  }
+
+  function undo() {
+    const prev = hist.undo(state);
+    if (prev !== null) { state = prev; render(); }
+  }
+
+  function redo() {
+    const next = hist.redo(state);
+    if (next !== null) { state = next; render(); }
+  }
+
+  /* Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, but never inside form controls (JSON
+     textarea / seed input keep browser-native edit undo) */
+  document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.target?.closest?.("input, textarea, select")) return;
+    const k = e.key.toLowerCase();
+    if (k === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if (k === "z" && e.shiftKey) { e.preventDefault(); redo(); }
+    else if (k === "y") { e.preventDefault(); redo(); }
+  });
 
   function emit(circuitJson, source) {
     hooks.onRun(circuitJson, ++seq, source);
@@ -126,6 +191,8 @@ export function initEditor(root, hooks) {
     staff.render();
     renderJson();
     hooks.onState(state);
+    if (dom.undoBtn) dom.undoBtn.disabled = !hist.canUndo();
+    if (dom.redoBtn) dom.redoBtn.disabled = !hist.canRedo();
     emit(toCircuitJson(state), "graph");
   }
 
@@ -136,12 +203,14 @@ export function initEditor(root, hooks) {
         hooks.onStatus(`该格已被占用（mode ${mode} @ x ${Math.round(x)}）`, false);
         return;
       }
+      pushHistory();
       state = { ...state, nodes: placeSingle(state.nodes, op, mode, x) };
       render();
     },
     onCompletePlacing: (placing, modeB) => {
       const res = completePlacing(state.nodes, placing, modeB);
       if (res.ok) {
+        pushHistory();
         state = { ...state, nodes: res.nodes };
         render();
       }
@@ -159,14 +228,17 @@ export function initEditor(root, hooks) {
           return;
         }
       }
+      pushHistory();
       state = { ...state, nodes: moveNodeX(state.nodes, id, x) };
       render();
     },
     onDelete: (id) => {
+      pushHistory();
       state = { ...state, nodes: removeNode(state.nodes, id) };
       render();
     },
     onParam: (id, key, value) => {
+      pushHistory(); // one entry per slider step; createHistory(50) caps growth (ponytail: coalesce consecutive slider drags when the history gets noisy)
       state = { ...state, nodes: state.nodes.map((x) => (x.id === id ? updateParam(x, key, value) : x)) };
       renderJson();
       hooks.onState(state);
@@ -206,6 +278,7 @@ export function initEditor(root, hooks) {
           hooks.onStatus("分束器需要至少 2 个模式（先添加 TMSV 或多源）", false);
           return;
         }
+        pushHistory();
         state = { ...state, nodes: addNode(state.nodes, op) };
         render();
       };
@@ -223,6 +296,7 @@ export function initEditor(root, hooks) {
 
   dom.resetBtn.addEventListener("click", () => {
     const parsed = hooks.defaultScene ? stateFromJson(hooks.defaultScene) : null;
+    pushHistory();
     state = parsed && parsed.state ? parsed.state : defaultState();
     lastGood = JSON.stringify(toCircuitJson(state));
     render();
@@ -247,6 +321,7 @@ export function initEditor(root, hooks) {
       }
       state = parsed.state;
       lastGood = JSON.stringify(toCircuitJson(state));
+      hist.clear(); // JSON is the edit source: graphic history no longer maps
       render(); // re-render staff + JSON (OCR: import left rows stale)
     }, 400);
   });
@@ -259,11 +334,14 @@ export function initEditor(root, hooks) {
     },
     setState: (next) => {
       // Load success: replace whole state, freeze, re-render (auto-run via emit)
+      pushHistory();
       state = next;
       lastGood = JSON.stringify(toCircuitJson(state));
       render();
     },
     render,
     isPlacing: () => staff.isPlacing(),
+    undo,
+    redo,
   };
 }

@@ -124,7 +124,7 @@ Exceeding these counts requires amending this doc first.
 | **P0** | 态摘要：`nmode`、physical 标志（可选 `is_physical`） |
 | **P0.5** | meters：`mean_photon`、`purity`、`log_negativity`（`modes_A` 选择） |
 | **P0.5** | **Measure once**（`homodyne_sample` / `heterodyne_sample` + condition 路径） |
-| **P1** | 参数扫描曲线（如 \(E_N(r)\)，**landed L4**）；撤销栈；多文档 |
+| **P1** | 参数扫描曲线（如 \(E_N(r)\)，**landed L4**）；**撤销栈（landed 08-06：Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y + 按钮，`createHistory` 快照栈）**；多文档 |
 | **L5** | **五线谱式电路编辑器**（landed）：每模一轨道、拖放放置、双模两步选择、水平 x=时序、参数浮层 |
 
 ### 4.6 Wigner policy
@@ -338,6 +338,7 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 | Ver | Date | Note |
 |-----|------|------|
 | 0.1.0 | 2026-07-30 | Initial lock from grill-me: user A/电路图/Wigner 灵魂/本地 Web/双轨测量；adopt recommended whitelist & 12b slice |
+| 0.1.1 | 2026-08-06 | fourier 门补回托盘（白名单 §4.2 ✅ 对齐，后端早已支持）；undo/redo 撤销栈 landed（P1） |
 | 0.2.0 | 2026-08-03 | **L0 landed**: `cvsim.lab` — `circuit_v0` IR (validation + compile-and-run, ordered-node semantics, runtime mode remap after heterodyne), FastAPI `/run` + `/health`, Wigner+ptrace payload, meters; golden equivalence + A4/A8/A9 guards (24 tests); lab extra in pyproject. No frontend / `/sample` (L1–L3). |
 | 0.3.0 | 2026-08-03 | **L1 landed**: static workbench page (JSON edit → `/run` → canvas Wigner heatmap + meters + r̄/V tables), FastAPI `StaticFiles` mount + `python -m cvsim.lab` entry; Hallmark design pass (genre=modern-minimal · theme=Cobalt · macrostructure=Workbench, offline system-font substitution); zero external deps/CDN (offline guard test); 5 UI tests (suite 409). No drag editor (L2) / save-load-sampling (L3). |
 | 0.4.0 | 2026-08-03 | **L2 landed**: sequence editor — palette DnD (8 ops: tmsv/coherent/squeeze/phase/displace/loss/beamsplitter/heterodyne) appends nodes, per-node param sliders (debounce 120ms + seq guard), ↑/↓/delete, JSON⇄graph two-way sync (400ms rebuild, frozen-graph on invalid), wigner_mode selector; A3 T=1 TMSV log_neg = -log₂(e⁻²ʳ) verified; 10 node tests + suite 412. No canvas/edges (ordered-node semantics kept), no modes_A selector (2-mode unique bipartition; add with 3-mode circuits), no undo (P1) / save-load-sampling (L3). |
