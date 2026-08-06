@@ -150,6 +150,20 @@ try {
   check("palette: tmsv+coherent hidden, vacuum present", staff.palette.includes("vacuum") && !staff.palette.includes("tmsv") && !staff.palette.includes("coherent"), JSON.stringify(staff.palette));
   check("JSON: graph→json sync intact (displace)", staff.jsonHasDisplace);
   check("grid: cell column rules rendered", staff.gridLines);
+  /* covariance tables: split layout labels (x0,x1,…,p0,p1,…) + displaced
+     means land on the x rows (√2·α≈1.414) not the p rows */
+  const cov = await evalJs(ws, `(async () => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < 8000 && !/^ok ·/.test(document.getElementById("status").textContent)) await new Promise((r) => setTimeout(r, 100));
+    const heads = [...document.querySelectorAll("#v-table thead th")].slice(1).map((h) => h.textContent);
+    const rbar = [...document.querySelectorAll("#rbar-table tbody tr")].map((tr) => tr.textContent);
+    return { heads, rbar };
+  })()`);
+  check("cov: split labels x0,x1,p0,p1; x-mean 1.414 on x rows, 0 on p rows",
+    JSON.stringify(cov.heads) === JSON.stringify(["mode 0·x", "mode 1·x", "mode 0·p", "mode 1·p"]) &&
+    cov.rbar[0].includes("1.414") && cov.rbar[1].includes("1.414") &&
+    cov.rbar[2].includes("0") && cov.rbar[3].includes("0"),
+    JSON.stringify(cov));
   /* default scene gates snap to column 0 */
   const defX = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.filter((n) => n.op === "displace").map((n) => n.ui.x))()`);
   check("default: displace gates at x=0", JSON.stringify(defX) === "[0,0]", JSON.stringify(defX));

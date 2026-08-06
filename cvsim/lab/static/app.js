@@ -209,7 +209,9 @@ function render(result, mode) {
 
   $("nmode-tag").textContent = `nmode ${result.nmode}`;
   const nm = result.nmode;
-  const modeHead = (i) => `mode ${Math.floor(i / 2)}·${i % 2 === 0 ? "x" : "p"}`;
+  /* backend covariance layout is split: [x0..x_{m-1}, p0..p_{m-1}] —
+     label rows/cols in that order (interleaved xpxpxp would mislabel m≥2) */
+  const modeHead = (i) => `mode ${i < nm ? i : i - nm}·${i < nm ? "x" : "p"}`;
   renderMatrix($("rbar-table"), nm * 2, 1, modeHead, (r) => fmt(result.rbar[r]));
   renderMatrix($("v-table"), nm * 2, nm * 2, modeHead, (r, c) => fmt(result.V[r][c]));
 
