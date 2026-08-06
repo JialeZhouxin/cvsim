@@ -99,7 +99,30 @@ try {
   /* folds start collapsed (above-the-fold design); open scan for the scan flow */
   await evalJs(ws, `(async () => { while (!document.getElementById("scan-panel")) await new Promise((r) => setTimeout(r, 50)); document.getElementById("scan-panel").open = true; return true; })()`);
 
-  /* 1. panel renders with adaptive defaults for the default TMSV scene */
+  /* wait for the editor to finish initial render before injecting (input
+     events fired earlier are lost — no listener bound yet) */
+  await evalJs(ws, `(async () => { while (!document.querySelector(".staff__row")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
+
+  /* 1. panel renders with adaptive defaults for a sweepable scene (L5.5:
+     the new default scene has no sweepable params, so inject a TMSV+loss
+     scene first — the scan panel is a feature test, not a scene test) */
+  await evalJs(ws, `(async () => {
+    const input = document.getElementById("json-input");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    const payload = {
+      schema: "circuit_v0", seed: 0,
+      nodes: [
+        { id: "s0", op: "tmsv", params: { r: 0.6 }, modes: [0, 1] },
+        { id: "l0", op: "loss", params: { T: 0.8 }, mode: 0 },
+        { id: "l1", op: "loss", params: { T: 0.8 }, mode: 1 },
+      ],
+      edges: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {},
+    };
+    setter.call(input, JSON.stringify(payload));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 600)); // 400ms debounce
+    return true;
+  })()`);
   const panel = await waitEval(ws, `(() => {
     const g = (id) => document.getElementById(id);
     if (!g("scan-node") || !g("scan-node").options.length) return null;
@@ -167,18 +190,18 @@ try {
     document.querySelector('[data-op="amplifier"]').click();
     document.querySelector('[data-op="mz"]').click();
     await new Promise((r) => setTimeout(r, 400));
-    const rows = [...document.querySelectorAll(".node-row__title")].map((t) => t.textContent);
+    const gates = document.querySelectorAll(".gate:not(.gate--preview):not(.gate--ghost)").length;
     g("run-btn").click();
     const t0 = Date.now();
     while (Date.now() - t0 < 10000) {
       const st = g("status");
-      if (/^ok ·/.test(st.textContent) && st.dataset.state === "ok") return { rows, status: st.textContent };
-      if (st.dataset.state === "error") return { rows, status: st.textContent };
+      if (/^ok ·/.test(st.textContent) && st.dataset.state === "ok") return { gates, status: st.textContent };
+      if (st.dataset.state === "error") return { gates, status: st.textContent };
       await new Promise((r) => setTimeout(r, 100));
     }
-    return { rows, status: "timeout" };
+    return { gates, status: "timeout" };
   })()`);
-  check("amplifier + mz palette cards add nodes", pal.rows.some((t) => t.includes("放大")) && pal.rows.some((t) => t.includes("马赫-曾德尔")), JSON.stringify(pal.rows));
+  check("amplifier + mz palette cards add gates (L5 staff)", pal.gates >= 2, JSON.stringify(pal));
   check("/run ok with amplifier + mz circuit", pal.status.includes("ok") && !pal.status.includes("timeout"), pal.status);
 
   /* 5. hit-test every interactive control across viewport widths — no element

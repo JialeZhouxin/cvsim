@@ -525,6 +525,12 @@ body {
 
 .staff__grid {
   position: relative;
+  /* L5.5: pre-defined cell columns — faint vertical rule every 72px */
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0 71px,
+    color-mix(in srgb, var(--color-rule) 50%, transparent) 71px 72px
+  );
 }
 
 .staff__row {
@@ -577,6 +583,14 @@ body {
   position: relative;
 }
 
+.staff__lane--hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.staff__lane--conflict {
+  background: color-mix(in srgb, var(--color-error) 16%, transparent);
+}
+
 .gate {
   position: absolute;
   width: 60px;
@@ -608,6 +622,21 @@ body {
   opacity: 0.55;
   cursor: default;
   z-index: 3;
+}
+
+.gate--ghost {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  background: transparent;
+  opacity: 0.65;
+  cursor: grabbing;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.gate--ghost.gate--conflict {
+  border-color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 12%, transparent);
 }
 
 .gate:hover {

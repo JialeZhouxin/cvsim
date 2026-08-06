@@ -3,7 +3,7 @@
    DOM/DnD work lives only inside initStaff. */
 "use strict";
 
-import { OPS, sourceRows } from "./ops.js";
+import { OPS, cellOccupied, sourceRows } from "./ops.js";
 
 export const GATE_W = 72;   // px per x unit (gate cell width)
 export const ROW_H = 56;    // px per lane
@@ -37,9 +37,20 @@ export function staffLayout(state) {
     onMove, onDelete, onParam, onPickSweep, onStatus}. */
 export function initStaff(root, api) {
   let placing = null; // {op, modeA, x} — two-mode "pick second lane" state
+  let hover = null;   // {mode, x, conflict} — drag-over preview cell
+  let ghostEl = null; // preview ghost block during drag-over
+
+  function clearHover() {
+    hover = null;
+    if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+    root.querySelectorAll(".staff__lane--hover, .staff__lane--conflict").forEach((el) => {
+      el.classList.remove("staff__lane--hover", "staff__lane--conflict");
+    });
+  }
 
   function render() {
     closeCard();
+    clearHover();
     const { rows, gates, nmode } = staffLayout(api.getState());
     root.replaceChildren();
     root.className = "staff";
@@ -122,9 +133,53 @@ export function initStaff(root, api) {
 
     /* delegated events on the grid (gate blocks overlap lanes; closest(row)
        keeps drops/click working regardless of the actual target) */
-    grid.addEventListener("dragover", (e) => e.preventDefault());
+    grid.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      const rowEl = e.target.closest(".staff__row");
+      if (!rowEl) return;
+      const gridRect = grid.getBoundingClientRect();
+      const x = Math.max(0, Math.round((e.clientX - gridRect.left - SRC_W) / GATE_W));
+      const mode = Number(rowEl.dataset.mode);
+      const data = e.dataTransfer.getData("text/plain") || "";
+      let op = null, moveId = null;
+      if (data.startsWith("move:")) moveId = data.slice(5);
+      else if (Object.hasOwn(OPS, data)) op = data;
+      const nodes = api.getState().nodes;
+      let conflict = false;
+      if (moveId) {
+        const n = nodes.find((y) => y.id === moveId);
+        const meta = n && OPS[n.op];
+        if (n && meta && meta.kind !== "source") {
+          const cells = meta.kind === "two" ? [[n.modes[0], x], [n.modes[1], x]] : [[n.mode, x]];
+          conflict = cells.some(([m, cx]) => cellOccupied(nodes, m, cx, moveId));
+        }
+      } else if (op && OPS[op].kind !== "source") {
+        conflict = cellOccupied(nodes, mode, x);
+      }
+      const lane = rowEl.querySelector(".staff__lane");
+      root.querySelectorAll(".staff__lane--hover, .staff__lane--conflict").forEach((el) => {
+        el.classList.remove("staff__lane--hover", "staff__lane--conflict");
+      });
+      const show = (moveId || (op && OPS[op].kind !== "source"));
+      if (!show) { clearHover(); return; }
+      lane.classList.add(conflict ? "staff__lane--conflict" : "staff__lane--hover");
+      hover = { mode, x, conflict };
+      if (!ghostEl) {
+        ghostEl = document.createElement("div");
+        ghostEl.className = "gate gate--ghost";
+        grid.querySelector(".staff__gates").appendChild(ghostEl);
+      }
+      ghostEl.classList.toggle("gate--conflict", conflict);
+      ghostEl.textContent = moveId ? "↔" : `${OPS[op].label} ?`;
+      ghostEl.style.left = `${SRC_W + x * GATE_W}px`;
+      ghostEl.style.top = `${mode * ROW_H}px`;
+    });
+    grid.addEventListener("dragleave", (e) => {
+      if (!grid.contains(e.relatedTarget)) clearHover();
+    });
     grid.addEventListener("drop", (e) => {
       e.preventDefault();
+      clearHover();
       const rowEl = e.target.closest(".staff__row");
       if (!rowEl) return;
       const mode = Number(rowEl.dataset.mode);
@@ -167,6 +222,7 @@ export function initStaff(root, api) {
 
   root.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      clearHover();
       if (placing) {
         placing = null;
         render();

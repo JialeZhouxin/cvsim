@@ -15,7 +15,7 @@ client = TestClient(app)
 STATIC_DIR = Path(__file__).resolve().parents[1] / "cvsim" / "lab" / "static"
 
 _JS_KEYS = r"\b(?:schema|seed|nodes|id|op|params|r|modes|loss|T|mode|edges|view|"
-_JS_KEYS += r"wigner_mode|lim|n|ui)\b"
+_JS_KEYS += r"wigner_mode|lim|n|ui|nmode|alpha|x)"
 
 
 def load_default_scene() -> dict:

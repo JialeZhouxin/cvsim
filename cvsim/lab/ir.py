@@ -208,6 +208,14 @@ def _source(op: str, node: Node) -> GaussianState:
     raise CircuitV0Error(f"nodes[{node.id}]: unknown source {op!r}")  # pragma: no cover
 
 
+def _append_source(state: GaussianState, node: Node) -> GaussianState:
+    """Extra source after the first: append its modes as independent blocks
+    (direct-product expansion via GaussianState.product, xxpp layout safe).
+    Gate mode refs are absolute and unchanged. Multi-source became legal in
+    L5.5; single-source JSON is unchanged."""
+    return GaussianState.product(state, _source(node.op, node))
+
+
 def _check_mode(state: GaussianState, mode: int, where: str) -> None:
     if mode >= state.nmode:
         raise CircuitV0Error(
@@ -352,18 +360,20 @@ def _build_result(
 def _state_after(circuit: CircuitV0) -> GaussianState:
     """Final GaussianState for a circuit without measurement nodes (scan path)."""
     state: GaussianState | None = None
+    seen_gate = False
     for node in circuit.nodes:
         if node.op in SOURCE_OPS:
-            if state is not None:
+            if seen_gate:
                 raise CircuitV0Error(
                     f"nodes[{node.id}]: source op must be first (state already exists)"
                 )
-            state = _source(node.op, node)
+            state = _append_source(state, node) if state is not None else _source(node.op, node)
         else:
             if state is None:
                 raise CircuitV0Error(
                     f"nodes[{node.id}]: op {node.op!r} requires a source node first"
                 )
+            seen_gate = True
             state, _ = _apply(node, state, rng=None)
     assert state is not None
     return state
@@ -457,18 +467,20 @@ def _execute(
     rng=None → mean path (/run); rng given → sample every measurement node."""
     state: GaussianState | None = None
     measured: list[dict[str, Any]] = []
+    seen_gate = False
     for node in circuit.nodes:
         if node.op in SOURCE_OPS:
-            if state is not None:
+            if seen_gate:
                 raise CircuitV0Error(
                     f"nodes[{node.id}]: source op must be first (state already exists)"
                 )
-            state = _source(node.op, node)
+            state = _append_source(state, node) if state is not None else _source(node.op, node)
         else:
             if state is None:
                 raise CircuitV0Error(
                     f"nodes[{node.id}]: op {node.op!r} requires a source node first"
                 )
+            seen_gate = True
             state, entry = _apply(node, state, rng=rng)
             if entry is not None:
                 measured.append(entry)

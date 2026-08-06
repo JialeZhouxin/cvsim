@@ -70,8 +70,11 @@ function evalJs(ws, expression) {
 }
 
 /* synthetic HTML5 DnD: drag a palette card onto a lane (or an existing gate
-   to a new spot). clientX drives the x computation in the staff drop handler. */
-async function drag(ws, { from, to, dx = 0 }) {
+   to a new spot). clientX drives the x computation in the staff drop handler.
+   Pass absolute clientX to pin the drop column (lane-relative dx drifts when
+   the staff grid width changes between renders). */
+async function drag(ws, { from, to, dx = 0, clientX } = {}) {
+  const cxExpr = clientX !== undefined ? JSON.stringify(clientX) : `rect.left + rect.width / 2 + ${dx}`;
   return evalJs(ws, `(async () => {
     const src = ${JSON.stringify(from)};
     const dst = ${JSON.stringify(to)};
@@ -79,11 +82,12 @@ async function drag(ws, { from, to, dx = 0 }) {
     const target = document.querySelector(dst);
     if (!el || !target) return "missing: " + src + " / " + dst;
     const rect = target.getBoundingClientRect();
+    const cx = ${cxExpr};
     const dt = new DataTransfer();
     el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dt, bubbles: true }));
     const data = dt.getData("text/plain");
-    const ok = target.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: rect.left + rect.width / 2 + ${dx}, clientY: rect.top + 10 }));
-    const dropped = target.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: rect.left + rect.width / 2 + ${dx}, clientY: rect.top + 10 }));
+    const ok = target.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: rect.top + 10 }));
+    const dropped = target.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: rect.top + 10 }));
     return JSON.stringify({ data, ok, dropped });
   })()`);
 }
@@ -124,23 +128,28 @@ try {
   await send(ws, "Runtime.enable");
   await evalJs(ws, `(async () => { while (!document.getElementById("staff")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
 
-  /* 1. default scene (tmsv legacy + 2 loss) renders as staff */
+  /* 1. default scene (vacuum×2 + displace×2 @ x=0) renders as staff */
   const staff = await waitEval(ws, `(() => {
     const s = document.getElementById("staff");
     if (!s || !s.querySelector(".staff__row")) return null;
     return {
       rows: s.querySelectorAll(".staff__row").length,
-      gates: s.querySelectorAll(".gate:not(.gate--preview)").length,
+      gates: s.querySelectorAll(".gate:not(.gate--preview):not(.gate--ghost)").length,
       srcLabels: [...s.querySelectorAll(".staff__source")].map((e) => e.textContent).filter(Boolean),
       palette: [...document.querySelectorAll(".palette__item")].map((e) => e.dataset.op),
-      jsonHasLoss: document.getElementById("json-input").value.includes('"op": "loss"'),
+      jsonHasDisplace: document.getElementById("json-input").value.includes('"op": "displace"'),
+      gridLines: getComputedStyle(s.querySelector(".staff__grid")).backgroundImage !== "none",
     };
   })()`);
-  check("staff: default scene = 2 lanes (tmsv legacy)", staff.rows === 2, JSON.stringify(staff));
-  check("staff: 2 gates rendered", staff.gates === 2, String(staff.gates));
-  check("staff: tmsv source label on lane 0", staff.srcLabels.length === 1 && staff.srcLabels[0].startsWith("TMSV"), JSON.stringify(staff.srcLabels));
-  check("palette: tmsv hidden, vacuum present", staff.palette.includes("vacuum") && !staff.palette.includes("tmsv"), JSON.stringify(staff.palette));
-  check("JSON: graph→json sync intact", staff.jsonHasLoss);
+  check("staff: default scene = 2 lanes (2 vacuum sources)", staff.rows === 2, JSON.stringify(staff));
+  check("staff: 2 displace gates rendered", staff.gates === 2, String(staff.gates));
+  check("staff: 2 vacuum source labels", staff.srcLabels.length === 2 && staff.srcLabels.every((t) => t.startsWith("真空模")), JSON.stringify(staff.srcLabels));
+  check("palette: tmsv+coherent hidden, vacuum present", staff.palette.includes("vacuum") && !staff.palette.includes("tmsv") && !staff.palette.includes("coherent"), JSON.stringify(staff.palette));
+  check("JSON: graph→json sync intact (displace)", staff.jsonHasDisplace);
+  check("grid: cell column rules rendered", staff.gridLines);
+  /* default scene gates snap to column 0 */
+  const defX = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.filter((n) => n.op === "displace").map((n) => n.ui.x))()`);
+  check("default: displace gates at x=0", JSON.stringify(defX) === "[0,0]", JSON.stringify(defX));
 
   /* 2. single-mode placement: drag 相位 onto lane 1 at offset +150px */
   const single = await drag(ws, { from: '[data-op="phase"]', to: '.staff__row[data-mode="1"] .staff__lane', dx: 150 });
@@ -153,7 +162,7 @@ try {
     const p = j.nodes.find((n) => n.op === "phase");
     return p ? { mode: p.mode, x: p.ui.x, n: j.nodes.length } : null;
   })()`);
-  check("place single: phase on mode 1, x≈2.6 (150px/72)", singleCheck && singleCheck.mode === 1 && Math.abs(singleCheck.x - (150 + 66) / 72) < 0.2, JSON.stringify(singleCheck));
+  check("place single: phase on mode 1, x snapped to integer col", singleCheck && singleCheck.mode === 1 && Number.isInteger(singleCheck.x) && singleCheck.x >= 0, JSON.stringify(singleCheck));
 
   /* 3. two-mode two-step: drag beamsplitter onto lane 0 → preview + hint → click lane 1 */
   const bs = await drag(ws, { from: '[data-op="beamsplitter"]', to: '.staff__row[data-mode="0"] .staff__lane', dx: 250 });
@@ -196,27 +205,81 @@ try {
   }))()`);
   check("two-mode: Esc cancels, no node added", !esc.preview && !esc.mz, JSON.stringify(esc));
 
-  /* 5. move existing gate: drag loss (lane 0) further right */
-  const lossBefore = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.find((n) => n.id === "l0").ui.x)()`);
-  const moved = await drag(ws, { from: '.gate[data-id="l0"]', to: '.staff__row[data-mode="0"] .staff__lane', dx: 400 });
+  /* 4b. L5.5 conflict rejection: drop squeeze onto occupied cell (d0 @ (0,0)) */
+  const gridL = await evalJs(ws, `document.querySelector(".staff__grid").getBoundingClientRect().left`);
+  const cell0CX = gridL + 132 + 0.3 * 72; // column 0 (off .5 boundary: round(0.3)=0)
+  /* hover preview: conflict cell turns red + ghost shows */
+  const hoverPreview = await evalJs(ws, `(async () => {
+    const el = document.querySelector('[data-op="squeeze"]');
+    const lane = document.querySelector('.staff__row[data-mode="0"] .staff__lane');
+    const r = lane.getBoundingClientRect();
+    const dt = new DataTransfer();
+    el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dt, bubbles: true }));
+    lane.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: ${cell0CX}, clientY: r.top + 10 }));
+    const ghost = document.querySelector(".gate--ghost");
+    const out = {
+      conflict: lane.classList.contains("staff__lane--conflict"),
+      ghost: !!ghost,
+      ghostConflict: !!(ghost && ghost.classList.contains("gate--conflict")),
+      ghostText: ghost ? ghost.textContent : "",
+    };
+    lane.dispatchEvent(new DragEvent("dragleave", { dataTransfer: dt, bubbles: true, relatedTarget: document.body }));
+    return out;
+  })()`);
+  check("hover preview: occupied cell → red conflict + ghost", hoverPreview.conflict && hoverPreview.ghost && hoverPreview.ghostConflict && /压缩/.test(hoverPreview.ghostText), JSON.stringify(hoverPreview));
+  await drag(ws, { from: '[data-op="squeeze"]', to: '.staff__row[data-mode="0"] .staff__lane', clientX: cell0CX });
+  await sleep(150);
+  const conflict = await evalJs(ws, `(() => ({
+    squeeze: JSON.parse(document.getElementById("json-input").value).nodes.some((n) => n.op === "squeeze"),
+    status: document.getElementById("status").textContent,
+  }))()`);
+  check("conflict: squeeze onto (0,0) rejected + hint", !conflict.squeeze && /已被占用/.test(conflict.status), JSON.stringify(conflict));
+
+  /* 4c. L5.5 two-mode locks both cells: BS @ [0,1] x4, then squeeze onto (1,4) rejected */
+  const cell4CX = gridL + 132 + 4.3 * 72; // column 4 (off .5 boundary: round(4.3)=4)
+  await drag(ws, { from: '[data-op="beamsplitter"]', to: '.staff__row[data-mode="0"] .staff__lane', clientX: cell4CX });
+  await waitEval(ws, `document.querySelector(".gate--preview")`);
+  await click(ws, '.staff__row[data-mode="1"] .staff__lane');
   await waitEval(ws, `(() => {
     const j = JSON.parse(document.getElementById("json-input").value);
-    return j.nodes.find((n) => n.id === "l0").ui.x > ${lossBefore};
+    const bs = j.nodes.filter((n) => n.op === "beamsplitter");
+    return bs.length === 2 && bs.some((b) => b.ui.x === 4);
   })()`);
-  const lossAfter = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.find((n) => n.id === "l0").ui.x)()`);
-  check("move gate: l0 x increased, JSON synced", lossAfter > lossBefore, `${lossBefore} → ${lossAfter}`);
+  const bsGateCX = await evalJs(ws, `(() => {
+    const j = JSON.parse(document.getElementById("json-input").value);
+    const id = j.nodes.filter((n) => n.op === "beamsplitter").at(-1).id;
+    const g = document.querySelector('.gate[data-id="' + id + '"]');
+    return g.getBoundingClientRect().left + g.getBoundingClientRect().width / 2;
+  })()`);
+  await drag(ws, { from: '[data-op="squeeze"]', to: '.staff__row[data-mode="1"] .staff__lane', clientX: bsGateCX });
+  await sleep(150);
+  const bsLock = await evalJs(ws, `(() => ({
+    squeeze: JSON.parse(document.getElementById("json-input").value).nodes.some((n) => n.op === "squeeze"),
+    status: document.getElementById("status").textContent,
+  }))()`);
+  check("two-mode lock: squeeze onto BS second lane rejected", !bsLock.squeeze && /已被占用/.test(bsLock.status), JSON.stringify(bsLock));
+
+  /* 5. move existing gate: drag displace d0 (lane 0) further right */
+  const lossBefore = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.find((n) => n.id === "d0").ui.x)()`);
+  const moved = await drag(ws, { from: '.gate[data-id="d0"]', to: '.staff__row[data-mode="0"] .staff__lane', dx: 400 });
+  await waitEval(ws, `(() => {
+    const j = JSON.parse(document.getElementById("json-input").value);
+    return j.nodes.find((n) => n.id === "d0").ui.x > ${lossBefore};
+  })()`);
+  const lossAfter = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.find((n) => n.id === "d0").ui.x)()`);
+  check("move gate: d0 x increased + integer, JSON synced", lossAfter > lossBefore && Number.isInteger(lossAfter), `${lossBefore} → ${lossAfter}`);
 
   /* 6. delete via hover × */
   const delClick = await evalJs(ws, `(async () => {
-    const g = document.querySelector('.gate[data-id="l1"]');
+    const g = document.querySelector('.gate[data-id="d1"]');
     g.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
     const btn = g.querySelector(".gate__del");
     btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 100));
     const j = JSON.parse(document.getElementById("json-input").value);
-    return !j.nodes.some((n) => n.id === "l1");
+    return !j.nodes.some((n) => n.id === "d1");
   })()`);
-  check("delete gate: l1 removed, JSON synced", delClick);
+  check("delete gate: d1 removed, JSON synced", delClick);
 
   /* 7. legacy JSON without ui.x loads and renders as grid columns */
   const legacy = await evalJs(ws, `(async () => {

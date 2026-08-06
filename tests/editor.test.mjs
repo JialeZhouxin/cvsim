@@ -6,6 +6,7 @@ import {
   OPS, OP_NAMES, TAU, paramsFromOp, sourceModes,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
   sortNodes, sourceRows, removeSource, updateParam, updateMode, toCircuitJson,
+  cellOccupied,
 } from "../cvsim/lab/static/ops.js";
 import { stateFromJson, loadJson } from "../cvsim/lab/static/editor.js";
 
@@ -14,6 +15,7 @@ const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "displac
 test("ops metadata: 13 ops (tmsv kept for JSON compat, palette:false)", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
   assert.equal(OPS.tmsv.palette, false); // legacy source: loadable, not in palette
+  assert.equal(OPS.coherent.palette, false); // L5.5: unified into vacuum + displace gate
 });
 
 test("ops metadata: param ranges sane", () => {
@@ -84,16 +86,40 @@ test("L5: sortNodes — (x, mode) order, sources first", () => {
   assert.deepEqual(sortNodes([s0, vac, coh]).map((n) => n.id), [vac.id, coh.id, s0.id]);
 });
 
-test("L5: placeSingle — lane + x locked, sorted", () => {
+test("L5.5: placeSingle — snaps x to nearest integer column (round)", () => {
   let nodes = addNode([], "vacuum");
   nodes = placeSingle(nodes, "phase", 1, 2.5);
-  assert.equal(nodes[1].op, "phase");
-  assert.equal(nodes[1].mode, 1);
-  assert.equal(nodes[1].ui.x, 2.5);
+  assert.equal(nodes.find((n) => n.mode === 1).ui.x, 3); // round(2.5)
+  nodes = placeSingle(nodes, "squeeze", 0, 0.4);
+  assert.equal(nodes.find((n) => n.op === "squeeze").ui.x, 0); // round(0.4)
+  nodes = placeSingle(nodes, "phase", 0, -3);
+  assert.equal(nodes.filter((n) => n.op === "phase").find((n) => n.mode === 0).ui.x, 0); // clamped
   // invalid: non-single op / bad mode / bad x rejected
-  assert.equal(placeSingle(nodes, "beamsplitter", 0, 1).length, 2);
-  assert.equal(placeSingle(nodes, "phase", -1, 1).length, 2);
-  assert.equal(placeSingle(nodes, "phase", 0, NaN).length, 2);
+  const n0 = nodes.length;
+  assert.equal(placeSingle(nodes, "beamsplitter", 0, 1).length, n0);
+  assert.equal(placeSingle(nodes, "phase", -1, 1).length, n0);
+  assert.equal(placeSingle(nodes, "phase", 0, NaN).length, n0);
+});
+
+test("L5.5: cellOccupied — single/two-mode cells, excludeId", () => {
+  const nodes = [
+    { id: "v0", op: "vacuum", params: {} },
+    { id: "p", op: "phase", params: { phi: 1 }, mode: 0, ui: { x: 1 } },
+    { id: "bs", op: "beamsplitter", params: { theta: 0.5 }, modes: [0, 1], ui: { x: 2 } },
+  ];
+  assert.equal(cellOccupied(nodes, 0, 1.4), true);  // single gate, round(1.4)=1
+  assert.equal(cellOccupied(nodes, 0, 0.6), true);  // round(0.6)=1 → same cell
+  assert.equal(cellOccupied(nodes, 0, 0.4), false); // round(0.4)=0 → free
+  assert.equal(cellOccupied(nodes, 0, 2), true);    // bs locks lane 0 @ x2
+  assert.equal(cellOccupied(nodes, 1, 2), true);    // bs locks lane 1 @ x2
+  assert.equal(cellOccupied(nodes, 1, 2.4), true);  // round to 2
+  assert.equal(cellOccupied(nodes, 2, 2), false);   // no gate on lane 2
+  assert.equal(cellOccupied(nodes, 0, 3), false);
+  // excludeId: the moving gate ignores its own cells
+  assert.equal(cellOccupied(nodes, 0, 1, "p"), false);
+  assert.equal(cellOccupied(nodes, 0, 2, "bs"), false);
+  assert.equal(cellOccupied(nodes, 1, 2, "bs"), false);
+  assert.equal(cellOccupied(nodes, 0, 2, "nope"), true);
 });
 
 test("L5: completePlacing — two-mode two-step flow", () => {
@@ -104,26 +130,33 @@ test("L5: completePlacing — two-mode two-step flow", () => {
   assert.equal(ok.ok, true);
   assert.equal(ok.nodes[2].op, "beamsplitter");
   assert.deepEqual(ok.nodes[2].modes, [0, 1]);
-  assert.equal(ok.nodes[2].ui.x, 1.5);
+  assert.equal(ok.nodes[2].ui.x, 2); // round(1.5)
   // same-lane reject, state preserved
   const same = completePlacing(nodes, placing, 0);
   assert.equal(same.ok, false);
   assert.match(same.reason, /不同模式/);
+  // L5.5: second lane's cell occupied → rejected, placing kept
+  const gated = completePlacing(ok.nodes, placing, 1);
+  assert.equal(gated.ok, false);
+  assert.match(gated.reason, /已被占用/);
   // invalid placing / non-two op rejected
   assert.equal(completePlacing(nodes, { op: "phase", modeA: 0, x: 1 }, 1).ok, false);
   assert.equal(completePlacing(nodes, null, 1).ok, false);
   assert.equal(completePlacing(nodes, placing, -1).ok, false);
 });
 
-test("L5: moveNodeX — reorders by new x, guards NaN", () => {
+test("L5: moveNodeX — reorders by new x, snaps round, guards NaN", () => {
   let nodes = addNode([], "vacuum");
   nodes = placeSingle(nodes, "phase", 0, 1);
   nodes = placeSingle(nodes, "squeeze", 0, 2);
   const [ph, sq] = nodes.slice(1);
-  const moved = moveNodeX(nodes, sq.id, 0.5); // squeeze now before phase
+  const moved = moveNodeX(nodes, sq.id, 0.4); // squeeze snaps to 0, now before phase
   assert.deepEqual(moved.slice(1).map((n) => n.op), ["squeeze", "phase"]);
-  assert.equal(moved[1].ui.x, 0.5);
+  assert.equal(moved[1].ui.x, 0); // round(0.4)
   assert.equal(moveNodeX(nodes, sq.id, "x").length, nodes.length); // NaN rejected
+  // same-column move keeps order
+  const sameCol = moveNodeX(nodes, ph.id, 1.4);
+  assert.equal(sameCol[1].ui.x, 1);
 });
 
 test("L5: sourceRows — vacuum nmode lanes, coherent/tmsv legacy", () => {
@@ -180,7 +213,7 @@ test("L5: toCircuitJson carries ui.x; legacy node without ui stays clean", () =>
   let nodes = addNode([], "vacuum");
   nodes = placeSingle(nodes, "phase", 0, 3.5);
   const payload = toCircuitJson({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
-  assert.equal(payload.nodes[1].ui.x, 3.5);
+  assert.equal(payload.nodes[1].ui.x, 4); // round(3.5)
   assert.ok(!("ui" in payload.nodes[0])); // source: no ui.x → no ui emitted
 });
 
@@ -197,10 +230,10 @@ test("L5: stateFromJson — missing ui.x falls back to array index", () => {
   const { state, error } = stateFromJson(legacy);
   assert.equal(error, undefined);
   assert.deepEqual(state.nodes.map((n) => n.ui?.x), [undefined, 0, 1]); // source layout-free
-  // explicit ui.x honored
+  // explicit ui.x honored (snapped to integer column)
   const withX = { ...legacy, nodes: [{ ...legacy.nodes[1], ui: { x: 7.5 } }] };
   const { state: sx } = stateFromJson(withX);
-  assert.equal(sx.nodes[0].ui.x, 7.5);
+  assert.equal(sx.nodes[0].ui.x, 8); // round(7.5)
   // round-trip: ui.x survives
   const rt = stateFromJson(toCircuitJson(state));
   assert.deepEqual(rt.state.nodes.map((n) => n.ui?.x), [undefined, 0, 1]);

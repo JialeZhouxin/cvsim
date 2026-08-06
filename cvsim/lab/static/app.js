@@ -4,13 +4,15 @@
 import { initEditor, loadJson } from "./editor.js";
 import { OPS, sourceModes, toCircuitJson } from "./ops.js";
 
+/* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
 const DEFAULT_JSON = {
   schema: "circuit_v0",
   seed: 0,
   nodes: [
-    { id: "s0", op: "tmsv", params: { r: 0.6 }, modes: [0, 1] },
-    { id: "l0", op: "loss", params: { T: 0.8 }, mode: 0 },
-    { id: "l1", op: "loss", params: { T: 0.8 }, mode: 1 },
+    { id: "s0", op: "vacuum", params: { nmode: 1 } },
+    { id: "s1", op: "vacuum", params: { nmode: 1 } },
+    { id: "d0", op: "displace", params: { alpha: 1.0 }, mode: 0, ui: { x: 0 } },
+    { id: "d1", op: "displace", params: { alpha: 1.0 }, mode: 1, ui: { x: 0 } },
   ],
   edges: [],
   view: { wigner_mode: 0, lim: 5.0, n: 64 },

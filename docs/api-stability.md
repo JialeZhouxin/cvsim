@@ -44,6 +44,7 @@ A regression test (`tests/test_public_api.py`) freezes that set. **Removing or r
 | Surface | Notes |
 |---------|--------|
 | `GaussianCircuit` / `ParamRef` | L2–L4 DSL; op names in the IR are semi-stable; new measure ops may appear |
+| `circuit_v0` IR (lab) | L5.5: **multi-source legal** — source nodes may repeat (all before any gate), later sources append independent modes via direct product; single-source JSON unchanged |
 | `cvsim.wigner` | Teaching grids; signature may gain kwargs |
 | `cvsim.fock` / `cvsim.bosonic` | Sibling reps; not the Phase 2 freeze focus |
 | Demo scripts under `cvsim.demos` / `examples/` | May move or rename without major bump |

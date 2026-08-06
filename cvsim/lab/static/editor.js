@@ -3,7 +3,7 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, completePlacing, moveNodeX, paramsFromOp, placeSingle, removeNode, sourceModes, toCircuitJson, updateParam } from "./ops.js";
+import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, paramsFromOp, placeSingle, removeNode, sourceModes, toCircuitJson, updateParam } from "./ops.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -63,13 +63,14 @@ export function stateFromJson(payload) {
       }
       node.modes = [...n.modes];
     }
-    // L5 staff layout x — honor ui.x when present, else array index (legacy/hand-written
-    // JSON falls back to grid columns, never errors). Sources stay layout-free.
+    // L5.5 staff layout x — honor ui.x when present (snapped to integer
+    // column), else array index (legacy/hand-written JSON falls back to grid
+    // columns, never errors). Sources stay layout-free.
     const rawUi = n.ui && typeof n.ui === "object" ? n.ui : {};
     if (meta.kind === "source") {
-      node.ui = Number.isFinite(rawUi.x) ? { x: rawUi.x } : undefined;
+      node.ui = Number.isFinite(rawUi.x) ? { x: Math.round(rawUi.x) } : undefined;
     } else {
-      node.ui = Number.isFinite(rawUi.x) ? { x: rawUi.x } : { x: gateIdx++ };
+      node.ui = Number.isFinite(rawUi.x) ? { x: Math.round(rawUi.x) } : { x: gateIdx++ };
     }
     nodes.push(node);
   }
@@ -131,6 +132,10 @@ export function initEditor(root, hooks) {
   const staff = initStaff(dom.staff, {
     getState: () => state,
     onPlace: (op, mode, x) => {
+      if (cellOccupied(state.nodes, mode, x)) {
+        hooks.onStatus(`该格已被占用（mode ${mode} @ x ${Math.round(x)}）`, false);
+        return;
+      }
       state = { ...state, nodes: placeSingle(state.nodes, op, mode, x) };
       render();
     },
@@ -143,6 +148,17 @@ export function initEditor(root, hooks) {
       return res;
     },
     onMove: (id, x) => {
+      const n = state.nodes.find((y) => y.id === id);
+      const meta = n && OPS[n.op];
+      if (n && meta && meta.kind !== "source") {
+        const cells = meta.kind === "two"
+          ? [[n.modes[0], x], [n.modes[1], x]]
+          : [[n.mode, x]];
+        if (cells.some(([m, cx]) => cellOccupied(state.nodes, m, cx, id))) {
+          hooks.onStatus(`该格已被占用（x ${Math.round(x)}）`, false);
+          return;
+        }
+      }
       state = { ...state, nodes: moveNodeX(state.nodes, id, x) };
       render();
     },

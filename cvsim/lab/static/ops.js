@@ -26,6 +26,7 @@ export const OPS = {
     label: "相干态",
     kind: "source",
     modes: 1,
+    palette: false, // L5.5: 统一为 vacuum + displace 门表达，保留定义以载入旧 JSON
     params: { alpha: { min: -5, max: 5, step: 0.05, def: 1.0 } },
   },
   squeeze: {
@@ -161,18 +162,40 @@ export function removeNode(nodes, id) {
   return nodes.filter((n) => n.id !== id);
 }
 
-/** Place a single-mode gate on a lane at x (staff drag-drop). */
+/** L5.5: true if a gate occupies the cell (mode, round(x)). Sources never
+    occupy cells. Two-mode gates lock both their lanes. excludeId lets a
+    moving gate ignore its own cells. */
+export function cellOccupied(nodes, mode, x, excludeId = null) {
+  const cx = Math.round(x);
+  for (const n of nodes) {
+    if (n.id === excludeId) continue;
+    const meta = OPS[n.op];
+    if (!meta || meta.kind === "source") continue;
+    if (Math.round(n.ui?.x ?? 0) !== cx) continue;
+    if (meta.kind === "two") {
+      if (n.modes[0] === mode || n.modes[1] === mode) return true;
+    } else if (n.mode === mode) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Place a single-mode gate on a lane at x (staff drag-drop).
+    x snaps to the nearest integer column (round). */
 export function placeSingle(nodes, op, mode, x) {
   const v = Number(mode);
   const p = Number(x);
   if (!Object.hasOwn(OPS, op) || OPS[op].kind !== "single") return nodes;
   if (!Number.isInteger(v) || v < 0 || !Number.isFinite(p)) return nodes;
-  const node = { id: nextId(nodes), op, params: paramsFromOp(op), mode: v, ui: { x: Math.max(0, p) } };
+  const node = { id: nextId(nodes), op, params: paramsFromOp(op), mode: v, ui: { x: Math.max(0, Math.round(p)) } };
   return sortNodes([...nodes, node]);
 }
 
 /** Finish a two-mode placement after the user picks lane B.
-    Returns {ok:true, nodes} or {ok:false, reason}. */
+    Returns {ok:true, nodes} or {ok:false, reason}. L5.5: x rounds to the
+    nearest column; the second lane's cell must be free (two-mode locks
+    both cells once placed). */
 export function completePlacing(nodes, placing, modeB) {
   const v = Number(modeB);
   if (!placing || !Object.hasOwn(OPS, placing.op) || OPS[placing.op].kind !== "two") {
@@ -180,18 +203,21 @@ export function completePlacing(nodes, placing, modeB) {
   }
   if (!Number.isInteger(v) || v < 0) return { ok: false, reason: "非法模式" };
   if (v === placing.modeA) return { ok: false, reason: "双模操作需要两个不同模式" };
+  const cx = Math.max(0, Math.round(Number(placing.x) || 0));
+  if (cellOccupied(nodes, v, cx)) return { ok: false, reason: `该格已被占用（mode ${v} @ x ${cx}）` };
   const node = {
     id: nextId(nodes), op: placing.op, params: paramsFromOp(placing.op),
-    modes: [placing.modeA, v], ui: { x: Math.max(0, Number(placing.x) || 0) },
+    modes: [placing.modeA, v], ui: { x: cx },
   };
   return { ok: true, nodes: sortNodes([...nodes, node]) };
 }
 
-/** Drag an existing gate: change x, re-sort (order follows (x, mode)). */
+/** Drag an existing gate: change x (round to nearest column), re-sort
+    (order follows (x, mode)). Caller checks cellOccupied with excludeId. */
 export function moveNodeX(nodes, id, x) {
   const v = Number(x);
   if (!Number.isFinite(v)) return nodes;
-  const out = nodes.map((n) => (n.id === id ? { ...n, ui: { ...n.ui, x: Math.max(0, v) } } : n));
+  const out = nodes.map((n) => (n.id === id ? { ...n, ui: { ...n.ui, x: Math.max(0, Math.round(v)) } } : n));
   return sortNodes(out);
 }
 

@@ -107,16 +107,61 @@ def test_source_must_be_first():
         run_circuit(load_circuit(data))
 
 
-def test_two_sources_rejected():
+def test_two_sources_rejected_when_gate_in_between():
+    """L5.5: sources may repeat (direct-product append), but a gate between
+    sources is still illegal (sources must lead the node list)."""
     data = {
         "schema": "circuit_v0",
         "nodes": [
             {"id": "a", "op": "vacuum", "params": {}},
-            {"id": "b", "op": "tmsv", "params": {"r": 0.5}, "modes": [0, 1]},
+            {"id": "p", "op": "phase", "params": {"phi": 1.0}, "mode": 0},
+            {"id": "b", "op": "vacuum", "params": {}},
         ],
     }
     with pytest.raises(CircuitV0Error, match="source op must be first"):
         run_circuit(load_circuit(data))
+
+
+def test_multi_source_vacuum_equiv_single_nmode():
+    """L5.5: vacuum×2 + displace×2 ≡ vacuum nmode=2 (direct product)."""
+    def scene(multi: bool) -> dict:
+        nodes = [{"id": "s0", "op": "vacuum", "params": {"nmode": 1 if multi else 2}}]
+        if multi:
+            nodes.append({"id": "s1", "op": "vacuum", "params": {"nmode": 1}})
+        return {
+            "schema": "circuit_v0",
+            "nodes": nodes
+            + [
+                {"id": "d0", "op": "displace", "params": {"alpha": 1.0}, "mode": 0},
+                {"id": "d1", "op": "displace", "params": {"alpha": 1.0}, "mode": 1},
+            ],
+        }
+    r1 = run_circuit(load_circuit(scene(True)))   # two vacuum sources
+    r2 = run_circuit(load_circuit(scene(False)))  # single vacuum nmode=2
+    assert r1.nmode == 2 and r2.nmode == 2
+    assert np.allclose(r1.rbar, r2.rbar)
+    assert np.allclose(r1.V, r2.V)
+
+
+def test_multi_source_tmsv_append_third_mode():
+    """L5.5: vacuum + tmsv appended → 3 modes, tmsv block entangled only within
+    its own pair (V block diagonal across source groups)."""
+    data = {
+        "schema": "circuit_v0",
+        "nodes": [
+            {"id": "a", "op": "vacuum", "params": {}},
+            {"id": "b", "op": "tmsv", "params": {"r": 0.5}, "modes": [1, 2]},
+        ],
+    }
+    res = run_circuit(load_circuit(data))
+    assert res.nmode == 3
+    # xxpp split layout: rows = [x0,x1,x2,p0,p1,p2]
+    # tmsv pair (modes 1,2) entangled: x1-x2 and p1-p2 cross terms nonzero
+    assert abs(res.V[1, 2]) > 0  # x1·x2
+    assert abs(res.V[4, 5]) > 0  # p1·p2
+    # vacuum mode 0 uncorrelated with the pair: x0/p0 rows empty off-diagonal
+    assert np.abs(res.V[0, 1:]).max() < 1e-12                      # x0 row
+    assert np.abs(np.concatenate([res.V[3, :3], res.V[3, 4:]])).max() < 1e-12  # p0 row
 
 
 def test_mode_out_of_range():
