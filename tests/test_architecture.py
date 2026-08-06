@@ -23,18 +23,26 @@ def _cvsim_imports(path: Path) -> list[str]:
     out: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            out.extend(a.name for a in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            out.append(node.module)
+            for a in node.names:
+                if a.name == "cvsim":
+                    out.append("cvsim")  # bare import: allowlist violation
+                elif a.name.startswith("cvsim."):
+                    out.append(a.name)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            if node.module == "cvsim":
+                # `from cvsim import lab` → cvsim.lab, no bypass
+                out.extend(f"cvsim.{a.name}" for a in node.names)
+            else:
+                out.append(node.module)
+        elif isinstance(node, ast.ImportFrom) and node.level >= 2:
+            out.append("cvsim")  # relative import crossing into parent
     return out
 
 
 def _rep_modules():
     for pkg in REP_PACKAGES:
         pkg_dir = CVSIM / pkg.split(".")[-1]
-        for py in sorted(pkg_dir.glob("*.py")):
-            if py.name == "__init__.py":
-                continue
+        for py in sorted(pkg_dir.glob("**/*.py")):
             yield py, pkg
 
 
@@ -52,5 +60,12 @@ def test_rep_packages_isolated(path: Path, pkg: str) -> None:
             i == bad or i.startswith(bad + ".") for i in imports
         ), f"{path} imports {bad} (forbidden)"
     for i in imports:
-        if i.startswith("cvsim.") and not i.startswith(pkg + "."):
+        if (i == "cvsim" or i.startswith("cvsim.")) and not i.startswith(pkg + "."):
             assert i in ALLOWED_ROOT_IMPORTS, f"{path} imports {i} outside allowlist"
+
+
+@pytest.mark.parametrize("pkg", REP_PACKAGES)
+def test_rep_package_has_modules(pkg: str) -> None:
+    """Guard against silent-pass: empty/missing dir would parametrize to zero."""
+    pkg_dir = CVSIM / pkg.split(".")[-1]
+    assert any(pkg_dir.glob("*.py")), f"{pkg_dir} missing or empty"
