@@ -511,6 +511,7 @@ async function doScan() {
       return;
     }
     drawScanCurve(body);
+    scanSvg.scrollIntoView({ block: "nearest" }); // 曲线可能在折叠面板下方——滚到可见
     setStatus(`scan ok · ${body.ys.length} 点 · ${(performance.now() - t0).toFixed(0)} ms`);
   } catch (e) {
     setStatus("网络错误: " + e.message, false);
