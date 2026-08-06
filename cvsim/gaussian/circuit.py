@@ -145,7 +145,7 @@ class GaussianCircuit:
 
     def interferometer(self, U: np.ndarray) -> GaussianCircuit:
         """Passive interferometer: full nmode×nmode unitary U."""
-        U = np.asarray(U, dtype=complex)
+        U = np.asarray(U, dtype=complex).copy()
         if U.shape != (self.nmode, self.nmode):
             raise ValueError(
                 f"U shape {U.shape} incompatible with nmode={self.nmode}"
@@ -211,15 +211,15 @@ class GaussianCircuit:
         ``nmode`` will raise at ``run()``. Prefer named ``loss`` / ``amplifier``
         / ``phase_noise`` when only some modes are affected.
         """
-        X = np.asarray(X, dtype=float)
-        Y = np.asarray(Y, dtype=float)
+        X = np.asarray(X, dtype=float).copy()
+        Y = np.asarray(Y, dtype=float).copy()
         if X.ndim != 2 or X.shape[0] != X.shape[1] or X.shape[0] % 2 != 0:
             raise ValueError(f"X must be (2m,2m); got {X.shape}")
         if Y.shape != X.shape:
             raise ValueError(f"Y shape {Y.shape} != X shape {X.shape}")
         m_xy = X.shape[0] // 2
         if d is not None:
-            d = np.asarray(d, dtype=float)
+            d = np.asarray(d, dtype=float).copy()
             if d.shape != (2 * m_xy,):
                 raise ValueError(
                     f"d must be ({2 * m_xy},); got {d.shape}"

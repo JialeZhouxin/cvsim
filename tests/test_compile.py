@@ -284,6 +284,44 @@ def test_compile_parameterized_missing_param_raises():
         compiled.run()
 
 
+def test_compile_displace_merge_order_phase_then_displace():
+    """[phase, displace] merged: displacement must NOT be rotated by phase."""
+    c = GaussianCircuit(2)
+    c.phase(0, theta=0.3)
+    c.displace(0, alpha=0.5 + 0.2j)
+    c.beamsplitter(0, 1, theta=0.4)
+    segs, _ = _compile_segments(c._ops, c.nmode)
+    assert segs[0][0] == 'merged' and len(segs[0][2]) == 3
+    st_p = c.run()
+    st_n, _ = naive_run(c)
+    _assert_states_close(st_p, st_n, atol=1e-12)
+
+
+def test_compile_displace_merge_order_displace_then_phase():
+    """[displace, phase] merged: displacement must be rotated by later phase."""
+    c = GaussianCircuit(2)
+    c.displace(0, alpha=0.5 + 0.2j)
+    c.phase(0, theta=0.3)
+    segs, _ = _compile_segments(c._ops, c.nmode)
+    assert segs[0][0] == 'merged' and len(segs[0][2]) == 2
+    st_p = c.run()
+    st_n, _ = naive_run(c)
+    _assert_states_close(st_p, st_n, atol=1e-12)
+
+
+def test_compile_interferometer_copies_input_array():
+    """Mutating U after build must not change the circuit (snapshot semantics)."""
+    U = np.eye(2, dtype=complex)
+    c = GaussianCircuit(2)
+    c.interferometer(U)
+    U[0, 1] = 0.5j  # mutate caller's array
+    st_p = c.run()
+    c2 = GaussianCircuit(2)
+    c2.interferometer(np.eye(2, dtype=complex))
+    st_ref = c2.run()
+    _assert_states_close(st_p, st_ref, atol=1e-12)
+
+
 def test_compile_interferometer_segment():
     c = GaussianCircuit(4)
     c.beamsplitter(0, 1, theta=0.3)

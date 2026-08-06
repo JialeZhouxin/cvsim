@@ -95,6 +95,11 @@ def _instantiate(ops: list[tuple], nmode: int, values: dict) -> tuple[np.ndarray
                 kw[k] = values[v]
             op = (op_name, modes, kw, {}, {})
         Si, di = _factor(op, nmode)
+        if Si.shape != S.shape:
+            raise ValueError(
+                f"merge shape drift: factor {Si.shape} != segment S {S.shape} "
+                f"(nmode={nmode}) — compile-time mode count mismatch"
+            )
         S = Si @ S
         d = Si @ d + di
     return S, d
