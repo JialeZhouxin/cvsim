@@ -286,6 +286,29 @@ try {
   })()`);
   check("delete gate: d1 removed, JSON synced", delClick);
 
+  /* 6b. L5.5 empty columns: grid must have spare cells ahead of the last gate
+     (initial width covers 10+ columns) so drops land far beyond current gates */
+  const farCol = await evalJs(ws, `(async () => {
+    const g = (id) => document.getElementById(id);
+    const grid = document.querySelector(".staff__grid");
+    const gridW = grid.getBoundingClientRect().width;
+    const lane = document.querySelector('.staff__row[data-mode="0"] .staff__lane');
+    const r = lane.getBoundingClientRect();
+    const cx = grid.getBoundingClientRect().left + 132 + 8.3 * 72; // column 8
+    const dtStart = new DataTransfer();
+    const el = document.querySelector('[data-op="squeeze"]');
+    el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dtStart, bubbles: true }));
+    const dt = new DataTransfer();
+    lane.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: r.top + 10 }));
+    const ghostX = document.querySelector(".gate--ghost")?.style.left || "";
+    lane.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: r.top + 10 }));
+    await new Promise((r2) => setTimeout(r2, 120));
+    const j = JSON.parse(g("json-input").value);
+    const n = j.nodes.find((x) => x.op === "squeeze");
+    return { gridW, ghostX, placedX: n ? n.ui.x : null };
+  })()`);
+  check("far empty column: drop at x=8 works, grid ≥ 10 cols", farCol.gridW >= 132 + 10 * 72 && farCol.placedX === 8 && Math.round((parseFloat(farCol.ghostX) - 132) / 72) === 8, JSON.stringify(farCol));
+
   /* 7. legacy JSON without ui.x loads and renders as grid columns */
   const legacy = await evalJs(ws, `(async () => {
     const payload = {

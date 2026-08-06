@@ -525,12 +525,14 @@ body {
 
 .staff__grid {
   position: relative;
-  /* L5.5: pre-defined cell columns — faint vertical rule every 72px */
+  /* L5.5: pre-defined cell columns — faint vertical rule at every cell
+     boundary; shifted by SRC_W so lines fall exactly on 72px column edges */
   background: repeating-linear-gradient(
     to right,
     transparent 0 71px,
     color-mix(in srgb, var(--color-rule) 80%, transparent) 71px 72px
   );
+  background-position-x: 132px;
 }
 
 .staff__row {

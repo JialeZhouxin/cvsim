@@ -74,7 +74,9 @@ export function initStaff(root, api) {
     const grid = document.createElement("div");
     grid.className = "staff__grid";
     const maxX = gates.reduce((m, g) => Math.max(m, g.x), -1) + 1;
-    grid.style.width = `${SRC_W + Math.max(2, maxX) * GATE_W}px`;
+    /* L5.5: keep empty cells ahead of the last gate so drag-and-drop works
+       beyond the current content (grid is the dragover target, not the staff) */
+    grid.style.width = `${SRC_W + Math.max(10, maxX + 4) * GATE_W}px`;
     grid.style.height = `${Math.max(1, nmode) * ROW_H}px`;
 
     /* lanes (one per mode) */
