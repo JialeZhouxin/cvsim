@@ -11,29 +11,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from cvsim.gaussian.channels import (
-    amplifier,
-    apply_gaussian_channel,
-    loss,
-    phase_noise,
-)
+from cvsim.gaussian.compile import CompiledGaussian, _compile_segments
 from cvsim.gaussian.state import GaussianState
-from cvsim.gaussian.gates import (
-    beamsplitter,
-    cx,
-    cz,
-    displace,
-    fourier,
-    interferometer,
-    mach_zehnder,
-    phase,
-    squeeze,
-    two_mode_squeeze,
-)
-from cvsim.gaussian.observables import (
-    heterodyne_sample_and_condition,
-    homodyne_sample_and_condition,
-)
 
 
 @dataclass(frozen=True)
@@ -294,6 +273,15 @@ class GaussianCircuit:
 
     # -- execution --------------------------------------------------------
 
+    def compile(self) -> CompiledGaussian:
+        """Structure-compile this circuit: segment ops, resolve mode mapping.
+
+        Compilation is O(n_ops) and parameter-value independent (ADR-0002);
+        bind values per run via ``CompiledGaussian.run(**values)``.
+        """
+        segments, params = _compile_segments(self._ops, self.nmode)
+        return CompiledGaussian(self.nmode, segments, params)
+
     def run(
         self,
         *,
@@ -302,90 +290,13 @@ class GaussianCircuit:
     ) -> GaussianState | tuple[GaussianState, dict[str, float]]:
         """Execute circuit with given parameter values.
 
-        Returns ``GaussianState`` if no measurements, else
-        ``(GaussianState, results)``.
+        Equivalent to ``self.compile().run(rng=rng, **params)`` (single
+        execution path, ADR-0002 decision 1). Returns ``GaussianState`` if
+        no measurements, else ``(GaussianState, results)``.
 
         *rng* seeds Homodyne sampling for reproducible measurements.
         """
-        st = GaussianState.vacuum(self.nmode)
-        mapping = list(range(self.nmode))
-        results: dict[str, float] = {}
-
-        for op_name, modes, fixed, pnames, refs in self._ops:
-            kwargs = dict(fixed)
-            for k, v in pnames.items():
-                if v not in params:
-                    raise ValueError(
-                        f"Missing parameter '{v}' for {op_name}"
-                    )
-                kwargs[k] = params[v]
-
-            if op_name == 'measure_homodyne':
-                orig_mode = modes[0]
-                phys_mode = mapping[orig_mode]
-                phi_val = kwargs['phi']
-                val, st = homodyne_sample_and_condition(
-                    st, phys_mode, phi_val, rng=rng
-                )
-                results[kwargs['name']] = val
-                st = st.remove_mode(phys_mode)
-                # shift mappings for modes above the removed one
-                for i in range(len(mapping)):
-                    if mapping[i] > phys_mode:
-                        mapping[i] -= 1
-                mapping[orig_mode] = -1
-            elif op_name == 'measure_heterodyne':
-                orig_mode = modes[0]
-                phys_mode = mapping[orig_mode]
-                # heterodyne_condition already removes the measured mode
-                val, st = heterodyne_sample_and_condition(
-                    st, phys_mode, rng=rng
-                )
-                results[kwargs['name']] = val
-                for i in range(len(mapping)):
-                    if mapping[i] > phys_mode:
-                        mapping[i] -= 1
-                mapping[orig_mode] = -1
-            elif op_name == 'gaussian_channel':
-                # Full-state (X,Y): dimension must match modes still present.
-                X = kwargs['X']
-                if X.shape[0] != 2 * st.nmode:
-                    raise ValueError(
-                        f"gaussian_channel X/Y size {X.shape[0]} does not match "
-                        f"current 2*nmode={2 * st.nmode} (mode removed by "
-                        f"measurement? use loss/amplifier/phase_noise instead)"
-                    )
-                st = apply_gaussian_channel(
-                    st,
-                    X,
-                    kwargs['Y'],
-                    kwargs.get('d'),
-                    validate=kwargs.get('validate', True),
-                )
-            else:
-                # mode-less presets (amplifier/phase_noise with mode=None)
-                if modes:
-                    phys_modes = [mapping[m] for m in modes]
-                    if any(p < 0 for p in phys_modes):
-                        raise ValueError(
-                            f"{op_name} references a mode already measured/removed"
-                        )
-                else:
-                    phys_modes = []
-                # resolve ParamRef → real value
-                for k, v in refs.items():
-                    if v.source not in results:
-                        raise ValueError(
-                            f"ParamRef '{k}' references '{v.source}' "
-                            f"which has not been measured yet"
-                        )
-                    kwargs[k] = complex(results[v.source] * v.gain)
-
-                st = self._apply(op_name, st, tuple(phys_modes), **kwargs)
-
-        if results:
-            return st, results
-        return st
+        return self.compile().run(rng=rng, **params)
 
     # -- inspection -------------------------------------------------------
 
@@ -426,35 +337,3 @@ class GaussianCircuit:
             else:
                 fixed[k] = v
         return (op_name, tuple(modes), fixed, params, refs)
-
-    _DISPATCH = {
-        'squeeze': lambda st, m, **kw: squeeze(st, kw['r'], m[0]),
-        'displace': lambda st, m, **kw: displace(st, kw['alpha'], m[0]),
-        'phase': lambda st, m, **kw: phase(st, kw['theta'], m[0]),
-        'fourier': lambda st, m, **kw: fourier(st, m[0]),
-        'beamsplitter': lambda st, m, **kw: beamsplitter(
-            st, m[0], m[1], kw['theta'], kw.get('phi', 0.0)
-        ),
-        'mach_zehnder': lambda st, m, **kw: mach_zehnder(
-            st, m[0], m[1], kw['theta'], kw.get('phi', 0.0)
-        ),
-        'two_mode_squeeze': lambda st, m, **kw: two_mode_squeeze(
-            st, kw['r'], m[0], m[1]
-        ),
-        'cz': lambda st, m, **kw: cz(st, kw['weight'], m[0], m[1]),
-        'cx': lambda st, m, **kw: cx(st, kw['weight'], m[0], m[1]),
-        'interferometer': lambda st, m, **kw: interferometer(st, kw['U']),
-        'loss': lambda st, m, **kw: loss(st, kw['T'], m[0], kw.get('nbar', 0.0)),
-        'amplifier': lambda st, m, **kw: amplifier(
-            st, kw['G'], m[0] if m else None, kw.get('nbar', 0.0)
-        ),
-        'phase_noise': lambda st, m, **kw: phase_noise(
-            st, kw['sigma'], m[0] if m else None
-        ),
-    }
-
-    @staticmethod
-    def _apply(
-        op_name: str, st: GaussianState, modes: tuple, **kwargs: float
-    ) -> GaussianState:
-        return GaussianCircuit._DISPATCH[op_name](st, modes, **kwargs)
