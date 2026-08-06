@@ -102,6 +102,12 @@ export function initStaff(root, api) {
       lane.className = "staff__lane";
       lane.dataset.mode = String(r.mode);
       if (armed) lane.classList.add("staff__lane--arm");
+      if (placing && r.mode !== placing.modeA) {
+        const hint = document.createElement("span");
+        hint.className = "staff__lane-hint";
+        hint.textContent = "→ 点击";
+        lane.appendChild(hint);
+      }
       row.appendChild(lane);
       grid.appendChild(row);
     }

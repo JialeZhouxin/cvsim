@@ -3,7 +3,7 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, paramsFromOp, placeSingle, removeNode, sourceModes, toCircuitJson, updateParam } from "./ops.js";
+import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, sourceModes, toCircuitJson, updateParam } from "./ops.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -176,30 +176,49 @@ export function initEditor(root, hooks) {
     onStatus: (msg, ok) => hooks.onStatus(msg, ok),
   });
 
-  /* palette: DnD + click fallback（palette:false 的 op 不出托盘，如 legacy tmsv） */
-  for (const op of Object.keys(OPS)) {
-    if (OPS[op].palette === false) continue;
-    const card = document.createElement("div");
-    card.className = "palette__item";
-    card.draggable = true;
-    card.dataset.op = op;
-    card.textContent = OPS[op].label;
-    const tryAdd = () => {
-      const meta = OPS[op];
-      if (meta.kind === "two" && sourceModes(state.nodes) < 2) {
-        hooks.onStatus("分束器需要至少 2 个模式（先添加 TMSV 或多源）", false);
-        return;
-      }
-      state = { ...state, nodes: addNode(state.nodes, op) };
-      render();
-    };
-    card.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", op);
-      staff.setDragPayload({ kind: "op", op });
-    });
-    card.addEventListener("dragend", () => staff.setDragPayload(null));
-    card.addEventListener("click", tryAdd);
-    dom.palette.appendChild(card);
+  /* palette: DnD + click fallback, grouped by category（palette:false 的 op 不出托盘） */
+  const PALETTE_GROUPS = [
+    ["source", "源"],
+    ["gate", "门"],
+    ["channel", "通道"],
+    ["measure", "测量"],
+  ];
+  for (const [gid, title] of PALETTE_GROUPS) {
+    const ops = Object.keys(OPS).filter((op) => opGroup(op) === gid);
+    if (!ops.length) continue;
+    const group = document.createElement("div");
+    group.className = "palette__group";
+    const h = document.createElement("div");
+    h.className = "palette__group-title";
+    h.textContent = title;
+    group.appendChild(h);
+    const items = document.createElement("div");
+    items.className = "palette__grid";
+    for (const op of ops) {
+      const card = document.createElement("div");
+      card.className = "palette__item";
+      card.draggable = true;
+      card.dataset.op = op;
+      card.textContent = OPS[op].label;
+      const tryAdd = () => {
+        const meta = OPS[op];
+        if (meta.kind === "two" && sourceModes(state.nodes) < 2) {
+          hooks.onStatus("分束器需要至少 2 个模式（先添加 TMSV 或多源）", false);
+          return;
+        }
+        state = { ...state, nodes: addNode(state.nodes, op) };
+        render();
+      };
+      card.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", op);
+        staff.setDragPayload({ kind: "op", op });
+      });
+      card.addEventListener("dragend", () => staff.setDragPayload(null));
+      card.addEventListener("click", tryAdd);
+      items.appendChild(card);
+    }
+    group.appendChild(items);
+    dom.palette.appendChild(group);
   }
 
   dom.resetBtn.addEventListener("click", () => {

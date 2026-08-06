@@ -50,6 +50,7 @@ export const OPS = {
   loss: {
     label: "损耗",
     kind: "single",
+    channel: true,
     params: {
       T: { min: 0.01, max: 1, step: 0.01, def: 0.8, sweep: [0, 1] },
       nbar: { min: 0, max: 5, step: 0.1, def: 0, advanced: true },
@@ -58,6 +59,7 @@ export const OPS = {
   amplifier: {
     label: "放大",
     kind: "single",
+    channel: true,
     params: {
       G: { min: 1, max: 8, step: 0.05, def: 2, sweep: [1, 4] },
       nbar: { min: 0, max: 5, step: 0.1, def: 0, advanced: true },
@@ -87,14 +89,27 @@ export const OPS = {
   heterodyne: {
     label: "外差测量",
     kind: "single",
+    measure: true,
     params: {},
   },
   homodyne: {
     label: "零差测量",
     kind: "single",
+    measure: true,
     params: { phi: { min: 0, max: TAU, step: 0.01, def: 0, optional: true } },
   },
 };
+
+/** UX: palette grouping category — source / gate / channel / measure.
+    null = hidden from the palette (palette:false or unknown). */
+export function opGroup(op) {
+  const m = OPS[op];
+  if (!m || m.palette === false) return null;
+  if (m.kind === "source") return "source";
+  if (m.channel) return "channel";
+  if (m.measure) return "measure";
+  return "gate";
+}
 
 export const OP_NAMES = Object.keys(OPS);
 

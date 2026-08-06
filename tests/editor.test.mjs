@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  OPS, OP_NAMES, TAU, paramsFromOp, sourceModes,
+  OPS, OP_NAMES, TAU, paramsFromOp, sourceModes, opGroup,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
   sortNodes, sourceRows, removeSource, updateParam, updateMode, toCircuitJson,
   cellOccupied,
@@ -16,6 +16,23 @@ test("ops metadata: 13 ops (tmsv kept for JSON compat, palette:false)", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
   assert.equal(OPS.tmsv.palette, false); // legacy source: loadable, not in palette
   assert.equal(OPS.coherent.palette, false); // L5.5: unified into vacuum + displace gate
+});
+
+test("UX: opGroup — source/gate/channel/measure, palette:false → null", () => {
+  assert.equal(opGroup("vacuum"), "source");
+  assert.equal(opGroup("tmsv"), null); // palette:false
+  assert.equal(opGroup("coherent"), null); // palette:false
+  assert.equal(opGroup("squeeze"), "gate");
+  assert.equal(opGroup("phase"), "gate");
+  assert.equal(opGroup("displace"), "gate");
+  assert.equal(opGroup("beamsplitter"), "gate");
+  assert.equal(opGroup("mz"), "gate");
+  assert.equal(opGroup("two_mode_squeeze"), "gate");
+  assert.equal(opGroup("loss"), "channel");
+  assert.equal(opGroup("amplifier"), "channel");
+  assert.equal(opGroup("heterodyne"), "measure");
+  assert.equal(opGroup("homodyne"), "measure");
+  assert.equal(opGroup("nope"), null);
 });
 
 test("ops metadata: param ranges sane", () => {

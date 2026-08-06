@@ -467,6 +467,20 @@ body {
 }
 
 /* ── L2: palette / node list / params ──────────────────── */
+.palette__groups,
+.palette__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.palette__group-title {
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--color-ink) 55%, transparent);
+  padding-inline: var(--space-2xs);
+}
+
 .palette__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
@@ -575,8 +589,18 @@ body {
 }
 
 .staff__source--arm,
-.staff__lane--arm {
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+/* Goal-Gradient: while a two-mode gate waits for its second lane, show a
+   "click here" affordance on the other lanes (not on the armed one) */
+.staff__lane-hint {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  opacity: 0.85;
+  pointer-events: none;
+  user-select: none;
 }
 
 .staff__lane {
@@ -648,19 +672,30 @@ body {
 
 .gate__del {
   position: absolute;
-  top: -9px;
-  right: -9px;
-  width: 18px;
-  height: 18px;
+  top: -12px;
+  right: -12px;
+  width: 24px;   /* Fitts's Law: ≥24px hit area on the button itself */
+  height: 24px;
   border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-micro) var(--ease-out);
+}
+
+/* visual 18px circle drawn inside the 24px hit box */
+.gate__del::after {
+  content: "×";
+  position: absolute;
+  inset: 3px;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
   background: var(--color-ink);
   color: var(--color-paper);
   font-size: var(--text-xs);
   line-height: 1;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--dur-micro) var(--ease-out);
 }
 
 .gate:hover .gate__del {

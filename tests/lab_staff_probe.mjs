@@ -173,9 +173,11 @@ try {
   const placing = await evalJs(ws, `(() => ({
     preview: !!document.querySelector(".gate--preview"),
     armRows: document.querySelectorAll(".staff__lane--arm").length,
+    hints: document.querySelectorAll(".staff__lane-hint").length,
+    hintText: document.querySelector(".staff__lane-hint")?.textContent || "",
     status: document.getElementById("status").textContent,
   }))()`);
-  check("two-mode: preview + armed lane + hint", placing.preview && placing.armRows === 1 && /选择第二个模式/.test(placing.status), JSON.stringify(placing));
+  check("two-mode: preview + armed lane + hint", placing.preview && placing.armRows === 1 && placing.hints === 1 && placing.hintText === "→ 点击" && /选择第二个模式/.test(placing.status), JSON.stringify(placing));
 
   /* same-lane click rejected, placing kept */
   await click(ws, '.staff__row[data-mode="0"] .staff__lane');
@@ -334,7 +336,30 @@ try {
   })()`);
   check("legacy JSON: loads, renders 2 lanes + 2 gates, ui.x assigned", legacy);
 
-  /* 8. source click opens the param card (vacuum: no knobs, info shown) */
+  /* 8b. UX: palette grouped (源/门/通道/测量) with data-op preserved */
+  const groups = await evalJs(ws, `(() => ({
+    titles: [...document.querySelectorAll(".palette__group-title")].map((t) => t.textContent),
+    items: [...document.querySelectorAll(".palette__item")].map((c) => c.dataset.op),
+    inGroup: [...document.querySelectorAll(".palette__group")].map((g) => g.querySelectorAll(".palette__item").length),
+  }))()`);
+  check("palette: 4 groups 源/门/通道/测量, op order kept, palette:false hidden",
+    JSON.stringify(groups.titles) === JSON.stringify(["源", "门", "通道", "测量"]) &&
+    groups.items.length === 11 && !groups.items.includes("tmsv") && !groups.items.includes("coherent") &&
+    groups.inGroup[0] === 1 && groups.inGroup[1] === 6 && groups.inGroup[2] === 2 && groups.inGroup[3] === 2,
+    JSON.stringify(groups));
+
+  /* 8c. Fitts: delete button ≥ 24px hit area (visual 18px circle drawn
+        inside the 24px transparent hit box) */
+  const delHit = await evalJs(ws, `(() => {
+    const g = document.querySelector(".gate");
+    g.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    const del = g.querySelector(".gate__del");
+    const r = del.getBoundingClientRect();
+    return { w: Math.round(r.width), h: Math.round(r.height) };
+  })()`);
+  check("delete hit area ≥ 24×24", delHit.w >= 24 && delHit.h >= 24, JSON.stringify(delHit));
+
+  /* 9. source click opens the param card (vacuum: no knobs, info shown) */
   await click(ws, '.staff__source[data-src-id="v"]');
   await waitEval(ws, `document.querySelector(".gate-card")`);
   const srcCard = await evalJs(ws, `(() => {
