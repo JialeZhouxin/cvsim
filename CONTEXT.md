@@ -60,6 +60,22 @@ _Avoid_: 协方差阵（不带 rbar）
 v0 源节点：vacuum / coherent / tmsv；tmsv 贡献 2 模，coherent 1 模。
 _Avoid_: 态制备器, source node（英文保留 node）
 
+**编译段（segment）**:
+可合并的连续 affine 幺正 op 序列（squeeze/displace/phase/fourier/bs/mz/tms/cz/cx/interferometer），段内合并为单一 (S, d)。
+_Avoid_: 层, 模块
+
+**断点（break point）**:
+编译段边界：非幺正通道、测量（删模）、含 ParamRef 的 op。断点后的常量 op 开启新段。
+_Avoid_: barrier（中文语境）, 分隔符
+
+**结构编译 / 数值实例化**:
+compile() 只切段+收集参数名（结构编译，O(n)，不依赖数值）；run(**values) 按参数值把段内 ops 合并成数值 (S,d)（数值实例化，每次 run 重做，不缓存）。
+_Avoid_: 预编译, 编译缓存
+
+**CompiledGaussian**:
+compile() 的不可变产物，公开面仅 {nmode, params, run}；多次 run 独立随机，不暴露段布局。
+_Avoid_: 编译结果对象, bind 中间态
+
 ## Rules
 
 - 术语以 vision-gaussian-lab-ui.md §4 白名单为准；新增托盘 op 必须先改 vision 再改 UI。
