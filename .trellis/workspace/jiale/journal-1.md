@@ -1099,3 +1099,37 @@ L2 遗留 3 文件收尾提交；00-bootstrap-guidelines 完成：backend error-
 ### Next Steps
 
 - None - task complete
+
+
+## Session 34: Lab UI 14 项识图优化落地
+
+**Date**: 2026-08-06
+**Task**: Lab UI 14 项识图优化落地
+**Branch**: `master`
+
+### Summary
+
+识图 14 条全核对: 11 做/1 改方案(scan 摘要替代预览图)/1 保守(列宽 1.1fr)/1 不做(Windows 水印)。版本号移位、palette 对比度+title+details 折叠、ROW_H 56→44、状态栏绿勾、colorbar min/max、meters 中文、按钮反馈、hint 上移、拖拽 suppressEmit 单次运行。check 全过(93 pytest/52 probes/34 node)。OCR 1 low 死分支已修。spec: details 折叠 gotcha + 拖拽 emit 模式
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `22f16fd` | (see git log) |
+| `0b9ac9d` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
