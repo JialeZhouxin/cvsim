@@ -39,6 +39,22 @@ export function initStaff(root, api) {
   let placing = null; // {op, modeA, x} — two-mode "pick second lane" state
   let hover = null;   // {mode, x, conflict} — drag-over preview cell
   let ghostEl = null; // preview ghost block during drag-over
+  let dragPayload = null; // {kind:'op',op} | {kind:'move',id} — set on dragstart
+                          // (dataTransfer.getData is empty during dragover in
+                          // real browsers; read the closure instead)
+
+  function setDragPayload(p) {
+    dragPayload = p;
+  }
+
+  function parseDrag(e) {
+    // prefer the closure (reliable during dragover); fall back to getData
+    if (dragPayload) return dragPayload;
+    const data = e.dataTransfer.getData("text/plain") || "";
+    if (data.startsWith("move:")) return { kind: "move", id: data.slice(5) };
+    if (Object.hasOwn(OPS, data)) return { kind: "op", op: data };
+    return null;
+  }
 
   function clearHover() {
     hover = null;
@@ -115,7 +131,9 @@ export function initStaff(root, api) {
       el.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("text/plain", `move:${g.node.id}`);
         e.dataTransfer.effectAllowed = "move";
+        dragPayload = { kind: "move", id: g.node.id };
       });
+      el.addEventListener("dragend", () => { dragPayload = null; });
       gatesEl.appendChild(el);
     }
 
@@ -140,10 +158,10 @@ export function initStaff(root, api) {
       const gridRect = grid.getBoundingClientRect();
       const x = Math.max(0, Math.round((e.clientX - gridRect.left - SRC_W) / GATE_W));
       const mode = Number(rowEl.dataset.mode);
-      const data = e.dataTransfer.getData("text/plain") || "";
+      const drag = parseDrag(e);
       let op = null, moveId = null;
-      if (data.startsWith("move:")) moveId = data.slice(5);
-      else if (Object.hasOwn(OPS, data)) op = data;
+      if (drag?.kind === "move") moveId = drag.id;
+      else if (drag?.kind === "op") op = drag.op;
       const nodes = api.getState().nodes;
       let conflict = false;
       if (moveId) {
@@ -171,7 +189,7 @@ export function initStaff(root, api) {
       }
       ghostEl.classList.toggle("gate--conflict", conflict);
       ghostEl.textContent = moveId ? "↔" : `${OPS[op].label} ?`;
-      ghostEl.style.left = `${SRC_W + x * GATE_W}px`;
+      ghostEl.style.left = `${SRC_W + x * GATE_W + 6}px`;   // centre on the cell
       ghostEl.style.top = `${mode * ROW_H}px`;
     });
     grid.addEventListener("dragleave", (e) => {
@@ -184,12 +202,12 @@ export function initStaff(root, api) {
       if (!rowEl) return;
       const mode = Number(rowEl.dataset.mode);
       const x = (e.clientX - grid.getBoundingClientRect().left - SRC_W) / GATE_W;
-      const data = e.dataTransfer.getData("text/plain") || "";
-      if (data.startsWith("move:")) {
-        api.onMove(data.slice(5), x);
+      const drag = parseDrag(e);
+      if (drag?.kind === "move") {
+        api.onMove(drag.id, x);
         return;
       }
-      const op = data;
+      const op = drag?.kind === "op" ? drag.op : "";
       if (!Object.hasOwn(OPS, op) || OPS[op].palette === false) return;
       const meta = OPS[op];
       if (meta.kind === "source") {
@@ -314,5 +332,5 @@ export function initStaff(root, api) {
     closeCard();
   });
 
-  return { render, isPlacing: () => placing !== null };
+  return { render, isPlacing: () => placing !== null, setDragPayload };
 }

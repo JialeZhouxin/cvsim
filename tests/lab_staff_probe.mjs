@@ -83,9 +83,12 @@ async function drag(ws, { from, to, dx = 0, clientX } = {}) {
     if (!el || !target) return "missing: " + src + " / " + dst;
     const rect = target.getBoundingClientRect();
     const cx = ${cxExpr};
+    const dtStart = new DataTransfer();
+    el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dtStart, bubbles: true }));
+    const data = dtStart.getData("text/plain");
+    // real browsers keep getData empty during dragover/drop; use a fresh empty
+    // DataTransfer so the page must rely on its closure drag payload
     const dt = new DataTransfer();
-    el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dt, bubbles: true }));
-    const data = dt.getData("text/plain");
     const ok = target.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: rect.top + 10 }));
     const dropped = target.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: rect.top + 10 }));
     return JSON.stringify({ data, ok, dropped });
@@ -213,8 +216,10 @@ try {
     const el = document.querySelector('[data-op="squeeze"]');
     const lane = document.querySelector('.staff__row[data-mode="0"] .staff__lane');
     const r = lane.getBoundingClientRect();
+    const dtStart = new DataTransfer();
+    el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dtStart, bubbles: true }));
+    // real-browser behaviour: no payload readable via getData during dragover
     const dt = new DataTransfer();
-    el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dt, bubbles: true }));
     lane.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: ${cell0CX}, clientY: r.top + 10 }));
     const ghost = document.querySelector(".gate--ghost");
     const out = {

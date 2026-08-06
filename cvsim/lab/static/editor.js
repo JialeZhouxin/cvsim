@@ -193,7 +193,11 @@ export function initEditor(root, hooks) {
       state = { ...state, nodes: addNode(state.nodes, op) };
       render();
     };
-    card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", op));
+    card.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", op);
+      staff.setDragPayload({ kind: "op", op });
+    });
+    card.addEventListener("dragend", () => staff.setDragPayload(null));
     card.addEventListener("click", tryAdd);
     dom.palette.appendChild(card);
   }
