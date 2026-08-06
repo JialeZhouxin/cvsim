@@ -65,3 +65,6 @@ _Avoid_: 态制备器, source node（英文保留 node）
 - 术语以 vision-gaussian-lab-ui.md §4 白名单为准；新增托盘 op 必须先改 vision 再改 UI。
 - 修改物理语义（如删模规则）必须先改 simulator vision / api-stability 文档，再改 Lab。
 - 离线工作台：零外部依赖/CDN，前端系统字体栈；此约束属 ADR 级决策，不在此表内。
+- 表示包互不 import；跨表示共享只放根级（conventions / symplectic / wigner），表示包根级 import 仅限 conventions + symplectic。见 docs/adr/0001。
+- 分析概念（purity / entropy / fidelity）跨表示共享名字，实现按表示私有；不得跨包复用 analyse 实现。
+- 公开 API = 各 `__init__.py` 的 `__all__` 白名单，白名单外视为私有。
