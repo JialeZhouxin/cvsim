@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/08-06-cvsim-phase3-serialize-ir/prd.md", "reason": "任务需求"}
+{"file": ".trellis/tasks/08-06-cvsim-phase3-serialize-ir/design.md", "reason": "技术设计"}
+{"file": ".trellis/tasks/08-06-cvsim-phase3-serialize-ir/implement.md", "reason": "执行计划"}
+{"file": "docs/adr/0003-circuit-v1-ir.md", "reason": "IR 决策 ADR"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "后端质量规范"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "错误处理规范"}
