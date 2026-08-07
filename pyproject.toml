@@ -37,6 +37,9 @@ dev = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
 ]
+gbs = [
+    "thewalrus>=0.22",  # xxpp 约定仅对 0.22.0 实测确认（见 docs/gbs-walrus.md 版本注）
+]
 lab = [
     "fastapi>=0.110",
     "uvicorn>=0.27",

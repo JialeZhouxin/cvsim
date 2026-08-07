@@ -168,6 +168,17 @@ Out of B3: S₂ phase φ, Fock TMS.
 
 Out of G-full core: sampling, PNRD/Hafnian, Fock/Bosonic condition/loss.
 
+### Walrus interop (GBS adapter)
+
+| Item | Contract |
+|------|----------|
+| `export_cov_for_walrus` | `cvsim/gaussian/walrus.py`; σ=2V (hbar=2), μ=√2·r̄, xxpp 同序不置换 |
+| thewalrus quantum 模块 | 实测 0.22.0 用 **xxpp** 序（docstring "xp-ordering" 过时）；对拍 P(n) vs 解析 sech(r)·(2n)!/(2ⁿn!)²·tanh²ⁿ(r) |
+| 依赖 | optional extra `[gbs]`；测试 `importorskip(exc_type=ImportError)`；核心依赖不引入 |
+| 文档 | `docs/gbs-walrus.md` 约定表 + 版本注 |
+
+Out of Walrus: 自研 Hafnian（vision L546 Avoid）; GBS 教学 notebook（Phase 5）。
+
 ---
 
 ## Testing Requirements

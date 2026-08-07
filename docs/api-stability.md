@@ -122,6 +122,7 @@ Frozen by `tests/test_public_api.py` at the Phase 2 API-stability commit. Catego
 | `cvsim/README.md` | Capability matrix (engineering) |
 | `cvsim/USER_ACCEPTANCE.md` | User-facing acceptance scenarios |
 | `docs/phase1-exit-demo.md` / `examples/phase1_exit_demo.py` | Phase 1 exit |
+| `docs/gbs-walrus.md` | GBS adapter (The Walrus) usage + conventions |
 | This file | Semver + public surface policy |
 
 ---

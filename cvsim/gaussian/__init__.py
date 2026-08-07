@@ -17,7 +17,6 @@ from cvsim.gaussian.channels import (
     validate_channel,
 )
 from cvsim.gaussian.circuit import GaussianCircuit, ParamRef
-from cvsim.gaussian.state import GaussianState
 from cvsim.gaussian.gates import (
     apply_interferometer,
     apply_mesh,
@@ -49,6 +48,8 @@ from cvsim.gaussian.observables import (
     homodyne_var,
     mean_photon,
 )
+from cvsim.gaussian.state import GaussianState
+from cvsim.gaussian.walrus import export_cov_for_walrus
 
 __all__ = [
     "GaussianState",
@@ -95,4 +96,5 @@ __all__ = [
     "fidelity",
     "GaussianCircuit",
     "ParamRef",
+    "export_cov_for_walrus",
 ]

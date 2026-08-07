@@ -54,6 +54,7 @@ GAUSSIAN_PUBLIC = {
     "fidelity",
     "GaussianCircuit",
     "ParamRef",
+    "export_cov_for_walrus",
 }
 
 

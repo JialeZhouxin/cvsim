@@ -83,3 +83,20 @@ jobs:
           python-version: "3.12"
       - run: pip install ".[dev]"
       - run: python benchmarks/benchmark_m100.py
+
+  # -----------------------------------------------------------------------
+  # GBS interop (vision Phase 3 exit #4): core test jobs install only
+  # ".[dev]" so thewalrus is absent and the comparison layer skips via
+  # importorskip; this job installs the optional cvsim[gbs] extra and
+  # runs the full suite including the walrus 对拍层.
+  # -----------------------------------------------------------------------
+  gbs:
+    name: Test (gbs extra)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ".[dev,gbs]"
+      - run: python -m pytest tests/ -q --tb=short
