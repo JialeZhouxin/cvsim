@@ -20,9 +20,9 @@ from cvsim.gaussian.observables import (
 )
 from cvsim.gaussian.state import GaussianState
 from cvsim.symplectic import (
-    S_beamsplitter,
     S_CX,
     S_CZ,
+    S_beamsplitter,
     S_from_unitary,
     S_mach_zehnder,
     S_phase,
@@ -269,7 +269,7 @@ class CompiledGaussian:
 
 
 _DISPATCH = {
-    'squeeze': lambda st, m, **kw: _squeeze_gate(st, m, kw['r']),
+    'squeeze': lambda st, m, **kw: _squeeze_gate(st, m, kw['r'], kw.get('phi', 0.0)),
     'displace': lambda st, m, **kw: _displace_gate(st, m, kw['alpha']),
     'phase': lambda st, m, **kw: _phase_gate(st, m, kw['theta']),
     'fourier': lambda st, m, **kw: _phase_gate(st, m, 0.5 * np.pi),
@@ -300,9 +300,9 @@ def _apply(op_name: str, st: GaussianState, modes: tuple, **kwargs) -> GaussianS
     return _DISPATCH[op_name](st, modes, **kwargs)
 
 
-def _squeeze_gate(st, m, r):
+def _squeeze_gate(st, m, r, phi=0.0):
     return apply_symplectic(
-        st, _factor(('squeeze', m, {'r': r, 'phi': 0.0}, {}, {}), st.nmode)[0],
+        st, _factor(('squeeze', m, {'r': r, 'phi': phi}, {}, {}), st.nmode)[0],
         validate=False,
     )
 

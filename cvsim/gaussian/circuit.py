@@ -74,8 +74,10 @@ class GaussianCircuit:
 
     # -- builder methods --------------------------------------------------
 
-    def squeeze(self, mode: int, r: float | str = 0.0) -> GaussianCircuit:
-        self._ops.append(self._partition('squeeze', [mode], r=r))
+    def squeeze(self, mode: int, r: float | str = 0.0, phi: float | str = 0.0) -> GaussianCircuit:
+        """Squeeze by ``r`` at angle ``phi`` (same convention as
+        ``gates.squeeze`` / ``GaussianState.squeezed``)."""
+        self._ops.append(self._partition('squeeze', [mode], r=r, phi=phi))
         return self
 
     def displace(
@@ -298,6 +300,26 @@ class GaussianCircuit:
         """
         return self.compile().run(rng=rng, **params)
 
+    # -- serialization (circuit_v1 IR, ADR-0003) --------------------------
+
+    def to_ir(self) -> dict:
+        """Serialize to a circuit_v1 IR dict (``cvsim.gaussian.ir``).
+
+        Lossless for all builder ops; the output is JSON-native
+        (complex → ``[re, im]``, ndarray → nested lists, symbolic →
+        ``$param``, ParamRef → ``$ref``).
+        """
+        from cvsim.gaussian.ir import to_ir
+
+        return to_ir(self)
+
+    @classmethod
+    def from_ir(cls, data: dict) -> GaussianCircuit:
+        """Rebuild a circuit from a circuit_v1 IR dict."""
+        from cvsim.gaussian.ir import from_ir
+
+        return from_ir(data)
+
     # -- inspection -------------------------------------------------------
 
     def __repr__(self) -> str:
@@ -305,7 +327,10 @@ class GaussianCircuit:
         for op_name, modes, fixed, pnames, refs in self._ops:
             args = [str(m) for m in modes]
             for k, v in fixed.items():
-                args.append(f"{k}={v}")
+                if isinstance(v, np.ndarray):
+                    args.append(f"{k}=<ndarray {v.shape}>")
+                else:
+                    args.append(f"{k}={v}")
             for k, v in pnames.items():
                 args.append(f"{k}=${{{v}}}")
             for k, v in refs.items():
