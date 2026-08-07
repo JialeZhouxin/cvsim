@@ -303,20 +303,53 @@ export function updateMode(node, mode) {
   return { ...node, mode: v };
 }
 
-/** Build the circuit_v0 payload the backend /run consumes (schema from L0). */
-export function toCircuitJson(state) {
+//: UI op names → circuit_v1 IR names (mirror of cvsim.lab.ir V0_TO_V1_OP).
+const UI_TO_V1_OP = {
+  homodyne: "measure_homodyne",
+  heterodyne: "measure_heterodyne",
+};
+//: v1 IR param name for phase is ``theta`` (core builder 1:1, ADR-0003 #3).
+const UI_TO_V1_PARAM = { phase: { phi: "theta" } };
+
+/** Build the circuit_v1 payload the backend consumes (schema from ADR-0003).
+    Sources are expanded (vacuum counts nmode; tmsv → two_mode_squeeze;
+    coherent → displace); array order = execution order; measured-mode
+    removal semantics live on the backend. */
+export function toV1Json(state) {
+  const ops = [];
+  const staff = {}; // UI extension: gate layout columns (core ignores ui)
+  let nmode = 0;
+  for (const n of state.nodes) {
+    const meta = OPS[n.op];
+    if (meta && meta.kind === "source") {
+      if (n.op === "vacuum") {
+        nmode += Math.max(1, Number(n.params.nmode) || 1);
+      } else if (n.op === "tmsv") {
+        ops.push({ id: n.id, op: "two_mode_squeeze",
+                   modes: [nmode, nmode + 1], params: { r: Number(n.params.r) || 0 } });
+        nmode += 2;
+      } else { // coherent → displace (L5.5: source replaced by gate expression)
+        const a = n.params.alpha;
+        const alpha = Array.isArray(a) ? a.map(Number)
+                                       : [Number(a) || 0, 0];
+        ops.push({ id: n.id, op: "displace", modes: [nmode], params: { alpha } });
+        nmode += 1;
+      }
+      continue;
+    }
+    const out = { id: n.id, op: UI_TO_V1_OP[n.op] || n.op, params: {} };
+    const pnames = UI_TO_V1_PARAM[out.op] || {};
+    for (const [k, v] of Object.entries(n.params)) out.params[pnames[k] || k] = v;
+    out.modes = n.modes !== undefined ? n.modes : [n.mode];
+    ops.push(out);
+    if (n.ui && Number.isFinite(n.ui.x)) staff[out.id] = n.ui.x; // staff layout
+  }
   return {
-    schema: "circuit_v0",
+    schema: "circuit_v1",
+    nmode,
     seed: Number.isInteger(state.seed) ? state.seed : 0,
-    nodes: state.nodes.map((n) => {
-      const out = { id: n.id, op: n.op, params: n.params };
-      if (n.mode !== undefined) out.mode = n.mode;
-      if (n.modes !== undefined) out.modes = n.modes;
-      if (n.ui && Number.isFinite(n.ui.x)) out.ui = { x: n.ui.x }; // staff layout (backend ignores)
-      return out;
-    }),
-    edges: [],
+    ops,
     view: state.view,
-    ui: {},
+    ui: Object.keys(staff).length ? { staff } : {},
   };
 }

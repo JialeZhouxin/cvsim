@@ -162,7 +162,7 @@ try {
   await evalJs(ws, `(() => {
     const t = document.getElementById("json-input");
     const v = JSON.parse(t.value);
-    v.nodes.push({ id: "xf", op: "fourier", params: {}, mode: 0, ui: { x: 5 } });
+    v.ops.push({ id: "xf", op: "fourier", params: {}, modes: [0] });
     t.value = JSON.stringify(v, null, 2);
     t.dispatchEvent(new Event("input", { bubbles: true }));
     return true;

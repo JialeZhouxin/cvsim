@@ -165,7 +165,7 @@ try {
     cov.rbar[2].includes("0") && cov.rbar[3].includes("0"),
     JSON.stringify(cov));
   /* default scene gates snap to column 0 */
-  const defX = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.filter((n) => n.op === "displace").map((n) => n.ui.x))()`);
+  const defX = await evalJs(ws, `(() => (() => { const d = JSON.parse(document.getElementById("json-input").value); const st = d.ui?.staff || {}; return d.ops.filter((n) => n.op === "displace").map((n) => st[n.id]); })())()`);
   check("default: displace gates at x=0", JSON.stringify(defX) === "[0,0]", JSON.stringify(defX));
 
   /* 2. single-mode placement: drag 相位 onto lane 1 at offset +150px */
@@ -176,8 +176,8 @@ try {
   })()`);
   const singleCheck = await evalJs(ws, `(() => {
     const j = JSON.parse(document.getElementById("json-input").value);
-    const p = j.nodes.find((n) => n.op === "phase");
-    return p ? { mode: p.mode, x: p.ui.x, n: j.nodes.length } : null;
+    const p = j.ops.find((n) => n.op === "phase");
+    return p ? { mode: p.modes[0], x: (j.ui?.staff || {})[p.id], n: j.ops.length } : null;
   })()`);
   check("place single: phase on mode 1, x snapped to integer col", singleCheck && singleCheck.mode === 1 && Number.isInteger(singleCheck.x) && singleCheck.x >= 0, JSON.stringify(singleCheck));
 
@@ -205,12 +205,12 @@ try {
   await click(ws, '.staff__row[data-mode="1"] .staff__lane');
   await waitEval(ws, `(() => {
     const j = JSON.parse(document.getElementById("json-input").value);
-    return j.nodes.some((n) => n.op === "beamsplitter");
+    return j.ops.some((n) => n.op === "beamsplitter");
   })()`);
   const placed = await evalJs(ws, `(() => {
     const j = JSON.parse(document.getElementById("json-input").value);
-    const b = j.nodes.find((n) => n.op === "beamsplitter");
-    return b ? { modes: b.modes, x: b.ui.x, preview: !!document.querySelector(".gate--preview") } : null;
+    const b = j.ops.find((n) => n.op === "beamsplitter");
+    return b ? { modes: b.modes, x: (j.ui?.staff || {})[b.id], preview: !!document.querySelector(".gate--preview") } : null;
   })()`);
   check("two-mode: placed modes=[0,1], preview gone", placed && JSON.stringify(placed.modes) === "[0,1]" && !placed.preview, JSON.stringify(placed));
 
@@ -220,7 +220,7 @@ try {
   await evalJs(ws, `document.getElementById("staff").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
   const esc = await evalJs(ws, `(() => ({
     preview: !!document.querySelector(".gate--preview"),
-    mz: JSON.parse(document.getElementById("json-input").value).nodes.some((n) => n.op === "mz"),
+    mz: JSON.parse(document.getElementById("json-input").value).ops.some((n) => n.op === "mz"),
   }))()`);
   check("two-mode: Esc cancels, no node added", !esc.preview && !esc.mz, JSON.stringify(esc));
 
@@ -251,7 +251,7 @@ try {
   await drag(ws, { from: '[data-op="squeeze"]', to: '.staff__row[data-mode="0"] .staff__lane', clientX: cell0CX });
   await sleep(150);
   const conflict = await evalJs(ws, `(() => ({
-    squeeze: JSON.parse(document.getElementById("json-input").value).nodes.some((n) => n.op === "squeeze"),
+    squeeze: JSON.parse(document.getElementById("json-input").value).ops.some((n) => n.op === "squeeze"),
     status: document.getElementById("status").textContent,
   }))()`);
   check("conflict: squeeze onto (0,0) rejected + hint", !conflict.squeeze && /已被占用/.test(conflict.status), JSON.stringify(conflict));
@@ -263,31 +263,31 @@ try {
   await click(ws, '.staff__row[data-mode="1"] .staff__lane');
   await waitEval(ws, `(() => {
     const j = JSON.parse(document.getElementById("json-input").value);
-    const bs = j.nodes.filter((n) => n.op === "beamsplitter");
-    return bs.length === 2 && bs.some((b) => b.ui.x === 4);
+    const bs = j.ops.filter((n) => n.op === "beamsplitter");
+    return bs.length === 2 && bs.some((b) => (j.ui?.staff || {})[b.id] === 4);
   })()`);
   const bsGateCX = await evalJs(ws, `(() => {
     const j = JSON.parse(document.getElementById("json-input").value);
-    const id = j.nodes.filter((n) => n.op === "beamsplitter").at(-1).id;
+    const id = j.ops.filter((n) => n.op === "beamsplitter").at(-1).id;
     const g = document.querySelector('.gate[data-id="' + id + '"]');
     return g.getBoundingClientRect().left + g.getBoundingClientRect().width / 2;
   })()`);
   await drag(ws, { from: '[data-op="squeeze"]', to: '.staff__row[data-mode="1"] .staff__lane', clientX: bsGateCX });
   await sleep(150);
   const bsLock = await evalJs(ws, `(() => ({
-    squeeze: JSON.parse(document.getElementById("json-input").value).nodes.some((n) => n.op === "squeeze"),
+    squeeze: JSON.parse(document.getElementById("json-input").value).ops.some((n) => n.op === "squeeze"),
     status: document.getElementById("status").textContent,
   }))()`);
   check("two-mode lock: squeeze onto BS second lane rejected", !bsLock.squeeze && /已被占用/.test(bsLock.status), JSON.stringify(bsLock));
 
   /* 5. move existing gate: drag displace d0 (lane 0) further right */
-  const lossBefore = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.find((n) => n.id === "d0").ui.x)()`);
+  const lossBefore = await evalJs(ws, `(() => { const d = JSON.parse(document.getElementById("json-input").value); return (d.ui?.staff || {})[d.ops.find((n) => n.id === "d0")?.id]; })()`);
   const moved = await drag(ws, { from: '.gate[data-id="d0"]', to: '.staff__row[data-mode="0"] .staff__lane', dx: 400 });
   await waitEval(ws, `(() => {
     const j = JSON.parse(document.getElementById("json-input").value);
-    return j.nodes.find((n) => n.id === "d0").ui.x > ${lossBefore};
+    return (j.ui?.staff || {})[j.ops.find((n) => n.id === "d0")?.id] > ${lossBefore};
   })()`);
-  const lossAfter = await evalJs(ws, `(() => JSON.parse(document.getElementById("json-input").value).nodes.find((n) => n.id === "d0").ui.x)()`);
+  const lossAfter = await evalJs(ws, `(() => { const d = JSON.parse(document.getElementById("json-input").value); return (d.ui?.staff || {})[d.ops.find((n) => n.id === "d0")?.id]; })()`);
   check("move gate: d0 x increased + integer, JSON synced", lossAfter > lossBefore && Number.isInteger(lossAfter), `${lossBefore} → ${lossAfter}`);
 
   /* 6. delete via hover × */
@@ -298,7 +298,7 @@ try {
     btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 100));
     const j = JSON.parse(document.getElementById("json-input").value);
-    return !j.nodes.some((n) => n.id === "d1");
+    return !j.ops.some((n) => n.id === "d1");
   })()`);
   check("delete gate: d1 removed, JSON synced", delClick);
 
@@ -320,8 +320,8 @@ try {
     lane.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: r.top + 10 }));
     await new Promise((r2) => setTimeout(r2, 120));
     const j = JSON.parse(g("json-input").value);
-    const n = j.nodes.find((x) => x.op === "squeeze");
-    return { gridW, ghostX, placedX: n ? n.ui.x : null };
+    const n = j.ops.find((x) => x.op === "squeeze");
+    return { gridW, ghostX, placedX: n ? (j.ui?.staff || {})[n.id] : null };
   })()`);
   check("far empty column: drop at x=8 works, grid ≥ 10 cols", farCol.gridW >= 132 + 10 * 72 && farCol.placedX === 8 && Math.round((parseFloat(farCol.ghostX) - 132) / 72) === 8, JSON.stringify(farCol));
 
@@ -345,7 +345,7 @@ try {
     const j = JSON.parse(input.value);
     const ok = s.querySelectorAll(".staff__row").length === 2
       && s.querySelectorAll(".gate:not(.gate--preview)").length === 2
-      && j.nodes.filter((n) => n.op !== "vacuum").every((n) => Number.isFinite(n.ui.x));
+      && j.ops.every((n) => Number.isFinite((j.ui?.staff || {})[n.id]));
     return ok;
   })()`);
   check("legacy JSON: loads, renders 2 lanes + 2 gates, ui.x assigned", legacy);
@@ -394,8 +394,8 @@ try {
     range.dispatchEvent(new Event("input", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 150));
     const j = JSON.parse(document.getElementById("json-input").value);
-    const p = j.nodes.find((n) => n.op === "phase");
-    return { phi: p.params.phi, cardStillOpen: !!document.querySelector(".gate-card") };
+    const p = j.ops.find((n) => n.op === "phase");
+    return { phi: p.params.theta, cardStillOpen: !!document.querySelector(".gate-card") };
   })()`);
   check("gate card: slider edit → JSON sync, card stays open", cardEdit.phi === 2.5 && cardEdit.cardStillOpen, JSON.stringify(cardEdit));
 

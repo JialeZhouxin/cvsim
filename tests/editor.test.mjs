@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {
   OPS, OP_NAMES, TAU, paramsFromOp, sourceModes, opGroup,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
-  sortNodes, sourceRows, removeSource, updateParam, updateMode, toCircuitJson,
+  sortNodes, sourceRows, removeSource, updateParam, updateMode, toV1Json,
   cellOccupied,
 } from "../cvsim/lab/static/ops.js";
 import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
@@ -227,12 +227,21 @@ test("L5: removeSource — cascades gates on its lanes only", () => {
   assert.equal(removeSource(nodes, "nope").nodes.length, nodes.length);
 });
 
-test("L5: toCircuitJson carries ui.x; legacy node without ui stays clean", () => {
+test("L5: toV1Json — v1 payload, sources expanded, no ui.x on ops", () => {
   let nodes = addNode([], "vacuum");
   nodes = placeSingle(nodes, "phase", 0, 3.5);
-  const payload = toCircuitJson({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
-  assert.equal(payload.nodes[1].ui.x, 4); // round(3.5)
-  assert.ok(!("ui" in payload.nodes[0])); // source: no ui.x → no ui emitted
+  nodes = addNode(nodes, "loss");
+  nodes = nodes.map((n) => (n.op === "loss" ? { ...n, mode: 1 } : n));
+  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  assert.equal(payload.schema, "circuit_v1");
+  assert.equal(payload.nmode, 1); // vacuum(1) counts nmode
+  assert.deepEqual(payload.ops.map((o) => o.op), ["phase", "loss"]);
+  assert.deepEqual(payload.ops[0].params, { theta: Math.PI / 2 }); // phase phi → theta (placeSingle uses default param)
+  assert.deepEqual(payload.ops[1].modes, [1]); // mode → modes
+  assert.ok(!("ui" in payload.ops[0]) && !("edges" in payload));
+  assert.deepEqual(payload.ui, { staff: { n1: 4, n2: 5 } }); // staff layout in ui extension
+  const st = stateFromJson(payload);
+  assert.deepEqual(st.state.nodes.filter((n) => n.op !== "vacuum").map((n) => n.ui.x), [4, 5]);
 });
 
 test("L5: stateFromJson — missing ui.x falls back to array index", () => {
@@ -253,7 +262,7 @@ test("L5: stateFromJson — missing ui.x falls back to array index", () => {
   const { state: sx } = stateFromJson(withX);
   assert.equal(sx.nodes[0].ui.x, 8); // round(7.5)
   // round-trip: ui.x survives
-  const rt = stateFromJson(toCircuitJson(state));
+  const rt = stateFromJson(toV1Json(state));
   assert.deepEqual(rt.state.nodes.map((n) => n.ui?.x), [undefined, 0, 1]);
 });
 
@@ -279,14 +288,14 @@ test("OCR guards: clamp, unknown keys", () => {
 });
 
 test("OCR guards: id collision after import, proto keys, dup ids", () => {
-  const payload = toCircuitJson({
+  const payload = toV1Json({
     nodes: [{ id: "n0", op: "vacuum", params: {} }],
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
     ui: {},
   });
   const { state } = stateFromJson(payload);
   const grown = addNode(state.nodes, "loss");
-  assert.equal(grown[1].id, "n1"); // no duplicate n0
+  assert.equal(grown[1].id, "n0"); // vac0 does not occupy the n-prefix
   // __proto__ / constructor must not pass the whitelist
   assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "__proto__", params: {} }] }).error);
   assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "constructor", params: {} }] }).error);
@@ -301,21 +310,22 @@ test("OCR guards: id collision after import, proto keys, dup ids", () => {
   assert.ok(stateFromJson(bad).error);
 });
 
-test("toCircuitJson: L0-compatible payload", () => {
+test("toV1Json: circuit_v1 payload (ADR-0003)", () => {
   let nodes = [];
   nodes = addNode(nodes, "vacuum");
   nodes = addNode(nodes, "loss");
   nodes = nodes.map((n) => (n.id === nodes[1].id ? { ...n, mode: 1 } : n));
-  const payload = toCircuitJson({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
-  assert.equal(payload.schema, "circuit_v0");
-  assert.deepEqual(payload.edges, []);
-  assert.equal(payload.nodes[0].op, "vacuum");
-  assert.equal(payload.nodes[1].mode, 1);
-  assert.ok(!("mode" in payload.nodes[0])); // sources carry no mode
+  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  assert.equal(payload.schema, "circuit_v1");
+  assert.equal(payload.nmode, 1);
+  assert.ok(!("edges" in payload));
+  assert.deepEqual(payload.ops[0].op, "loss");
+  assert.deepEqual(payload.ops[0].modes, [1]);
+  assert.equal(payload.ops.length, 1); // vacuum folded into nmode
 });
 
 test("stateFromJson: valid payload round-trips", () => {
-  const payload = toCircuitJson({
+  const payload = toV1Json({
     nodes: addNode(addNode([], "vacuum"), "loss"),
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
     ui: {},
@@ -324,7 +334,7 @@ test("stateFromJson: valid payload round-trips", () => {
   assert.equal(error, undefined);
   assert.equal(state.nodes.length, 2);
   assert.equal(state.nodes[1].op, "loss");
-  assert.equal(state.nodes[0].params.nmode, 1);
+  assert.equal(state.nodes[0].params.nmode, 1); // v1 nmode → implicit vacuum source
 });
 
 test("stateFromJson: rejects unknown op / wrong schema", () => {
@@ -345,8 +355,8 @@ test("L3: homodyne visible with phi default 0 / max TAU", () => {
   assert.equal(node[0].params.phi, 0);
 });
 
-test("L3: toCircuitJson preserves top-level seed", () => {
-  const payload = toCircuitJson({
+test("L3: toV1Json preserves top-level seed", () => {
+  const payload = toV1Json({
     seed: 42,
     nodes: addNode([], "vacuum"),
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
@@ -372,7 +382,7 @@ test("L3: stateFromJson accepts seed + homodyne optional phi", () => {
   assert.equal(state.nodes[1].params.phi, 1.5);
   assert.equal(state.nodes[2].params.phi, 0); // missing phi → default 0
   // round-trip
-  const rt = stateFromJson(toCircuitJson(state));
+  const rt = stateFromJson(toV1Json(state));
   assert.equal(rt.error, undefined);
   assert.equal(rt.state.seed, 7);
   assert.equal(rt.state.nodes[1].params.phi, 1.5);
@@ -445,7 +455,7 @@ test("L4: stateFromJson accepts amplifier/mz", () => {
   assert.equal(error, undefined);
   assert.equal(state.nodes[1].params.nbar, 0); // advanced default filled
   assert.equal(state.nodes[2].params.theta, 0.5);
-  const rt = stateFromJson(toCircuitJson(state));
+  const rt = stateFromJson(toV1Json(state));
   assert.equal(rt.error, undefined);
   // missing required G freezes
   const noG = { ...payload, nodes: [{ id: "a", op: "amplifier", params: {}, mode: 0 }] };
@@ -473,7 +483,7 @@ test("fourier gate: palette-visible gate, JSON round-trip loadable", () => {
   assert.equal(error, undefined);
   assert.equal(state.nodes[1].op, "fourier");
   assert.equal(state.nodes[1].ui.x, 0);
-  const rt = stateFromJson(toCircuitJson(state)); // save → load round-trip
+  const rt = stateFromJson(toV1Json(state)); // save → load round-trip
   assert.equal(rt.error, undefined);
   assert.equal(rt.state.nodes[1].op, "fourier");
 });
@@ -510,4 +520,62 @@ test("undo/redo: new edit clears redo; clear() empties both; max caps history", 
   h2.clear();
   assert.equal(h2.canUndo(), false);
   assert.equal(h2.canRedo(), false);
+});
+
+/* ── circuit_v1 (ADR-0003) ───────────────────────────────── */
+
+test("v1: toV1Json expands tmsv/coherent sources", () => {
+  let nodes = addNode([], "tmsv");
+  nodes = addNode(nodes, "coherent");
+  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  assert.equal(payload.nmode, 3); // tmsv 2 + coherent 1
+  assert.deepEqual(payload.ops.map((o) => o.op), ["two_mode_squeeze", "displace"]);
+  assert.deepEqual(payload.ops[0].modes, [0, 1]);
+  assert.deepEqual(payload.ops[1].modes, [2]);
+  assert.equal(payload.ops[0].params.r, 0.6);
+});
+
+test("v1: toV1Json maps measure ops + keeps measurement order", () => {
+  const nodes = [
+    addNode([], "vacuum")[0],
+    { id: "n1", op: "homodyne", params: { phi: 1.2 }, mode: 0 },
+    { id: "n2", op: "heterodyne", params: {}, mode: 1 },
+  ];
+  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  assert.deepEqual(payload.ops.map((o) => o.op), ["measure_homodyne", "measure_heterodyne"]);
+  assert.equal(payload.ops[0].params.phi, 1.2);
+});
+
+test("v1: stateFromJson inverts native v1 doc (implicit vacuum, op remap)", () => {
+  const payload = {
+    schema: "circuit_v1", nmode: 3, seed: 5,
+    ops: [
+      { op: "two_mode_squeeze", modes: [0, 1], params: { r: 0.4 } },
+      { op: "measure_heterodyne", modes: [1], params: {} },
+      { op: "phase", modes: [2], params: { theta: 0.7 } },
+    ],
+    view: { wigner_mode: 2, lim: 4.0, n: 32 }, ui: {},
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  assert.equal(state.seed, 5);
+  assert.equal(state.nodes.length, 4); // vacuum source + 3 ops
+  assert.equal(state.nodes[0].op, "vacuum");
+  assert.equal(state.nodes[0].params.nmode, 3);
+  assert.equal(state.nodes[0].ui, undefined); // source layout-free
+  assert.deepEqual(state.nodes.map((n) => n.op), ["vacuum", "two_mode_squeeze", "heterodyne", "phase"]);
+  assert.deepEqual(state.nodes[3].params, { phi: 0.7 }); // theta → phi
+  assert.equal(state.nodes[2].mode, 1);
+  // round-trip back to v1 is stable
+  const again = toV1Json(state);
+  assert.equal(again.nmode, 3);
+  assert.deepEqual(again.ops.map((o) => o.op), ["two_mode_squeeze", "measure_heterodyne", "phase"]);
+});
+
+test("v1: stateFromJson rejects core-only ops (Lab whitelist)", () => {
+  const payload = {
+    schema: "circuit_v1", nmode: 2,
+    ops: [{ op: "cz", modes: [0, 1], params: { weight: 0.5 } }],
+  };
+  assert.ok(stateFromJson(payload).error);
 });

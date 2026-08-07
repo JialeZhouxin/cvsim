@@ -3,7 +3,7 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, sourceModes, toCircuitJson, updateParam } from "./ops.js";
+import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, sourceModes, toV1Json, updateParam } from "./ops.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -15,12 +15,15 @@ const defaultState = () => ({
 });
 
 /* ── JSON ↔ graph two-way sync (pure parts) ────────────── */
-/** Parse + validate a circuit_v0 JSON payload into editor state.
-    Returns {state} or {error}. Unknown ops / malformed shapes are
-    errors (frozen-graph policy handles the UI side). */
+/** Parse + validate a circuit JSON payload into editor state.
+    circuit_v1 (ADR-0003, native) is inverted back to the graph model:
+    implicit vacuum source, op name/param remapping (measure_*, phase theta).
+    circuit_v0 files keep the legacy path. Returns {state} or {error}.
+    Unknown ops / malformed shapes are errors (frozen-graph policy). */
 export function stateFromJson(payload) {
   if (!payload || typeof payload !== "object") return { error: "circuit 必须是对象" };
-  if (payload.schema !== "circuit_v0") return { error: "schema 必须是 circuit_v0" };
+  if (payload.schema === "circuit_v1") return stateFromV1(payload);
+  if (payload.schema !== "circuit_v0") return { error: "schema 必须是 circuit_v0 或 circuit_v1" };
   if (!Array.isArray(payload.nodes)) return { error: "nodes 必须是数组" };
   const seed = payload.seed === undefined ? 0 : payload.seed;
   if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
@@ -74,6 +77,94 @@ export function stateFromJson(payload) {
     }
     nodes.push(node);
   }
+  const rawView = payload.view && typeof payload.view === "object" ? payload.view : {};
+  if (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0) {
+    return { error: "view.wigner_mode 必须是非负整数" };
+  }
+  if (typeof rawView.lim !== "number" || !Number.isFinite(rawView.lim) || rawView.lim <= 0 || rawView.lim > 50) {
+    return { error: "view.lim 必须是 (0, 50] 的数值" };
+  }
+  if (typeof rawView.n !== "number" || !Number.isFinite(rawView.n) || rawView.n < 2 || rawView.n > 512) {
+    return { error: "view.n 必须在 [2, 512]" };
+  }
+  const view = { wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n };
+  return { state: { seed, nodes, view, ui: {} } };
+}
+
+//: v1 IR op → UI op (mirror of cvsim.lab.ir V0_TO_V1_OP, inverted).
+const V1_TO_UI_OP = {
+  measure_homodyne: "homodyne",
+  measure_heterodyne: "heterodyne",
+};
+
+//: UI param → v1 IR param (inverse of UI_TO_V1_PARAM in ops.js).
+const V1_TO_UI_PARAM = { phase: { phi: "theta" } };
+
+/** circuit_v1 → graph model (inverse of toV1Json). v1 has no source
+    concept: an implicit vacuum source (nmode) is prepended; ops map 1:1
+    to UI nodes; phase ``theta`` maps back to the UI ``phi`` param.
+    Core-only ops (cz/cx/interferometer/…) are rejected — same whitelist
+    the backend load enforces. */
+function stateFromV1(payload) {
+  if (!Array.isArray(payload.ops)) return { error: "ops 必须是数组" };
+  if (!Number.isInteger(payload.nmode) || payload.nmode < 1) {
+    return { error: "nmode 必须是不小于 1 的整数" };
+  }
+  const seed = payload.seed === undefined ? 0 : payload.seed;
+  if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
+  const nodes = [];
+  const seenIds = new Set();
+  const staff = payload.ui && typeof payload.ui === "object" ? payload.ui.staff : undefined;
+  let gateIdx = 0;
+  for (let i = 0; i < payload.ops.length; i++) {
+    const o = payload.ops[i];
+    if (!o || typeof o !== "object") return { error: `ops[${i}] 非法` };
+    const uiOp = V1_TO_UI_OP[o.op] || o.op;
+    if (!Object.hasOwn(OPS, uiOp)) return { error: `ops[${i}]: op ${o.op} 不在 Lab 白名单` };
+    const meta = OPS[uiOp];
+    if (o.id !== undefined && (typeof o.id !== "string" || o.id.length === 0 || seenIds.has(o.id))) {
+      return { error: `ops[${i}]: id 必须是非空唯一字符串` };
+    }
+    const id = o.id !== undefined ? o.id : `n${i}`; // v1 ids are optional
+    seenIds.add(id);
+    const node = { id, op: uiOp, params: {} };
+    const pnames = V1_TO_UI_PARAM[uiOp] || {};
+    for (const [k, d] of Object.entries(meta.params)) {
+      // phase: IR speaks theta, UI speaks phi
+      const v = o.params?.[pnames[k] || k];
+      if (d.advanced || d.optional) {
+        node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
+        continue;
+      }
+      if (typeof v !== "number" || !Number.isFinite(v)) {
+        return { error: `ops[${i}].params.${k} 必须是有限数值` };
+      }
+      node.params[k] = v;
+    }
+    if (meta.kind === "two") {
+      if (!Array.isArray(o.modes) || o.modes.length !== 2 || o.modes.some((m) => !Number.isInteger(m) || m < 0)) {
+        return { error: `ops[${i}].modes 必须是两个非负整数` };
+      }
+      node.modes = [...o.modes];
+      node.ui = { x: staff && Number.isFinite(staff[id]) ? staff[id] : gateIdx++ };
+    } else {
+      if (!Array.isArray(o.modes) || o.modes.length !== 1 || !Number.isInteger(o.modes[0]) || o.modes[0] < 0) {
+        return { error: `ops[${i}].modes 必须是一个非负整数` };
+      }
+      node.mode = o.modes[0];
+      node.ui = { x: staff && Number.isFinite(staff[id]) ? staff[id] : gateIdx++ };
+    }
+    nodes.push(node);
+  }
+  // implicit vacuum source covering all modes (v1 has no source concept)
+  let vid = "vac0";
+  while (seenIds.has(vid)) vid = "vac" + (Number(vid.slice(3)) + 1);
+  nodes.unshift({
+    id: vid,
+    op: "vacuum",
+    params: { nmode: payload.nmode },
+    ui: undefined,
+  });
   const rawView = payload.view && typeof payload.view === "object" ? payload.view : {};
   if (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0) {
     return { error: "view.wigner_mode 必须是非负整数" };
@@ -144,7 +235,7 @@ export function initEditor(root, hooks) {
   let state = hooks.defaultScene
     ? (stateFromJson(hooks.defaultScene).state ?? defaultState())
     : defaultState();
-  let lastGood = JSON.stringify(toCircuitJson(state)); // frozen-graph policy
+  let lastGood = JSON.stringify(toV1Json(state)); // frozen-graph policy
   let suppress = false; // graph→JSON writes don't echo-trigger rebuild
   let suppressEmit = false; // #13: dragstart→dragend 期间抑制 emit，drop/取消后单次
   let seq = 0; // stale-response guard
@@ -184,7 +275,7 @@ export function initEditor(root, hooks) {
 
   function renderJson() {
     suppress = true;
-    dom.json.value = JSON.stringify(toCircuitJson(state), null, 2);
+    dom.json.value = JSON.stringify(toV1Json(state), null, 2);
     suppress = false;
   }
 
@@ -194,7 +285,7 @@ export function initEditor(root, hooks) {
     hooks.onState(state);
     if (dom.undoBtn) dom.undoBtn.disabled = !hist.canUndo();
     if (dom.redoBtn) dom.redoBtn.disabled = !hist.canRedo();
-    if (!suppressEmit) emit(toCircuitJson(state), "graph");
+    if (!suppressEmit) emit(toV1Json(state), "graph");
   }
 
   const staff = initStaff(dom.staff, {
@@ -243,7 +334,7 @@ export function initEditor(root, hooks) {
       state = { ...state, nodes: state.nodes.map((x) => (x.id === id ? updateParam(x, key, value) : x)) };
       renderJson();
       hooks.onState(state);
-      emit(toCircuitJson(state), "graph");
+      emit(toV1Json(state), "graph");
     },
     onPickSweep: (id) => hooks.onPickSweep?.(id),
     onStatus: (msg, ok) => hooks.onStatus(msg, ok),
@@ -251,7 +342,7 @@ export function initEditor(root, hooks) {
     onDragStart: () => { suppressEmit = true; },
     onDragEnd: () => {
       suppressEmit = false;
-      emit(toCircuitJson(state), "graph");
+      emit(toV1Json(state), "graph");
     },
   });
 
@@ -299,7 +390,7 @@ export function initEditor(root, hooks) {
       card.addEventListener("dragend", () => {
         staff.setDragPayload(null);
         suppressEmit = false;
-        emit(toCircuitJson(state), "graph"); // drop/取消后单次 emit
+        emit(toV1Json(state), "graph"); // drop/取消后单次 emit
       });
       card.addEventListener("click", tryAdd);
       items.appendChild(card);
@@ -312,7 +403,7 @@ export function initEditor(root, hooks) {
     const parsed = hooks.defaultScene ? stateFromJson(hooks.defaultScene) : null;
     pushHistory();
     state = parsed && parsed.state ? parsed.state : defaultState();
-    lastGood = JSON.stringify(toCircuitJson(state));
+    lastGood = JSON.stringify(toV1Json(state));
     render();
   });
 
@@ -334,7 +425,7 @@ export function initEditor(root, hooks) {
         return; // graph stays at lastGood
       }
       state = parsed.state;
-      lastGood = JSON.stringify(toCircuitJson(state));
+      lastGood = JSON.stringify(toV1Json(state));
       hist.clear(); // JSON is the edit source: graphic history no longer maps
       render(); // re-render staff + JSON (OCR: import left rows stale)
     }, 400);
@@ -350,7 +441,7 @@ export function initEditor(root, hooks) {
       // Load success: replace whole state, freeze, re-render (auto-run via emit)
       pushHistory();
       state = next;
-      lastGood = JSON.stringify(toCircuitJson(state));
+      lastGood = JSON.stringify(toV1Json(state));
       render();
     },
     render,

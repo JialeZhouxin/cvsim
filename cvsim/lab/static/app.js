@@ -2,7 +2,7 @@
 "use strict";
 
 import { initEditor, loadJson } from "./editor.js";
-import { OPS, sourceModes, toCircuitJson } from "./ops.js";
+import { OPS, sourceModes, toV1Json } from "./ops.js";
 
 /* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
 const DEFAULT_JSON = {
@@ -300,7 +300,7 @@ async function doSample(seq) {
   setBusy(true);
   const t0 = performance.now();
   try {
-    const payload = toCircuitJson(editor.getState());
+    const payload = toV1Json(editor.getState());
     payload.view.wigner_mode = Number(modeSelect.value) || 0;
     payload.seed = Number(seedInput.value);
     if (!Number.isInteger(payload.seed) || payload.seed < 0) {
@@ -489,7 +489,7 @@ async function doScan() {
   }
   const k = Number(scanModesA.value) || 1;
   const modesA = Array.from({ length: k }, (_, i) => i);
-  const payload = toCircuitJson(state);
+  const payload = toV1Json(state);
   payload.view.wigner_mode = Number(modeSelect.value) || 0;
   payload.sweep = { node_id: node.id, param, min: pmin, max: pmax, n, modes_A: modesA };
   /* #8: scan 前置为空（旧摘要失效） */
@@ -542,7 +542,7 @@ scanBtn.addEventListener("click", doScan);
 runBtn.addEventListener("click", () => {
   clearTimeout(debounceTimer); // manual run supersedes pending debounced payload
   debounceTimer = null;
-  const payload = toCircuitJson(editor.getState());
+  const payload = toV1Json(editor.getState());
   payload.view.wigner_mode = Number(modeSelect.value) || 0;
   latestSeq = ++seqCounter;
   doRun(payload, latestSeq); // manual run: immediate, no debounce
@@ -557,16 +557,16 @@ sampleBtn.addEventListener("click", () => {
 
 /* ── Save / Load (A5) ──────────────────────────────────── */
 saveBtn.addEventListener("click", () => {
-  const payload = toCircuitJson(editor.getState());
+  const payload = toV1Json(editor.getState());
   payload.view.wigner_mode = Number(modeSelect.value) || 0;
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "circuit_v0.json";
+  a.download = "circuit_v1.json";
   a.click();
   URL.revokeObjectURL(url);
-  setStatus("已保存 circuit_v0.json");
+  setStatus("已保存 circuit_v1.json");
 });
 
 loadInput.addEventListener("change", async () => {

@@ -98,8 +98,8 @@ def scan(body: dict[str, Any]) -> dict[str, Any]:
     in except tuples.)
     """
     try:
+        sweep = body.pop("sweep", None)
         circuit = load_circuit(body)
-        sweep = body.get("sweep")
         if not isinstance(sweep, dict):
             raise CircuitV0Error("sweep must be an object")
         return scan_circuit(circuit, sweep)
