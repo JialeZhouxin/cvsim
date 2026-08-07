@@ -753,7 +753,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | API stability policy | Done | `docs/api-stability.md` + `test_public_api` |
 | TMSV teaching notebook (purity/log_neg) | Done | `tutorials/04_tmsv_analyse.ipynb` + `tests/test_tmsv_tutorial.py` |
 | Compile merge S | Missing | F-COMPILE (Phase 3) |
-| Circuit serialize IR | Missing | Phase 3; Lab `circuit_v0` may probe early |
+| Circuit serialize IR | Spec locked (`circuit_v1`, ADR-0003) | 任务 `08-06-cvsim-phase3-serialize-ir`；Lab 已探路 v0 |
 | Local Gaussian Lab UI | Spec locked | [`docs/vision-gaussian-lab-ui.md`](./vision-gaussian-lab-ui.md) (L0–L3) |
 | GBS | Out | Adapter phase 3 |
 | AD | Out | Phase 4 |

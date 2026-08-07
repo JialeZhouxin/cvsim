@@ -20,17 +20,21 @@ _Avoid_: 数态表示
 多组分态：{(V_k, r̄_k, w_k)} 权重加权的 Gaussian 分量。
 _Avoid_: 混合高斯表示
 
+**circuit_v1**:
+核心正式电路 IR schema（`cvsim/gaussian/ir.py`，ADR-0003）：顶层 `nmode` + `ops` 列表，无源概念（coherent≡displace、tmsv≡two_mode_squeeze、thermal≡amplifier），全 op 集 1:1 对齐 GaussianCircuit；`view/seed/ui` 为顶层扩展字段（核心忽略）。
+_Avoid_: 电路格式, schema v0
+
 **circuit_v0**:
-Gaussian Lab 的电路 IR schema 名（`schema: "circuit_v0"`），白名单 op 的图形/JSON 表示。
-_Avoid_: 电路格式, schema v1
+Lab 旧电路 IR schema（已退役）：白名单 op、source 节点、mode/modes 双字段。Lab `load` 经翻译函数兼容旧文件。
+_Avoid_: 电路格式, 新旧通用名
 
 **nodes 顺序语义**:
-`circuit_v0` 中 nodes 数组的顺序即执行顺序；edges 字段后端忽略（v0 无连线拓扑）。
+电路节点数组的顺序即执行顺序；edges 字段后端忽略（无连线拓扑）。v1 中 `ops` 数组同此语义。
 _Avoid_: 图拓扑, 连线电路
 
 **mode / modes**:
-电路节点引用的运行时模号（单模 op 用 mode，双模 op 用 modes）。heterodyne 删模后后续节点模号自动重映射。
-_Avoid_: 端口, 通道号
+v1 统一为 `modes` 数组（单模 op 也写 `[k]`）。节点引用逻辑模号；heterodyne 删模后后续节点模号自动重映射。
+_Avoid_: 端口, 通道号, 物理模号
 
 **heterodyne（外差测量）**:
 v0 用均值路径（`heterodyne_mean` + condition），测后**删除**被测模；L3 换真抽样不破坏 schema。
@@ -59,6 +63,10 @@ _Avoid_: 协方差阵（不带 rbar）
 **高斯态工厂**:
 v0 源节点：vacuum / coherent / tmsv；tmsv 贡献 2 模，coherent 1 模。
 _Avoid_: 态制备器, source node（英文保留 node）
+
+**参数值枚举**:
+IR 参数值只允许五种：number、复数 `[re,im]`、矩阵嵌套数组、`{"$param": name}` 符号参数、`{"$ref": name, "gain": g}` 前馈；省略参数 = 库默认值。
+_Avoid_: 裸字符串参数, 位置参数数组
 
 **编译段（segment）**:
 可合并的连续 affine 幺正 op 序列（squeeze/displace/phase/fourier/bs/mz/tms/cz/cx/interferometer），段内合并为单一 (S, d)。

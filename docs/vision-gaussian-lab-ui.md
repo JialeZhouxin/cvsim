@@ -221,6 +221,8 @@ Exceeding these counts requires amending this doc first.
 
 ## 7. `circuit_v0` JSON（serialize 探路）
 
+> **Amended 2026-08-07（ADR-0003）**: 核心正式 IR 已收编为 **`circuit_v1`**（`cvsim/gaussian/ir.py`，顶层 `nmode` + `ops`，无源概念，全 op 集）。Lab 直接读写 v1；`view/seed/ui` 为顶层扩展字段（核心忽略）；旧 v0 文件经翻译函数兼容。下方设计约束仍有效（除 schema 名与 sketch 字段布局），本节保留为历史探路记录。
+
 规范性 schema 在实现任务中冻结并附 golden file；此处定 **设计约束**：
 
 1. 版本字段：`"schema": "circuit_v0"`.  
@@ -337,6 +339,7 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 
 | Ver | Date | Note |
 |-----|------|------|
+| 0.1.7 | 2026-08-07 | **circuit_v1 收编锁（ADR-0003）**：核心正式 IR（顶层 nmode + ops、无源、全 op 集、统一 modes、命名 params、view/seed/ui 扩展字段）；Lab 迁 v1（save 写 v1、load 兼容 v0 翻译）；任务 `08-06-cvsim-phase3-serialize-ir` |
 | 0.1.0 | 2026-07-30 | Initial lock from grill-me: user A/电路图/Wigner 灵魂/本地 Web/双轨测量；adopt recommended whitelist & 12b slice |
 | 0.1.1 | 2026-08-06 | fourier 门补回托盘（白名单 §4.2 ✅ 对齐，后端早已支持）；undo/redo 撤销栈 landed（P1） |
 | 0.2.0 | 2026-08-03 | **L0 landed**: `cvsim.lab` — `circuit_v0` IR (validation + compile-and-run, ordered-node semantics, runtime mode remap after heterodyne), FastAPI `/run` + `/health`, Wigner+ptrace payload, meters; golden equivalence + A4/A8/A9 guards (24 tests); lab extra in pyproject. No frontend / `/sample` (L1–L3). |
