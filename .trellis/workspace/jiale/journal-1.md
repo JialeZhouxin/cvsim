@@ -1199,3 +1199,36 @@ vision §4.2 F-SAMPLE 落地。brainstorm 2 问: outcome-only 批量 (不批量�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 37: benchmark-ci m=100 基准 + CI job
+
+**Date**: 2026-08-07
+**Task**: benchmark-ci m=100 基准 + CI job
+**Branch**: `master`
+
+### Summary
+
+vision Phase 3 exit #2/#5. Brainstorm 2 问: 宽松 hard fail 2s + JSON 记录 (naive 对比只记录不硬断言, depth=100 加速 1.1-2.9x 防 flaky); 脚本 --m 参数 (CI 只跑 m=100, 300/1000 本地). 0653b30 feat(bench): benchmarks/benchmark_m100.py (random depth-100 passive, 等价性 atol=1e-10, exit 2=超预算 3=不等价, latest.json schema 1) + ci.yml benchmark job (py3.12, timeout 10m) + README. 实测 m=100 0.10s vs 2s 预算 18x 余量; --m 300 1.9s 贴边 PASS. OCR 0653b30: 7 findings — 2 引入 (--m 1 crash medium + git subprocess low) 已修 5979f0a; 5 pre-existing (ruff v3 tag/permissions/timeout/双跑) 未顺手改. 验收: 581 pytest 绿 + 全 exit 码验证 + OCR 0. 已归档.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5979f0a` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
