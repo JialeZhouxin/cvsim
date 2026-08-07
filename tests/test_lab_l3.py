@@ -29,7 +29,7 @@ def test_load_homodyne_phi_default_zero():
     res = run_circuit(load_circuit(data))
     assert len(res.measured) == 1
     entry = res.measured[0]
-    assert entry["op"] == "homodyne"
+    assert entry["op"] == "measure_homodyne"
     assert entry["phi"] == 0.0
     assert isinstance(entry["outcome"], float)
 
@@ -45,16 +45,18 @@ def test_sample_heterodyne_removes_mode():
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert len(res.measured) == 1
     entry = res.measured[0]
-    assert entry["op"] == "heterodyne"
+    assert entry["op"] == "measure_heterodyne"
     assert isinstance(entry["outcome"], list) and len(entry["outcome"]) == 2
     assert res.nmode == 1
 
-def test_sample_homodyne_keeps_mode():
+
+def test_sample_homodyne_removes_mode():
+    """v1 semantics (design §0): homodyne removes the measured mode."""
     data = _circuit([TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
-    assert res.nmode == 2
+    assert res.nmode == 1
     entry = res.measured[0]
-    assert entry["op"] == "homodyne"
+    assert entry["op"] == "measure_homodyne"
     assert isinstance(entry["outcome"], float)
 
 def test_sample_same_seed_reproducible():
@@ -67,17 +69,19 @@ def test_sample_same_seed_reproducible():
     np.testing.assert_allclose(r1.V, r2.V, atol=0.0)
 
 def test_sample_multi_measurement_chain():
-    """homodyne(mode0) → heterodyne(mode1): ordered conditioning chain."""
+    """homodyne(mode0) → heterodyne(mode1): ordered conditioning chain; each
+    measurement removes its mode (v1 semantics) → all modes gone."""
     data = _circuit([
         TMSV,
         {"id": "a", "op": "homodyne", "params": {}, "mode": 0},
         {"id": "b", "op": "heterodyne", "params": {}, "mode": 1},
     ])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
-    assert [m["op"] for m in res.measured] == ["homodyne", "heterodyne"]
+    assert [m["op"] for m in res.measured] == ["measure_homodyne", "measure_heterodyne"]
     assert isinstance(res.measured[0]["outcome"], float)
     assert isinstance(res.measured[1]["outcome"], list)
-    assert res.nmode == 1  # heterodyne removed mode1 after homodyne kept mode0
+    assert res.nmode == 0  # both measured modes removed
+    assert res.wigner is None  # no mode left to view — honest empty result
 
 def test_run_no_rng_deterministic():
     """/run stays pure: no RNG anywhere; /sample does not perturb it."""
@@ -93,25 +97,26 @@ def test_run_no_rng_deterministic():
 
 # --- S1d: singular conditional-state view -----------------------------------
 
-def test_sample_homodyne_singular_view_mode():
-    """Homodyne-conditioned V is singular on the measured mode: no fake
-    Wigner; mark meters.singular; keep nmode."""
+def test_sample_homodyne_removed_mode_not_viewable():
+    """v1: homodyne removes the measured mode — no singular state remains.
+    The remaining mode is regular and viewable; the measured mode is gone."""
     data = _circuit(
         [TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}],
         wigner_mode=0,
     )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
-    assert res.nmode == 2
-    assert res.wigner is None
-    assert res.meters["singular"] is True
-    assert res.meters["purity"] is None
-    assert isinstance(res.meters["mean_photon"], float)  # computable, shown honestly
+    assert res.nmode == 1
+    assert res.wigner is not None  # remaining mode is regular
+    assert res.meters["singular"] is False
+    assert res.meters["purity"] is not None
+    assert isinstance(res.meters["mean_photon"], float)
+
 
 def test_sample_homodyne_other_mode_wigner_ok():
     """Unmeasured mode stays positive definite → normal Wigner grid."""
     data = _circuit(
         [TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}],
-        wigner_mode=1,
+        wigner_mode=0,
     )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert res.wigner is not None
@@ -136,7 +141,8 @@ def test_sample_heterodyne_conditioned_removes_mode_and_keeps_meters():
 def test_sample_homodyne_phi_controls_variance():
     """PRD §4 #6: squeezed vacuum, homodyne along x vs p — empirical
     outcome variance follows the analytic ½e^{∓2r} (squeeze phi=0:
-    V_xx=½e⁻²ʳ, V_pp=½e²ʳ). Sampling must actually use phi."""
+    V_xx=½e⁻²ʳ, V_pp=½e²ʳ). Sampling must actually use phi.
+    (Single-mode homodyne circuit ends with 0 modes — honest empty result.)"""
     from cvsim.gaussian import GaussianState, homodyne_var, squeeze
 
     r = 0.6

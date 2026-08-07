@@ -43,8 +43,9 @@ def _hand_main_scene() -> GaussianState:
 
 
 def test_rejects_wrong_schema_version():
+    """schema v1 but v0 shape (nodes key, no nmode): v1 path rejects."""
     data = dict(MAIN_SCENE, schema="circuit_v1")
-    with pytest.raises(CircuitV0Error, match="unsupported schema"):
+    with pytest.raises(CircuitV0Error, match="nmode"):
         load_circuit(data)
 
 
@@ -103,8 +104,8 @@ def test_source_must_be_first():
             {"id": "s", "op": "vacuum", "params": {}},
         ],
     }
-    with pytest.raises(CircuitV0Error, match="source node first"):
-        run_circuit(load_circuit(data))
+    with pytest.raises(CircuitV0Error, match="source op must be first"):
+        load_circuit(data)
 
 
 def test_two_sources_rejected_when_gate_in_between():
@@ -165,6 +166,7 @@ def test_multi_source_tmsv_append_third_mode():
 
 
 def test_mode_out_of_range():
+    """v1 trust boundary: modes >= nmode rejected at load (not at run)."""
     data = {
         "schema": "circuit_v0",
         "nodes": [
@@ -173,7 +175,7 @@ def test_mode_out_of_range():
         ],
     }
     with pytest.raises(CircuitV0Error, match="out of range"):
-        run_circuit(load_circuit(data))
+        load_circuit(data)
 
 
 def test_wigner_mode_out_of_range():
@@ -223,24 +225,32 @@ def test_heterodyne_removes_mode():
     np.testing.assert_allclose(res.V, hand.V, atol=1e-10)
     np.testing.assert_allclose(res.rbar, hand.rbar, atol=1e-10)
     assert len(res.measured) == 1
-    assert res.measured[0]["op"] == "heterodyne"
+    assert res.measured[0]["op"] == "measure_heterodyne"
     assert res.measured[0]["mode"] == 0
 
 
-def test_homodyne_keeps_mode():
+def test_homodyne_removes_mode():
+    """v1 semantics (design §0): homodyne removes the measured mode — same as
+    GaussianCircuit; v0 kept it in place. Guided state = condition + remove."""
+    from cvsim.gaussian import homodyne_condition, homodyne_mean
+
     data = {
         "schema": "circuit_v0",
         "nodes": [
             {"id": "s", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-            {"id": "h", "op": "homodyne", "params": {}, "mode": 0},
+            {"id": "h", "op": "homodyne", "params": {"phi": 0.0}, "mode": 0},
         ],
         "edges": [],
-        "view": {"wigner_mode": 1, "lim": 4.0, "n": 32},
+        "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
     }
     res = run_circuit(load_circuit(data))
-    assert res.nmode == 2
+    assert res.nmode == 1
     hand = GaussianState.tmsv(0.6)
+    o = homodyne_mean(hand, 0, 0.0)
+    hand = homodyne_condition(hand, 0, 0.0, o).remove_mode(0)
     np.testing.assert_allclose(res.V, hand.V, atol=1e-10)
+    np.testing.assert_allclose(res.rbar, hand.rbar, atol=1e-10)
+    assert res.measured[0]["op"] == "measure_homodyne"
 
 
 def test_wigner_matches_direct_partial_trace_grid():

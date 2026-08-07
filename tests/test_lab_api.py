@@ -33,7 +33,7 @@ def test_health():
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"
-    assert body["schema"] == "circuit_v0"
+    assert body["schema"] == "circuit_v1"
 
 
 def test_run_main_scene():
@@ -110,7 +110,7 @@ def test_run_heterodyne_removes_mode_and_remaps_view():
     body = r.json()
     assert body["nmode"] == 1
     assert len(body["V"]) == 2
-    assert body["measured"][0]["op"] == "heterodyne"
+    assert body["measured"][0]["op"] == "measure_heterodyne"
 
 
 def test_sample_endpoint_reproduces_same_seed():
@@ -128,7 +128,9 @@ def test_sample_endpoint_reproduces_same_seed():
     assert "sampled" not in client.post("/run", json=body).json()
 
 
-def test_sample_endpoint_singular_homodyne_wigner_null():
+def test_sample_endpoint_homodyne_removes_mode_wigner_ok():
+    """v1 semantics: homodyne removes the measured mode — remaining mode is
+    regular, Wigner viewable (no singular state remains)."""
     body = dict(MAIN_SCENE, nodes=[
         {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
         {"id": "h", "op": "homodyne", "params": {}, "mode": 0},
@@ -136,9 +138,10 @@ def test_sample_endpoint_singular_homodyne_wigner_null():
     r = client.post("/sample", json=body)
     assert r.status_code == 200
     j = r.json()
-    assert j["wigner"] is None
-    assert j["meters"]["singular"] is True
-    assert j["meters"]["purity"] is None
+    assert j["nmode"] == 1
+    assert j["wigner"] is not None
+    assert j["meters"]["singular"] is False
+    assert j["meters"]["purity"] is not None
 
 
 def test_sample_endpoint_422_bad_seed():

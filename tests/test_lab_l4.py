@@ -82,7 +82,7 @@ def test_mz_local_phase_preserves_logneg():
 
 def test_mz_422_non_numeric_theta():
     mz = _circuit([TMSV, {"id": "m", "op": "mz", "params": {"theta": "x"}, "modes": [0, 1]}])
-    with pytest.raises(CircuitV0Error, match="theta must be a number"):
+    with pytest.raises(CircuitV0Error, match="must be a number"):
         run_circuit(load_circuit(mz))
     assert client.post("/run", json=mz).status_code == 422
 
@@ -301,13 +301,13 @@ def test_scan_endpoint_422_bad_circuit():
     assert client.post("/scan", json=body).status_code == 422
 
 def test_scan_does_not_mutate_circuit():
-    """Sweep config never writes back: /scan leaves the circuit_v0 unchanged."""
+    """Sweep config never writes back: /scan leaves the circuit unchanged."""
     data = _circuit([TMSV])
     c = load_circuit(data)
-    before = {n.id: dict(n.params) for n in c.nodes}
+    before = {n.id: dict(n.params) for n in c.core.ops}
     sweep = {"node_id": "s0", "param": "r", "min": 0.1, "max": 1.0, "n": 5, "modes_A": [0]}
     scan_circuit(c, sweep)
-    assert {n.id: dict(n.params) for n in c.nodes} == before
+    assert {n.id: dict(n.params) for n in c.core.ops} == before
 
 
 def test_scan_extreme_g_never_leaks_nan():
