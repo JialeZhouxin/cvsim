@@ -1166,3 +1166,36 @@ L2 遗留 3 文件收尾提交；00-bootstrap-guidelines 完成：backend error-
 ### Next Steps
 
 - None - task complete
+
+
+## Session 36: F-SAMPLE batch 批量采样
+
+**Date**: 2026-08-07
+**Task**: F-SAMPLE batch 批量采样
+**Branch**: `master`
+
+### Summary
+
+vision §4.2 F-SAMPLE 落地。brainstorm 2 问: outcome-only 批量 (不批量条件状态) + 核心 API only (lab 不动)。commit a821f43 feat(sample): homodyne_sample_batch (size,) / heterodyne_sample_batch (size,) complex / GaussianState.sample_quadratures (size,2m), 全向量化一次 RNG 调用, _heterodyne_params helper 防公式漂移; 12 测试 (size=1 逐值一致/golden 种子/统计收敛/单次调用计数)。OCR 1 medium (sample_quadratures 方法未冻结) → d048f2b fix 方法级冻结。581 passed, 已归档。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d048f2b` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

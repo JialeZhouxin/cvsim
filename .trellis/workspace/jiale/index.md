@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 35
+- **Total Sessions**: 36
 - **Last Active**: 2026-08-07
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1168 | Active |
+| `journal-1.md` | ~1201 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 36 | 2026-08-07 | F-SAMPLE batch 批量采样 | `d048f2b` | `master` |
 | 35 | 2026-08-07 | cvsim-phase3-serialize-ir circuit_v1 IR 收编 | `030df66` | `master` |
 | 34 | 2026-08-06 | Lab UI 14 项识图优化落地 | `22f16fd`, `0b9ac9d` | `master` |
 | 33 | 2026-08-04 | L2 收尾 + 00 bootstrap spec 填充 | `3e75613`, `18a82f1`, `ea3ca2c`, `87e650b`, `9c95b56` | `master` |
