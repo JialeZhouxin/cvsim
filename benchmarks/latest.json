@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "m": 100,
+  "depth": 100,
+  "seed": 42,
+  "commit": "cc4f94c61f662f40e59ff4f42c9dc5906775a488",
+  "timestamp": "2026-08-07T06:35:02+00:00",
+  "t_compile_s": 8.7e-05,
+  "t_compiled_run_s": 0.10109,
+  "t_naive_s": 0.290282,
+  "speedup": 2.872,
+  "budget_s": 2.0,
+  "passed": true
+}

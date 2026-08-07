@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: "check --output-format=github"
+
+  type-check:
+    name: Type Check (mypy)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install ".[dev]"
+      - run: mypy cvsim/
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install ".[dev]"
+      - run: python -m pytest tests/ -q --tb=short
+      - run: python -m pytest tests/ --cov=cvsim --cov-report=term-missing
+        if: matrix.python-version == '3.12'
+
+  # -----------------------------------------------------------------------
+  # Guardrail: enforce that public API does not regress (no accidental
+  # private-symbol leaks in demos/examples).
+  # -----------------------------------------------------------------------
+  api-freeze:
+    name: API Freeze Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ".[dev]"
+      - run: python -m pytest tests/test_public_api.py -q -v
+
+  # -----------------------------------------------------------------------
+  # Benchmark (vision Phase 3 exit #2/#5): m=100 compile+run must stay
+  # under the time budget (default 2s in the script) or CI fails.
+  # -----------------------------------------------------------------------
+  benchmark:
+    name: Benchmark (m=100, budget 2s)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ".[dev]"
+      - run: python benchmarks/benchmark_m100.py
