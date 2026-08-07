@@ -1,0 +1,2 @@
+{"file": "docs/vision-gaussian-simulator.md", "reason": "L545/L546 adapter 路线 + L646 exit #4 + L720 约定 metadata（ħ/ordering）"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "实现质量规范（测试/验证/atol）"}

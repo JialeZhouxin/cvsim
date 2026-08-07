@@ -1,0 +1,2 @@
+{"file": "docs/vision-gaussian-simulator.md", "reason": "Phase 3 exit #4 验收对照 + 全量回归基线"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "导出函数参数校验/错误处理规范"}
