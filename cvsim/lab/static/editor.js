@@ -147,9 +147,14 @@ function stateFromV1(payload) {
     assigned.add(id);
     const node = { id, op: uiOp, params: {} };
     const pnames = V1_TO_UI_PARAM[uiOp] || {};
+    const params = { ...o.params };
+    if (uiOp === "displace" && Array.isArray(params.alpha)) {
+      // v1 alpha is [re, im]; the UI slider controls the real part only
+      params.alpha = typeof params.alpha[0] === "number" ? params.alpha[0] : NaN;
+    }
     for (const [k, d] of Object.entries(meta.params)) {
       // phase: IR speaks theta, UI speaks phi
-      const v = o.params?.[pnames[k] || k];
+      const v = params[pnames[k] || k];
       if (d.advanced || d.optional) {
         node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
         continue;

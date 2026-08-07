@@ -206,3 +206,14 @@ def test_sample_conditioning_chain_translated():
     assert r1.measured == r2.measured
     assert r1.nmode == 1
     assert r1.meters["singular"] is False
+
+
+def test_amplifier_all_modes_rejected_in_lab():
+    """Core semantics: modes=[] = all modes; Lab always emits a single
+    explicit mode — reject (422) instead of crashing the engine (500)."""
+    v1 = {
+        "schema": "circuit_v1", "nmode": 1,
+        "ops": [{"op": "amplifier", "modes": [], "params": {"G": 2.0}}],
+    }
+    with pytest.raises(CircuitV0Error, match="requires an explicit mode"):
+        run_circuit(load_circuit(v1))

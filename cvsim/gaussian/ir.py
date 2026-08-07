@@ -336,7 +336,10 @@ def _decode(v: Any, kind: str) -> Any:
     if isinstance(v, list):
         if kind == "complex":
             return complex(v[0], v[1])
-        # matrix: pair leaves ⇒ complex (validation guarantees consistency)
+        # matrix: pair leaves ⇒ complex (validation guarantees consistency).
+        # ponytail: a complex 1-D vector [[re,im],...] would be misread as a
+        # 2x2 real matrix — no current param uses one (d real, X/Y/U 2-D),
+        # add a shape check here if a complex vector param ever appears.
         if v and isinstance(v[0], list) and v[0] and isinstance(v[0][0], list):
             return np.array(
                 [[complex(x[0], x[1]) for x in row] for row in v], dtype=complex

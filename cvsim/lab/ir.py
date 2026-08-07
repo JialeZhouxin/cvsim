@@ -348,6 +348,10 @@ def _apply(
     if op == "amplifier":
         G = _num(p.get("G"), where, "G")
         nbar = _num(p.get("nbar", 0.0), where, "nbar")
+        if not phys:
+            # core semantics: modes=[] means all modes; the Lab workbench
+            # always emits a single explicit mode — reject instead of 500.
+            raise CircuitV0Error(f"{where}: amplifier requires an explicit mode in Lab")
         return amplifier(state, G, phys[0], nbar), None
     if op == "beamsplitter":
         theta = _num(p.get("theta"), where, "theta")

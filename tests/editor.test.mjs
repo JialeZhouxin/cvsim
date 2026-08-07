@@ -594,3 +594,17 @@ test("v1: auto id never collides with explicit id", () => {
   assert.equal(error, undefined);
   assert.deepEqual(state.nodes.filter((n) => n.op !== "vacuum").map((n) => n.id), ["n0_1", "n0", "n2"]);
 });
+
+test("v1: displace array alpha round-trips (UI takes real part)", () => {
+  const payload = {
+    schema: "circuit_v1", nmode: 2, seed: 0,
+    view: { wigner_mode: 0, lim: 5.0, n: 64 },
+    ops: [{ id: "d", op: "displace", modes: [0], params: { alpha: [0.3, -0.4] } }],
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  assert.equal(state.nodes.find((n) => n.op === "displace").params.alpha, 0.3);
+  // save again: back to v1 with a real scalar (UI real-part semantics)
+  const again = toV1Json(state);
+  assert.equal(again.ops.find((o) => o.op === "displace").params.alpha, 0.3);
+});
