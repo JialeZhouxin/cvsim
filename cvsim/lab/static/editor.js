@@ -100,6 +100,13 @@ const V1_TO_UI_OP = {
 //: UI param → v1 IR param (inverse of UI_TO_V1_PARAM in ops.js).
 const V1_TO_UI_PARAM = { phase: { phi: "theta" } };
 
+function nextFreeV1Id(i, seenIds) {
+  // auto ids must never collide with explicit ids (n0 + explicit "n0")
+  let id = `n${i}`;
+  for (let k = 1; seenIds.has(id); k++) id = `n${i}_${k}`;
+  return id;
+}
+
 /** circuit_v1 → graph model (inverse of toV1Json). v1 has no source
     concept: an implicit vacuum source (nmode) is prepended; ops map 1:1
     to UI nodes; phase ``theta`` maps back to the UI ``phi`` param.
@@ -113,20 +120,31 @@ function stateFromV1(payload) {
   const seed = payload.seed === undefined ? 0 : payload.seed;
   if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
   const nodes = [];
-  const seenIds = new Set();
   const staff = payload.ui && typeof payload.ui === "object" ? payload.ui.staff : undefined;
   let gateIdx = 0;
+  // pass 1: collect explicit ids — auto ids (n${i}) must defer to them
+  const explicit = new Set();
+  for (let i = 0; i < payload.ops.length; i++) {
+    const o = payload.ops[i];
+    if (o && typeof o === "object" && typeof o.id === "string") {
+      if (o.id.length === 0 || explicit.has(o.id)) {
+        return { error: `ops[${i}]: id 必须是非空唯一字符串` };
+      }
+      explicit.add(o.id);
+    }
+  }
+  const assigned = new Set(explicit);
   for (let i = 0; i < payload.ops.length; i++) {
     const o = payload.ops[i];
     if (!o || typeof o !== "object") return { error: `ops[${i}] 非法` };
     const uiOp = V1_TO_UI_OP[o.op] || o.op;
     if (!Object.hasOwn(OPS, uiOp)) return { error: `ops[${i}]: op ${o.op} 不在 Lab 白名单` };
     const meta = OPS[uiOp];
-    if (o.id !== undefined && (typeof o.id !== "string" || o.id.length === 0 || seenIds.has(o.id))) {
+    const id = o.id !== undefined ? o.id : nextFreeV1Id(i, assigned);
+    if (typeof id !== "string" || id.length === 0 || (assigned.has(id) && id !== o.id)) {
       return { error: `ops[${i}]: id 必须是非空唯一字符串` };
     }
-    const id = o.id !== undefined ? o.id : `n${i}`; // v1 ids are optional
-    seenIds.add(id);
+    assigned.add(id);
     const node = { id, op: uiOp, params: {} };
     const pnames = V1_TO_UI_PARAM[uiOp] || {};
     for (const [k, d] of Object.entries(meta.params)) {
@@ -158,7 +176,7 @@ function stateFromV1(payload) {
   }
   // implicit vacuum source covering all modes (v1 has no source concept)
   let vid = "vac0";
-  while (seenIds.has(vid)) vid = "vac" + (Number(vid.slice(3)) + 1);
+  while (assigned.has(vid)) vid = "vac" + (Number(vid.slice(3)) + 1);
   nodes.unshift({
     id: vid,
     op: "vacuum",

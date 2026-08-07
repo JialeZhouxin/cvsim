@@ -579,3 +579,18 @@ test("v1: stateFromJson rejects core-only ops (Lab whitelist)", () => {
   };
   assert.ok(stateFromJson(payload).error);
 });
+
+test("v1: auto id never collides with explicit id", () => {
+  const payload = {
+    schema: "circuit_v1", nmode: 1,
+    view: { wigner_mode: 0, lim: 5.0, n: 64 },
+    ops: [
+      { op: "fourier", modes: [0] },          // auto → n0
+      { id: "n0", op: "phase", modes: [0], params: { theta: 1 } }, // explicit n0
+      { op: "squeeze", modes: [0], params: { r: 0.4, phi: 0 } },  // auto → n2_? (n2 free)
+    ],
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  assert.deepEqual(state.nodes.filter((n) => n.op !== "vacuum").map((n) => n.id), ["n0_1", "n0", "n2"]);
+});
