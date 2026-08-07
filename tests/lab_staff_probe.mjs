@@ -165,7 +165,7 @@ try {
     cov.rbar[2].includes("0") && cov.rbar[3].includes("0"),
     JSON.stringify(cov));
   /* default scene gates snap to column 0 */
-  const defX = await evalJs(ws, `(() => (() => { const d = JSON.parse(document.getElementById("json-input").value); const st = d.ui?.staff || {}; return d.ops.filter((n) => n.op === "displace").map((n) => st[n.id]); })())()`);
+  const defX = await evalJs(ws, `(() => { const d = JSON.parse(document.getElementById("json-input").value); const st = d.ui?.staff || {}; return d.ops.filter((n) => n.op === "displace").map((n) => st[n.id]); })()`);
   check("default: displace gates at x=0", JSON.stringify(defX) === "[0,0]", JSON.stringify(defX));
 
   /* 2. single-mode placement: drag 相位 onto lane 1 at offset +150px */
