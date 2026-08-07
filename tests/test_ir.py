@@ -207,11 +207,30 @@ def _doc(ops, **top):
     (_doc([], nmode=0), "nmode must be an int >= 1"),
     (_doc([], nmode=True), "nmode must be an int >= 1"),
     (_doc([], nmode=1.5), "nmode must be an int >= 1"),
-    (_doc([]), "ops must be a non-empty list"),
+    (_doc([], nmode=True), "nmode must be an int >= 1"),
 ])
 def test_top_level_validation(data, msg):
     with pytest.raises(ValueError, match=msg):
         validate_ir(data)
+
+
+def test_empty_circuit_roundtrip():
+    """Empty ops list is a legitimate circuit (vacuum) — to_ir/from_ir must
+    round-trip (OCR review medium: empty circuit was rejected on the way back)."""
+    c = GaussianCircuit(3)
+    doc = to_ir(c)
+    assert doc["ops"] == []
+    c2 = from_ir(doc)
+    assert c2.nmode == 3
+    s1, s2 = c.run(), c2.run()
+    assert np.allclose(s1.V, s2.V, atol=1e-12)
+    assert np.allclose(s1.rbar, s2.rbar, atol=1e-12)
+
+
+def test_modes_out_of_range_rejected():
+    """modes >= nmode fails at the trust boundary (OCR review medium)."""
+    with pytest.raises(ValueError, match="out of range"):
+        validate_ir(_doc([{"op": "displace", "modes": [5], "params": {"alpha": 1.0}}], nmode=2))
 
 
 @pytest.mark.parametrize("op,modes,msg", [

@@ -230,8 +230,10 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
         raise ValueError(f"ui must be an object, got {type(data['ui']).__name__}")
 
     raw_ops = data.get("ops")
-    if not isinstance(raw_ops, list) or not raw_ops:
-        raise ValueError("ops must be a non-empty list")
+    if not isinstance(raw_ops, list):
+        raise ValueError(
+            f"ops must be a list, got {type(raw_ops).__name__}"
+        )
     ops: list[IRNode] = []
     seen_ids: set[str] = set()
     for i, rn in enumerate(raw_ops):
@@ -276,6 +278,10 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
             if not isinstance(m, int) or isinstance(m, bool) or m < 0:
                 raise ValueError(
                     f"{where}: mode index must be a non-negative int, got {m!r}"
+                )
+            if m >= nmode:
+                raise ValueError(
+                    f"{where}: mode {m} out of range (nmode={nmode})"
                 )
         params = rn.get("params")
         if not isinstance(params, dict):
