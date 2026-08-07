@@ -1133,3 +1133,36 @@ L2 遗留 3 文件收尾提交；00-bootstrap-guidelines 完成：backend error-
 ### Next Steps
 
 - None - task complete
+
+
+## Session 35: cvsim-phase3-serialize-ir circuit_v1 IR 收编
+
+**Date**: 2026-08-07
+**Task**: cvsim-phase3-serialize-ir circuit_v1 IR 收编
+**Branch**: `master`
+
+### Summary
+
+核心 IR + lab 后端 + 前端 + docs 四步全落地。9 commits: 37ab34c feat(ir) 核心 circuit_v1 (ir.py 436行 + test_ir 40) → ef8fc28 OCR 修 2 → 2c52453 feat(lab) translate_v0 + 逻辑索引引擎 + homodyne 删模 + 空态诚实结果 → c1691e9 feat(lab-ui) toV1Json 源展开/stateFromV1 反解/ui.staff 布局/save circuit_v1.json → 5144257 docs api-stability v1 入表 → OCR 3 low 修 → 2566e7f auto id 避让 → c7f34c0 trellis-check 2 medium (amplifier 空 modes 422 + 数组 alpha 反解)。验收: pytest 568 过 + editor 40 + 3 CDP probes 全过 + 往返等价 atol=1e-12。v0 语义统一: homodyne 也删模; phase phi→theta; /scan sweep 弹出。已归档。8000 端口服务已重启 (schema circuit_v1)。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `030df66` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
