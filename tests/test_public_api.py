@@ -67,6 +67,12 @@ def test_gaussian_all_importable():
         assert obj is not None
 
 
+def test_gaussian_methods_frozen():
+    """Methods are not in ``__all__``; freeze the ones the stability policy
+    covers explicitly (F-SAMPLE batch: ``sample_quadratures``)."""
+    assert callable(g.GaussianState.sample_quadratures)
+
+
 def test_conventions_frozen():
     assert HBAR == 1.0
     assert QUAD_ORDER == "xxpp"
