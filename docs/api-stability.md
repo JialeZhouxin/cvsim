@@ -45,6 +45,7 @@ A regression test (`tests/test_public_api.py`) freezes that set. **Removing or r
 |---------|--------|
 | `GaussianCircuit` / `ParamRef` | L2–L4 DSL; op names in the IR are semi-stable; new measure ops may appear |
 | `circuit_v1` IR (ADR-0003) | **Stable core schema** (`cvsim.gaussian.ir`): top-level `schema/nmode/ops`, extension fields `view/seed/ui` ignored; ops 1:1 with `GaussianCircuit` builders; `id` optional; array order = execution order; measurement ops remove their mode |
+| Batch samplers | `homodyne_sample_batch`, `heterodyne_sample_batch`, `GaussianState.sample_quadratures` — vectorized, `size=10³` standard; outcome-only, iid, no per-shot conditioning |
 | `circuit_v0` IR (lab) | **Retired** (ADR-0003). Old files still load: Lab translates v0 → v1 on load (`translate_v0`); sources (vacuum/tmsv/coherent) expand to v1 ops, `edges` dropped |
 | `cvsim.wigner` | Teaching grids; signature may gain kwargs |
 | `cvsim.fock` / `cvsim.bosonic` | Sibling reps; not the Phase 2 freeze focus |

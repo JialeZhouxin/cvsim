@@ -145,6 +145,25 @@ def heterodyne_cov_xp(state: GaussianState, mode: int = 0) -> np.ndarray:
     return Vblk + 0.5 * np.eye(2)
 
 
+def _heterodyne_params(
+    state: GaussianState, mode: int = 0
+) -> tuple[np.ndarray, np.ndarray]:
+    """(mu, Sigma) of the heterodyne outcome edge N(r̄_xp, V_xp + I/2).
+    Shared by single-shot and batch samplers (no formula drift)."""
+    m = _check_mode(state, mode)
+    idx = _xp_indices(m, mode)
+    mu = np.asarray(state.rbar, dtype=float)[idx]
+    Sigma = heterodyne_cov_xp(state, mode)
+    # PSD guard for float noise
+    Sigma = 0.5 * (Sigma + Sigma.T)
+    w = np.linalg.eigvalsh(Sigma)
+    if np.min(w) <= _EPS:
+        raise ValueError(
+            f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}"
+        )
+    return mu, Sigma
+
+
 def heterodyne_sample(
     state: GaussianState,
     mode: int = 0,
@@ -157,17 +176,7 @@ def heterodyne_sample(
     """
     if rng is None:
         rng = np.random.default_rng()
-    m = _check_mode(state, mode)
-    idx = _xp_indices(m, mode)
-    mu = np.asarray(state.rbar, dtype=float)[idx]
-    Sigma = heterodyne_cov_xp(state, mode)
-    # PSD guard for float noise
-    Sigma = 0.5 * (Sigma + Sigma.T)
-    w, vec = np.linalg.eigh(Sigma)
-    if np.min(w) <= _EPS:
-        raise ValueError(
-            f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}"
-        )
+    mu, Sigma = _heterodyne_params(state, mode)
     z = rng.multivariate_normal(mu, Sigma)
     return complex((z[0] + 1j * z[1]) / np.sqrt(2.0))
 
@@ -279,3 +288,53 @@ def mean_photon(state: GaussianState, mode: int | None = None) -> float:
     if mode is not None:
         return one(mode)
     return sum(one(i) for i in range(m))
+
+
+# ── F-SAMPLE batch (vision §4.2): vectorized size=10³ standard ──────────────
+
+def _check_size(size: int) -> None:
+    if not isinstance(size, (int, np.integer)) or isinstance(size, bool) or size < 1:
+        raise ValueError(f"size must be a positive int, got {size!r}")
+
+
+def homodyne_sample_batch(
+    state: GaussianState,
+    mode: int = 0,
+    phi: float = 0.0,
+    size: int = 1000,
+    *,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
+    """Batch homodyne outcomes (size,) from the same edge N(μ, σ²).
+
+    μ = u·r̄, σ² = uᵀVu with u the φ-quadrature vector; iid across shots
+    (no per-shot conditioning). One RNG call; σ² ≤ EPS rejected as in
+    the single-shot sampler.
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    _check_size(size)
+    mu = homodyne_mean(state, mode, phi)
+    var = homodyne_var(state, mode, phi)
+    if var <= _EPS:
+        raise ValueError(f"homodyne variance too small: σ²={var}")
+    return rng.normal(mu, np.sqrt(var), size=size)
+
+
+def heterodyne_sample_batch(
+    state: GaussianState,
+    mode: int = 0,
+    size: int = 1000,
+    *,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
+    """Batch heterodyne outcomes (size,) complex, β=(x+ip)/√2.
+
+    Draws (x, p) ~ N(r̄_xp, V_xp + I/2) once for all shots (vectorized).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    _check_size(size)
+    mu, Sigma = _heterodyne_params(state, mode)
+    z = rng.multivariate_normal(mu, Sigma, size=size)
+    return (z[:, 0] + 1j * z[:, 1]) / np.sqrt(2.0)

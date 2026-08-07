@@ -192,3 +192,17 @@ class GaussianState:
             V=self.V[np.ix_(keep, keep)],
             rbar=self.rbar[keep],
         )
+
+    def sample_quadratures(
+        self, size: int = 1000, *, rng: np.random.Generator | None = None
+    ) -> np.ndarray:
+        """Batch (size, 2m) samples of the xxpp quadrature vector.
+
+        iid draws from N(r̄, V) — the raw Gaussian shots of the whole
+        state (vision §4.2 F-SAMPLE). One RNG call.
+        """
+        if rng is None:
+            rng = np.random.default_rng()
+        if not isinstance(size, (int, np.integer)) or isinstance(size, bool) or size < 1:
+            raise ValueError(f"size must be a positive int, got {size!r}")
+        return rng.multivariate_normal(self.rbar, self.V, size=size)
