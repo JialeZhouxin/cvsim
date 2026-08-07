@@ -10,7 +10,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cvsim.gaussian import GaussianState
 from cvsim.lab import (
     CircuitV0Error,
     load_circuit,
