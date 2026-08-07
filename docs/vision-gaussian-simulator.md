@@ -748,14 +748,16 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | Interferometer / mesh | Done | true Clements layout = future |
 | apply_symplectic | Done | — |
 | Channels loss/amp/phase_noise/(X,Y) | Done | — |
-| Homodyne + Heterodyne + FF circuit | Done | serialize |
+| Homodyne + Heterodyne + FF circuit | Done | — |
 | F-ANALYSE (purity…fidelity) | Done | — |
 | API stability policy | Done | `docs/api-stability.md` + `test_public_api` |
 | TMSV teaching notebook (purity/log_neg) | Done | `tutorials/04_tmsv_analyse.ipynb` + `tests/test_tmsv_tutorial.py` |
-| Compile merge S | Missing | F-COMPILE (Phase 3) |
-| Circuit serialize IR | Spec locked (`circuit_v1`, ADR-0003) | 任务 `08-06-cvsim-phase3-serialize-ir`；Lab 已探路 v0 |
+| Compile merge S | Done | F-COMPILE (Phase 3, `cvsim/gaussian/compile.py`) |
+| Circuit serialize IR | Done | F-SERIALIZE (Phase 3, `cvsim/gaussian/ir.py`; Lab 已探路 v0) |
+| F-SAMPLE batch | Done | 10³ shots API (`homodyne_sample_batch` 等) |
+| m=100 benchmark | Done | `benchmarks/benchmark_m100.py` + CI time-capped job + `benchmarks/latest.json` |
 | Local Gaussian Lab UI | Spec locked | [`docs/vision-gaussian-lab-ui.md`](./vision-gaussian-lab-ui.md) (L0–L3) |
-| GBS | Out | Adapter phase 3 |
+| GBS | Done | adapter `export_cov_for_walrus` (Phase 3, `cvsim/gaussian/walrus.py` + `docs/gbs-walrus.md`); thewalrus optional extra `[gbs]` |
 | AD | Out | Phase 4 |
 | Fock/Bosonic | Teaching MVP | Bridges phase 5 |
 
@@ -767,7 +769,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 2. Threshold measurement: outcomes-only vs forced Fock backend.  
 3. Whether `GaussianCircuit` becomes generic `CVCircuit` in phase 5.  
 4. ~~Exact fidelity formula reference implementation (Banchi et al. vs other).~~ **Resolved:** Banchi–Braunstein–Pirandola / thewalrus–Brask transcription; freeze tests in `test_analyse.py`.  
-5. CI wall-time budget for $m=100$ benchmark on available runners.
+5. ~~CI wall-time budget for $m=100$ benchmark on available runners.~~ **Resolved:** time-capped CI benchmark job + `benchmarks/latest.json` (Phase 3, `08-06-cvsim-phase3-benchmark-ci`); 仓库无 git remote，workflow 从未实跑（仓库级现状）。
 
 ---
 
@@ -796,5 +798,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1.4 | 2026-07-30 | Phase 2 API stability policy (`docs/api-stability.md`); gap table refreshed post F-ANALYSE + Heterodyne |
 | 0.1.5 | 2026-07-30 | Phase 2 TMSV analyse tutorial (`tutorials/04_tmsv_analyse.ipynb`); teach exit criterion |
 | 0.1.6 | 2026-07-30 | Unlock local Gaussian Lab UI phase; SoT `docs/vision-gaussian-lab-ui.md` (grill-me lock) |
+| 0.2.0 | 2026-08-07 | **Phase 3 close** — F-COMPILE / F-SERIALIZE / F-SAMPLE batch / m=100 benchmark CI / GBS adapter (`export_cov_for_walrus`); gap table refreshed; §11#5 resolved |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.
