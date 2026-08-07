@@ -77,6 +77,10 @@ def main() -> int:
     ap.add_argument("--budget", type=float, default=2.0)
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
+    if args.m < 2:
+        ap.error("--m must be >= 2 (two-mode gates need >=2 modes)")
+    if args.depth < 1:
+        ap.error("--depth must be >= 1")
 
     circ = random_circuit(args.m, args.depth, args.seed)
 
@@ -95,6 +99,13 @@ def main() -> int:
         print(f"[bench] FAIL: compiled vs naive mismatch (m={args.m})")
         return 3
 
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True
+    )
+    if commit.returncode != 0:
+        print("[bench] warn: git rev-parse failed; commit field empty")
+    commit_sha = commit.stdout.strip()
+
     total = t_compile + t_compiled_run
     passed = total <= args.budget
     result = {
@@ -102,9 +113,7 @@ def main() -> int:
         "m": args.m,
         "depth": args.depth,
         "seed": args.seed,
-        "commit": subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True
-        ).stdout.strip(),
+        "commit": commit_sha,
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "t_compile_s": round(t_compile, 6),
         "t_compiled_run_s": round(t_compiled_run, 6),

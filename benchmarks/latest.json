@@ -3,12 +3,12 @@
   "m": 100,
   "depth": 100,
   "seed": 42,
-  "commit": "cc4f94c61f662f40e59ff4f42c9dc5906775a488",
-  "timestamp": "2026-08-07T06:35:02+00:00",
-  "t_compile_s": 8.7e-05,
-  "t_compiled_run_s": 0.10109,
-  "t_naive_s": 0.290282,
-  "speedup": 2.872,
+  "commit": "0653b30e5b335262f7ea9a22407e38f1ec2cbd18",
+  "timestamp": "2026-08-07T06:53:58+00:00",
+  "t_compile_s": 0.000103,
+  "t_compiled_run_s": 0.119744,
+  "t_naive_s": 0.360527,
+  "speedup": 3.011,
   "budget_s": 2.0,
   "passed": true
 }
