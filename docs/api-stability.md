@@ -44,7 +44,8 @@ A regression test (`tests/test_public_api.py`) freezes that set. **Removing or r
 | Surface | Notes |
 |---------|--------|
 | `GaussianCircuit` / `ParamRef` | L2–L4 DSL; op names in the IR are semi-stable; new measure ops may appear |
-| `circuit_v0` IR (lab) | L5.5: **multi-source legal** — source nodes may repeat (all before any gate), later sources append independent modes via direct product; single-source JSON unchanged |
+| `circuit_v1` IR (ADR-0003) | **Stable core schema** (`cvsim.gaussian.ir`): top-level `schema/nmode/ops`, extension fields `view/seed/ui` ignored; ops 1:1 with `GaussianCircuit` builders; `id` optional; array order = execution order; measurement ops remove their mode |
+| `circuit_v0` IR (lab) | **Retired** (ADR-0003). Old files still load: Lab translates v0 → v1 on load (`translate_v0`); sources (vacuum/tmsv/coherent) expand to v1 ops, `edges` dropped |
 | `cvsim.wigner` | Teaching grids; signature may gain kwargs |
 | `cvsim.fock` / `cvsim.bosonic` | Sibling reps; not the Phase 2 freeze focus |
 | Demo scripts under `cvsim.demos` / `examples/` | May move or rename without major bump |
@@ -87,7 +88,7 @@ Frozen by `tests/test_public_api.py` at the Phase 2 API-stability commit. Catego
 | Channels | `loss`, `amplifier`, `phase_noise`, `apply_gaussian_channel`, `is_cp_channel`, `validate_channel` |
 | Observables | `det_cov`, `mean_photon`, `homodyne_*`, `heterodyne_*` |
 | Analyse | `is_physical`, `validate_state`, `symplectic_eigenvalues`, `purity`, `entropy_vn`, `partial_trace`, `log_negativity`, `fidelity` |
-| Circuit | `GaussianCircuit`, `ParamRef` |
+| Circuit | `GaussianCircuit`, `ParamRef`, `GaussianCircuit.to_ir` / `from_ir`, `cvsim.gaussian.ir` (`validate_ir`, `SCHEMA`) |
 
 **Units (document in call sites, do not silently switch)**
 
@@ -108,6 +109,7 @@ Frozen by `tests/test_public_api.py` at the Phase 2 API-stability commit. Catego
 | `homodyne_condition` | **Yes** (singular $V$ along $u$); circuit then `remove_mode` |
 | `heterodyne_condition` | **No** — mode removed inside the call |
 | `partial_trace` | Drops modes **without** measurement conditioning |
+| `circuit_v1` `measure_*` ops (ADR-0003) | **No** — both measure ops remove their mode; later ops address modes by logical index, remapped at run time (compile.py semantics) |
 
 ---
 
