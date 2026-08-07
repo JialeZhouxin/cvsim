@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 37
+- **Total Sessions**: 38
 - **Last Active**: 2026-08-07
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1234 | Active |
+| `journal-1.md` | ~1265 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 38 | 2026-08-07 | Phase 3 GBS adapter 完成 — Phase 3 全关闭 | - | `master` |
 | 37 | 2026-08-07 | benchmark-ci m=100 基准 + CI job | `5979f0a` | `master` |
 | 36 | 2026-08-07 | F-SAMPLE batch 批量采样 | `d048f2b` | `master` |
 | 35 | 2026-08-07 | cvsim-phase3-serialize-ir circuit_v1 IR 收编 | `030df66` | `master` |
