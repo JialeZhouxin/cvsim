@@ -1263,3 +1263,43 @@ Session summary was not supplied.
 ### Next Steps
 
 - None - task complete
+
+
+## Session 39: Phase 4 F-AD：19 函数 backend 化 + 可微链 + 优化 notebook
+
+**Date**: 2026-08-10
+**Task**: Phase 4 F-AD：19 函数 backend 化 + 可微链 + 优化 notebook
+**Branch**: `master`
+
+### Summary
+
+cvsim Phase 4（F-AD）完成并归档：cvsim/backend.py 双后端协议（lazy jax + x64）、symplectic 19 函数 backend= 关键字（numpy 默认零回归）、decompose numpy-only guard、cvsim/ad.py 可微链（apply_gaussian + log_neg_loss）、tutorials/05_ad_designer.ipynb（TMSV→损耗→能量惩罚 E_N−λ·2sinh²r→梯度上升→设计曲线，物理修正：纯损耗 E_N 饱和无内点最优）、[jax] extra、vision v0.3.0、CONTEXT 4 术语、spec backend-interface。验证：700 passed / 6 skipped；梯度 vs FD 2e-07；多参数联合梯度 + jit 全链路集成测试 20ed5c4。OCR 5 轮不稳（3 超时 2 partial 0 findings）trellis-check 兜底。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ed4f080` | (see git log) |
+| `0957d01` | (see git log) |
+| `b91d771` | (see git log) |
+| `e9ac730` | (see git log) |
+| `79d5678` | (see git log) |
+| `889505e` | (see git log) |
+| `8e6e709` | (see git log) |
+| `20ed5c4` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
