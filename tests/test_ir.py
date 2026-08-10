@@ -15,7 +15,7 @@ ALL_OPS = {
     "beamsplitter", "two_mode_squeeze", "cz", "cx",
     "mach_zehnder", "mz", "interferometer",
     "loss", "amplifier", "phase_noise", "gaussian_channel",
-    "measure_homodyne", "measure_heterodyne",
+    "measure_homodyne", "measure_heterodyne", "measure_threshold",
 }
 
 
