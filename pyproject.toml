@@ -40,6 +40,9 @@ dev = [
 gbs = [
     "thewalrus>=0.22,<0.23",  # 仅 0.22.0 实测确认（xxpp 约定），见 docs/gbs-walrus.md 版本注
 ]
+sf = [
+    "strawberryfields>=0.24",  # 对照脚本 docs/sf-roundtrip.md；非运行时依赖
+]
 jax = [
     "jax[cpu]>=0.4",  # 可微后端（Phase 4 F-AD）；Windows CPU 官方支持
 ]
