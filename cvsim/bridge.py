@@ -85,8 +85,9 @@ def vacuum_probability(V: np.ndarray, rbar: np.ndarray, mode: int = 0) -> float:
     if not 0 <= mode < m:
         raise IndexError(f"mode {mode} out of range for nmode={m}")
     i = mode
-    V1 = V[2 * i : 2 * i + 2, 2 * i : 2 * i + 2]
-    r1 = rbar[2 * i : 2 * i + 2]
+    # xxpp: mode i block is (V[i,i], V[i,m+i]; V[m+i,i], V[m+i,m+i])
+    V1 = np.array([[V[i, i], V[i, m + i]], [V[m + i, i], V[m + i, m + i]]])
+    r1 = np.array([rbar[i], rbar[m + i]])
     A = V1 + 0.5 * np.eye(2)
     if np.linalg.eigvalsh(A).min() <= 0.0:
         raise ValueError(f"V+½I on mode {mode} is not positive-definite")

@@ -170,10 +170,9 @@ def test_vacuum_probability_thermal_anchor() -> None:
 
 
 def test_vacuum_probability_multimode_reduction() -> None:
-    # 2-mode: mode 1 is vacuum-like thermal, mode 0 displaced — reduction
-    # must ignore the other mode.
-    nbar = 1.0
-    V = np.block([[2.0 * np.eye(2), np.zeros((2, 2))], [np.zeros((2, 2)), 1.5 * np.eye(2)]])
+    # 2-mode xxpp ordering: (x0, x1, p0, p1). Mode 0 hot (2I), mode 1
+    # thermal-like (1.5I). Reduction must pick the right 2×2 corner.
+    V = np.diag([2.0, 1.5, 2.0, 1.5])
     rbar = np.zeros(4)
     # mode 0: V00 = 2I → det(2.5I)=6.25 → p = 1/2.5 = 0.4
     got = bridge.vacuum_probability(V, rbar, 0)
@@ -181,6 +180,13 @@ def test_vacuum_probability_multimode_reduction() -> None:
     # mode 1: V11 = 1.5I → det(2I)=4 → p = 1/2
     got1 = bridge.vacuum_probability(V, rbar, 1)
     np.testing.assert_allclose(got1, 1.0 / 2.0, atol=1e-12)
+    # xxpp cross terms: off-diagonal x-p mixing must be picked up per mode
+    Vx = np.diag([2.0, 1.5, 2.0, 1.5])
+    Vx[0, 2] = Vx[2, 0] = 0.5  # mode-0 x–p correlation
+    got_m0 = bridge.vacuum_probability(Vx, np.zeros(4), 0)
+    np.testing.assert_allclose(got_m0, 1.0 / np.sqrt(2.5 * 1.5 - 0.25), atol=1e-12)
+    got_m1 = bridge.vacuum_probability(Vx, np.zeros(4), 1)
+    np.testing.assert_allclose(got_m1, 1.0 / 2.0, atol=1e-12)
 
 
 def test_vacuum_probability_errors() -> None:
