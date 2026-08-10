@@ -547,12 +547,15 @@ $$
 
 ---
 
-#### F-AD — Differentiable backend
+#### F-AD — Differentiable backend ✅ (Phase 4 done, 2026-08-10)
 
-- Math identical to numpy path.  
-- Backend protocol: `Array` type alias; `symplectic` functions backend-agnostic.  
-- JAX first candidate; Torch second.  
-- No AD in core import path (optional package extra).
+- Math identical to numpy path.
+- Backend protocol: `cvsim/backend.py` — `_get_xp` / `require_jax` / `_set` / `_block` / `_allclose`; lazy jax import + x64 forced at first use; **sole jax-aware point**.
+- `cvsim/symplectic.py` 19 functions backend-agnostic via keyword `*, backend="numpy"` (方案 B); numpy path byte-identical to pre-Phase-4 (592 regression green).
+- Decompose trio (`reck` / `clements` / `compose_unitary_mesh`) **numpy-only**: `backend="jax"` → `NotImplementedError` (ponytail; no mesh AD).
+- Differentiable objective chain: `cvsim/ad.py` (top-level, ADR-0001 keeps `cvsim.gaussian` import allowlist) — `apply_gaussian` + `log_neg_loss` (jnp mirror of `analyse.log_negativity`: PT → raw symplectic spectrum → per-term PPT log-neg).
+- Optimization notebook: `tutorials/05_ad_designer.ipynb` — TMSV → loss η → max [E_N − λ·2sinh²r] (energy-penalized; loss-only E_N saturates, no interior optimum) → gradient ascent → design curve r*(λ). Physics note in `tests/test_ad_objective.py`.
+- JAX first candidate; Torch second. No AD in core import path: `[jax]` optional extra.
 
 ---
 
@@ -647,14 +650,14 @@ Ordering principle: **S1 ∩ S2** — dependency order first, each phase ships a
 
 ---
 
-### Phase 4 — Differentiable designer (D)
+### Phase 4 — Differentiable designer (D) ✅ done 2026-08-10
 
 **Build:** F-AD extras, one optimization notebook (e.g. maximize log-neg under loss).
 
 **Exit criteria**
 
-1. Gradients agree with finite difference on squeeze/BS params.  
-2. Numpy and JAX paths share tests via backend parametrization.
+1. Gradients agree with finite difference on squeeze/BS params. ✅ `tests/test_ad_gates_basic.py` (squeeze/BS grad vs central FD) + `tests/test_ad_objective.py` (full-chain grad vs FD, 2e-07).  
+2. Numpy and JAX paths share tests via backend parametrization. ✅ `tests/conftest.py` `backends` fixture; gates/validate/objective tests parametrized; jax-less env skips cleanly.
 
 ---
 
@@ -758,7 +761,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | m=100 benchmark | Done | `benchmarks/benchmark_m100.py` + CI time-capped job + `benchmarks/latest.json` |
 | Local Gaussian Lab UI | Spec locked | [`docs/vision-gaussian-lab-ui.md`](./vision-gaussian-lab-ui.md) (L0–L3) |
 | GBS | Done | adapter `export_cov_for_walrus` (Phase 3, `cvsim/gaussian/walrus.py` + `docs/gbs-walrus.md`); thewalrus optional extra `[gbs]` |
-| AD | Out | Phase 4 |
+| AD (F-AD) | **Done** | Phase 4 — 19/19 symplectic funcs `backend=` + `cvsim/backend.py` + `cvsim/ad.py` + `tutorials/05_ad_designer.ipynb`; `[jax]` extra; decompose numpy-only (NotImplementedError); JAX not on core import path |
 | Fock/Bosonic | Teaching MVP | Bridges phase 5 |
 
 ---
@@ -799,5 +802,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1.5 | 2026-07-30 | Phase 2 TMSV analyse tutorial (`tutorials/04_tmsv_analyse.ipynb`); teach exit criterion |
 | 0.1.6 | 2026-07-30 | Unlock local Gaussian Lab UI phase; SoT `docs/vision-gaussian-lab-ui.md` (grill-me lock) |
 | 0.2.0 | 2026-08-07 | **Phase 3 close** — F-COMPILE / F-SERIALIZE / F-SAMPLE batch / m=100 benchmark CI / GBS adapter (`export_cov_for_walrus`); gap table refreshed; §11#5 resolved |
+| 0.3.0 | 2026-08-10 | **Phase 4 close** — F-AD: `cvsim/backend.py` protocol (lazy jax + x64), 19/19 `cvsim/symplectic.py` funcs `backend=` (numpy default, zero regression), decompose numpy-only guard, `cvsim/ad.py` differentiable chain, `tutorials/05_ad_designer.ipynb` (energy-penalized log-neg design curve), `[jax]` extra; gap table AD row Done |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.

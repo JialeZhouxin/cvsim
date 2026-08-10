@@ -15,6 +15,7 @@ Simulator package `cvsim/` implements three CV representations from pure theory 
 | Guide | Description | Status |
 |-------|-------------|--------|
 | [Directory Structure](./directory-structure.md) | `cvsim/` layout, notes isolation | Filled |
+| [Backend Interface](./backend-interface.md) | Dual-backend protocol (numpy/jax, Phase 4 F-AD) | Filled |
 | [Quality Guidelines](./quality-guidelines.md) | Physics contracts, tests, forbidden patterns | Filled |
 | [Error Handling](./error-handling.md) | ValueError fail-fast + CircuitV0Error → 422 | Filled |
 | [Scan API](./scan-api.md) | `POST /scan` sweep contract (L4) | Filled |

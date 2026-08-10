@@ -84,6 +84,18 @@ _Avoid_: 预编译, 编译缓存
 compile() 的不可变产物，公开面仅 {nmode, params, run}；多次 run 独立随机，不暴露段布局。
 _Avoid_: 编译结果对象, bind 中间态
 
+**双后端（backend=）**:
+`cvsim/backend.py` 协议：symplectic 全 19 函数 + ad 链接受 `*, backend="numpy"| "jax"` 关键字（方案 1：显式参数，无全局状态）；numpy 默认路径零回归；jax 是可选 extra `[jax]`，惰性导入 + 首次调用强制 x64；唯一 jax 感知点是 backend.py。jax 数组不可变 → `.at`；无 `np.block` → 嵌套 concatenate。
+_Avoid_: 双后端 GaussianState, backend 全局切换
+
+**decompose numpy-only**:
+reck/clements/compose_unitary_mesh 仅 numpy：`backend="jax"` → NotImplementedError（mesh AD 未实现，ponytail 标注）。
+_Avoid_: mesh 的 jax 梯度
+
+**可微目标链（cvsim/ad.py）**:
+顶层模块（ADR-0001：表示包只允许 conventions+symplectic，ad 需要 backend → 不放 gaussian 包）：`apply_gaussian`(SVSᵀ) + `log_neg_loss`（jnp 镜像 analyse.log_negativity：PT→原始辛谱→逐项 PPT log-neg）。教学目标：TMSV→损耗→能量惩罚 `E_N − λ·2sinh²r`（纯损耗 E_N 饱和无内点最优，加惩罚才有）。
+_Avoid_: ad 放 gaussian 包内, 纯损耗最大化
+
 ## Rules
 
 - 术语以 vision-gaussian-lab-ui.md §4 白名单为准；新增托盘 op 必须先改 vision 再改 UI。
