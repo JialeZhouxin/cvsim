@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 39
+- **Total Sessions**: 40
 - **Last Active**: 2026-08-10
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1305 | Active |
+| `journal-1.md` | ~1370 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 40 | 2026-08-10 | Phase 5 Bridges & CV error-correction close | `69ac65d` | `master` |
 | 39 | 2026-08-10 | Phase 4 F-AD：19 函数 backend 化 + 可微链 + 优化 notebook | `ed4f080`, `0957d01`, `b91d771`, `e9ac730`, `79d5678`, `889505e`, `8e6e709`, `20ed5c4` | `master` |
 | 38 | 2026-08-07 | Phase 3 GBS adapter 完成 — Phase 3 全关闭 | - | `master` |
 | 37 | 2026-08-07 | benchmark-ci m=100 基准 + CI job | `5979f0a` | `master` |
