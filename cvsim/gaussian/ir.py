@@ -72,6 +72,7 @@ OP_META: dict[str, OpMeta] = {
         "one", {"phi": "num", "name": "str"}, {"phi": 0.0}
     ),
     "measure_heterodyne": OpMeta("one", {"name": "str"}, {}),
+    "measure_threshold": OpMeta("one", {"name": "str"}, {}),
 }
 
 
@@ -421,6 +422,8 @@ def _build_op(
         circuit.measure_homodyne(m0, kw["phi"], kw["name"])
     elif op == "measure_heterodyne":
         circuit.measure_heterodyne(m0, kw["name"])
+    elif op == "measure_threshold":
+        circuit.measure_threshold(m0, kw["name"])
     else:  # pragma: no cover — validate_ir gates OP_META
         raise ValueError(f"unsupported op {op!r}")
 

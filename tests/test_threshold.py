@@ -163,4 +163,18 @@ def test_circuit_threshold_after_homodyne_removed_mode() -> None:
         c.compile()  # fail-fast at compile time
 
 
+def test_circuit_threshold_ir_roundtrip() -> None:
+    c = GaussianCircuit(1)
+    c.measure_threshold(0, name="click")
+    c2 = GaussianCircuit.from_ir(c.to_ir())
+    _, res = c2.compile().run(rng=np.random.default_rng(8))
+    assert res["click"] in (0, 1)
+
+
+def test_p_click_rejects_nonphysical() -> None:
+    # V=0.1I below Heisenberg bound → p0 = 1/√0.6 > 1 → must raise
+    with pytest.raises(ValueError, match="outside \[0, 1\]"):
+        p_click(GaussianState(V=0.1 * np.eye(2), rbar=np.zeros(2)), 0)
+
+
 from cvsim.gaussian.circuit import ParamRef  # noqa: E402 — after builder tests

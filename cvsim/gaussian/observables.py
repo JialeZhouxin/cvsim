@@ -324,7 +324,13 @@ def p_click(state: GaussianState, mode: int = 0) -> float:
             f"p_click requires GaussianState, got {type(state).__name__}"
         )
     _check_mode(state, mode)
-    return 1.0 - _vacuum_probability(state.V, state.rbar, mode)
+    p0 = _vacuum_probability(state.V, state.rbar, mode)
+    if not np.isfinite(p0) or not 0.0 <= p0 <= 1.0:
+        raise ValueError(
+            f"vacuum probability {p0:.3g} outside [0, 1] — state V/rbar "
+            "non-physical or non-finite?"
+        )
+    return 1.0 - p0
 
 
 def sample_threshold(
