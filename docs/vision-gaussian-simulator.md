@@ -6,7 +6,7 @@
 
 **Last updated:** 2026-08-10  
 **Status:** Phases 0–5 done, Phase 6 interop partially landed, **feature-complete for the CV Gaussian story — project on hold**（用户 2026-08-10 拍板告一段落）  
-**Codebase today:** `cvsim` (numpy, Gauss + Fock + Bosonic teaching MVP)
+**Codebase today:** `cvsim` (numpy, Gauss + Fock + Bosonic teaching MVP; Fock 生产级愿景已锁定 → [`vision-fock-simulator.md`](./vision-fock-simulator.md))
 
 ---
 
@@ -766,7 +766,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | F-BRIDGE (Phase 5) | **Done** | `cvsim/bridge.py`（coherent/squeezed/thermal 矩阵元 + vacuum_probability + fock_state_amplitude）；`tests/test_bridge.py` 25 测试 |
 | Threshold (Phase 5) | **Done** | outcome-only `p_click`/`sample_threshold`/`measure_threshold`（compile + IR round-trip）；后验更新 ponytail |
 | GKP tutorial (Phase 5) | **Done** | `tutorials/06_gkp_feedforward.ipynb`（CZ+measure+ParamRef 位移误差闭环）|
-| Fock/Bosonic | Teaching MVP | Bridges phase 5 — `tests/test_bosonic_consistency.py` 合同固化 + cat/GKP 三向锚定；纠缠量跨表示 ponytail |
+| Fock/Bosonic | Teaching MVP → **Fock production vision locked** | Fock 生产级愿景见 [`docs/vision-fock-simulator.md`](./vision-fock-simulator.md)（Q1–Q12 已锁：平级能力面/截断工程/共享电路框架 F3+/稀疏延伸）；Bosonic 仍 teaching MVP |
 
 ---
 

@@ -16,6 +16,18 @@ _Avoid_: 协方差形式, Wigner 表示
 用截断 Fock 空间振幅/密度矩阵描述态，代价随模式数指数增长。
 _Avoid_: 数态表示
 
+**截断泄漏 (truncation leakage)**:
+Fock 态对未截断态的尾部概率估计（工厂态用解析尾部如 coherent 的 1−Γ(N,|α|²)，其余高 cutoff 对照）；默认阈值 1e-6 警告、validate=True 或 >1e-3 硬拒绝。
+_Avoid_: 截断误差（不量化）, 隐藏截断提升
+
+**稀疏态表示 (sparse amps)**:
+光子数稀疏态（cat/GKP/单光子）用稀疏数组表示，稠密 m≤4 保真 + m=6 上限拒绝，稀疏延伸 m≤10+。
+_Avoid_: 张量网络（远期研究项，非承诺）, 稠密大 m
+
+**共享电路框架 (circuit_common)**:
+表示无关 DSL 公共层（op 列表/参数解析/编译遍历/ParamRef），GaussianCircuit 与 FockCircuit 各自实例化；反转 Phase 5 "CVCircuit 不泛化" YAGNI —— 第二消费者（Fock 生产级）已出现，回归面 758+ 测试兜底。
+_Avoid_: CVCircuit 单类泛化, 重复实现两套编译
+
 **Bosonic 表示**:
 多组分态：{(V_k, r̄_k, w_k)} 权重加权的 Gaussian 分量。
 _Avoid_: 混合高斯表示
