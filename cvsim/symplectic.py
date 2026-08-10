@@ -8,14 +8,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsim.backend import _block, _get_xp, _set
+from cvsim.backend import _allclose, _block, _get_xp, _set
 from cvsim.conventions import omega
 
 
-def is_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> bool:
+def is_symplectic(S: np.ndarray, *, atol: float = 1e-8, backend: str = "numpy") -> bool:
     """Return True if S Ω Sᵀ ≈ Ω (xxpp convention).
 
-    Uses component-wise absolute tolerance ``atol`` via ``numpy.allclose``
+    Uses component-wise absolute tolerance ``atol`` via ``allclose``
     (rtol=0 effectively for the residual when entries are O(1)). This is an
     *engineering default*: residuals of the form S Ω Sᵀ − Ω can be amplified
     or attenuated depending on the perturbation direction and ‖S‖, so a matrix
@@ -23,22 +23,24 @@ def is_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> bool:
     boundary. Callers that need scale-aware checks should set ``atol``
     explicitly (e.g. ``atol=1e-8 * max(1.0, ‖S‖²)``) or use a relative metric.
     """
-    S = np.asarray(S, dtype=float)
+    xp = _get_xp(backend)
+    S = xp.asarray(S, dtype=float)
     if S.ndim != 2 or S.shape[0] != S.shape[1] or S.shape[0] % 2 != 0:
         return False
     m = S.shape[0] // 2
-    Om = omega(m)
-    return np.allclose(S @ Om @ S.T, Om, atol=atol, rtol=0.0)
+    Om = xp.asarray(omega(m))
+    return bool(_allclose(xp, S @ Om @ S.T, Om, atol=atol, rtol=0.0))
 
 
-def validate_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> None:
+def validate_symplectic(S: np.ndarray, *, atol: float = 1e-8, backend: str = "numpy") -> None:
     """Raise ValueError if S is not symplectic (see ``is_symplectic`` for atol)."""
-    S = np.asarray(S, dtype=float)
+    xp = _get_xp(backend)
+    S = xp.asarray(S, dtype=float)
     if S.ndim != 2 or S.shape[0] != S.shape[1] or S.shape[0] % 2 != 0:
         raise ValueError(
             f"S must be square with even dimension, got shape {getattr(S, 'shape', None)}"
         )
-    if not is_symplectic(S, atol=atol):
+    if not is_symplectic(S, atol=atol, backend=backend):
         raise ValueError("S is not symplectic: S Ω Sᵀ ≠ Ω (xxpp)")
 
 
@@ -222,25 +224,27 @@ def S_CX(
 # ---------------------------------------------------------------------------
 
 
-def is_unitary(U: np.ndarray, *, atol: float = 1e-8) -> bool:
+def is_unitary(U: np.ndarray, *, atol: float = 1e-8, backend: str = "numpy") -> bool:
     """Return True if U†U ≈ I and UU† ≈ I."""
-    U = np.asarray(U, dtype=complex)
+    xp = _get_xp(backend)
+    U = xp.asarray(U, dtype=complex)
     if U.ndim != 2 or U.shape[0] != U.shape[1]:
         return False
     m = U.shape[0]
-    eye = np.eye(m, dtype=complex)
+    eye = xp.eye(m, dtype=complex)
     return bool(
-        np.allclose(U.conj().T @ U, eye, atol=atol)
-        and np.allclose(U @ U.conj().T, eye, atol=atol)
+        _allclose(xp, U.conj().T @ U, eye, atol=atol)
+        and _allclose(xp, U @ U.conj().T, eye, atol=atol)
     )
 
 
-def validate_unitary(U: np.ndarray, *, atol: float = 1e-8) -> None:
+def validate_unitary(U: np.ndarray, *, atol: float = 1e-8, backend: str = "numpy") -> None:
     """Raise ValueError if U is not unitary."""
-    U = np.asarray(U, dtype=complex)
+    xp = _get_xp(backend)
+    U = xp.asarray(U, dtype=complex)
     if U.ndim != 2 or U.shape[0] != U.shape[1]:
         raise ValueError(f"U must be square, got shape {U.shape}")
-    if not is_unitary(U, atol=atol):
+    if not is_unitary(U, atol=atol, backend=backend):
         raise ValueError("U is not unitary: U†U ≠ I")
 
 
