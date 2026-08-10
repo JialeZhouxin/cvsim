@@ -4,8 +4,8 @@
 > **Role:** Single source of truth for *what to build* and *what must not drift*.  
 > **Not:** An implementation changelog. Current code may lag this doc; when they disagree, **this doc wins for greenfield work**, and tasks must either implement the spec or explicitly amend this doc first.
 
-**Last updated:** 2026-07-28  
-**Status:** Target architecture / phased product vision  
+**Last updated:** 2026-08-10  
+**Status:** Phases 0–5 done, Phase 6 interop partially landed, **feature-complete for the CV Gaussian story — project on hold**（用户 2026-08-10 拍板告一段落）  
 **Codebase today:** `cvsim` (numpy, Gauss + Fock + Bosonic teaching MVP)
 
 ---
@@ -807,5 +807,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1.6 | 2026-07-30 | Unlock local Gaussian Lab UI phase; SoT `docs/vision-gaussian-lab-ui.md` (grill-me lock) |
 | 0.2.0 | 2026-08-07 | **Phase 3 close** — F-COMPILE / F-SERIALIZE / F-SAMPLE batch / m=100 benchmark CI / GBS adapter (`export_cov_for_walrus`); gap table refreshed; §11#5 resolved |
 | 0.4.0 | 2026-08-10 | **Phase 5 close** — F-BRIDGE (`cvsim/bridge.py` 5 解析函数, 25 测试) / threshold outcome-only（p_click/sample_threshold/measure_threshold builder + compile + IR）/ GKP feedforward 教程（CZ+measure+ParamRef 闭环, 残差 e^{−r}/√2）/ Bosonic 合同固化 + cat/GKP 三向桥锚定；gap table 刷新；Phase 5 exit 1/2 ✅ |
+| 0.5.0 | 2026-08-10 | **Phase 6 (interop) partial + project on hold** — `cvsim/interop/ordering.py` to_xpxp/from_xpxp + TMSV golden 8 测试 + `docs/sf-roundtrip.md` + `[sf]` extra；vision §10 Interop ordering Done；§11 5/5 resolved；0 活跃任务；**用户拍板 CV 高斯模拟器告一段落** |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.
