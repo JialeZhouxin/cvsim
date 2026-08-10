@@ -47,6 +47,8 @@ from cvsim.gaussian.observables import (
     homodyne_sample_batch,
     homodyne_var,
     mean_photon,
+    p_click,
+    sample_threshold,
 )
 from cvsim.gaussian.state import GaussianState
 from cvsim.gaussian.walrus import export_cov_for_walrus
@@ -77,6 +79,8 @@ __all__ = [
     "homodyne_mean",
     "homodyne_var",
     "homodyne_sample",
+    "p_click",
+    "sample_threshold",
     "homodyne_sample_and_condition",
     "homodyne_sample_batch",
     "homodyne_condition",

@@ -55,6 +55,8 @@ GAUSSIAN_PUBLIC = {
     "GaussianCircuit",
     "ParamRef",
     "export_cov_for_walrus",
+    "p_click",
+    "sample_threshold",
 }
 
 

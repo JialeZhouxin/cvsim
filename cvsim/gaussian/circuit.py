@@ -273,6 +273,25 @@ class GaussianCircuit:
         )
         return self
 
+    def measure_threshold(
+        self, mode: int, name: str
+    ) -> GaussianCircuit:
+        """Threshold (on/off) measurement — outcome-only (grill 2026-08-10).
+
+        At ``run()``, produces a random ``0/1`` outcome stored in
+        ``results[name]`` (``1`` = click). **No state update and no mode
+        removal** — the post-click state leaves the Gaussian manifold.
+        The outcome can feed later gates via ``ParamRef(name, gain)``.
+        """
+        self._ops.append(
+            self._partition(
+                'measure_threshold', [mode],
+                _fixed_str_keys={'name'},
+                name=name,
+            )
+        )
+        return self
+
     # -- execution --------------------------------------------------------
 
     def compile(self) -> CompiledGaussian:

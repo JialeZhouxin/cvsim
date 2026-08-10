@@ -17,6 +17,7 @@ from cvsim.gaussian.gates import apply_symplectic
 from cvsim.gaussian.observables import (
     heterodyne_sample_and_condition,
     homodyne_sample_and_condition,
+    sample_threshold,
 )
 from cvsim.gaussian.state import GaussianState
 from cvsim.symplectic import (
@@ -34,7 +35,7 @@ from cvsim.symplectic import (
 # Ops that break a compile segment (ADR-0002 decision 2).
 _BREAK_OPS = frozenset(
     {'loss', 'amplifier', 'phase_noise', 'gaussian_channel',
-     'measure_homodyne', 'measure_heterodyne'}
+     'measure_homodyne', 'measure_heterodyne', 'measure_threshold'}
 )
 # Affine unitary ops that can be merged into a single (S, d).
 _MERGEABLE_OPS = frozenset(
@@ -143,6 +144,8 @@ def _compile_segments(
             segments.append(
                 ('op', (op_name, tuple(phys), fixed, pnames, refs))
             )
+            # threshold breaks the segment too, but removes no mode
+            # (removed-mode refs already fail in the generic check above)
             if op_name in ('measure_homodyne', 'measure_heterodyne'):
                 phys_mode = mapping[modes[0]]
                 nmode -= 1
@@ -198,6 +201,10 @@ def _run_op(
             st, phys_mode, rng=rng
         )
         results[kwargs['name']] = val
+    elif op_name == 'measure_threshold':
+        val = sample_threshold(st, modes[0], rng=rng)
+        results[kwargs['name']] = int(val)
+        # outcome-only: no state update, no mode removal
     elif op_name == 'gaussian_channel':
         X = kwargs['X']
         if X.shape[0] != 2 * st.nmode:

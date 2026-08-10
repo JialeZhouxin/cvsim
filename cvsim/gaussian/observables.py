@@ -292,6 +292,56 @@ def mean_photon(state: GaussianState, mode: int | None = None) -> float:
 
 # ── F-SAMPLE batch (vision §4.2): vectorized size=10³ standard ──────────────
 
+def _vacuum_probability(V: np.ndarray, rbar: np.ndarray, mode: int) -> float:
+    """P(0) of a Gaussian state on one mode — same formula as
+    ``cvsim.bridge.vacuum_probability`` (kept in lock by
+    ``test_threshold`` / ``test_bridge`` cross-checks; xxpp, ħ=1).
+    """
+    V = np.asarray(V, dtype=float)
+    rbar = np.asarray(rbar, dtype=float)
+    m = V.shape[0] // 2
+    i = mode
+    # xxpp: mode-i block is (V[i,i], V[i,m+i]; V[m+i,i], V[m+i,m+i])
+    V1 = np.array([[V[i, i], V[i, m + i]], [V[m + i, i], V[m + i, m + i]]])
+    r1 = np.array([rbar[i], rbar[m + i]])
+    A = V1 + 0.5 * np.eye(2)
+    if np.linalg.eigvalsh(A).min() <= 0.0:
+        raise ValueError(f"V+½I on mode {mode} is not positive-definite")
+    exponent = -0.5 * float(r1 @ np.linalg.solve(A, r1))
+    return float(np.exp(exponent) / np.sqrt(np.linalg.det(A)))
+
+
+def p_click(state: GaussianState, mode: int = 0) -> float:
+    """Threshold (on/off) click probability p = 1 − ⟨0|ρ|0⟩.
+
+    **Outcome-only** (grill 2026-08-10): sampling returns {0,1} with no
+    state update — the post-click state leaves the Gaussian manifold, and
+    this module does not pretend to update it. Full post-measurement
+    conditioning is a ponytail (needs the Gaussian→Fock state bridge).
+    """
+    if not isinstance(state, GaussianState):
+        raise TypeError(
+            f"p_click requires GaussianState, got {type(state).__name__}"
+        )
+    _check_mode(state, mode)
+    return 1.0 - _vacuum_probability(state.V, state.rbar, mode)
+
+
+def sample_threshold(
+    state: GaussianState,
+    mode: int = 0,
+    *,
+    rng: np.random.Generator | None = None,
+) -> bool:
+    """Sample one threshold outcome: ``True`` = click, ``False`` = no click.
+
+    Outcome-only (no state update, see :func:`p_click`).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+    return bool(rng.random() < p_click(state, mode))
+
+
 def _check_size(size: int) -> None:
     if not isinstance(size, (int, np.integer)) or isinstance(size, bool) or size < 1:
         raise ValueError(f"size must be a positive int, got {size!r}")
