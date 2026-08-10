@@ -184,7 +184,8 @@ def test_vacuum_probability_multimode_reduction() -> None:
     Vx = np.diag([2.0, 1.5, 2.0, 1.5])
     Vx[0, 2] = Vx[2, 0] = 0.5  # mode-0 x–p correlation
     got_m0 = bridge.vacuum_probability(Vx, np.zeros(4), 0)
-    np.testing.assert_allclose(got_m0, 1.0 / np.sqrt(2.5 * 1.5 - 0.25), atol=1e-12)
+    # mode-0 block [[2,.5],[.5,2]] → A=[[2.5,.5],[.5,2.5]], det=6 → 1/√6
+    np.testing.assert_allclose(got_m0, 1.0 / np.sqrt(6.0), atol=1e-12)
     got_m1 = bridge.vacuum_probability(Vx, np.zeros(4), 1)
     np.testing.assert_allclose(got_m1, 1.0 / 2.0, atol=1e-12)
 
