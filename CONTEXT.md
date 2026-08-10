@@ -104,6 +104,14 @@ _Avoid_: threshold 点击后的高斯条件化, 强制转 Fock 自动更新
 `GaussianCircuit` 保持专用（grill 2026-08-10, YAGNI）：F-BRIDGE 是独立顶层模块的函数级转换（非 DSL）；compile/Lab/IR 零波及；待第二个表示真需要 DSL 时再泛化（届时 ADR）。
 _Avoid_: CVCircuit 抽象基类, bridge 做成电路 DSL
 
+**F-BRIDGE 观测值桥**:
+`cvsim/bridge.py`（顶层）：只转**可观测量矩阵元**，非完整态桥 — coherent_element（⟨n|α⟩ = e^{−|α|²/2}αⁿ/√n!）、squeezed_element（⟨2m|S|0⟩ = √(2m)!/(2ᵐ·m!)·zᵐ/√cosh r，φ=0 对齐 Fock expm 含 (−1)ᵐ）、thermal_diag（n̄ⁿ/(n̄+1)^{n+1}）、vacuum_probability（xxpp 单模块闭式 e^{−½r̄ᵀ(V+½I)⁻¹r̄}/√det(V+½I)）、fock_state_amplitude。Fock expm 截断泄漏 → 对照 atol 放宽（1e-7..1e-9）并注释。
+_Avoid_: 完整 ρ_fock 态转换, bridge 引入 gaussian/fock 包 import
+
+**threshold 编译语义**:
+measure_threshold 是断点但**不删模**（homodyne/heterodyne 删模）；结果 int(0/1)；可经 ParamRef 驱动后续 op。IR（circuit_v1）同步注册。
+_Avoid_: threshold 删模, IR 漏注册
+
 ## Rules
 
 - 术语以 vision-gaussian-lab-ui.md §4 白名单为准；新增托盘 op 必须先改 vision 再改 UI。

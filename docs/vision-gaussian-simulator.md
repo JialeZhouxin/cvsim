@@ -661,14 +661,14 @@ Ordering principle: **S1 ∩ S2** — dependency order first, each phase ships a
 
 ---
 
-### Phase 5 — Bridges & CV error-correction story
+### Phase 5 — Bridges & CV error-correction story ✅ done 2026-08-10
 
 **Build:** F-BRIDGE Gauss↔Fock small-$m$, GKP feedforward tutorial at production quality, Bosonic consistency tests.
 
 **Exit criteria**
 
-1. Documented GKP-style circuit using CZ+measure+ParamRef.  
-2. Bridge tests for coherent/squeezed low cutoff.
+1. Documented GKP-style circuit using CZ+measure+ParamRef. ✅ `tutorials/06_gkp_feedforward.ipynb` (GKP |0⟩ 强挤压近似 → CZ 传播 x 误差 → Homodyne p 读出 → ParamRef 反馈修正；残差 std≈e^{−r}/√2 指数下降，Run-All 全过 + `tests/test_gkp_tutorial.py` 数值回归).
+2. Bridge tests for coherent/squeezed low cutoff. ✅ `cvsim/bridge.py`（coherent_element / squeezed_element / thermal_diag / vacuum_probability / fock_state_amplitude）+ `tests/test_bridge.py` 25 测试（解析 vs Fock 数值 atol 1e-9..1e-7，expm 截断泄漏已注释）+ threshold outcome-only 桥接（`p_click`/`sample_threshold`/`measure_threshold`/IR round-trip）.
 
 ---
 
@@ -762,7 +762,10 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | Local Gaussian Lab UI | Spec locked | [`docs/vision-gaussian-lab-ui.md`](./vision-gaussian-lab-ui.md) (L0–L3) |
 | GBS | Done | adapter `export_cov_for_walrus` (Phase 3, `cvsim/gaussian/walrus.py` + `docs/gbs-walrus.md`); thewalrus optional extra `[gbs]` |
 | AD (F-AD) | **Done** | Phase 4 — 19/19 symplectic funcs `backend=` + `cvsim/backend.py` + `cvsim/ad.py` + `tutorials/05_ad_designer.ipynb`; `[jax]` extra; decompose numpy-only (NotImplementedError); JAX not on core import path |
-| Fock/Bosonic | Teaching MVP | Bridges phase 5 |
+| F-BRIDGE (Phase 5) | **Done** | `cvsim/bridge.py`（coherent/squeezed/thermal 矩阵元 + vacuum_probability + fock_state_amplitude）；`tests/test_bridge.py` 25 测试 |
+| Threshold (Phase 5) | **Done** | outcome-only `p_click`/`sample_threshold`/`measure_threshold`（compile + IR round-trip）；后验更新 ponytail |
+| GKP tutorial (Phase 5) | **Done** | `tutorials/06_gkp_feedforward.ipynb`（CZ+measure+ParamRef 位移误差闭环）|
+| Fock/Bosonic | Teaching MVP | Bridges phase 5 — `tests/test_bosonic_consistency.py` 合同固化 + cat/GKP 三向锚定；纠缠量跨表示 ponytail |
 
 ---
 
@@ -802,6 +805,6 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | 0.1.5 | 2026-07-30 | Phase 2 TMSV analyse tutorial (`tutorials/04_tmsv_analyse.ipynb`); teach exit criterion |
 | 0.1.6 | 2026-07-30 | Unlock local Gaussian Lab UI phase; SoT `docs/vision-gaussian-lab-ui.md` (grill-me lock) |
 | 0.2.0 | 2026-08-07 | **Phase 3 close** — F-COMPILE / F-SERIALIZE / F-SAMPLE batch / m=100 benchmark CI / GBS adapter (`export_cov_for_walrus`); gap table refreshed; §11#5 resolved |
-| 0.3.0 | 2026-08-10 | **Phase 4 close** — F-AD: `cvsim/backend.py` protocol (lazy jax + x64), 19/19 `cvsim/symplectic.py` funcs `backend=` (numpy default, zero regression), decompose numpy-only guard, `cvsim/ad.py` differentiable chain, `tutorials/05_ad_designer.ipynb` (energy-penalized log-neg design curve), `[jax]` extra; gap table AD row Done |
+| 0.4.0 | 2026-08-10 | **Phase 5 close** — F-BRIDGE (`cvsim/bridge.py` 5 解析函数, 25 测试) / threshold outcome-only（p_click/sample_threshold/measure_threshold builder + compile + IR）/ GKP feedforward 教程（CZ+measure+ParamRef 闭环, 残差 e^{−r}/√2）/ Bosonic 合同固化 + cat/GKP 三向桥锚定；gap table 刷新；Phase 5 exit 1/2 ✅ |
 
 **Amendments:** require human or explicit task approval; agents must not delete hard conventions (§2) without major-version note.
