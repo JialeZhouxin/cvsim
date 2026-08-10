@@ -96,6 +96,14 @@ _Avoid_: mesh 的 jax 梯度
 顶层模块（ADR-0001：表示包只允许 conventions+symplectic，ad 需要 backend → 不放 gaussian 包）：`apply_gaussian`(SVSᵀ) + `log_neg_loss`（jnp 镜像 analyse.log_negativity：PT→原始辛谱→逐项 PPT log-neg）。教学目标：TMSV→损耗→能量惩罚 `E_N − λ·2sinh²r`（纯损耗 E_N 饱和无内点最优，加惩罚才有）。
 _Avoid_: ad 放 gaussian 包内, 纯损耗最大化
 
+**threshold outcome-only**:
+Threshold(点击/未点击)测量语义（grill 2026-08-10 锁定）：只采样 {0,1} 结果（`p_click=1−⟨0|ρ|0⟩`，Fock 截断对角元），**无态更新**（点击后验离开高斯流形，Gaussian 不假装能更新）；homodyne/heterodyne 保持条件化。GKP 教程：homodyne 条件化 + threshold outcome 驱动经典 feedforward（ParamRef）。
+_Avoid_: threshold 点击后的高斯条件化, 强制转 Fock 自动更新
+
+**CVCircuit 不泛化**:
+`GaussianCircuit` 保持专用（grill 2026-08-10, YAGNI）：F-BRIDGE 是独立顶层模块的函数级转换（非 DSL）；compile/Lab/IR 零波及；待第二个表示真需要 DSL 时再泛化（届时 ADR）。
+_Avoid_: CVCircuit 抽象基类, bridge 做成电路 DSL
+
 ## Rules
 
 - 术语以 vision-gaussian-lab-ui.md §4 白名单为准；新增托盘 op 必须先改 vision 再改 UI。

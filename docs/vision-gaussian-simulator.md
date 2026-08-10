@@ -500,7 +500,7 @@ def phase_noise(state, sigma: float, modes=None) -> GaussianState: ...  # docume
 |-------------|--------|--------------|
 | Homodyne $\phi$ | Gaussian scalar | conditional Gaussian (existing) |
 | Heterodyne | complex $\beta$ / pair $(x,p)$ | Husimi, projection to coherent |
-| Threshold (on/off) | $\{0,1\}$ | non-Gaussian → **flag**: exact update leaves Gaussian manifold; either reject, use Fock, or return outcome-only without state |
+| Threshold (on/off) | $\{0,1\}$ | **outcome-only**（grill 2026-08-10）：采样 $p_{click}=1-\langle0|\rho|0\rangle$（Fock 截断对角元），无态更新；后验态更新留 ponytail（F-BRIDGE 完成后可增强） |
 | PNR | photon counts | via Fock bridge or Walrus sample; Gaussian state update not generally Gaussian |
 
 **Phase rule:** Homodyne+Heterodyne stay in Gaussian core; threshold/PNR sampling may live in `sample` + interop.
@@ -769,8 +769,8 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 ## 11. Open questions (resolve by amending this doc)
 
 1. ~~Phase-noise Gaussian kernel: Ornstein–Uhlenbeck phase diffusion vs static random phase average—**pick one before F-CHANNEL-GENERAL preset**.~~ **Resolved:** static random-phase average (Option B) selected; implemented as `phase_noise`.  
-2. Threshold measurement: outcomes-only vs forced Fock backend.  
-3. Whether `GaussianCircuit` becomes generic `CVCircuit` in phase 5.  
+2. ~~Threshold measurement: outcomes-only vs forced Fock backend.~~ **Resolved:** outcome-only（2026-08-10 grill）—— 采样 {0,1} 无态更新；Gaussian 核心保持纯；后验态更新留 ponytail（bridge 完成后可增强）。
+3. ~~Whether `GaussianCircuit` becomes generic `CVCircuit` in phase 5.~~ **Resolved:** 不泛化（2026-08-10 grill, YAGNI）—— 保持 `GaussianCircuit`；F-BRIDGE 做独立顶层模块（函数级转换，非 DSL）；compile/Lab/IR 零波及；泛化推迟到第二个表示真需要 DSL 时。
 4. ~~Exact fidelity formula reference implementation (Banchi et al. vs other).~~ **Resolved:** Banchi–Braunstein–Pirandola / thewalrus–Brask transcription; freeze tests in `test_analyse.py`.  
 5. ~~CI wall-time budget for $m=100$ benchmark on available runners.~~ **Resolved:** time-capped CI benchmark job + `benchmarks/latest.json` (Phase 3, `08-06-cvsim-phase3-benchmark-ci`); 仓库无 git remote，workflow 从未实跑（仓库级现状）。
 
