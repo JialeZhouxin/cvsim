@@ -1368,3 +1368,36 @@ Phase 5 全 4 child + parent 归档：F-BRIDGE 5 函数（OCR 抓 xxpp 切片 bu
 ### Next Steps
 
 - None - task complete
+
+
+## Session 41: Phase 6 Interop ordering
+
+**Date**: 2026-08-10
+**Task**: Phase 6 Interop ordering
+**Branch**: `master`
+
+### Summary
+
+ordering xxpp↔xpxp 纯排列（cvsim/interop/ordering.py）+ 8 测试（round-trip + TMSV golden，自查出 golden 期望写反一处）+ docs/sf-roundtrip.md + [sf] extra；OCR complete 0 findings；766 绿
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
