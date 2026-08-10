@@ -28,13 +28,13 @@ from cvsim.symplectic import (
 def test_reck_roundtrip_numpy() -> None:
     rng = np.random.default_rng(7)
     U, _ = np.linalg.qr(rng.normal(size=(4, 4)) + 1j * rng.normal(size=(4, 4)))
-    ops = reck_decomposition(U)
-    U_rec = compose_unitary_mesh(4, ops)
+    ops = reck_decomposition(U, backend="numpy")
+    U_rec = compose_unitary_mesh(4, ops, backend="numpy")
     np.testing.assert_allclose(U_rec, U, atol=1e-8)
 
 
 def test_reck_returns_ops_list_numpy() -> None:
-    ops = reck_decomposition(U_beamsplitter(0.4, 0.2))
+    ops = reck_decomposition(U_beamsplitter(0.4, 0.2), backend="numpy")
     assert isinstance(ops, list)
     assert len(ops) >= 2  # phases + at least one u2
 
@@ -60,7 +60,7 @@ def test_clements_warns_numpy() -> None:
     with pytest.warns(FutureWarning):
         ops = clements_decomposition(U)
     # alias of reck: same op list
-    assert _ops_equal(ops, reck_decomposition(U))
+    assert _ops_equal(ops, reck_decomposition(U, backend="numpy"))
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ def test_clements_jax_not_implemented() -> None:
 
 
 def test_compose_unitary_mesh_jax_not_implemented() -> None:
-    ops = reck_decomposition(U_beamsplitter(0.4, 0.2))
+    ops = reck_decomposition(U_beamsplitter(0.4, 0.2), backend="numpy")
     with pytest.raises(NotImplementedError, match="numpy"):
         compose_unitary_mesh(2, ops, backend="jax")
 
