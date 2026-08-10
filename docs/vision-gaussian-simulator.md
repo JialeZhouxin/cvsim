@@ -761,6 +761,7 @@ Marker idea: `@pytest.mark.phase1` etc. for optional CI slicing.
 | m=100 benchmark | Done | `benchmarks/benchmark_m100.py` + CI time-capped job + `benchmarks/latest.json` |
 | Local Gaussian Lab UI | Spec locked | [`docs/vision-gaussian-lab-ui.md`](./vision-gaussian-lab-ui.md) (L0–L3) |
 | GBS | Done | adapter `export_cov_for_walrus` (Phase 3, `cvsim/gaussian/walrus.py` + `docs/gbs-walrus.md`); thewalrus optional extra `[gbs]` |
+| Interop ordering (Phase 6) | **Done** | `cvsim/interop/ordering.py` to_xpxp/from_xpxp（xxpp↔xpxp 纯排列，ħ 缩放调用方责任）+ `tests/test_interop_ordering.py`（round-trip + TMSV golden）+ `docs/sf-roundtrip.md`（SF ħ=2 对照脚本）+ `[sf]` extra |
 | AD (F-AD) | **Done** | Phase 4 — 19/19 symplectic funcs `backend=` + `cvsim/backend.py` + `cvsim/ad.py` + `tutorials/05_ad_designer.ipynb`; `[jax]` extra; decompose numpy-only (NotImplementedError); JAX not on core import path |
 | F-BRIDGE (Phase 5) | **Done** | `cvsim/bridge.py`（coherent/squeezed/thermal 矩阵元 + vacuum_probability + fock_state_amplitude）；`tests/test_bridge.py` 25 测试 |
 | Threshold (Phase 5) | **Done** | outcome-only `p_click`/`sample_threshold`/`measure_threshold`（compile + IR round-trip）；后验更新 ponytail |
