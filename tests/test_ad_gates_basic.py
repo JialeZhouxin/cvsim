@@ -148,11 +148,6 @@ _VAC = np.eye(4) * 0.5
 """2-mode vacuum covariance (xxpp)."""
 
 
-def _apply_objective(S: np.ndarray) -> float:
-    """Scalar objective: sum of evolved vacuum covariance entries."""
-    return float(np.sum(S @ _VAC @ S.T))
-
-
 @pytest.mark.skipif(not be.HAS_JAX, reason="jax not installed")
 def test_squeeze_gradient_vs_fd() -> None:
     import jax
