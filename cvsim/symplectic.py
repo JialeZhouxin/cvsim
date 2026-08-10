@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from cvsim.backend import _block, _get_xp, _set
 from cvsim.conventions import omega
 
 
@@ -41,37 +42,51 @@ def validate_symplectic(S: np.ndarray, *, atol: float = 1e-8) -> None:
         raise ValueError("S is not symplectic: S Ω Sᵀ ≠ Ω (xxpp)")
 
 
-def d_displace(nmode: int, alpha: complex, mode: int = 0) -> np.ndarray:
-    """Displacement vector d: d_x=√2 Re α, d_p=√2 Im α."""
+def d_displace(nmode: int, alpha: complex, mode: int = 0, *, backend: str = "numpy") -> np.ndarray:
+    """Displacement vector d: d_x=√2 Re α, d_p=√2 Im α.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
+    """
     if not 0 <= mode < nmode:
         raise IndexError(f"mode {mode} out of range for nmode={nmode}")
+    xp = _get_xp(backend)
     alpha = complex(alpha)
-    d = np.zeros(2 * nmode, dtype=float)
-    d[mode] = np.sqrt(2.0) * alpha.real
-    d[nmode + mode] = np.sqrt(2.0) * alpha.imag
-    return d
+    d = xp.zeros(2 * nmode, dtype=float)
+    d = _set(xp, d, (mode,), xp.sqrt(2.0) * alpha.real)
+    d = _set(xp, d, (nmode + mode,), xp.sqrt(2.0) * alpha.imag)
+    return d  # type: ignore[no-any-return]
 
 
-def S_squeeze(nmode: int, r: float, mode: int = 0) -> np.ndarray:
-    """Single-mode squeeze: x→e^{-r}x, p→e^{r}p."""
+def S_squeeze(nmode: int, r: float, mode: int = 0, *, backend: str = "numpy") -> np.ndarray:
+    """Single-mode squeeze: x→e^{-r}x, p→e^{r}p.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
+    """
     if not 0 <= mode < nmode:
         raise IndexError(f"mode {mode} out of range for nmode={nmode}")
-    S = np.eye(2 * nmode)
-    S[mode, mode] = np.exp(-r)
-    S[nmode + mode, nmode + mode] = np.exp(r)
-    return S
+    xp = _get_xp(backend)
+    S = xp.eye(2 * nmode)
+    S = _set(xp, S, (mode, mode), xp.exp(-r))
+    S = _set(xp, S, (nmode + mode, nmode + mode), xp.exp(r))
+    return S  # type: ignore[no-any-return]
 
 
-def S_phase(nmode: int, theta: float, mode: int = 0) -> np.ndarray:
-    """Single-mode phase rotation in (x,p) plane."""
+def S_phase(nmode: int, theta: float, mode: int = 0, *, backend: str = "numpy") -> np.ndarray:
+    """Single-mode phase rotation in (x,p) plane.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
+    """
     if not 0 <= mode < nmode:
         raise IndexError(f"mode {mode} out of range for nmode={nmode}")
-    c, s = np.cos(theta), np.sin(theta)
-    S = np.eye(2 * nmode)
+    xp = _get_xp(backend)
+    c, s = xp.cos(theta), xp.sin(theta)
+    S = xp.eye(2 * nmode)
     i, p = mode, nmode + mode
-    S[i, i], S[i, p] = c, -s
-    S[p, i], S[p, p] = s, c
-    return S
+    S = _set(xp, S, (i, i), c)
+    S = _set(xp, S, (i, p), -s)
+    S = _set(xp, S, (p, i), s)
+    S = _set(xp, S, (p, p), c)
+    return S  # type: ignore[no-any-return]
 
 
 def S_beamsplitter(
@@ -80,11 +95,15 @@ def S_beamsplitter(
     mode2: int,
     theta: float,
     phi: float = 0.0,
+    *,
+    backend: str = "numpy",
 ) -> np.ndarray:
     """Two-mode BS from unitary U embedded as xxpp symplectic.
 
     U = [[c, e^{iφ}s], [-e^{-iφ}s, c]], then
     S = [[Re U, -Im U], [Im U, Re U]] on the two-mode subspace.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
     """
     if mode1 == mode2:
         raise ValueError("mode1 and mode2 must differ")
@@ -92,27 +111,28 @@ def S_beamsplitter(
         if not 0 <= m < nmode:
             raise IndexError(f"mode {m} out of range for nmode={nmode}")
 
-    c, s = np.cos(theta), np.sin(theta)
-    eip = np.exp(1j * phi)
-    U = np.array(
-        [[c, eip * s], [-np.conj(eip) * s, c]],
+    xp = _get_xp(backend)
+    c, s = xp.cos(theta), xp.sin(theta)
+    eip = xp.exp(1j * phi)
+    U = xp.array(
+        [[c, eip * s], [-xp.conj(eip) * s, c]],
         dtype=complex,
     )
     Ru, Iu = U.real, U.imag
 
-    ReU = np.eye(nmode)
-    ImU = np.zeros((nmode, nmode))
+    ReU = xp.eye(nmode)
+    ImU = xp.zeros((nmode, nmode))
     pair = [mode1, mode2]
     for a in range(2):
         for b in range(2):
-            ReU[pair[a], pair[b]] = Ru[a, b]
-            ImU[pair[a], pair[b]] = Iu[a, b]
+            ReU = _set(xp, ReU, (pair[a], pair[b]), Ru[a, b])
+            ImU = _set(xp, ImU, (pair[a], pair[b]), Iu[a, b])
 
-    return np.block([[ReU, -ImU], [ImU, ReU]])
+    return _block(xp, [[ReU, -ImU], [ImU, ReU]])  # type: ignore[no-any-return]
 
 
 def S_two_mode_squeeze(
-    nmode: int, r: float, mode1: int, mode2: int
+    nmode: int, r: float, mode1: int, mode2: int, *, backend: str = "numpy"
 ) -> np.ndarray:
     """Two-mode squeeze S₂(r) in xxpp (real r), EPR form.
 
@@ -120,6 +140,8 @@ def S_two_mode_squeeze(
       x_i' = ch x_i + sh x_j,  x_j' = sh x_i + ch x_j
       p_i' = ch p_i - sh p_j,  p_j' = -sh p_i + ch p_j
     Vacuum: ⟨n_i⟩=⟨n_j⟩=sinh²r; cross ⟨x_i x_j⟩, ⟨p_i p_j⟩ ≠ 0.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
     """
     if mode1 == mode2:
         raise ValueError("mode1 and mode2 must differ")
@@ -127,12 +149,13 @@ def S_two_mode_squeeze(
         if not 0 <= m < nmode:
             raise IndexError(f"mode {m} out of range for nmode={nmode}")
 
-    ch, sh = np.cosh(r), np.sinh(r)
-    S = np.eye(2 * nmode)
+    xp = _get_xp(backend)
+    ch, sh = xp.cosh(r), xp.sinh(r)
+    S = xp.eye(2 * nmode)
     i, j = mode1, mode2
     pi, pj = nmode + i, nmode + j
     idx = [i, j, pi, pj]
-    block = np.array(
+    block = xp.array(
         [
             [ch, sh, 0.0, 0.0],
             [sh, ch, 0.0, 0.0],
@@ -143,8 +166,8 @@ def S_two_mode_squeeze(
     )
     for a in range(4):
         for b in range(4):
-            S[idx[a], idx[b]] = block[a, b]
-    return S
+            S = _set(xp, S, (idx[a], idx[b]), block[a, b])
+    return S  # type: ignore[no-any-return]
 
 
 def S_CZ(nmode: int, weight: float, mode1: int, mode2: int) -> np.ndarray:
