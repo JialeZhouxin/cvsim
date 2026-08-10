@@ -170,10 +170,14 @@ def S_two_mode_squeeze(
     return S  # type: ignore[no-any-return]
 
 
-def S_CZ(nmode: int, weight: float, mode1: int, mode2: int) -> np.ndarray:
+def S_CZ(
+    nmode: int, weight: float, mode1: int, mode2: int, *, backend: str = "numpy"
+) -> np.ndarray:
     """Controlled-Z symplectic in xxpp: CZ = exp(i·weight·x̂₁·x̂₂).
 
     Action: x unchanged; p₁ → p₁ + weight·x₂, p₂ → p₂ + weight·x₁.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
     """
     if mode1 == mode2:
         raise ValueError("mode1 and mode2 must differ")
@@ -181,18 +185,23 @@ def S_CZ(nmode: int, weight: float, mode1: int, mode2: int) -> np.ndarray:
         if not 0 <= m < nmode:
             raise IndexError(f"mode {m} out of range for nmode={nmode}")
 
-    S = np.eye(2 * nmode)
+    xp = _get_xp(backend)
+    S = xp.eye(2 * nmode)
     i, j = mode1, mode2
-    S[nmode + i, j] = weight
-    S[nmode + j, i] = weight
-    return S
+    return _set(  # type: ignore[no-any-return]
+        xp, _set(xp, S, (nmode + i, j), weight), (nmode + j, i), weight
+    )
 
 
-def S_CX(nmode: int, weight: float, mode1: int, mode2: int) -> np.ndarray:
+def S_CX(
+    nmode: int, weight: float, mode1: int, mode2: int, *, backend: str = "numpy"
+) -> np.ndarray:
     """Controlled-X symplectic in xxpp: CX = exp(-i·weight·x̂₁·p̂₂).
 
     Action: x₁ unchanged, x₂ → x₂ + weight·x₁;
     p₁ → p₁ - weight·p₂, p₂ unchanged.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
     """
     if mode1 == mode2:
         raise ValueError("mode1 and mode2 must differ")
@@ -200,11 +209,12 @@ def S_CX(nmode: int, weight: float, mode1: int, mode2: int) -> np.ndarray:
         if not 0 <= m < nmode:
             raise IndexError(f"mode {m} out of range for nmode={nmode}")
 
-    S = np.eye(2 * nmode)
+    xp = _get_xp(backend)
+    S = xp.eye(2 * nmode)
     i, j = mode1, mode2
-    S[j, i] = weight
-    S[nmode + i, nmode + j] = -weight
-    return S
+    return _set(  # type: ignore[no-any-return]
+        xp, _set(xp, S, (j, i), weight), (nmode + i, nmode + j), -weight
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +245,7 @@ def validate_unitary(U: np.ndarray, *, atol: float = 1e-8) -> None:
 
 
 def S_from_unitary(
-    U: np.ndarray, *, validate: bool = True, atol: float = 1e-8
+    U: np.ndarray, *, validate: bool = True, atol: float = 1e-8, backend: str = "numpy"
 ) -> np.ndarray:
     """Embed passive unitary U (m×m complex) as xxpp symplectic S (2m×2m).
 
@@ -249,31 +259,50 @@ def S_from_unitary(
     Note: a *global* phase factor e^{iφ}U is **not** a no-op in this CV
     embedding (collective phase appears in S). Do not drop global phases
     by qubit-style "w.l.o.g." arguments.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array);
+    the input U is always a numpy array (validation stays numpy).
     """
-    U = np.asarray(U, dtype=complex)
+    xp = _get_xp(backend)
+    U = xp.asarray(U, dtype=complex)
     if validate:
-        validate_unitary(U, atol=atol)
+        validate_unitary(np.asarray(U), atol=atol)
     elif U.ndim != 2 or U.shape[0] != U.shape[1]:
         raise ValueError(f"U must be square, got shape {U.shape}")
-    Ru, Iu = np.real(U), np.imag(U)
-    return np.asarray(np.block([[Ru, -Iu], [Iu, Ru]]), dtype=float)
+    Ru, Iu = xp.real(U), xp.imag(U)
+    return _block(xp, [[Ru, -Iu], [Iu, Ru]])  # type: ignore[no-any-return]
 
 
-def U_beamsplitter(theta: float, phi: float = 0.0) -> np.ndarray:
+def U_beamsplitter(theta: float, phi: float = 0.0, *, backend: str = "numpy") -> np.ndarray:
     """2×2 unitary matching ``S_beamsplitter`` convention.
 
     U = [[c, e^{iφ} s], [-e^{-iφ} s, c]] with c=cos θ, s=sin θ.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
     """
-    c, s = np.cos(theta), np.sin(theta)
-    eip = np.exp(1j * phi)
-    return np.array([[c, eip * s], [-np.conj(eip) * s, c]], dtype=complex)
+    xp = _get_xp(backend)
+    c, s = xp.cos(theta), xp.sin(theta)
+    eip = xp.exp(1j * phi)
+    return xp.array(  # type: ignore[no-any-return]
+        [[c, eip * s], [-xp.conj(eip) * s, c]], dtype=complex
+    )
 
 
-def embed_U_2mode(m: int, mode1: int, mode2: int, U2: np.ndarray) -> np.ndarray:
-    """Embed a 2×2 unitary on (mode1, mode2) into m×m."""
-    U = np.eye(m, dtype=complex)
-    U[np.ix_([mode1, mode2], [mode1, mode2])] = np.asarray(U2, dtype=complex)
-    return U
+def embed_U_2mode(
+    m: int, mode1: int, mode2: int, U2: np.ndarray, *, backend: str = "numpy"
+) -> np.ndarray:
+    """Embed a 2×2 unitary on (mode1, mode2) into m×m.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
+    """
+    xp = _get_xp(backend)
+    U = xp.eye(m, dtype=complex)
+    U2 = xp.asarray(U2, dtype=complex)
+    if xp is np:
+        U[np.ix_([mode1, mode2], [mode1, mode2])] = U2
+        return U  # type: ignore[no-any-return]
+    rows = xp.asarray([mode1, mode2])
+    return U.at[rows[:, None], rows[None, :]].set(U2)  # type: ignore[no-any-return]
 
 
 def _nulling_T_for_column(v0: complex, v1: complex, atol: float) -> np.ndarray:
@@ -389,6 +418,8 @@ def S_mach_zehnder(
     mode2: int,
     theta: float,
     phi: float = 0.0,
+    *,
+    backend: str = "numpy",
 ) -> np.ndarray:
     """Mach–Zehnder symplectic on (mode1, mode2).
 
@@ -397,10 +428,13 @@ def S_mach_zehnder(
         S = S_BS(π/4, 0) @ S_phase(φ, mode1) @ S_BS(θ, 0)
 
     i.e. BS(θ) then internal phase φ on mode1 then 50:50 BS.
+
+    Returned array type follows ``backend`` (np.ndarray or jax.Array);
+    the backend is propagated to the inner gates (jax path is fully jnp).
     """
     if mode1 == mode2:
         raise ValueError("mode1 and mode2 must differ")
-    S1 = S_beamsplitter(nmode, mode1, mode2, theta, 0.0)
-    S2 = S_phase(nmode, phi, mode1)
-    S3 = S_beamsplitter(nmode, mode1, mode2, np.pi / 4, 0.0)
-    return S3 @ S2 @ S1
+    S1 = S_beamsplitter(nmode, mode1, mode2, theta, 0.0, backend=backend)
+    S2 = S_phase(nmode, phi, mode1, backend=backend)
+    S3 = S_beamsplitter(nmode, mode1, mode2, np.pi / 4, 0.0, backend=backend)
+    return S3 @ S2 @ S1  # type: ignore[no-any-return]
