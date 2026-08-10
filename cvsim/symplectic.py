@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsim.backend import _allclose, _block, _get_xp, _set
+from cvsim.backend import BACKENDS, _allclose, _block, _get_xp, _set
 from cvsim.conventions import omega
 
 
@@ -313,6 +313,22 @@ def embed_U_2mode(
     return U.at[rows[:, None], rows[None, :]].set(U2)  # type: ignore[no-any-return]
 
 
+def _reject_non_numpy_backend(backend: str) -> None:
+    """Decomposition algorithms are numpy-only (Phase 4 design decision Q4).
+
+    ponytail: add a jnp path when compiled mesh optimisation needs it — the
+    control flow (peeling loop, column nulling) is tracer-unfriendly, so the
+    guard is the honest ceiling for now.
+    """
+    if backend not in BACKENDS:
+        raise ValueError(f"Unknown backend {backend!r}; expected one of {BACKENDS}")
+    if backend != "numpy":
+        raise NotImplementedError(
+            f"decomposition algorithms are numpy-only; got backend={backend!r}. "
+            "Use backend='numpy'."
+        )
+
+
 def _nulling_T_for_column(v0: complex, v1: complex, atol: float) -> np.ndarray:
     """Unitary T with first column parallel to (v0, v1).
 
@@ -327,8 +343,13 @@ def _nulling_T_for_column(v0: complex, v1: complex, atol: float) -> np.ndarray:
     return np.column_stack([e0, e1])
 
 
-def reck_decomposition(U: np.ndarray, *, atol: float = 1e-10) -> list[tuple]:
+def reck_decomposition(
+    U: np.ndarray, *, atol: float = 1e-10, backend: str = "numpy"
+) -> list[tuple]:
     """Reck triangular factorization into 2-mode unitaries + diagonal phases.
+
+    Numpy-only (``backend="jax"`` raises NotImplementedError; see
+    ``_reject_non_numpy_backend``).
 
     Returns ops in **state-apply order** (first list element applied first):
 
@@ -346,6 +367,7 @@ def reck_decomposition(U: np.ndarray, *, atol: float = 1e-10) -> list[tuple]:
     matrix factorization ``U = T1 T2 … Tk D``. State-apply order is therefore
     ``D``, then ``Tk … T1`` (right-to-left). Phase-1 ships Reck (vision OK).
     """
+    _reject_non_numpy_backend(backend)
     U = np.asarray(U, dtype=complex).copy()
     validate_unitary(U, atol=max(atol, 1e-8))
     m = U.shape[0]
@@ -370,14 +392,18 @@ def reck_decomposition(U: np.ndarray, *, atol: float = 1e-10) -> list[tuple]:
     return phases + list(reversed(ts))
 
 
-def compose_unitary_mesh(m: int, ops: list[tuple]) -> np.ndarray:
+def compose_unitary_mesh(m: int, ops: list[tuple], *, backend: str = "numpy") -> np.ndarray:
     """Compose mesh ops into m×m unitary.
+
+    Numpy-only (``backend="jax"`` raises NotImplementedError; see
+    ``_reject_non_numpy_backend``).
 
     ``ops`` are in state-apply order (first applied first). The resulting matrix
     satisfies a ↦ U a with U = Op_n @ … @ Op_1.
 
     Phase op ``("phase", i, theta)`` means ``S_phase`` angle: mode factor e^{+iθ}.
     """
+    _reject_non_numpy_backend(backend)
     U = np.eye(m, dtype=complex)
     for op in ops:
         kind = op[0]
@@ -400,7 +426,7 @@ def compose_unitary_mesh(m: int, ops: list[tuple]) -> np.ndarray:
 
 
 def clements_decomposition(
-    U: np.ndarray, *, atol: float = 1e-10
+    U: np.ndarray, *, atol: float = 1e-10, backend: str = "numpy"
 ) -> list[tuple]:
     """ALIAS FOR RECK — not rectangular Clements hardware layout.
 
@@ -417,7 +443,7 @@ def clements_decomposition(
         FutureWarning,
         stacklevel=2,
     )
-    return reck_decomposition(U, atol=atol)
+    return reck_decomposition(U, atol=atol, backend=backend)
 
 
 def S_mach_zehnder(
