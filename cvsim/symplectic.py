@@ -260,15 +260,19 @@ def S_from_unitary(
     embedding (collective phase appears in S). Do not drop global phases
     by qubit-style "w.l.o.g." arguments.
 
-    Returned array type follows ``backend`` (np.ndarray or jax.Array);
-    the input U is always a numpy array (validation stays numpy).
+    Returned array type follows ``backend`` (np.ndarray or jax.Array).
+
+    Note: on the jax backend the unitary check is skipped (``validate``
+    ignored) — numpy validation cannot run on JAX tracers, and would raise
+    ``TracerArrayConversionError`` inside ``jax.jit``/``jax.grad``. The
+    square-shape check still runs on both backends.
     """
     xp = _get_xp(backend)
     U = xp.asarray(U, dtype=complex)
-    if validate:
-        validate_unitary(np.asarray(U), atol=atol)
-    elif U.ndim != 2 or U.shape[0] != U.shape[1]:
+    if U.ndim != 2 or U.shape[0] != U.shape[1]:
         raise ValueError(f"U must be square, got shape {U.shape}")
+    if backend == "numpy" and validate:
+        validate_unitary(U, atol=atol)
     Ru, Iu = xp.real(U), xp.imag(U)
     return _block(xp, [[Ru, -Iu], [Iu, Ru]])  # type: ignore[no-any-return]
 

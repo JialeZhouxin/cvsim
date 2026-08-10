@@ -100,6 +100,28 @@ def test_s_from_unitary_backend(backend: str) -> None:
     np.testing.assert_allclose(S, expected, atol=1e-12)
 
 
+@pytest.mark.skipif(not be.HAS_JAX, reason="jax not installed")
+def test_s_from_unitary_jit_compatible() -> None:
+    # OCR finding b91d771: validate must not run on JAX tracers (jit/grad).
+    import jax
+    import jax.numpy as jnp
+
+    U = jnp.asarray(U_beamsplitter(THETA, PHI))
+
+    @jax.jit
+    def build(u):
+        return S_from_unitary(u, backend="jax")
+
+    S = np.asarray(build(U))
+    expected = np.block([[np.asarray(U).real, -np.asarray(U).imag], [np.asarray(U).imag, np.asarray(U).real]])
+    np.testing.assert_allclose(S, expected, atol=1e-12)
+
+
+def test_s_from_unitary_non_square_backend(backend: str) -> None:
+    with pytest.raises(ValueError, match="square"):
+        S_from_unitary(np.eye(3, dtype=complex)[:, :2], backend=backend)
+
+
 # ---------------------------------------------------------------------------
 # S_mach_zehnder — backend must propagate to inner S_beamsplitter/S_phase
 # ---------------------------------------------------------------------------
