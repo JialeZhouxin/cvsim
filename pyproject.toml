@@ -40,6 +40,9 @@ dev = [
 gbs = [
     "thewalrus>=0.22,<0.23",  # 仅 0.22.0 实测确认（xxpp 约定），见 docs/gbs-walrus.md 版本注
 ]
+jax = [
+    "jax[cpu]>=0.4",  # 可微后端（Phase 4 F-AD）；Windows CPU 官方支持
+]
 lab = [
     "fastapi>=0.110",
     "uvicorn>=0.27",
