@@ -1604,3 +1604,36 @@ FockState.coherent（递推稳定，gammainc 下侧尾部）/squeezed/cat（含�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 47: F1 全 4 切片完成 — Fock 核心能力补全
+
+**Date**: 2026-08-11
+**Task**: F1 全 4 切片完成 — Fock 核心能力补全
+**Branch**: `master`
+
+### Summary
+
+circuit_common 迁移（切片1: ed4b69c+ea7f99c）/ 工厂+泄漏三件套（切片2: coherent 递推稳定+squeezed+cat+thermal, gammainc 下侧） / 门（切片3: cz/cx/mach_zehnder/interferometer/apply_unitary, 高斯 mean_photon 对照） / 通道（切片4: amplifier 量子限 Kraus 闭式+phase_noise 精确+apply_kraus, kron 全空间 2 模）; 822 passed; OCR 每切片收口 0 遗留; 归档 4 子任务 + parent
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

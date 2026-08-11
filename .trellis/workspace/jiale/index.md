@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 46
+- **Total Sessions**: 47
 - **Last Active**: 2026-08-11
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1606 | Active |
+| `journal-1.md` | ~1639 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 47 | 2026-08-11 | F1 全 4 切片完成 — Fock 核心能力补全 | HEAD | `master` |
 | 46 | 2026-08-11 | F1 切片 2/4 — 工厂 + 泄漏三件套 | HEAD | `master` |
 | 45 | 2026-08-11 | F1 切片 1/4 — circuit_common 迁移 | HEAD | `master` |
 | 44 | 2026-08-11 | Fock 架构设计锁定 | HEAD | `master` |
