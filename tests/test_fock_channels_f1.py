@@ -148,18 +148,17 @@ def _loss_kraus(N: int, T: float) -> list[np.ndarray]:
 
 
 def test_apply_kraus_mode_selection() -> None:
-    # non-identity operator on mode 1: phase-shift e^{iφn} — wrong-mode
-    # routing would leave ⟨n₁⟩/coherences unchanged and fail the assertions
+    # coherence-detecting: A = diag(e^{iφn}) on mode 1 turns the |2,1⟩⟨2,0|
+    # coherence (mode-1 photon numbers 1 vs 0) into ½e^{iφ}; wrong-mode
+    # routing multiplies both by e^{2iφ} → coherence stays ½ (phase 0)
     phi = 0.7
     A = np.diag(np.exp(1j * phi * np.arange(6)))
-    st = FockState.fock2(2, 1, 6)  # |2,1⟩
+    amps = np.zeros((6, 6), dtype=complex)
+    amps[2, 1] = 1.0 / np.sqrt(2.0)
+    amps[2, 0] = 1.0 / np.sqrt(2.0)
+    st = FockState(amps=amps)
     d = apply_kraus(st, [A], mode=1)
-    idx = 2 * 6 + 1
-    np.testing.assert_allclose(d.rho[idx, idx], 1.0, atol=1e-12)
-    # phase picked up on mode 1: ρ'[|2,1⟩,|2,1⟩] = |c|² e^{iφ·1}·e^{−iφ·1} — diagonal
-    # invariant; check the off-diagonal coherence |2,1⟩⟨2,1|↔|2,1⟩ is pure state
-    # instead: verify no leakage into |1,1⟩ (wrong-mode would move idx to 1·6+1)
-    np.testing.assert_allclose(d.rho[1 * 6 + 1, 1 * 6 + 1], 0.0, atol=1e-12)
+    np.testing.assert_allclose(d.rho[2 * 6 + 1, 2 * 6 + 0], 0.5 * np.exp(1j * phi), atol=1e-12)
 
 
 def test_apply_kraus_full_space() -> None:
