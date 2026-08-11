@@ -69,6 +69,7 @@ __all__ = [
     "norm",
     "pnrd_probs",
     "pnr_sample",
+    "pnr_sample_batch",
     "pnr_condition",
     "pnr_sample_and_condition",
     "heterodyne_sample",
