@@ -7,28 +7,16 @@ L4: ``measure_homodyne`` / ``measure_heterodyne`` + ``ParamRef`` feedforward.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import numpy as np
 
-from cvsim.gaussian.compile import CompiledGaussian, _compile_segments
+from cvsim.circuit_common import ParamRef, partition
+from cvsim.gaussian.compile import (
+    _BREAK_OPS,
+    _REMOVE_MODE_OPS,
+    CompiledGaussian,
+    _compile_segments,
+)
 from cvsim.gaussian.state import GaussianState
-
-
-@dataclass(frozen=True)
-class ParamRef:
-    """Reference to a homodyne measurement outcome, scaled by gain.
-
-    Used in circuit builder methods where a gate parameter depends on
-    a prior measurement result.
-
-    Usage::
-
-        c.measure_homodyne(1, phi=0, name='m_x')
-        c.displace(0, alpha=ParamRef('m_x', gain=0.5))
-    """
-    source: str
-    gain: float = 1.0
 
 
 class GaussianCircuit:
@@ -370,14 +358,5 @@ class GaussianCircuit:
         _fixed_str_keys: frozenset[str] = frozenset(),
         **kwargs: float | str | ParamRef,
     ) -> tuple[str, tuple, dict, dict, dict]:
-        fixed: dict = {}
-        params: dict = {}
-        refs: dict = {}
-        for k, v in kwargs.items():
-            if isinstance(v, ParamRef):
-                refs[k] = v
-            elif isinstance(v, str) and k not in _fixed_str_keys:
-                params[k] = v
-            else:
-                fixed[k] = v
-        return (op_name, tuple(modes), fixed, params, refs)
+        """Split builder kwargs into a 5-tuple (shared core, ADR-0004)."""
+        return partition(op_name, modes, _fixed_str_keys=_fixed_str_keys, **kwargs)

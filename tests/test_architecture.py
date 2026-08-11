@@ -14,7 +14,11 @@ REPO = Path(__file__).resolve().parents[1]
 CVSIM = REPO / "cvsim"
 
 REP_PACKAGES = ("cvsim.gaussian", "cvsim.fock", "cvsim.bosonic")
-ALLOWED_ROOT_IMPORTS = ("cvsim.conventions", "cvsim.symplectic")
+ALLOWED_ROOT_IMPORTS = (
+    "cvsim.conventions",
+    "cvsim.symplectic",
+    "cvsim.circuit_common",  # ADR-0004: 共享 DSL 核（gaussian/fock 共用）
+)
 FORBIDDEN_IMPORTS = ("cvsim.lab", "cvsim.demos", "cvsim.wigner")
 
 

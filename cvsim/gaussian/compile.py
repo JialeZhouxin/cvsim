@@ -1,7 +1,8 @@
-"""Circuit compiler: segment ops, merge affine unitary layers into (S, d).
+"""Gaussian circuit compiler: segment ops, merge affine unitary layers into (S, d).
 
-Architecture: docs/adr/0002. Segments are either ``('merged', nmode, ops)``
-(compile-time constants, instantiated to one (S, d) per run) or
+Architecture: docs/adr/0002 + ADR-0004 (shared core in ``cvsim.circuit_common``).
+Segments are either ``('merged', nmode, ops)`` (compile-time constants,
+instantiated to one (S, d) per run) or
 ``('op', op)`` (channel / measurement / ParamRef op, executed op-by-op).
 Mode references are resolved to physical coordinates at compile time via a
 static simulation of the measurement-mode-removal mapping (measurement
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from cvsim.circuit_common import CompiledCircuit, compile_segments
 from cvsim.gaussian.channels import apply_gaussian_channel
 from cvsim.gaussian.gates import apply_symplectic
 from cvsim.gaussian.observables import (
@@ -37,6 +39,8 @@ _BREAK_OPS = frozenset(
     {'loss', 'amplifier', 'phase_noise', 'gaussian_channel',
      'measure_homodyne', 'measure_heterodyne', 'measure_threshold'}
 )
+# Measurement ops that remove their mode from the physical mapping.
+_REMOVE_MODE_OPS = frozenset({'measure_homodyne', 'measure_heterodyne'})
 # Affine unitary ops that can be merged into a single (S, d).
 _MERGEABLE_OPS = frozenset(
     {'squeeze', 'displace', 'phase', 'fourier', 'beamsplitter',
@@ -110,64 +114,11 @@ def _compile_segments(
     ops: list[tuple],
     nmode: int,
 ) -> tuple[list, frozenset[str]]:
-    """Static segmentation with mode mapping resolved to physical coords.
-
-    Returns ``(segments, params)`` where params = union of bindable
-    parameter names (strings in ``pnames``).
-    """
-    # ops from GaussianCircuit._ops: (name, orig_modes, fixed, pnames, refs)
-    mapping = list(range(nmode))
-    segments: list = []
-    merged: list = []
-    params: set[str] = set()
-    merged_nmode = nmode
-
-    def flush() -> None:
-        nonlocal merged
-        if merged:
-            segments.append(('merged', merged_nmode, merged))
-            merged = []
-
-    for op in ops:
-        op_name, modes, fixed, pnames, refs = op
-        params.update(pnames.values())
-        if op_name in _BREAK_OPS or refs:
-            flush()
-            if modes:
-                phys = [mapping[m] for m in modes]
-                if any(p < 0 for p in phys):
-                    raise ValueError(
-                        f"{op_name} references a mode already measured/removed"
-                    )
-            else:
-                phys = []
-            segments.append(
-                ('op', (op_name, tuple(phys), fixed, pnames, refs))
-            )
-            # threshold breaks the segment too, but removes no mode
-            # (removed-mode refs already fail in the generic check above)
-            if op_name in ('measure_homodyne', 'measure_heterodyne'):
-                phys_mode = mapping[modes[0]]
-                nmode -= 1
-                for i in range(len(mapping)):
-                    if mapping[i] > phys_mode:
-                        mapping[i] -= 1
-                mapping[modes[0]] = -1
-            continue
-        # mergeable affine unitary
-        if not merged:
-            merged_nmode = nmode
-        if modes:
-            phys = [mapping[m] for m in modes]
-            if any(p < 0 for p in phys):
-                raise ValueError(
-                    f"{op_name} references a mode already measured/removed"
-                )
-        else:
-            phys = []
-        merged.append((op_name, tuple(phys), fixed, pnames, refs))
-    flush()
-    return segments, frozenset(params)
+    """Backward-compatible wrapper (ADR-0004): shared core with Gaussian sets."""
+    return compile_segments(
+        ops, nmode,
+        break_ops=_BREAK_OPS, remove_mode_ops=_REMOVE_MODE_OPS,
+    )
 
 
 def _run_op(
@@ -229,50 +180,26 @@ def _run_op(
     return st, results
 
 
-class CompiledGaussian:
-    """Compiled circuit: immutable segment snapshot; run() instantiates.
+class CompiledGaussian(CompiledCircuit):
+    """Compiled Gaussian circuit: immutable segment snapshot; run() instantiates.
 
-    Public surface: ``nmode``, ``params``, ``run(**values)``.
+    Public surface: ``nmode``, ``params``, ``run(**values)`` (ADR-0004: physics
+    injected via the three hooks below).
     """
 
-    def __init__(self, nmode: int, segments: list, params: frozenset[str]) -> None:
-        self.nmode = nmode
-        self.params = params
-        self._segments = list(segments)
+    def _init_state(self) -> GaussianState:
+        return GaussianState.vacuum(self.nmode)
 
-    def run(
-        self,
-        *,
-        rng: np.random.Generator | None = None,
-        **values: float,
-    ) -> GaussianState | tuple[GaussianState, dict[str, float]]:
-        """Execute compiled segments. Same semantics as ``GaussianCircuit.run``."""
-        st = GaussianState.vacuum(self.nmode)
-        results: dict[str, float] = {}
-        for seg in self._segments:
-            if seg[0] == 'merged':
-                _, nmode, ops = seg
-                S, d = _instantiate(ops, nmode, values)
-                st = apply_symplectic(st, S, d, validate=False)
-                continue
-            st, results = _run_op(seg[1], st, results, values, rng=rng)
-        if results:
-            return st, results
-        return st
+    def _apply_merged(
+        self, ops: list[tuple], nmode: int, values: dict, st: GaussianState
+    ) -> GaussianState:
+        S, d = _instantiate(ops, nmode, values)
+        return apply_symplectic(st, S, d, validate=False)
 
-    def __repr__(self) -> str:
-        lines = [f"CompiledGaussian({self.nmode})"]
-        for seg in self._segments:
-            if seg[0] == 'merged':
-                lines.append(f"  merged({len(seg[2])} ops)")
-            else:
-                op_name, modes, fixed, pnames, refs = seg[1]
-                args = [str(m) for m in modes]
-                args += [f"{k}={v}" for k, v in fixed.items()]
-                args += [f"{k}=${{{v}}}" for k, v in pnames.items()]
-                args += [f"{k}=${{{v.source}}}*{v.gain}" for k, v in refs.items()]
-                lines.append(f"  .{op_name}({', '.join(args)})")
-        return "\n".join(lines)
+    def _run_op(
+        self, op: tuple, st: GaussianState, results: dict, values: dict, *, rng=None
+    ) -> tuple[GaussianState, dict]:
+        return _run_op(op, st, results, values, rng=rng)
 
 
 _DISPATCH = {
