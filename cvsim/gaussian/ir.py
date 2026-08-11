@@ -24,7 +24,7 @@ SCHEMA = "circuit_v1"
 #: Top-level extension fields (UI concepts; content ignored, shallow type
 #: check only — vision-gaussian-lab-ui §7.5). Unknown top-level fields are
 #: rejected.
-EXTENSION_FIELDS = frozenset({"view", "seed", "ui"})
+EXTENSION_FIELDS = frozenset({"view", "seed", "ui", "cutoff"})  # cutoff: Fock per-mode cutoffs (F3)
 
 #: ``gaussian_channel`` execution-control flag stored in ``_ops.fixed``;
 #: not physics, not part of the IR (from_ir re-defaults validate=True).

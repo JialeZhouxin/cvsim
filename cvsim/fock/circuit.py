@@ -394,6 +394,19 @@ class FockCircuit:
 
     # -- execution ---------------------------------------------------------
 
+    def to_ir(self) -> dict:
+        """Serialize to a circuit_v1 dict (ADR-0003; with ``cutoff``)."""
+        from cvsim.fock.ir import to_ir
+
+        return to_ir(self)
+
+    @classmethod
+    def from_ir(cls, data: dict) -> FockCircuit:
+        """Rebuild from a circuit_v1 dict (ADR-0003)."""
+        from cvsim.fock.ir import from_ir
+
+        return from_ir(data)
+
     def compile(self) -> CompiledFock:
         """Structure-compile: segment ops (ADR-0002), resolve mode mapping."""
         segments, params = compile_segments(
@@ -574,8 +587,8 @@ class CompiledFock(CompiledCircuit):
                 st = _ch_loss(st, float(kwargs['eta']), modes[0])
             elif op_name == 'amplifier':
                 st = _ch_amplifier(
-                    st, float(kwargs['G']), float(kwargs.get('nbar', 0.0)),
-                    modes[0],
+                    st, float(kwargs['G']), modes[0],
+                    float(kwargs.get('nbar', 0.0)),
                 )
             elif op_name == 'phase_noise':
                 st = _ch_phase_noise(st, float(kwargs['sigma']), modes[0])
