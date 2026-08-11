@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 import numpy as np
 from scipy.special import eval_hermite, factorial
 
@@ -301,3 +303,212 @@ def homodyne_sample_and_condition(
     """Sample Homodyne outcome then condition. Thin combo; no new physics."""
     o = homodyne_sample(state, mode, phi, rng=rng, lim=lim, n_grid=n_grid)
     return o, homodyne_condition(state, mode, phi, o)
+
+
+# -- PNR measurement (vision §4 F2) ----------------------------------------
+
+
+def pnr_sample(
+    state: FockLike, mode: int = 0, *, rng: np.random.Generator | None = None
+) -> int:
+    """Sample a photon-number outcome from p_n = ⟨n|ρ|n⟩ (marginal on `mode`)."""
+    p = pnrd_probs(state, mode)
+    if rng is None:
+        rng = np.random.default_rng()
+    return int(rng.choice(p.size, p=p))
+
+
+def pnr_condition(state: FockLike, mode: int = 0, n: int = 0) -> FockState | FockDensity:
+    """Posterior after photon-number outcome `n` on `mode` (Born rule).
+
+    - 1-mode pure: posterior |n⟩ (projective, independent of prior).
+    - 1-mode density: |n⟩⟨n|.
+    - 2-mode pure: remaining mode conditioned on ⟨n|: ψ'[k] ∝ ψ[n,k] (mode 0)
+      or ψ[k,n] (mode 1).
+    - 2-mode density: (P⊗I)ρ(P⊗I)†/p with P=|n⟩⟨n|.
+    Outcome with zero probability → ValueError (honest, no silent renormalize).
+    """
+    if isinstance(state, FockDensity):
+        return _pnr_condition_density(state, mode, n)
+    return _pnr_condition_pure(state, mode, n)
+
+
+def _pnr_condition_pure(state: FockState, mode: int, n: int) -> FockState:
+    N = state.cutoff
+    if not 0 <= n < N:
+        raise IndexError(f"n={n} out of range for cutoff={N}")
+    if state.nmode == 1:
+        if mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        p = abs(state.amps[n]) ** 2
+        if p <= _EPS:
+            raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
+        amps = np.zeros(N, dtype=complex)
+        amps[n] = 1.0
+        return FockState(amps=amps)
+    if mode not in (0, 1):
+        raise IndexError(f"mode {mode} out of range for nmode=2")
+    if mode == 0:
+        vec = state.amps[n, :].copy()
+    else:
+        vec = state.amps[:, n].copy()
+    p = np.sum(abs(vec) ** 2)
+    if p <= _EPS:
+        raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
+    return FockState(amps=vec / np.sqrt(p))
+
+
+def _pnr_condition_density(state: FockDensity, mode: int, n: int) -> FockDensity:
+    N = state.cutoff
+    if not 0 <= n < N:
+        raise IndexError(f"n={n} out of range for cutoff={N}")
+    if state.nmode == 1:
+        if mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        p = np.real(state.rho[n, n])
+        if p <= _EPS:
+            raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
+        rho = np.zeros((N, N), dtype=complex)
+        rho[n, n] = 1.0
+        return FockDensity(rho=rho, nmode=1)
+    if mode not in (0, 1):
+        raise IndexError(f"mode {mode} out of range for nmode=2")
+    P = np.zeros((N, N), dtype=complex)
+    P[n, n] = 1.0
+    I = np.eye(N, dtype=complex)
+    A = np.kron(P, I) if mode == 0 else np.kron(I, P)
+    rho2 = A @ state.rho @ A.conj().T
+    p = np.real(np.trace(rho2))
+    if p <= _EPS:
+        raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
+    return FockDensity(rho=rho2 / p, nmode=2)
+
+
+def pnr_sample_and_condition(
+    state: FockLike, mode: int = 0, *, rng: np.random.Generator | None = None
+) -> tuple[int, FockState | FockDensity]:
+    """Sample a photon number then condition. Thin combo."""
+    n = pnr_sample(state, mode, rng=rng)
+    return n, pnr_condition(state, mode, n)
+
+
+# -- heterodyne measurement (vision §4 F2) ----------------------------------
+
+
+@lru_cache(maxsize=8)
+def _coherent_overlap_matrix(N: int, betas_key: tuple[complex, ...]) -> np.ndarray:
+    """v_n(β) = ⟨n|β⟩ = e^{−|β|²/2}·β^n/√n! — rows n, columns β (recurrence).
+
+    Cached on the beta tuple; grid samples reuse the same matrix."""
+    betas = np.asarray(betas_key, dtype=complex)
+    v = np.empty((N, betas.size), dtype=complex)
+    v[0] = np.exp(-0.5 * np.abs(betas) ** 2)
+    for n in range(1, N):
+        v[n] = v[n - 1] * betas / np.sqrt(n)
+    return v
+
+
+def _marginal_density(state: FockLike, mode: int) -> np.ndarray:
+    """Reduced density matrix of `mode` (N×N) from pure 2-mode or density."""
+    N = state.cutoff
+    if isinstance(state, FockDensity):
+        if state.nmode == 1:
+            if mode != 0:
+                raise IndexError(f"mode {mode} out of range for nmode=1")
+            return state.rho
+        rho4 = state.rho.reshape(N, N, N, N)
+        if mode == 0:
+            return np.einsum("abad->bd", rho4)
+        return np.einsum("abcb->ac", rho4)
+    if state.nmode == 1:
+        if mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        return np.outer(state.amps, state.amps.conj())
+    if mode == 0:
+        return np.einsum("ab,cb->ac", state.amps, state.amps.conj())
+    return np.einsum("ab,ac->bc", state.amps, state.amps.conj())
+
+
+def _q_function(state: FockLike, mode: int, betas: np.ndarray) -> np.ndarray:
+    """Q(β) = ⟨β|ρ_m|β⟩ on the marginal density of `mode` (vectorized)."""
+    rho = _marginal_density(state, mode)
+    V = _coherent_overlap_matrix(state.cutoff, tuple(betas))
+    return np.real(np.einsum("ng,nm,mg->g", V.conj(), rho, V))
+
+
+def heterodyne_sample(
+    state: FockLike,
+    mode: int = 0,
+    *,
+    rng: np.random.Generator | None = None,
+    lim: float = _SAMPLE_L,
+    n_grid: int = 129,
+) -> complex:
+    """Sample a heterodyne outcome β from Q(β) ∝ ⟨β|ρ|β⟩ on the discrete
+    (x,p) grid (teaching approx, same style as homodyne_sample)."""
+    if rng is None:
+        rng = np.random.default_rng()
+    if n_grid < 3:
+        raise ValueError("n_grid must be >= 3")
+    xs = np.linspace(-lim, lim, n_grid)
+    betas = (xs[None, :] + 1j * xs[:, None]).ravel()
+    q = _q_function(state, mode, betas)
+    q = np.maximum(q, 0.0)
+    s = q.sum()
+    if s <= _EPS:
+        raise ValueError("heterodyne_sample: Q-sum ~ 0 (zero state?)")
+    i = rng.choice(q.size, p=q / s)
+    return complex(betas[i])
+
+
+def heterodyne_condition(
+    state: FockLike, mode: int = 0, beta: complex = 0.0
+) -> FockState | FockDensity:
+    """Posterior after heterodyne outcome β (coherent POVM |β⟩⟨β|/π).
+
+    Rank-1 POVM: 1-mode posterior is always the coherent state |β⟩
+    (independent of prior). 2-mode: remaining mode conditioned on ⟨β|.
+    """
+    beta = complex(beta)
+    N = state.cutoff
+    if isinstance(state, FockDensity):
+        if state.nmode == 1:
+            if mode != 0:
+                raise IndexError(f"mode {mode} out of range for nmode=1")
+            return FockDensity.from_pure(FockState.coherent(N, beta))
+        if mode not in (0, 1):
+            raise IndexError(f"mode {mode} out of range for nmode=2")
+        v = _coherent_overlap_matrix(N, (beta,))[:, 0]
+        A = np.kron(np.outer(v, v.conj()), np.eye(N)) if mode == 0 else \
+            np.kron(np.eye(N), np.outer(v, v.conj()))
+        rho2 = A @ state.rho @ A.conj().T
+        p = np.real(np.trace(rho2))
+        if p <= _EPS:
+            raise ValueError(f"heterodyne_condition: outcome β={beta} has ~zero probability")
+        return FockDensity(rho=rho2 / p, nmode=2)
+    if state.nmode == 1:
+        if mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        return FockState.coherent(N, beta)
+    if mode not in (0, 1):
+        raise IndexError(f"mode {mode} out of range for nmode=2")
+    v = _coherent_overlap_matrix(N, (beta,))[:, 0]
+    if mode == 0:
+        vec = np.sum(state.amps * np.conj(v)[:, None], axis=0)  # Σ_n ψ[n,k] conj(v_n)
+    else:
+        vec = np.sum(state.amps * np.conj(v)[None, :], axis=1)
+    p = np.sum(abs(vec) ** 2)
+    if p <= _EPS:
+        raise ValueError(f"heterodyne_condition: outcome β={beta} has ~zero probability")
+    return FockState(amps=vec / np.sqrt(p))
+
+
+def heterodyne_sample_and_condition(
+    state: FockLike,
+    mode: int = 0,
+    *,
+    rng: np.random.Generator | None = None,
+) -> tuple[complex, FockState | FockDensity]:
+    """Sample a heterodyne outcome then condition. Thin combo."""
+    b = heterodyne_sample(state, mode, rng=rng)
+    return b, heterodyne_condition(state, mode, b)
