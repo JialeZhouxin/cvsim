@@ -1637,3 +1637,36 @@ circuit_common 迁移（切片1: ed4b69c+ea7f99c）/ 工厂+泄漏三件套（�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 48: F2 完成 — Fock analyse+measure+通用m+API 冻结（863 绿）
+
+**Date**: 2026-08-11
+**Task**: F2 完成 — Fock analyse+measure+通用m+API 冻结（863 绿）
+**Branch**: `master`
+
+### Summary
+
+切片1 测量: pnr_sample/condition（Born 规则零概率拒绝）+ heterodyne sample/condition（相干 POVM Q 网格采样 lru 缓存; 1 模后验恒=|β⟩）; 切片2 analyse: entropy_vn（thermal 闭式）/log_negativity（PT 'cbad' TMS 高斯对照 2r nats）/fidelity（Uhlmann 平方+截断重归一化）/partial_trace（恒返回密度）; 切片3 通用 m=1..4（m 次根 cutoff 校验）; 切片4 FOCK_PUBLIC 冻结 35 导出; 863 passed; OCR 每切片收口（4 findings 全修）
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
