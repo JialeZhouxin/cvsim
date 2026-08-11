@@ -64,9 +64,9 @@ class FockDensity:
             raise ValueError("cutoff must be >= 1")
         if nbar < 0:
             raise ValueError("nbar must be >= 0")
-        p = np.zeros(cutoff)
         n = np.arange(cutoff)
-        p = nbar ** n / (nbar + 1.0) ** (n + 1.0)
+        # p_n = (nbar/(nbar+1))^n / (nbar+1) — base < 1, no overflow for large nbar
+        p = (nbar / (nbar + 1.0)) ** n / (nbar + 1.0)
         rho = np.diag(p).astype(complex)
         return cls(rho=rho, nmode=1, _nbar=nbar)
 

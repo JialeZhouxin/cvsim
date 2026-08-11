@@ -112,9 +112,7 @@ def test_cat_matches_closed_form() -> None:
     en = np.exp(-abs(alpha) ** 2 / 2.0) * alpha**n / np.sqrt(
         np.array([math.factorial(k) for k in n])
     )
-    c = (en + (-1) ** 0 * np.conj(en))  # placeholder, replaced below
-    c = (en + (en * np.exp(-2 * abs(alpha) ** 2) * 0))  # noqa
-    # 直接用解析式：⟨n|±α⟩ = e^{−|α|²/2}(±α)^n/√n!
+    # ⟨n|−α⟩ = e^{−|α|²/2}(−α)^n/√n!
     em = np.exp(-abs(alpha) ** 2 / 2.0) * (-alpha) ** n / np.sqrt(
         np.array([math.factorial(k) for k in n])
     )
