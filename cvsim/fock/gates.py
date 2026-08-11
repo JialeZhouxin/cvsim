@@ -248,7 +248,6 @@ def interferometer(state: FockState, U: np.ndarray) -> FockState:
     a = annihilation(N)
     a0 = np.kron(a, I)
     a1 = np.kron(I, a)
-    K = np.linalg.slogdet(U)
     logU = logm(U)
     H = logU[0, 0] * (a0.conj().T @ a0) + logU[0, 1] * (a0.conj().T @ a1) + \
         logU[1, 0] * (a1.conj().T @ a0) + logU[1, 1] * (a1.conj().T @ a1)
@@ -268,11 +267,13 @@ def apply_unitary(
     """
     U = np.asarray(U, dtype=complex)
     if isinstance(state, FockDensity):
-        if state.nmode != 1:
-            raise ValueError("apply_unitary: FockDensity full-space path not implemented (m≤1)")
-        if U.shape != (state.cutoff, state.cutoff):
-            raise ValueError(f"U must be ({state.cutoff},{state.cutoff}) for 1-mode density")
-        return _apply_U_density(state, U)
+        N = state.cutoff
+        d = N if state.nmode == 1 else N * N
+        if U.shape != (d, d):
+            raise ValueError(f"apply_unitary: FockDensity U must be ({d},{d})")
+        rho = U @ state.rho @ U.conj().T
+        rho = 0.5 * (rho + rho.conj().T)
+        return FockDensity(rho=rho, nmode=state.nmode)
     N = state.cutoff
     if state.nmode == 1:
         if U.shape != (N, N):

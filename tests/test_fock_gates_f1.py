@@ -116,6 +116,19 @@ def test_mz_equals_sequential_gates() -> None:
         np.testing.assert_allclose(mz.amps, seq.amps, atol=1e-10)
 
 
+def test_mz_analytic_anchor() -> None:
+    # |1,0⟩ → BS(θ,φ) → P(φ)₁ → BS(π/4,0), BS sends |1,0⟩→(|1,0⟩−|0,1⟩)/√2:
+    # amps = (cosθ−sinθ)/√2 |1,0⟩ − (cosθ+sinθ)/√2 |0,1⟩ (closed form)
+    theta = 0.6
+    out = mach_zehnder(FockState.fock2(1, 0, 10), theta, 0.3)
+    np.testing.assert_allclose(
+        out.amps[1, 0], (np.cos(theta) - np.sin(theta)) / np.sqrt(2.0), atol=1e-12
+    )
+    np.testing.assert_allclose(
+        out.amps[0, 1], -(np.cos(theta) + np.sin(theta)) / np.sqrt(2.0), atol=1e-12
+    )
+
+
 def test_mz_requires_two_modes() -> None:
     with pytest.raises(ValueError):
         mach_zehnder(FockState.vacuum(8), 0.5)
@@ -178,6 +191,29 @@ def test_apply_unitary_full_space() -> None:
     expected = FockState.fock2(1, 0, 6)
     expected.amps[1, 0] *= np.exp(1j)
     np.testing.assert_allclose(out.amps, expected.amps, atol=1e-12)
+
+
+def test_interferometer_preserves_norm() -> None:
+    st = FockState.fock2(2, 1, 8)
+    theta, phi = 0.4, -0.7
+    U = np.array(
+        [
+            [np.cos(theta), np.exp(1j * phi) * np.sin(theta)],
+            [-np.exp(-1j * phi) * np.sin(theta), np.cos(theta)],
+        ]
+    )
+    out = interferometer(st, U)
+    np.testing.assert_allclose(
+        np.sum(abs(out.amps) ** 2), np.sum(abs(st.amps) ** 2), atol=1e-12
+    )
+
+
+def test_apply_unitary_density_full_space() -> None:
+    d = FockDensity.from_pure(FockState.fock2(1, 1, 6))
+    U = np.kron(np.eye(6), np.diag(np.exp(1j * np.arange(6))))
+    out = apply_unitary(d, U)
+    np.testing.assert_allclose(np.trace(out.rho), np.trace(d.rho), atol=1e-12)
+    np.testing.assert_allclose(out.rho, out.rho.conj().T, atol=1e-12)
 
 
 def test_apply_unitary_density() -> None:
