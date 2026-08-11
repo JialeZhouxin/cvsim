@@ -1538,3 +1538,36 @@ ADR-0004 接受：circuit_common 纯函数+注册表（ParamRef/partition/compil
 ### Next Steps
 
 - None - task complete
+
+
+## Session 45: F1 切片 1/4 — circuit_common 迁移
+
+**Date**: 2026-08-11
+**Task**: F1 切片 1/4 — circuit_common 迁移
+**Branch**: `master`
+
+### Summary
+
+ADR-0004 落地：cvsim/circuit_common.py（ParamRef/partition/compile_segments/CompiledCircuit 基类）；高斯 circuit/compile 迁移（_compile_segments 变 wrapper）；allowlist + circuit_common；ruff --fix 后 checkout 无关文件保持 surgical；OCR 1 low（死 import）已修 ea7f99c；766 绿
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
