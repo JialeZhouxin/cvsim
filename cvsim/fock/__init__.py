@@ -33,6 +33,7 @@ from cvsim.fock.observables import (
     pnr_condition,
     pnr_sample,
     pnr_sample_and_condition,
+    pnr_sample_batch,
     pnrd_probs,
     trace,
 )

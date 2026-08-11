@@ -150,3 +150,43 @@ def test_heterodyne_matches_tms_marginal() -> None:
     q = _q_function(st, 0, betas)
     expected = np.exp(-np.abs(betas) ** 2 / (nbar + 1.0)) / (nbar + 1.0)
     np.testing.assert_allclose(q, expected, atol=1e-6)
+
+
+# -- F3: PNR batch -----------------------------------------------------------
+
+def test_pnr_sample_batch_shapes_and_range() -> None:
+    from cvsim.fock import pnr_sample_batch
+
+    st = FockState.vacuum(8)
+    out = pnr_sample_batch(st, 0, size=1000, rng=np.random.default_rng(0))
+    assert out.shape == (1000,)
+    assert out.dtype.kind == "i" or out.dtype.kind == "u"
+    assert out.min() >= 0 and out.max() < 8
+    # all-zero draws must all be zero (vacuum)
+    assert np.all(out == 0)
+
+
+def test_pnr_sample_batch_matches_single_shot_distribution() -> None:
+    from cvsim.fock import pnr_sample, pnr_sample_batch
+    from cvsim.fock.gates import squeeze
+
+    st = squeeze(FockState.vacuum(10), 0.8)  # n̄ = sinh²(0.8) ≈ 0.79
+    rng1, rng2 = np.random.default_rng(1), np.random.default_rng(1)
+    single = np.array([pnr_sample(st, 0, rng=rng1) for _ in range(400)])
+    batch = pnr_sample_batch(st, 0, size=400, rng=rng2)
+    # same RNG seed → same stream semantics: both draw from the same marginal,
+    # so the empirical distributions agree (not necessarily identical draws).
+    assert abs(batch.mean() - single.mean()) < 0.2
+    # batch distribution ≈ theory n̄ = sinh² r
+    assert abs(batch.mean() - np.sinh(0.8) ** 2) < 0.15
+
+
+def test_pnr_sample_batch_density_2mode() -> None:
+    from cvsim.fock import pnr_sample_batch
+    from cvsim.fock.gates import two_mode_squeeze
+
+    st = FockDensity.from_pure(two_mode_squeeze(FockState.vacuum(8, nmode=2), 0.5))
+    out = pnr_sample_batch(st, mode=1, size=600, rng=np.random.default_rng(2))
+    assert out.shape == (600,)
+    # marginal on mode 1 of TMSV: thermal n̄ = sinh² r
+    assert abs(out.mean() - np.sinh(0.5) ** 2) < 0.2

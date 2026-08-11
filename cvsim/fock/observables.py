@@ -318,6 +318,24 @@ def pnr_sample(
     return int(rng.choice(p.size, p=p))
 
 
+def pnr_sample_batch(
+    state: FockLike,
+    mode: int = 0,
+    size: int = 1000,
+    *,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
+    """Vectorized batch of :func:`pnr_sample` — ``size`` i.i.d. outcomes in one call.
+
+    Same Born-rule marginal as the single-shot path (shared ``pnrd_probs``),
+    so 10³ shots cost one multinomial draw (F3 vision §4.3).
+    """
+    p = pnrd_probs(state, mode)
+    if rng is None:
+        rng = np.random.default_rng()
+    return rng.choice(p.size, p=p, size=size)
+
+
 def pnr_condition(state: FockLike, mode: int = 0, n: int = 0) -> FockState | FockDensity:
     """Posterior after photon-number outcome `n` on `mode` (Born rule).
 
