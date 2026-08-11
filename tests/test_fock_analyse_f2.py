@@ -156,5 +156,7 @@ def test_fidelity_density_mixed_mixed() -> None:
 
 
 def test_fidelity_nmode_mismatch() -> None:
+    # density on one side → density path → nmode guard actually fires
+    d1 = FockDensity.from_pure(FockState.fock(0, 6))
     with pytest.raises(ValueError):
-        fidelity(FockState.fock(0, 6), FockState.fock2(0, 0, 6))
+        fidelity(d1, FockState.fock2(0, 0, 6))
