@@ -117,7 +117,7 @@ def test_density_2mode_channel_path() -> None:
     assert out.nmode == 2
     # full-matrix parity: ρ_ref = U @ ρ_after_loss @ U† (same physics chain)
     rho_pure = FockDensity.from_pure(two_mode_squeeze(FockState.vacuum(6, nmode=2), 0.3))
-    rho_after = ch_loss(rho_pure, 0.6)
+    rho_after = ch_loss(rho_pure, 0.6, mode=0)
     U = _bs_U(6, 0.5, 0.0)
     ref = U @ rho_after.rho @ U.conj().T
     np.testing.assert_allclose(out.rho, ref, atol=1e-12)
