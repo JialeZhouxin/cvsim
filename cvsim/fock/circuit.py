@@ -12,6 +12,8 @@ execution path). Representation specifics (F3 decisions):
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from scipy.linalg import expm, logm
 
