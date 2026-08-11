@@ -49,8 +49,8 @@ def test_fockdensity_generic_m_validation() -> None:
         FockDensity(rho=np.eye(10, dtype=complex), nmode=3)  # not cutoff³
     with pytest.raises(ValueError):
         FockDensity(rho=np.eye(4, dtype=complex), nmode=5)
+    assert FockDensity(rho=np.eye(4, dtype=complex), nmode=1).cutoff == 4  # any d valid
     with pytest.raises(ValueError):
-        FockDensity(rho=np.eye(4, dtype=complex), nmode=1)  # nmode=1 needs d=N any — 4 fine
         FockDensity(rho=np.eye(4, dtype=complex), nmode=0)
 
 
