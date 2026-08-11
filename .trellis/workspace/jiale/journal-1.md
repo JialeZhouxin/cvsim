@@ -1571,3 +1571,36 @@ ADR-0004 落地：cvsim/circuit_common.py（ParamRef/partition/compile_segments/
 ### Next Steps
 
 - None - task complete
+
+
+## Session 46: F1 切片 2/4 — 工厂 + 泄漏三件套
+
+**Date**: 2026-08-11
+**Task**: F1 切片 2/4 — 工厂 + 泄漏三件套
+**Branch**: `master`
+
+### Summary
+
+FockState.coherent（递推稳定，gammainc 下侧尾部）/squeezed/cat（含偶奇）+ FockDensity.thermal（基<1 无溢出）+ truncation_leakage/check_leakage/estimate_leakage；22 测试（cat homodyne 锚 4.9506）；开发期自查 3 bug（gammaincc 上下侧写反/(-1)^nn 恒正/renorm 方向）；OCR 1 medium 1 low 已修；788 绿
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
