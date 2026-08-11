@@ -1,6 +1,18 @@
-from cvsim.fock.channels import loss
+from cvsim.fock.channels import amplifier, apply_kraus, loss, phase_noise
 from cvsim.fock.density import FockDensity
-from cvsim.fock.gates import beamsplitter, displace, kerr, phase, squeeze, two_mode_squeeze
+from cvsim.fock.gates import (
+    apply_unitary,
+    beamsplitter,
+    cx,
+    cz,
+    displace,
+    interferometer,
+    kerr,
+    mach_zehnder,
+    phase,
+    squeeze,
+    two_mode_squeeze,
+)
 from cvsim.fock.observables import (
     homodyne_condition,
     homodyne_mean,

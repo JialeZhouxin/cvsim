@@ -83,3 +83,161 @@ def loss(
     N = dens.cutoff
     out = _apply_kraus_2mode_side(dens.rho, N, T, mode)
     return FockDensity(rho=out, nmode=2)
+
+
+FockLike = FockState | FockDensity
+
+
+def _to_density(state: FockLike) -> FockDensity:
+    if isinstance(state, FockDensity):
+        return state
+    return FockDensity.from_pure(state)
+
+
+def phase_noise(state: FockLike, sigma: float, mode: int = 0) -> FockDensity:
+    """Phase diffusion: ρ' = ∫ R(φ) ρ R(φ)† p(φ)dφ, φ∼N(0,σ²).
+
+    Closed form: ρ'_{nm} = ρ_{nm}·e^{−σ²(n−m)²/2} (diagonal invariant).
+    Output is a density operator (random phase decorrelates).
+    """
+    if sigma < 0.0:
+        raise ValueError(f"sigma must be >= 0, got {sigma}")
+    rho = _to_density(state)
+    if rho.nmode == 1:
+        if mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        return _apply_phase_diffusion(rho, sigma)
+    if mode not in (0, 1):
+        raise IndexError(f"mode {mode} out of range for nmode=2")
+    N = rho.cutoff
+    # 2-mode: act on mode `mode` — elementwise mask on the (N²×N²) rho
+    n0, n1 = np.meshgrid(np.arange(N), np.arange(N), indexing="ij")
+    fock_idx = n0.ravel() * N + n1.ravel()  # row-major |n0 n1⟩
+    if mode == 0:
+        nn = fock_idx // N
+    else:
+        nn = fock_idx % N
+    damp = np.exp(-sigma * sigma / 2.0 * (nn[:, None] - nn[None, :]) ** 2)
+    rho2 = rho.rho * damp
+    return FockDensity(rho=rho2, nmode=2)
+
+
+def _apply_phase_diffusion(rho: FockDensity, sigma: float) -> FockDensity:
+    n = np.arange(rho.cutoff)
+    damp = np.exp(-sigma * sigma / 2.0 * (n[:, None] - n[None, :]) ** 2)
+    return FockDensity(rho=rho.rho * damp, nmode=1)
+
+
+def amplifier(
+    state: FockLike, G: float, mode: int = 0, nbar: float = 0.0
+) -> FockDensity:
+    """Quantum-limited phase-insensitive amplifier (nbar=0).
+
+    Kraus (vacuum environment TMS): A_k|n⟩ = √C(n+k,k)·(√(G−1))^k·G^{−(n+k+1)/2}|n+k⟩.
+    Verified: Σ_k A_k†A_k = I (trace-preserving); vacuum → thermal n̄ = G−1.
+    Matches Gaussian amplifier(G, nbar=0): X=√G·I₂, Y=(G−1)/2·I₂.
+    ``nbar>0``: not implemented (F3 truncation engineering).
+    """
+    if not G >= 1.0:
+        raise ValueError(f"G must be >= 1, got {G}")
+    if nbar != 0.0:
+        raise NotImplementedError(
+            "amplifier nbar>0 not implemented in Fock (F3 truncation engineering)"
+        )
+    rho = _to_density(state)
+    if rho.nmode == 1:
+        if mode != 0:
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        return _amplify_1mode(rho, G)
+    if mode not in (0, 1):
+        raise IndexError(f"mode {mode} out of range for nmode=2")
+    N = rho.cutoff
+    rho_1 = _amplify_1mode(_partial_1mode(rho, mode), G)
+    return _embed_1mode(rho_1, mode)
+
+
+def _amplify_1mode(rho: FockDensity, G: float) -> FockDensity:
+    N = rho.cutoff
+    sG = math.sqrt(G)
+    gm1 = math.sqrt(G - 1.0)
+    out = np.zeros((N, N), dtype=complex)
+    for k in range(N):
+        # A_k[n+k, n] = √C(n+k,k)·(√(G−1))^k·(1/√G)^{n+1}
+        ns = np.arange(N - k)
+        coef = np.sqrt(np.array([math.comb(n + k, k) for n in ns]))
+        ak = np.zeros((N, N), dtype=complex)
+        ak[np.arange(k, N), ns] = coef * (gm1**k) * (1.0 / sG) ** (ns + k + 1.0)
+        out += ak @ rho.rho @ ak.conj().T
+    out = 0.5 * (out + out.conj().T)
+    return FockDensity(rho=out, nmode=1)
+
+
+def _partial_1mode(rho: FockDensity, mode: int) -> FockDensity:
+    """Trace out the other mode of a 2-mode density (per-mode reduced state)."""
+    N = rho.cutoff
+    rho4 = rho.rho.reshape(N, N, N, N)
+    if mode == 0:
+        red = np.einsum("abcd->ac", rho4)
+    else:
+        red = np.einsum("abcd->bd", rho4)
+    return FockDensity(rho=red, nmode=1)
+
+
+def _embed_1mode(rho1: FockDensity, mode: int) -> FockDensity:
+    """Embed a 1-mode density into 2-mode space (other mode vacuum)."""
+    N = rho1.cutoff
+    vac = np.zeros((N, N), dtype=complex)
+    vac[0, 0] = 1.0
+    if mode == 0:
+        full = np.kron(rho1.rho, vac)
+    else:
+        full = np.kron(vac, rho1.rho)
+    return FockDensity(rho=full, nmode=2)
+
+
+def apply_kraus(
+    state: FockLike, kraus: list[np.ndarray], mode: int | None = None
+) -> FockDensity:
+    """Apply a Kraus decomposition ρ' = Σ_k A_k ρ A_k†.
+
+    - 1-mode state: each A_k is (N, N); ``mode`` must be None/0.
+    - 2-mode state with ``mode``: (N, N) Kraus on that mode (tensor I).
+    - 2-mode state with ``mode=None``: (N², N²) full-space Kraus.
+    Validates Σ_k A_k†A_k = I (trace preservation) unless it is a
+    post-selection (measurement) channel, in which case pass the
+    unnormalized list and renormalize the output.
+    """
+    rho = _to_density(state)
+    N = rho.cutoff
+    ks = [np.asarray(a, dtype=complex) for a in kraus]
+    if not ks:
+        raise ValueError("kraus list must be non-empty")
+    if rho.nmode == 1:
+        if mode not in (None, 0):
+            raise IndexError(f"mode {mode} out of range for nmode=1")
+        for a in ks:
+            if a.shape != (N, N):
+                raise ValueError(f"Kraus must be ({N},{N}) for 1-mode, got {a.shape}")
+        return _kraus_sum(rho, ks)
+    d = N * N
+    if mode is None:
+        for a in ks:
+            if a.shape != (d, d):
+                raise ValueError(f"Kraus must be ({d},{d}) full-space, got {a.shape}")
+        return _kraus_sum(rho, ks)
+    if mode not in (0, 1):
+        raise IndexError(f"mode {mode} out of range for nmode=2")
+    I = np.eye(N, dtype=complex)
+    for a in ks:
+        if a.shape != (N, N):
+            raise ValueError(f"Kraus must be ({N},{N}) for mode application, got {a.shape}")
+    full = [np.kron(a, I) if mode == 0 else np.kron(I, a) for a in ks]
+    return _kraus_sum(rho, full)
+
+
+def _kraus_sum(rho: FockDensity, ks: list[np.ndarray]) -> FockDensity:
+    out = np.zeros_like(rho.rho, dtype=complex)
+    for a in ks:
+        out += a @ rho.rho @ a.conj().T
+    out = 0.5 * (out + out.conj().T)
+    return FockDensity(rho=out, nmode=rho.nmode)
