@@ -1505,3 +1505,36 @@ Q1-Q12 brainstorm 全锁：生产级平级（能力面对称+截断工程横切�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 44: Fock 架构设计锁定
+
+**Date**: 2026-08-11
+**Task**: Fock 架构设计锁定
+**Branch**: `master`
+
+### Summary
+
+ADR-0004 接受：circuit_common 纯函数+注册表（ParamRef/partition/compile_segments/CompiledCircuit）+ 立即迁移策略（766 兜底）+ ADR-0001 allowlist 修订（F3 前置）；fock 8 模块划分认可 + 接口 A-H 全锁（标量 cutoff/泄漏三件套/CZ CX 连续变量物理/apply_unitary 独有/PNR heterodyne 族命名/analyse 镜像/api-freeze F2 出口）；设计任务归档，F1 可开
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `HEAD` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
