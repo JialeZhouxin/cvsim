@@ -33,13 +33,11 @@ class FockState:
 
     def __post_init__(self) -> None:
         self.amps = np.asarray(self.amps, dtype=complex)
-        if self.amps.ndim == 1:
-            pass
-        elif self.amps.ndim == 2:
-            if self.amps.shape[0] != self.amps.shape[1]:
-                raise ValueError("two-mode amps must be square (N,N)")
-        else:
-            raise ValueError("amps must be 1-D or 2-D")
+        m = self.amps.ndim
+        if not 1 <= m <= 4:
+            raise ValueError("amps ndim must be 1..4 (dense m≤4; sparse F3)")
+        if len(set(self.amps.shape)) != 1:
+            raise ValueError(f"amps axes must be equal length (got {self.amps.shape})")
 
     @property
     def cutoff(self) -> int:
@@ -47,21 +45,17 @@ class FockState:
 
     @property
     def nmode(self) -> int:
-        return 1 if self.amps.ndim == 1 else 2
+        return self.amps.ndim
 
     @classmethod
     def vacuum(cls, cutoff: int, nmode: int = 1) -> FockState:
         if cutoff < 1:
             raise ValueError("cutoff must be >= 1")
-        if nmode == 1:
-            amps = np.zeros(cutoff, dtype=complex)
-            amps[0] = 1.0
-            return cls(amps=amps, tail=0.0)
-        if nmode == 2:
-            amps = np.zeros((cutoff, cutoff), dtype=complex)
-            amps[0, 0] = 1.0
-            return cls(amps=amps, tail=0.0)
-        raise ValueError("nmode must be 1 or 2")
+        if not 1 <= nmode <= 4:
+            raise ValueError("nmode must be 1..4 (dense m≤4; sparse F3)")
+        amps = np.zeros((cutoff,) * nmode, dtype=complex)
+        amps[(0,) * nmode] = 1.0
+        return cls(amps=amps, tail=0.0)
 
     @classmethod
     def fock(cls, n: int, cutoff: int) -> FockState:

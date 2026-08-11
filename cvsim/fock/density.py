@@ -25,33 +25,25 @@ class FockDensity:
         self.rho = np.asarray(self.rho, dtype=complex)
         if self.rho.ndim != 2 or self.rho.shape[0] != self.rho.shape[1]:
             raise ValueError("rho must be square 2-D")
-        if self.nmode not in (1, 2):
-            raise ValueError("nmode must be 1 or 2")
+        if not 1 <= self.nmode <= 4:
+            raise ValueError("nmode must be 1..4 (dense m≤4; sparse F3)")
         d = self.rho.shape[0]
-        if self.nmode == 1:
-            return
-        # nmode=2: d must be perfect square
-        n = int(round(d**0.5))
-        if n * n != d:
-            raise ValueError(f"2-mode rho dim {d} is not a perfect square")
+        n = int(round(d ** (1.0 / self.nmode)))
+        if n ** self.nmode != d:
+            raise ValueError(f"rho dim {d} is not cutoff**{self.nmode}")
 
     @property
     def cutoff(self) -> int:
         d = int(self.rho.shape[0])
-        if self.nmode == 1:
-            return d
-        n = int(round(d**0.5))
-        return n
+        return int(round(d ** (1.0 / self.nmode)))
 
     @classmethod
     def from_pure(cls, state: FockState) -> FockDensity:
         if state.nmode == 1:
             a = state.amps
             return cls(rho=np.outer(a, a.conj()), nmode=1)
-        if state.nmode == 2:
-            a = state.amps.ravel()
-            return cls(rho=np.outer(a, a.conj()), nmode=2)
-        raise ValueError("FockDensity.from_pure supports nmode 1 or 2 only")
+        a = state.amps.ravel()
+        return cls(rho=np.outer(a, a.conj()), nmode=state.nmode)
 
     @classmethod
     def thermal(cls, cutoff: int, nbar: float) -> FockDensity:
