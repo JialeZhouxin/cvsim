@@ -19,6 +19,7 @@ class FockDensity:
 
     rho: np.ndarray
     nmode: int = 1
+    _nbar: float | None = None  # thermal factory parameter (analytic tail)
 
     def __post_init__(self) -> None:
         self.rho = np.asarray(self.rho, dtype=complex)
@@ -52,5 +53,33 @@ class FockDensity:
             return cls(rho=np.outer(a, a.conj()), nmode=2)
         raise ValueError("FockDensity.from_pure supports nmode 1 or 2 only")
 
+    @classmethod
+    def thermal(cls, cutoff: int, nbar: float) -> FockDensity:
+        """Thermal state with mean photon number nbar (diagonal).
+
+        p_n = nbar^n / (nbar+1)^{n+1}; exact analytic tail
+        (nbar/(nbar+1))^cutoff.
+        """
+        if cutoff < 1:
+            raise ValueError("cutoff must be >= 1")
+        if nbar < 0:
+            raise ValueError("nbar must be >= 0")
+        p = np.zeros(cutoff)
+        n = np.arange(cutoff)
+        p = nbar ** n / (nbar + 1.0) ** (n + 1.0)
+        rho = np.diag(p).astype(complex)
+        return cls(rho=rho, nmode=1, _nbar=nbar)
+
+    @property
+    def tail(self) -> float | None:
+        """Analytic truncation tail: thermal states exact, else ``None``.
+
+        Thermal tail = (nbar/(nbar+1))^cutoff (closed form). General density
+        matrices: unknown — never guessed (vision §5).
+        """
+        if self._nbar is not None:
+            return float((self._nbar / (self._nbar + 1.0)) ** self.cutoff)
+        return None
+
     def copy(self) -> FockDensity:
-        return FockDensity(rho=self.rho.copy(), nmode=self.nmode)
+        return FockDensity(rho=self.rho.copy(), nmode=self.nmode, _nbar=self._nbar)

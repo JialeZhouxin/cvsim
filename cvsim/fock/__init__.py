@@ -12,11 +12,19 @@ from cvsim.fock.observables import (
     pnrd_probs,
     trace,
 )
-from cvsim.fock.state import FockState
+from cvsim.fock.state import (
+    FockState,
+    check_leakage,
+    estimate_leakage,
+    truncation_leakage,
+)
 
 __all__ = [
     "FockState",
     "FockDensity",
+    "truncation_leakage",
+    "check_leakage",
+    "estimate_leakage",
     "squeeze",
     "displace",
     "phase",
