@@ -148,51 +148,36 @@ def amplifier(
     if rho.nmode == 1:
         if mode != 0:
             raise IndexError(f"mode {mode} out of range for nmode=1")
-        return _amplify_1mode(rho, G)
+        return _kraus_sum(rho, _amplify_kraus(rho.cutoff, G))
     if mode not in (0, 1):
         raise IndexError(f"mode {mode} out of range for nmode=2")
     N = rho.cutoff
-    rho_1 = _amplify_1mode(_partial_1mode(rho, mode), G)
-    return _embed_1mode(rho_1, mode)
+    I = np.eye(N, dtype=complex)
+    ks = _amplify_kraus(N, G)
+    full = [np.kron(a, I) if mode == 0 else np.kron(I, a) for a in ks]
+    return _kraus_sum(rho, full)
 
 
-def _amplify_1mode(rho: FockDensity, G: float) -> FockDensity:
-    N = rho.cutoff
+def _amplify_kraus(N: int, G: float) -> list[np.ndarray]:
+    """Quantum-limited amplifier Kraus ops A_k (see amplifier docstring).
+
+    k loop stops early once the k-th op is negligible ((√(G−1)/√G)^k < 1e-15);
+    column truncation (input n near cutoff) is the same truncation-honest
+    boundary as ``loss`` — leakage visible via check_leakage/estimate.
+    """
     sG = math.sqrt(G)
     gm1 = math.sqrt(G - 1.0)
-    out = np.zeros((N, N), dtype=complex)
-    for k in range(N):
-        # A_k[n+k, n] = √C(n+k,k)·(√(G−1))^k·(1/√G)^{n+1}
+    ratio = gm1 / sG  # < 1 for G > 1; A_k norm decays as ratio^k
+    ks: list[np.ndarray] = []
+    k = 0
+    while k < N and (ratio**k) * (sG ** (-1)) > 1e-15:
         ns = np.arange(N - k)
         coef = np.sqrt(np.array([math.comb(n + k, k) for n in ns]))
         ak = np.zeros((N, N), dtype=complex)
         ak[np.arange(k, N), ns] = coef * (gm1**k) * (1.0 / sG) ** (ns + k + 1.0)
-        out += ak @ rho.rho @ ak.conj().T
-    out = 0.5 * (out + out.conj().T)
-    return FockDensity(rho=out, nmode=1)
-
-
-def _partial_1mode(rho: FockDensity, mode: int) -> FockDensity:
-    """Trace out the other mode of a 2-mode density (per-mode reduced state)."""
-    N = rho.cutoff
-    rho4 = rho.rho.reshape(N, N, N, N)
-    if mode == 0:
-        red = np.einsum("abcd->ac", rho4)
-    else:
-        red = np.einsum("abcd->bd", rho4)
-    return FockDensity(rho=red, nmode=1)
-
-
-def _embed_1mode(rho1: FockDensity, mode: int) -> FockDensity:
-    """Embed a 1-mode density into 2-mode space (other mode vacuum)."""
-    N = rho1.cutoff
-    vac = np.zeros((N, N), dtype=complex)
-    vac[0, 0] = 1.0
-    if mode == 0:
-        full = np.kron(rho1.rho, vac)
-    else:
-        full = np.kron(vac, rho1.rho)
-    return FockDensity(rho=full, nmode=2)
+        ks.append(ak)
+        k += 1
+    return ks
 
 
 def apply_kraus(

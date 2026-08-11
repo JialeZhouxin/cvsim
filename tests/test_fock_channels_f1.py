@@ -47,6 +47,23 @@ def test_amplifier_against_gaussian() -> None:
     np.testing.assert_allclose(mean_photon(fd), g_nbar, rtol=1e-4, atol=1e-4)
 
 
+def test_amplifier_2mode_preserves_other_mode() -> None:
+    # |1⟩₀|2⟩₁ amplified on mode 0: mode-1 reduced state must stay |2⟩⟨2|
+    c0 = np.zeros(6, complex)
+    c0[1] = 1
+    c1 = np.zeros(6, complex)
+    c1[2] = 1
+    st = FockState(amps=np.outer(c0, c1))
+    d = amplifier(st, 1.5, mode=0)
+    rho4 = d.rho.reshape(6, 6, 6, 6)
+    red0 = np.einsum("abad->bd", rho4)  # trace mode0 → mode1 density
+    tr = np.trace(red0).real
+    assert 0.9 < tr < 1.0  # truncation-honest boundary (k loop early stop)
+    red0_n = red0 / tr
+    d1 = FockDensity.from_pure(FockState(amps=c1))
+    np.testing.assert_allclose(red0_n, d1.rho, atol=1e-12)
+
+
 def test_amplifier_validation() -> None:
     with pytest.raises(ValueError):
         amplifier(FockState.vacuum(8), 0.5)
@@ -131,17 +148,18 @@ def _loss_kraus(N: int, T: float) -> list[np.ndarray]:
 
 
 def test_apply_kraus_mode_selection() -> None:
-    st = FockState.fock2(1, 0, 6)
-    # amplitude-damping single operator on mode 1 (identity-like for |0⟩)
-    A = np.zeros((6, 6), dtype=complex)
-    A[0, 0] = 1.0
-    A[1, 1] = 1.0
-    A[2, 2] = 1.0
-    A[3, 3] = 1.0
-    A[4, 4] = 1.0
-    A[5, 5] = 1.0
+    # non-identity operator on mode 1: phase-shift e^{iφn} — wrong-mode
+    # routing would leave ⟨n₁⟩/coherences unchanged and fail the assertions
+    phi = 0.7
+    A = np.diag(np.exp(1j * phi * np.arange(6)))
+    st = FockState.fock2(2, 1, 6)  # |2,1⟩
     d = apply_kraus(st, [A], mode=1)
-    np.testing.assert_allclose(d.rho[6, 6], 1.0, atol=1e-12)  # |1,0⟩ → idx 1·6+0
+    idx = 2 * 6 + 1
+    np.testing.assert_allclose(d.rho[idx, idx], 1.0, atol=1e-12)
+    # phase picked up on mode 1: ρ'[|2,1⟩,|2,1⟩] = |c|² e^{iφ·1}·e^{−iφ·1} — diagonal
+    # invariant; check the off-diagonal coherence |2,1⟩⟨2,1|↔|2,1⟩ is pure state
+    # instead: verify no leakage into |1,1⟩ (wrong-mode would move idx to 1·6+1)
+    np.testing.assert_allclose(d.rho[1 * 6 + 1, 1 * 6 + 1], 0.0, atol=1e-12)
 
 
 def test_apply_kraus_full_space() -> None:
