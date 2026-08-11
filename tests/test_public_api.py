@@ -113,3 +113,73 @@ def test_examples_phase1_imports_public_only():
                     assert not any(
                         p.startswith("_") for p in parts[1:]
                     ), f"private import {alias.name}"
+
+
+# -- FOCK (F2 exit: freeze the export surface, mirror of GAUSSIAN_PUBLIC) ----
+
+import cvsim.fock as fock
+
+FOCK_PUBLIC = {
+    # states + factories
+    "FockState",
+    "FockDensity",
+    # leakage trio (F1)
+    "truncation_leakage",
+    "check_leakage",
+    "estimate_leakage",
+    # gates (F1)
+    "squeeze",
+    "displace",
+    "phase",
+    "beamsplitter",
+    "mach_zehnder",
+    "two_mode_squeeze",
+    "cz",
+    "cx",
+    "kerr",
+    "interferometer",
+    "apply_unitary",
+    # channels (F1)
+    "loss",
+    "amplifier",
+    "phase_noise",
+    "apply_kraus",
+    # observables (F1/F2)
+    "norm",
+    "trace",
+    "mean_photon",
+    "pnrd_probs",
+    "homodyne_mean",
+    "homodyne_var",
+    "homodyne_sample",
+    "homodyne_condition",
+    "homodyne_sample_and_condition",
+    "pnr_sample",
+    "pnr_condition",
+    "pnr_sample_and_condition",
+    "heterodyne_sample",
+    "heterodyne_condition",
+    "heterodyne_sample_and_condition",
+    # analyse (F2)
+    "entropy_vn",
+    "partial_trace",
+    "log_negativity",
+    "fidelity",
+}
+
+
+def test_fock_all_matches_freeze():
+    assert set(fock.__all__) == FOCK_PUBLIC
+
+
+def test_fock_all_importable():
+    for name in fock.__all__:
+        assert getattr(fock, name) is not None
+
+
+def test_fock_methods_frozen():
+    """Classmethods (factories) live on the classes, not in ``__all__``."""
+    assert callable(fock.FockState.coherent)
+    assert callable(fock.FockState.squeezed)
+    assert callable(fock.FockState.cat)
+    assert callable(fock.FockDensity.thermal)
