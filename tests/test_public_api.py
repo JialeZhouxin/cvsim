@@ -123,6 +123,7 @@ FOCK_PUBLIC = {
     # states + factories
     "FockState",
     "FockDensity",
+    "FockSparse",
     # leakage trio (F1)
     "truncation_leakage",
     "check_leakage",

@@ -37,6 +37,7 @@ from cvsim.fock.observables import (
     pnrd_probs,
     trace,
 )
+from cvsim.fock.sparse import FockSparse
 from cvsim.fock.state import (
     FockState,
     check_leakage,
@@ -45,6 +46,7 @@ from cvsim.fock.state import (
 )
 
 __all__ = [
+    "FockSparse",
     "FockState",
     "FockDensity",
     "truncation_leakage",
