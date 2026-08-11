@@ -1,3 +1,9 @@
+from cvsim.fock.analyse import (
+    entropy_vn,
+    fidelity,
+    log_negativity,
+    partial_trace,
+)
 from cvsim.fock.channels import amplifier, apply_kraus, loss, phase_noise
 from cvsim.fock.density import FockDensity
 from cvsim.fock.gates import (
@@ -67,6 +73,10 @@ __all__ = [
     "heterodyne_sample",
     "heterodyne_condition",
     "heterodyne_sample_and_condition",
+    "entropy_vn",
+    "log_negativity",
+    "fidelity",
+    "partial_trace",
     "trace",
     "homodyne_mean",
     "homodyne_var",
