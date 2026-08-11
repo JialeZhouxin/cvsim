@@ -29,8 +29,9 @@ def test_fockstate_4mode_and_validation() -> None:
     assert st.nmode == 4 and st.cutoff == 3
     with pytest.raises(ValueError):
         FockState(np.zeros((3, 3, 3, 3, 3), dtype=complex))  # m=5 above ceiling
-    with pytest.raises(ValueError):
-        FockState(np.zeros((4, 5), dtype=complex))  # unequal axes
+    # per-mode cutoffs (F3): unequal axes are legal now
+    st = FockState(np.zeros((4, 5), dtype=complex))
+    assert st.nmode == 2 and st.cutoff == 4
 
 
 def test_fockstate_vacuum_generic_m() -> None:

@@ -36,8 +36,8 @@ class FockState:
         m = self.amps.ndim
         if not 1 <= m <= 4:
             raise ValueError("amps ndim must be 1..4 (dense m≤4; sparse F3)")
-        if len(set(self.amps.shape)) != 1:
-            raise ValueError(f"amps axes must be equal length (got {self.amps.shape})")
+        if any(n < 1 for n in self.amps.shape):
+            raise ValueError(f"amps axes must be positive (got {self.amps.shape})")
 
     @property
     def cutoff(self) -> int:
