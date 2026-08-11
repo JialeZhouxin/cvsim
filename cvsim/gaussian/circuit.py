@@ -10,12 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from cvsim.circuit_common import ParamRef, partition
-from cvsim.gaussian.compile import (
-    _BREAK_OPS,
-    _REMOVE_MODE_OPS,
-    CompiledGaussian,
-    _compile_segments,
-)
+from cvsim.gaussian.compile import CompiledGaussian, _compile_segments
 from cvsim.gaussian.state import GaussianState
 
 
