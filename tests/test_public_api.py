@@ -155,6 +155,7 @@ FOCK_PUBLIC = {
     "homodyne_condition",
     "homodyne_sample_and_condition",
     "pnr_sample",
+    "pnr_sample_batch",
     "pnr_condition",
     "pnr_sample_and_condition",
     "heterodyne_sample",
