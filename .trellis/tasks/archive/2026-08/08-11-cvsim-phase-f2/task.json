@@ -1,0 +1,31 @@
+{
+  "id": "cvsim-phase-f2",
+  "name": "cvsim-phase-f2",
+  "title": "F2 analyse+measure+api-freeze",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "jiale",
+  "assignee": "jiale",
+  "createdAt": "2026-08-11",
+  "completedAt": "2026-08-11",
+  "branch": null,
+  "base_branch": "master",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "08-11-f2-measure",
+    "08-11-f2-analyse",
+    "08-11-f2-generic-m",
+    "08-11-f2-apifreeze"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
