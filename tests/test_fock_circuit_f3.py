@@ -98,7 +98,6 @@ def test_channel_breaks_segment_and_density_path() -> None:
     c.phase(0, theta=0.5)  # after channel: density path
     out = c.run()
     assert isinstance(out, FockDensity)
-    ref = phase(FockDensity.from_pure(squeeze(FockState.vacuum(8), 0.4)), 0.5)
     from cvsim.fock.channels import loss as ch_loss
 
     ref = phase(ch_loss(FockDensity.from_pure(squeeze(FockState.vacuum(8), 0.4)), 0.7), 0.5)
@@ -106,6 +105,9 @@ def test_channel_breaks_segment_and_density_path() -> None:
 
 
 def test_density_2mode_channel_path() -> None:
+    from cvsim.fock.circuit import _bs_U
+    from cvsim.fock.channels import loss as ch_loss
+
     c = FockCircuit(2, cutoff=6)
     c.two_mode_squeeze(0, 1, r=0.3)
     c.loss(0, eta=0.6)
@@ -113,6 +115,12 @@ def test_density_2mode_channel_path() -> None:
     out = c.run()
     assert isinstance(out, FockDensity)
     assert out.nmode == 2
+    # full-matrix parity: ρ_ref = U @ ρ_after_loss @ U† (same physics chain)
+    rho_pure = FockDensity.from_pure(two_mode_squeeze(FockState.vacuum(6, nmode=2), 0.3))
+    rho_after = ch_loss(rho_pure, 0.6)
+    U = _bs_U(6, 0.5, 0.0)
+    ref = U @ rho_after.rho @ U.conj().T
+    np.testing.assert_allclose(out.rho, ref, atol=1e-12)
     np.testing.assert_allclose(np.trace(out.rho), 1.0, atol=1e-10)
 
 
