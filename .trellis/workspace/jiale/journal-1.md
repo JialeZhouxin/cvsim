@@ -1670,3 +1670,79 @@ circuit_common 迁移（切片1: ed4b69c+ea7f99c）/ 工厂+泄漏三件套（�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 49: F3 阶段完成 — FockCircuit + compile + IR + PNR batch + 稀疏（895 绿）
+
+**Date**: 2026-08-11
+**Task**: F3 阶段完成 — FockCircuit + compile + IR + PNR batch + 稀疏（895 绿）
+**Branch**: `master`
+
+### Summary
+
+F3 四切片全落地并归档（vision §4 F3 全项）: FockCircuit DSL+compile（einsum 'oa,arbs,ib->oris' 密度路径, 测量坍缩移除映射）/ circuit_v1 IR+cutoff 扩展 / pnr_sample_batch 向量化 / FockSparse COO 稀疏（对角门保稀疏, m≤10 锚）。895 绿, OCR 全收口, FOCK_PUBLIC 36 项。
+
+### Main Changes
+
+# F3 阶段完成 — FockCircuit + compile + IR + PNR batch + 稀疏（895 绿）
+
+F3 四切片全落地（vision §4 F3 全项 + design §3.9）：用户"开F3"后全执行。
+
+## 切片与 commit
+
+| 切片 | commit | 内容 |
+|------|--------|------|
+| f3-circuit | `4d95065` + `f9c1694` + `0aae678` + `d667b93` | FockCircuit 镜像高斯 DSL（11 门 + 3 测量 + per-mode cutoffs + ParamRef）+ compile（merged 段）+ 密度 UρU† Kronecker 路径 + 测量坍缩移除映射 |
+| f3-ir | `5057149` | to_ir/from_ir 复用 circuit_v1（cutoff 扩展字段 + 18 op 全 roundtrip + ParamRef/kraus）|
+| f3-pnr-batch | `60e2119` + `b66cb60` + `4e4fce1` | pnr_sample_batch 向量化 10³ shots（共享 pnrd_probs 边际）|
+| f3-sparse | `3f4b132` | FockSparse COO 张量（对角门/permute 保稀疏 + pnr 边际 + to_dense 移交，m≤10 锚）|
+
+## 关键决策（本阶段新锁）
+
+1. **merged 段 = Kronecker 逐 op 应用**：tensordot/einsum 于模态轴，不物化 N^{2m} 全空间酉；interferometer/apply_unitary 全模式走 `_full_apply`
+2. **Fock 测量 = 移除映射**：PNR/homodyne/heterodyne 条件化后测量模物理坍缩消失（同高斯 homodyne 移位语义）—— 曾被误判为"不移除"导致 compile 后模式错乱
+3. **FockSparse 诚实边界**：对角门（phase/kerr）+ permute 保稀疏；非对角门（squeeze/BS…）to_dense 移交稠密（vision Q6）
+4. **cutoff 扩展字段**：ADR-0003 circuit_v1 顶层 `cutoff`（int 均匀或 per-mode 列表），高斯 from_ir 静默忽略
+
+## 关键 bug（F3 新增教训）
+
+- **einsum 双酉密度路径**：`ρ' = UρU†` 的 einsum 三操作数，前两次尝试错在 (a) 共轭转置方向（`U.conj().T` vs `U.conj()`）(b) 同名标签 `i` 隐式配对求和 (c) 输出轴误保留求和轴 `b`。最终 `'oa,arbs,ib->oris'`（a,b 求和，o=out sel, i=in sel）N=2/3 全矩阵 diff ~1e-17
+- **amplifier 参数错位**：channels.amplifier 签名 `(state, G, mode=0, nbar=0.0)`（mode 在 nbar 前），circuit _run_op 传参按 (G, nbar, mode) → nbar=0.1 进 mode → IndexError "mode 0.1"
+- **scipy coo_array 坐标传法**：新版传 `(data, coords)` 中 coords 直接是 (ndim, nnz) 数组，包 tuple `(idx,)` 报 "mismatching number of index arrays"；`coo.coords` 是每轴数组的 tuple（phase/kerr 取 `coords[mode]`，permute 用 `tuple(coords[i] for i in perm)`）
+- **FockSparse 归一化校验**：用 Σ|ψ|² = 1（范数），非 Σψ = 1（phase 门合法改变复数总和）
+- **kerr 约定**：gates.kerr = e^{iχn²}（无 /2），稀疏 kerr 对齐（曾写 n(n−1)/2 被稠密对照打脸）
+- ch_loss 默认 mode=None = 双模 loss，电路传 mode=0 —— 测试对照漏 mode 参数
+
+## 状态
+
+- **895 passed / 6 skipped / 4 warnings**；OCR 每 commit 收口（3 项 low/medium 全修）
+- F3 parent `08-11-cvsim-phase-f3` 已归档；journal 已录
+- FOCK_PUBLIC 冻结更新为 **36 项**（+pnr_sample_batch +FockSparse）
+- 遗留：愿景 §10 开放项（GUI/m>4 稠密扩展/tensor-net）；高斯侧 7 项挂账；仓库无 remote
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4d95065` | (see git log) |
+| `f9c1694` | (see git log) |
+| `0aae678` | (see git log) |
+| `d667b93` | (see git log) |
+| `5057149` | (see git log) |
+| `60e2119` | (see git log) |
+| `b66cb60` | (see git log) |
+| `4e4fce1` | (see git log) |
+| `3f4b132` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
