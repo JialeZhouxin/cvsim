@@ -14,6 +14,9 @@ from cvsim.fock.gates import (
     two_mode_squeeze,
 )
 from cvsim.fock.observables import (
+    heterodyne_condition,
+    heterodyne_sample,
+    heterodyne_sample_and_condition,
     homodyne_condition,
     homodyne_mean,
     homodyne_sample,
@@ -21,6 +24,9 @@ from cvsim.fock.observables import (
     homodyne_var,
     mean_photon,
     norm,
+    pnr_condition,
+    pnr_sample,
+    pnr_sample_and_condition,
     pnrd_probs,
     trace,
 )
@@ -55,6 +61,12 @@ __all__ = [
     "mean_photon",
     "norm",
     "pnrd_probs",
+    "pnr_sample",
+    "pnr_condition",
+    "pnr_sample_and_condition",
+    "heterodyne_sample",
+    "heterodyne_condition",
+    "heterodyne_sample_and_condition",
     "trace",
     "homodyne_mean",
     "homodyne_var",
