@@ -6,7 +6,7 @@
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md). This doc is the Fock peer; cross-representation rules (bridges) are owned by the Gaussian vision §6 unless amended here.
 
 **Last updated:** 2026-08-12
-**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F4 complete (2026-08-12)**; F5+ open
+**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F5 complete (2026-08-12)**; F6 open
 **Codebase today:** `cvsim/fock` F1–F3 + 顶层 `cvsim/fock_ad.py`（F4，ADR-0001 约束下 backend 只能顶层）
 
 ---
@@ -141,9 +141,9 @@ Mirrors the Gaussian phase structure (Q4). Each phase ships a demo exit.
 1. Gradients agree with finite difference (squeeze/BS/Kerr) — mirror Gaussian Phase 4 bar (2e-07).
 2. Numpy and JAX paths share tests via backend parametrization.
 
-### F5 — Bridges + integration
+### F5 — Bridges + integration (done 2026-08-12)
 
-**Build:** observation bridge promoted to formal bidirectional API (Q11): element-level conversion (done in `bridge.py`), observable propagation, threshold/PNR cross-checks; Gaussian-vision §6 rules kept (Fock→Gauss only within tolerance, else reject).
+**Build:** observation bridge 提升为正式双向 API — 证据驱动**零新公开 API**（bridge 元素² vs `pnrd_probs` 已机器精度级一致）；交叉核对套件 `tests/test_fock_bridge_f5.py`（36 测试：PNR/mean_photon/threshold 双表示 atol 1e-7 + 有损相干 η 扫掠 + 泄漏纪律负测试）+ 双表示教程 `tutorials/08_fock_bridge.ipynb`（有损相干态对账 + 截断生存曲线）。Gaussian-vision §6 规则保持（Fock→Gauss 容差内否则 reject，测试/tutorial 以泄漏断言落地）。
 
 **Exit criteria**
 
@@ -221,7 +221,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 | Compile | `to_ir`/`from_ir` roundtrip（IR 形式落地） | —（F3 done） |
 | Sparse | FockSparse（COO，m≤10） | —（F3 done） |
 | AD | `cvsim/fock_ad.py`（顶层，backend= + grad vs fd 3 参数） | —（F4 done） |
-| Bridges | bridge.py elements | formal bidirectional API (F5) |
+| Bridges | bridge.py elements + F5 核对套件 + notebook 08 | —（F5 done） |
 | Interop | — | SF round-trip (F6) |
 
 ## 10. Open questions
@@ -234,6 +234,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 0.4.0 | 2026-08-12 | F5 落地：交叉核对套件 + notebook 08 + 状态节/gap 表同步（commit `76a961e` `dd92c8f`；Fock 254 / 全套 959 tests） |
 | 0.3.0 | 2026-08-12 | F4 落地：顶层 `cvsim/fock_ad.py` + notebook 07 + 状态节/架构树/gap 表同步（commit 链 `046d9f9`…`7cade0e`；Fock 218 / 全套 923 tests） |
 | 0.2.0 | 2026-08-11 | F1–F3 落地：架构树 / gap 表 / roadmap 同步至实现状态（commit 链 `34f3fb6`…`3f4b132`，165 tests） |
 | 0.1.0 | 2026-08-10 | Vision created from brainstorm Q1–Q12 (user: production-grade, peer to Gaussian; shared circuit framework; hard scale anchor + sparse extension; truncation discipline; GUI long-term + compatibility assessment open) |
