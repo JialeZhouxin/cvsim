@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/backend-interface.md", "reason": "检查项：backend 协议合规（仅 cvsim/backend.py 接触 jax；numpy 默认零回归；jax 未装时 skip）；模块放置（fock_ad 顶层、不进 rep 包）"}
+{"file": ".trellis/spec/backend/index.md", "reason": "质量检查入口（backend 层）"}
+{"file": "tests/conftest.py", "reason": "backend fixture（numpy + jax-skipif 参数化）与严格容差——新测试复用"}
+{"file": "tests/test_ad_gates_basic.py", "reason": "Gaussian 梯度测试模板：skipif(be.HAS_JAX)、h=1e-6、atol 1e-6 —— Fock 测试镜像"}
+{"file": "tests/test_public_api.py", "reason": "FOCK_PUBLIC 冻结面：fock_ad 不进 __all__，冻结零改动"}
+{"file": "tests/test_architecture.py", "reason": "ADR-0001 白名单 AST 扫描：新顶层模块不得违反（fock 包零改动）"}
