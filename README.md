@@ -74,8 +74,17 @@ Gaussian 路线图 / 硬约定 / **API 稳定性**：[`docs/vision-gaussian-simu
 
 cv-photonic-notes/
 ├── README.md
-├── tutorials/          # 三表示新手 Jupyter
-├── cvsim/              # 最小模拟器
+├── tutorials/              # 三表示新手 Jupyter
+├── cvsim/                  # 最小模拟器（numpy+scipy，ħ=1，正交序 xxpp）
+│   ├── gaussian/           # Gaussian：V/r̄，m→100，GBS adapter
+│   ├── fock/               # Fock：截断光子数；state/density/sparse/circuit/ir（F1–F3 ✅）
+│   ├── bosonic/            # Bosonic：{(V_k, r̄_k, w_k)}；cat/GKP
+│   ├── interop/            # 跨表示桥（xxpp↔xpxp 等）
+│   ├── lab/                # 本地图形化实验室 UI（前端）
+│   └── *.py                # symplectic / wigner / backend / ad / bridge / circuit_common
+├── tests/                  # 81 文件（含 19 个 Fock 测试）
+├── benchmarks/             # m=100 基准 + CI time-capped job
+├── docs/                   # vision / API 稳定性 / ADR
 ├── 术语表.md
 ├── 00-CV核心原理.md
 ├── 01-Fock表示原理.md

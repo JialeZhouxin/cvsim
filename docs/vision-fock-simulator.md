@@ -5,9 +5,23 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md). This doc is the Fock peer; cross-representation rules (bridges) are owned by the Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-08-10
-**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); no implementation started
-**Codebase today:** `cvsim/fock` teaching MVP (19 exports, 10 test files, 2 notebooks)
+**Last updated:** 2026-08-11
+**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F3 complete (2026-08-11)**; F4+ open
+**Codebase today:** `cvsim/fock` — F1–F3 landed（见下节）
+
+---
+
+## 0. Implementation status (2026-08-11)
+
+F1–F3 切片已全部落地并归档（`.trellis/tasks/archive/2026-08/08-11-cvsim-phase-f*`）；以下愿景正文 F4+ 部分仍然有效。
+
+| 切片 | 内容 | 代表 commit |
+|------|------|-------------|
+| **F1** factories/gates/channels | `FockState`/`FockDensity`（m=1–4）+ 11 门（D/R/S/BS/S₂/Kerr/CZ/CX/MZ/interferometer/…）+ loss/amplifier/phase_noise/apply_kraus + `circuit_common` 共享核 | `34f3fb6` `07fc7ab` |
+| **F2** analyse/measure/api-freeze | entropy_vn/log_negativity/fidelity/partial_trace + pnr/homodyne/heterodyne（sample/condition）+ generic-m + **FOCK_PUBLIC 冻结**（35 导出） | `15c3815` `c355443` `9b7e432` |
+| **F3** circuit/ir/batch/sparse | `FockCircuit`（任意 m、per-mode cutoffs、Kronecker 逐 op）+ `to_ir`/`from_ir` + `pnr_sample_batch`（10³ 向量化）+ `FockSparse`（COO，m≤10 锚） | `4d95065` `5057149` `60e2119` `3f4b132` |
+
+**验证**：19 个 Fock 测试文件，165 passed（2026-08-11 复核）。
 
 ---
 

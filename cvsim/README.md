@@ -19,7 +19,7 @@ uv pip install numpy scipy
 | 表示 | 初态 | 门 | 通道 | 测量 / 分析 |
 |------|------|----|------|-------------|
 | **Gaussian** | vacuum / coherent / thermal / squeezed / displaced_squeezed / tmsv / product | D/R/S/BS/**S₂**/Fourier/MZ/CZ/CX/interferometer | **loss** / amplifier / phase_noise / general `(X,Y)` | Homodyne + **Heterodyne**；F-ANALYSE（purity / ν / entropy_vn / ptrace / log_neg / fidelity）；**`GaussianCircuit`** |
-| **Fock** | 真空 / `fock` / `fock2` / **`FockDensity`（1–2 模）** | D/R/S/**Kerr** / **BS** / **S₂** / **1 模 ρ 上 D/R/S** | **`loss(T, mode=)`（1–2 模 Kraus→ρ）** | norm / ⟨n⟩ / **`pnrd_probs`** / Trρ / **Wigner** / **Homodyne mean·var·sample·condition** |
+| **Fock** | `fock`/`fock2`/`FockDensity`/**`FockSparse`（m≤10，COO）** | D/R/S/**Kerr**/BS/S₂/CZ/CX/MZ/interferometer + **`FockCircuit`（任意 m，per-mode cutoff，Kronecker 逐 op）** | **`loss(T, mode=)`** / amplifier / phase_noise / **apply_kraus**（1–2 模 Kraus→ρ） | norm / ⟨n⟩ / **`pnrd_probs`** / **PNR·Homodyne·Heterodyne（sample/condition + `pnr_sample_batch` 10³）** / Wigner / **IR roundtrip** |
 | **Bosonic** | 真空 / **cat** / **`gkp0`/`gkp1`** | D/R/S/BS/S₂（逐组件，**w 不变**） | **`loss(T, nbar=0)`** | ∑w / 加权 ⟨n⟩ / Homodyne / **sample** / **condition** / **sample_and_condition** |
 
 辛矩阵只在 **`cvsim/symplectic.py`**（G/B 共享地基）。Gaussian 有 **`GaussianCircuit`**（含 Homodyne/Heterodyne + feedforward）。B **不** import G 包。
@@ -30,7 +30,7 @@ uv pip install numpy scipy
 
 ```text
 G: factories → 门/干涉仪 → channel → Homodyne|Heterodyne → analyse (purity/log_neg/…)
-F: 1–2 模 → D/R/S/Kerr/BS → PNRD
+F: FockState/FockSparse → FockCircuit（门/通道/测量）→ PNR/Homodyne/Heterodyne → analyse（熵/log_neg/…）
 B: cat|gkp0 → 门 → [loss] → 加权矩
 ```
 
@@ -46,7 +46,7 @@ X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 ### 诚实边界
 
 - `gkp0`/`gkp1`：`lattice=1d|2d`；`cross=none|nn|full`（2d 无 nn）；**Gram** `Z=c†Sc`；`gkp_logical_overlap`；非 Clifford  
-- Fock：仅 **1–2 模**；`loss` 1–2 模 dens；**ρ 门** / Wigner / Homodyne 1 模；sample=网格 PDF；**condition=截断 x_φ 本征态（≠G Kalman）**；无 m≥3  
+- Fock：**`FockState`/`FockDensity` m=1–4 稠密**（`FockCircuit` 任意 m，per-mode cutoffs，双模门需等 cutoff）；**`FockSparse` m≤10**（光子数稀疏态，如 cat/GKP）；sample=网格 PDF；**condition=截断 x_φ 本征态（≠G Kalman）**；截断预算纪律见 `docs/vision-fock-simulator.md` §F3  
 - `sample_and_condition` = sample + condition 薄组合，无新物理  
 - 无 Hafnian / 生产 GBS
 
@@ -83,7 +83,7 @@ cvsim/
   conventions.py   # ħ, xxpp, Ω, vacuum
   symplectic.py    # shared S/d (G+B gates only)
   gaussian/        # state, gates, channels, observables, analyse, circuit
-  fock/            # 1–2 模；独立，不依赖 G/B
+  fock/            # F1–F3 完成：state/density/sparse/circuit/ir；独立，不依赖 G/B
   bosonic/         # Component, cat, gkp0, gates→symplectic, loss, moments
   wigner.py        # 跨表示门面（故意）
   demos/           # m1–m4 + user_acceptance
