@@ -5,23 +5,24 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md). This doc is the Fock peer; cross-representation rules (bridges) are owned by the Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-08-11
-**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F3 complete (2026-08-11)**; F4+ open
-**Codebase today:** `cvsim/fock` — F1–F3 landed（见下节）
+**Last updated:** 2026-08-12
+**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F4 complete (2026-08-12)**; F5+ open
+**Codebase today:** `cvsim/fock` F1–F3 + 顶层 `cvsim/fock_ad.py`（F4，ADR-0001 约束下 backend 只能顶层）
 
 ---
 
-## 0. Implementation status (2026-08-11)
+## 0. Implementation status (2026-08-12)
 
-F1–F3 切片已全部落地并归档（`.trellis/tasks/archive/2026-08/08-11-cvsim-phase-f*`）；以下愿景正文 F4+ 部分仍然有效。
+F1–F4 切片已全部落地并归档；以下愿景正文 F5+ 部分仍然有效。
 
 | 切片 | 内容 | 代表 commit |
 |------|------|-------------|
 | **F1** factories/gates/channels | `FockState`/`FockDensity`（m=1–4）+ 11 门（D/R/S/BS/S₂/Kerr/CZ/CX/MZ/interferometer/…）+ loss/amplifier/phase_noise/apply_kraus + `circuit_common` 共享核 | `34f3fb6` `07fc7ab` |
 | **F2** analyse/measure/api-freeze | entropy_vn/log_negativity/fidelity/partial_trace + pnr/homodyne/heterodyne（sample/condition）+ generic-m + **FOCK_PUBLIC 冻结**（35 导出） | `15c3815` `c355443` `9b7e432` |
 | **F3** circuit/ir/batch/sparse | `FockCircuit`（任意 m、per-mode cutoffs、Kronecker 逐 op）+ `to_ir`/`from_ir` + `pnr_sample_batch`（10³ 向量化）+ `FockSparse`（COO，m≤10 锚） | `4d95065` `5057149` `60e2119` `3f4b132` |
+| **F4** differentiable designer | 顶层 `cvsim/fock_ad.py`（squeeze_u/bs_u/kerr_diag/cat_fidelity/bs_overlap — numpy 真源复用 + jnp 镜像）+ backend 参数化共享测试（grad vs fd 3 参数）+ `tutorials/07_fock_ad_designer.ipynb` | `046d9f9` `b11f692` `7cade0e` |
 
-**验证**：19 个 Fock 测试文件，165 passed（2026-08-11 复核）。
+**验证**：Fock 相关 218 passed（2026-08-12 复核；全套件 923 passed）。
 
 ---
 
@@ -131,9 +132,9 @@ Mirrors the Gaussian phase structure (Q4). Each phase ships a demo exit.
 2. Sparse vs dense identical on cat/GKP/single-photon states within budget.
 3. 10³ PNR shots API stable; truncation budget documented (see §7).
 
-### F4 — Differentiable designer
+### F4 — Differentiable designer (done 2026-08-12)
 
-**Build:** `backend=` numpy/jax parametrization of gates/measures; Fock AD (gradients w.r.t. squeeze/BS/Kerr), one optimization notebook (e.g. maximize Kerr-squeezed state fidelity under loss).
+**Build:** 顶层 `cvsim/fock_ad.py`（ADR-0001：rep 包禁 import backend → backend 化落顶层，镜像 Gaussian `ad.py`）— squeeze_u/bs_u/kerr_diag + cat_fidelity 全链 + bs_overlap；numpy 真源复用、jnp 镜像 + 恒等测试；one optimization notebook `tutorials/07_fock_ad_designer.ipynb`（Kerr-squeezed state fidelity under loss，偶猫目标态）。
 
 **Exit criteria**
 
@@ -219,7 +220,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 | Circuit DSL | FockCircuit（任意 m，per-mode cutoffs） | —（F3 done） |
 | Compile | `to_ir`/`from_ir` roundtrip（IR 形式落地） | —（F3 done） |
 | Sparse | FockSparse（COO，m≤10） | —（F3 done） |
-| AD | — | backend= + gradients (F4) |
+| AD | `cvsim/fock_ad.py`（顶层，backend= + grad vs fd 3 参数） | —（F4 done） |
 | Bridges | bridge.py elements | formal bidirectional API (F5) |
 | Interop | — | SF round-trip (F6) |
 
@@ -233,5 +234,6 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 0.3.0 | 2026-08-12 | F4 落地：顶层 `cvsim/fock_ad.py` + notebook 07 + 状态节/架构树/gap 表同步（commit 链 `046d9f9`…`7cade0e`；Fock 218 / 全套 923 tests） |
 | 0.2.0 | 2026-08-11 | F1–F3 落地：架构树 / gap 表 / roadmap 同步至实现状态（commit 链 `34f3fb6`…`3f4b132`，165 tests） |
 | 0.1.0 | 2026-08-10 | Vision created from brainstorm Q1–Q12 (user: production-grade, peer to Gaussian; shared circuit framework; hard scale anchor + sparse extension; truncation discipline; GUI long-term + compatibility assessment open) |
