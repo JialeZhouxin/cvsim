@@ -1,0 +1,6 @@
+{"file": "docs/vision-fock-simulator.md", "reason": "F5 愿景原文：bridge 正式双向 API、可观测传播、threshold/PNR 交叉核对、3 条退出判据（atol 1e-7 / p_click+PNR 一致 / 双表示教程）；§6 bridge 规则（Gauss→Fock 闭式、Fock→Gauss 容差内否则 reject）"}
+{"file": "cvsim/bridge.py", "reason": "现有正式 API 面：coherent_element/squeezed_element/thermal_diag/vacuum_probability/fock_state_amplitude + ponytail 注释（无状态转换）— F5 零新 API 的证据"}
+{"file": "tests/test_bridge.py", "reason": "既有桥测试风格：解析 vs Fock 数值 atol 1e-9..1e-7、expm 截断泄漏注释 — F5 套件镜像此风格"}
+{"file": "cvsim/gaussian/observables.py", "reason": "Gaussian 侧核对源：mean_photon（½(⟨x²⟩+⟨p²⟩−1)）、p_click（=1−bridge.vacuum_probability，outcome-only）"}
+{"file": "cvsim/fock/observables.py", "reason": "Fock 侧核对源：pnrd_probs（marginal）/mean_photon/pnr_sample_batch"}
+{"file": "tutorials/_build_07.py", "reason": "notebook 生成器模板（md/code/notebook 辅助函数 + 路径写入），08 直接镜像"}
