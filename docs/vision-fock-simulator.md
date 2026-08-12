@@ -51,8 +51,8 @@ The Gaussian simulator's "production" claim rests on scale + precision (m→100,
 
 ### 2.1 State representation
 
-- **Pure state:** amplitude tensor `amps`, shape `(N,)` (1 mode) or `(N0, N1)` (2 mode), Fock-basis coefficients `c[n0, n1, ...]`. Cutoff `N` per mode (global or per-mode — per-mode when F2 lands).
-- **Density:** `FockDensity` matrix, 2-mode currently; general m when F2 lands.
+- **Pure state:** amplitude tensor `amps`, shape `(N,)` (1 mode) or `(N0, N1)` (2 mode), Fock-basis coefficients `c[n0, n1, ...]`. Cutoff `N` per mode (global or per-mode — per-mode landed in F3 `FockCircuit`).
+- **Density:** `FockDensity` matrix, 2-mode originally; general m=1–4 landed (F2 generic-m).
 - **Truncation leakage** (cross-cutting): for pure state `leak = 1 − ‖amps‖²`? No — amplitudes are stored truncated and renormalized; leakage is defined against the *untruncated* state, available only analytically (cat/coherent/squeezed/thermal have closed-form tails) or via higher-cutoff comparison. **API:** `truncation_leakage(state)` returns an estimate (analytic tail for factory states, higher-cutoff comparison otherwise); gates check it (Q7).
 
 ### 2.2 Quadrature / phase conventions
@@ -73,17 +73,18 @@ The Gaussian simulator's "production" claim rests on scale + precision (m→100,
 cvsim/
   conventions.py         # shared (ħ=1, xxpp) — already exists
   fock/
-    state.py             # FockState (pure) + factories (vacuum/fock/fock2 + cat/coherent/squeezed/thermal)
-    density.py           # FockDensity (general m when F2)
-    gates.py             # named gates + apply_unitary; backend= parametrized (F4)
-    channels.py          # Kraus channels: loss (done), amplifier/phase_noise (F1)
-    observables.py       # norm/trace/mean_photon/pnrd_probs/homodyne (done) + heterodyne (F2), PNR condition (F2)
-    analyse.py           # entropy_vn / log_negativity / fidelity / partial_trace (F2)
-    circuit.py           # FockCircuit — shared DSL framework (F3)
-    compile.py           # merged-U compilation (F3)
-  circuit_common/        # shared DSL core (Q5): op list, params, compile traversal, ParamRef
+    state.py             # FockState + factories (vacuum/fock/fock2/coherent/squeezed/cat, m=1–4) + leakage API — done F1–F2
+    density.py           # FockDensity (thermal/from_pure, m=1–4) — done F2
+    gates.py             # 11 named gates + apply_unitary — done F1; backend= parametrization is F4
+    channels.py          # loss/amplifier/phase_noise/apply_kraus — done F1
+    observables.py       # norm/⟨n⟩/pnrd_probs/homodyne/heterodyne/PNR sample+condition+batch — done F1–F3
+    analyse.py           # entropy_vn/log_negativity/fidelity/partial_trace — done F2
+    circuit.py           # FockCircuit — arbitrary m, per-mode cutoffs — done F3
+    ir.py                # to_ir/from_ir (circuit_v1 roundtrip; compile landed as IR — no separate compile.py) — done F3
+    sparse.py            # FockSparse (COO, m≤10 anchor) — done F3
+  circuit_common.py      # shared DSL core (Q5): op list, params, compile traversal, ParamRef — exists
   interop/               # existing ordering + Fock SF interop (F6)
-  bridge.py              # observation bridge — elevate to formal API (F5)
+  bridge.py              # observation bridge — formal bidirectional API is F5
 ```
 
 **Shared circuit framework (Q5):** `circuit_common` holds the representation-agnostic machinery (op list, parameter resolution, compile traversal, ParamRef). `GaussianCircuit` and `FockCircuit` instantiate it with their own gate/measure registries. This reverses the Phase 5 "no CVCircuit" YAGNI decision — justified because the second consumer now actually exists. Gaussian regression surface (758+ tests) is the safety net.
@@ -100,7 +101,7 @@ Mirrors the Gaussian phase structure (Q4). Each phase ships a demo exit.
 
 **Exit:** freeze current conventions (§2); any change is major-version territory.
 
-### F1 — Core completeness
+### F1 — Core completeness (done 2026-08-11)
 
 **Build:** factories (cat/coherent/squeezed/thermal with analytic tails), missing gates (interferometer/MZ/CZ/CX per Fock qudit encoding), channels (amplifier, phase_noise), truncation-leakage API + checks (Q7), per-mode cutoff.
 
@@ -110,7 +111,7 @@ Mirrors the Gaussian phase structure (Q4). Each phase ships a demo exit.
 2. Leakage API returns analytic tails matching high-cutoff comparison (golden).
 3. `pytest` green; no convention drift.
 
-### F2 — Analyse + measure
+### F2 — Analyse + measure (done 2026-08-11)
 
 **Build:** entropy_vn / log_negativity / fidelity / partial_trace; heterodyne (sample + condition); **PNR condition** (posterior state update on photon-count outcome); density for general m.
 
@@ -120,7 +121,7 @@ Mirrors the Gaussian phase structure (Q4). Each phase ships a demo exit.
 2. PNR condition: posterior norms sum to 1; Σ p(n)·ρ_post(n) = ρ (consistency identity).
 3. Teaching notebook Run-All (PNR statistics + conditioning).
 
-### F3 — Compile, sample, truncation engineering
+### F3 — Compile, sample, truncation engineering (done 2026-08-11)
 
 **Build:** FockCircuit (shared framework), compile (merged unitaries, no merge across noise/measure), PNR batch sampling (vectorized, seeded), **sparse amplitude representation** (sparse arrays for photon-number-sparse states, m≤10+), scale budget tests.
 
@@ -210,14 +211,14 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 | Feature | Now | Gap |
 |---------|-----|-----|
-| State factories | vacuum/fock/fock2 | cat/coherent/squeezed/thermal + analytic tails (F1) |
-| Gates | squeeze/phase/displace/kerr/BS/tms | interferometer/MZ/CZ/CX, backend= (F1/F4) |
-| Channels | loss | amplifier/phase_noise (F1) |
-| Measures | homodyne (sample/condition), pnrd_probs | PNR condition, heterodyne (F2) |
-| Analyse | — | entropy_vn/log_neg/fidelity/partial_trace (F2) |
-| Circuit DSL | — | FockCircuit via circuit_common (F3) |
-| Compile | — | merged-U (F3) |
-| Sparse | — | sparse amps (F3) |
+| State factories | vacuum/fock/fock2/coherent/squeezed/cat + leakage API | —（F1 done）；thermal 在 `FockDensity` |
+| Gates | 11 门（D/R/S/BS/S₂/Kerr/CZ/CX/MZ/interferometer/…） | `backend=` (F4) |
+| Channels | loss/amplifier/phase_noise/apply_kraus | —（F1 done） |
+| Measures | homodyne/heterodyne/PNR（sample/condition/`pnr_sample_batch` 10³） | —（F1–F3 done） |
+| Analyse | entropy_vn/log_neg/fidelity/partial_trace | —（F2 done） |
+| Circuit DSL | FockCircuit（任意 m，per-mode cutoffs） | —（F3 done） |
+| Compile | `to_ir`/`from_ir` roundtrip（IR 形式落地） | —（F3 done） |
+| Sparse | FockSparse（COO，m≤10） | —（F3 done） |
 | AD | — | backend= + gradients (F4) |
 | Bridges | bridge.py elements | formal bidirectional API (F5) |
 | Interop | — | SF round-trip (F6) |
@@ -232,4 +233,5 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 0.2.0 | 2026-08-11 | F1–F3 落地：架构树 / gap 表 / roadmap 同步至实现状态（commit 链 `34f3fb6`…`3f4b132`，165 tests） |
 | 0.1.0 | 2026-08-10 | Vision created from brainstorm Q1–Q12 (user: production-grade, peer to Gaussian; shared circuit framework; hard scale anchor + sparse extension; truncation discipline; GUI long-term + compatibility assessment open) |
