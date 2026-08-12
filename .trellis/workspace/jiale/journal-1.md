@@ -1779,3 +1779,36 @@ grilling 8 问全锁定（文档整理不动代码）。docs/vision-fock-simulat
 ### Next Steps
 
 - None - task complete
+
+
+## Session 51: vision-fock 正文渐进标注同步（延续架构整理）
+
+**Date**: 2026-08-12
+**Task**: vision-fock 正文渐进标注同步（延续架构整理）
+**Branch**: `master`
+
+### Summary
+
+上一 commit fafbab9 的遗留跟进：vision-fock 正文所有 F1-F3 渐进标注清掉 — 架构树逐模块标注实际状态（compile.py→ir.py 修正、补 sparse.py、circuit_common 目录→文件）、F1-F3 roadmap 节标题加 done、§9 gap 表同步、§2.1 when-F2-lands ×2、§11 追加 v0.2.0。F4+ 愿景保留。OCR 跳过（md 过滤）。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a392c38` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
