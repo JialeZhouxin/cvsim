@@ -51,7 +51,7 @@ from cvsim.gaussian.observables import (
     sample_threshold,
 )
 from cvsim.gaussian.state import GaussianState
-from cvsim.gaussian.walrus import export_cov_for_walrus
+from cvsim.gaussian.walrus import export_cov_for_walrus, gbs_sample, pnr_probs, threshold_sample
 
 __all__ = [
     "GaussianState",
@@ -101,4 +101,7 @@ __all__ = [
     "GaussianCircuit",
     "ParamRef",
     "export_cov_for_walrus",
+    "pnr_probs",
+    "gbs_sample",
+    "threshold_sample",
 ]

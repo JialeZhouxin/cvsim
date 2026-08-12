@@ -9,7 +9,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cvsim.gaussian import GaussianState, export_cov_for_walrus
+from cvsim.gaussian import (
+    GaussianState,
+    export_cov_for_walrus,
+    gbs_sample,
+    pnr_probs,
+    threshold_sample,
+)
 
 # --- format layer (no thewalrus needed) ---
 
@@ -82,6 +88,49 @@ def test_no_aliasing():
     np.testing.assert_allclose(st.V[0, 0], 0.5 * np.exp(-1.0), atol=1e-15)
     np.testing.assert_allclose(st.rbar[0], 0.0, atol=1e-15)
 
+# --- thin GBS wrappers: format layer (no thewalrus needed) ---
+
+def test_wrap_type_errors():
+    with pytest.raises(TypeError):
+        pnr_probs(np.eye(2), 5)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        pnr_probs("vacuum", 5)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        gbs_sample(np.eye(2), 10)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        threshold_sample(np.zeros(4), 10)  # type: ignore[arg-type]
+
+def test_wrap_positive_int_errors():
+    st = GaussianState.vacuum(1)
+    with pytest.raises(ValueError):
+        pnr_probs(st, 0)
+    with pytest.raises(ValueError):
+        pnr_probs(st, 2.5)  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        gbs_sample(st, 0)
+    with pytest.raises(ValueError):
+        gbs_sample(st, 10, cutoff=0)
+    with pytest.raises(ValueError):
+        gbs_sample(st, 10, max_photons=0)
+    with pytest.raises(ValueError):
+        threshold_sample(st, 0)
+    with pytest.raises(ValueError):
+        threshold_sample(st, 10, fanout=0)
+
+def test_wrap_missing_extra(monkeypatch):
+    """No thewalrus installed → RuntimeError with install hint (PRD AC2)."""
+    import sys
+
+    st = GaussianState.vacuum(1)
+    monkeypatch.setitem(sys.modules, "thewalrus", None)
+    with pytest.raises(RuntimeError, match=r"cvsim\[gbs\]"):
+        pnr_probs(st, 5)
+    with pytest.raises(RuntimeError, match=r"cvsim\[gbs\]"):
+        gbs_sample(st, 10)
+    with pytest.raises(RuntimeError, match=r"cvsim\[gbs\]"):
+        threshold_sample(st, 10)
+
+
 
 # --- comparison layer (needs thewalrus, cvsim[gbs]) ---
 
@@ -142,3 +191,83 @@ def test_walrus_tmsv_ordering_xxpp():
         expected = (1.0 / np.cosh(r) ** 2) * np.tanh(r) ** (2 * n)
         got = np.real(dm[n, n, n, n])
         assert abs(got - expected) < 1e-9, f"P({n},{n}) = {got}, expected {expected}"
+
+# --- thin GBS wrappers: comparison layer (needs thewalrus, cvsim[gbs]) ---
+
+def test_pnr_probs_matches_density_matrix_diag():
+    thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
+    from thewalrus.quantum import density_matrix
+
+    r = 0.5
+    st = GaussianState.tmsv(r)
+    sigma, mu = export_cov_for_walrus(st)
+    P = pnr_probs(st, 5)
+    assert P.shape == (5, 5)
+    assert P.sum() < 1.0  # truncation leakage, deliberately not normalized
+    dm = density_matrix(mu, sigma, cutoff=5, hbar=2)
+    np.testing.assert_allclose(P, np.real(np.einsum("iijj->ij", dm)), atol=1e-9)
+
+def test_pnr_probs_squeezed_analytic():
+    thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
+
+    r = 1.0
+    P = pnr_probs(GaussianState.squeezed(r), 6)
+    assert P.shape == (6,)
+    for n in (0, 1, 2):
+        assert abs(P[2 * n] - _squeezed_vac_p(n, r)) < 1e-9
+    for n in (1, 3, 5):  # odd diagonals vanish
+        assert abs(P[n]) < 1e-9
+
+def test_pnr_probs_thermal_product_axes():
+    """Mixed-state enumeration path + mode-axis order (asymmetric nbar)."""
+    thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
+
+    nbar0, nbar1 = 0.3, 1.7
+    st = GaussianState.product(GaussianState.thermal(nbar0), GaussianState.thermal(nbar1))
+    P = pnr_probs(st, 4)
+    assert P.shape == (4, 4)
+    for n0 in range(4):
+        for n1 in range(4):
+            p0 = nbar0**n0 / (1.0 + nbar0) ** (n0 + 1)
+            p1 = nbar1**n1 / (1.0 + nbar1) ** (n1 + 1)
+            assert abs(P[n0, n1] - p0 * p1) < 1e-9
+
+def test_gbs_sample_frequencies():
+    thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
+
+    r = 0.5
+    st = GaussianState.tmsv(r)
+    np.random.seed(42)  # thewalrus draws from global np.random (no rng injection)
+    samples = gbs_sample(st, 5000)
+    assert samples.shape == (5000, 2)
+    assert samples.dtype == np.int64
+    P = pnr_probs(st, 5)
+    Ps = P / P.sum()
+    freq = np.zeros((5, 5))
+    for n0, n1 in samples:
+        freq[int(n0), int(n1)] += 1.0
+    freq /= samples.shape[0]
+    np.testing.assert_allclose(freq, Ps, atol=0.02)
+
+def test_threshold_sample_frequencies():
+    thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
+
+    r = 0.5
+    st = GaussianState.tmsv(r)
+    np.random.seed(42)
+    samples = threshold_sample(st, 5000)
+    assert samples.shape == (5000, 2)
+    assert samples.dtype == np.int8
+    assert set(np.unique(samples)) <= {0, 1}
+    # coarse-grained P(S) = Σ_{n: nᵢ>0 ⇔ i∈S} P(n) from pnr_probs
+    Ps = pnr_probs(st, 5)
+    Ps = Ps / Ps.sum()
+    coarse = np.zeros((2, 2))
+    for n0 in range(5):
+        for n1 in range(5):
+            coarse[int(n0 > 0), int(n1 > 0)] += Ps[n0, n1]
+    freq = np.zeros((2, 2))
+    for c0, c1 in samples:
+        freq[int(c0), int(c1)] += 1.0
+    freq /= samples.shape[0]
+    np.testing.assert_allclose(freq, coarse, atol=0.02)

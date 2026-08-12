@@ -53,8 +53,40 @@ nbar = photon_number_mean(mu, sigma, 0, hbar=2)                    # 模式 0 �
 `cvsim[gbs]` 未安装时，对拍测试（`tests/test_walrus.py` 对拍层）自动 skip
 （`pytest.importorskip`），格式层照跑 —— 核心 CI 不装 thewalrus 也能全绿。
 
+## 薄封装（pnr_probs / gbs_sample / threshold_sample）
+
+`cvsim.gaussian` 直接提供 thewalrus 的 GBS 概率/采样三件套（薄封装，
+**延迟导入**：未装 `cvsim[gbs]` 时调用抛 `RuntimeError` 提示安装）。
+用户无需记 ħ=2 / xxpp / σ=2V / μ=√2·r̄ 约定 —— 封装内部走
+`export_cov_for_walrus`。
+
+| API | 签名 | 输出 | 来源（thewalrus） |
+|-----|------|------|-------------------|
+| `pnr_probs` | `(state, cutoff)` | `[cutoff]^m` 联合分布 `P[n1..nm]`，float | `thewalrus.quantum.probabilities` |
+| `gbs_sample` | `(state, n_samples, *, cutoff=5, max_photons=30)` | `(n_samples, m)` int64 PNR 样本 | `thewalrus.samples.hafnian_sample_state` |
+| `threshold_sample` | `(state, n_samples, *, max_photons=30, fanout=10)` | `(n_samples, m)` int8 click pattern，值 ∈ {0,1} | `thewalrus.samples.torontonian_sample_state` |
+
+```python
+from cvsim.gaussian import GaussianState, pnr_probs, gbs_sample, threshold_sample
+
+st = GaussianState.tmsv(r=0.5)
+P = pnr_probs(st, cutoff=5)          # 形状 [5,5]；P.sum() < 1 是截断泄漏，不归一化
+samples = gbs_sample(st, 1000)       # (1000, 2) int64
+clicks = threshold_sample(st, 1000)  # (1000, 2) int8
+```
+
+注意：
+- **RNG 不可注入**：thewalrus 内部用全局 `np.random`，三函数无 `rng=` 参数
+  （与 cvsim 其他采样 API 风格不同，属上游约束）。
+- `pnr_probs` 与 fock 侧 `pnrd_probs`（输入 `FockLike`）命名区分，docstring 互指。
+- **ħ 固定 2**：`pnr_probs` 无 hbar 旋钮——`export_cov_for_walrus` 已归一化 σ=2V，
+  传其他 hbar 会静默算错（OCR 2026-08-12）。
+- 版本 pin `thewalrus>=0.22,<0.23`：0.22.x quantum 模块按 xxpp 读块
+  （docstring 写 xp 已过时）；`<0.23` 防约定漂移。
+
 ## 范围
 
-- **有**：薄层三件套（adapter + 测试 + 本说明）。GBS 路径 = 导出 + thewalrus 采样。
+- **有**：adapter + 薄封装三函数（pnr_probs / gbs_sample / threshold_sample）+ 测试 + 本说明。
+  GBS 路径 = 导出 + thewalrus 概率/采样。
 - **无**：自研 Hafnian/Torontonian 内核、approximate GBS samplers（vision §4.3 P2）、
   GBS 教学 notebook（Phase 5）、GBS 应用算法。

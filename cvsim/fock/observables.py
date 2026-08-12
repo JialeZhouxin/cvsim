@@ -94,6 +94,9 @@ def pnrd_probs(state: FockLike, mode: int | None = None) -> np.ndarray:
     """Photon-number probabilities from |c|² or diag(ρ).
 
     2-mode dens: mode=None → joint (N,N); mode=0|1 → marginal (N,).
+
+    Gaussian-state counterpart (joint P(n) via thewalrus):
+    ``cvsim.gaussian.pnr_probs``.
     """
     if _is_density(state):
         if state.nmode == 1:
