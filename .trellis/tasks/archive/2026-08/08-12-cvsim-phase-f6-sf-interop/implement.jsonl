@@ -1,0 +1,5 @@
+{"file": "docs/vision-fock-simulator.md", "reason": "F6 愿景原文：Fock ↔ SF 互操作、round-trip golden（无运行时依赖）、interop docs mirror sf-roundtrip.md、密度导出格式文档化；2 条退出判据"}
+{"file": "docs/sf-roundtrip.md", "reason": "Gaussian 互操作文档模板：约定表/转换链/双向脚本/运行方式 — F6 文档直接 mirror 结构（70 行 copy-paste 风格）"}
+{"file": "cvsim/fock/gates.py", "reason": "cvsim 侧对照面：squeeze/displace/phase/kerr/beamsplitter/two_mode_squeeze 全部签名与约定（实 r、BS(θ,φ) exp[θ(e^{iφ}a0†a1−h.c.)]）"}
+{"file": "cvsim/fock/density.py", "reason": "密度导出格式源：FockDensity.rho (N^m, N^m) complex C-order，与 SF dm() 展平对照"}
+{"file": "cvsim/fock/state.py", "reason": "态工厂：squeezed(phi=0)/coherent/fock/fock2/vacuum — golden 对照的 cvsim 侧态制备"}

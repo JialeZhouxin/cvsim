@@ -237,7 +237,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 | Version | Date | Change |
 |---------|------|--------|
-| 0.5.0 | 2026-08-12 | F6 落地：SF fock golden 对照套件（npz，零运行时依赖）+ `docs/sf-roundtrip-fock.md` + 密度导出格式文档化（commit TBD 主会话提交后回填；Fock 263 / 全套 968 tests） |
+| 0.5.0 | 2026-08-12 | F6 落地：SF fock golden 对照套件（npz，零运行时依赖）+ `docs/sf-roundtrip-fock.md` + 密度导出格式文档化（commit `e85af5c` `9e5f6a8`；Fock 263 / 全套 968 tests） |
 | 0.4.0 | 2026-08-12 | F5 落地：交叉核对套件 + notebook 08 + 状态节/gap 表同步（commit `76a961e` `dd92c8f`；Fock 254 / 全套 959 tests） |
 | 0.3.0 | 2026-08-12 | F4 落地：顶层 `cvsim/fock_ad.py` + notebook 07 + 状态节/架构树/gap 表同步（commit 链 `046d9f9`…`7cade0e`；Fock 218 / 全套 923 tests） |
 | 0.2.0 | 2026-08-11 | F1–F3 落地：架构树 / gap 表 / roadmap 同步至实现状态（commit 链 `34f3fb6`…`3f4b132`，165 tests） |
