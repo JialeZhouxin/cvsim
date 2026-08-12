@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 49
-- **Last Active**: 2026-08-11
+- **Total Sessions**: 50
+- **Last Active**: 2026-08-12
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1748 | Active |
+| `journal-1.md` | ~1781 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 50 | 2026-08-12 | Fock 架构整理 — vision-fock 状态节 + README 同步（文档） | `fafbab9` | `master` |
 | 49 | 2026-08-11 | F3 阶段完成 — FockCircuit + compile + IR + PNR batch + 稀疏（895 绿） | `4d95065`, `f9c1694`, `0aae678`, `d667b93`, `5057149`, `60e2119`, `b66cb60`, `4e4fce1`, `3f4b132` | `master` |
 | 48 | 2026-08-11 | F2 完成 — Fock analyse+measure+通用m+API 冻结（863 绿） | HEAD | `master` |
 | 47 | 2026-08-11 | F1 全 4 切片完成 — Fock 核心能力补全 | HEAD | `master` |

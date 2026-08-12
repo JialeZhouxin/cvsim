@@ -1746,3 +1746,36 @@ F3 四切片全落地（vision §4 F3 全项 + design §3.9）：用户"开F3"�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 50: Fock 架构整理 — vision-fock 状态节 + README 同步（文档）
+
+**Date**: 2026-08-12
+**Task**: Fock 架构整理 — vision-fock 状态节 + README 同步（文档）
+**Branch**: `master`
+
+### Summary
+
+grilling 8 问全锁定（文档整理不动代码）。docs/vision-fock-simulator.md 头部 no implementation started → F1-F3 complete + §0 实现状态节（切片/commit/165 passed）；cvsim/README 能力矩阵+概念闭环+诚实边界+包结构 4 处同步；根 README 目录树细到子模块级。OCR 跳过（md 过滤）。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fafbab9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
