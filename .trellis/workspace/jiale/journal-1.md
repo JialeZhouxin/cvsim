@@ -1812,3 +1812,36 @@ grilling 8 问全锁定（文档整理不动代码）。docs/vision-fock-simulat
 ### Next Steps
 
 - None - task complete
+
+
+## Session 52: GBS 薄封装: pnr_probs / gbs_sample / threshold_sample
+
+**Date**: 2026-08-12
+**Task**: GBS 薄封装: pnr_probs / gbs_sample / threshold_sample
+**Branch**: `master`
+
+### Summary
+
+cvsim.gaussian 新增 thewalrus 薄封装三函数（延迟导入, optional extra cvsim[gbs] 不变）。pnr_probs(state,cutoff)->[cutoff]^m 联合分布; gbs_sample->(n,m) int64 PNR; threshold_sample->(n,m) int8 click。hbar 旋钮删除（OCR: export 已固定 σ=2V, 传其他值静默算错）。API 冻结更新 GAUSSIAN_PUBLIC + fock pnrd_probs docstring 互指。OCR 2 轮 0 findings。976 passed/3 skipped。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4c87373` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
