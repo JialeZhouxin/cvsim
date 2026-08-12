@@ -104,7 +104,7 @@ def test_golden_metadata():
     """npz metadata records the SF/thewalrus version lock + generation date."""
     import json
 
-    meta = json.loads(_GOLDEN["metadata"].item())
+    meta = json.loads(_GOLDEN["metadata"].item().decode("utf-8"))
     assert meta["strawberryfields"] == "0.23.0"
     assert meta["thewalrus"] == "0.22.0"
     assert meta["engine"] == "fock"

@@ -302,7 +302,7 @@ def main() -> None:
         s2_00=cases[5][1],
         chain=cases[6][1],
         thermal_dm=cases[7][1],
-        metadata=np.array(json.dumps(meta, indent=2)),
+        metadata=json.dumps(meta, indent=2).encode('utf-8'),  # bytes: native dtype, no allow_pickle needed
     )
     print(f"saved {OUT} ({OUT.stat().st_size / 1e6:.1f} MB)")
 

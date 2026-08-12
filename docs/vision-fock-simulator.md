@@ -6,14 +6,14 @@
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md). This doc is the Fock peer; cross-representation rules (bridges) are owned by the Gaussian vision §6 unless amended here.
 
 **Last updated:** 2026-08-12
-**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F5 complete (2026-08-12)**; F6 open
+**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F6 complete (2026-08-12)**
 **Codebase today:** `cvsim/fock` F1–F3 + 顶层 `cvsim/fock_ad.py`（F4，ADR-0001 约束下 backend 只能顶层）
 
 ---
 
 ## 0. Implementation status (2026-08-12)
 
-F1–F4 切片已全部落地并归档；以下愿景正文 F5+ 部分仍然有效。
+F1–F5 切片已全部落地并归档；以下愿景正文 F6+ 部分仍然有效。
 
 | 切片 | 内容 | 代表 commit |
 |------|------|-------------|
@@ -22,7 +22,7 @@ F1–F4 切片已全部落地并归档；以下愿景正文 F5+ 部分仍然有�
 | **F3** circuit/ir/batch/sparse | `FockCircuit`（任意 m、per-mode cutoffs、Kronecker 逐 op）+ `to_ir`/`from_ir` + `pnr_sample_batch`（10³ 向量化）+ `FockSparse`（COO，m≤10 锚） | `4d95065` `5057149` `60e2119` `3f4b132` |
 | **F4** differentiable designer | 顶层 `cvsim/fock_ad.py`（squeeze_u/bs_u/kerr_diag/cat_fidelity/bs_overlap — numpy 真源复用 + jnp 镜像）+ backend 参数化共享测试（grad vs fd 3 参数）+ `tutorials/07_fock_ad_designer.ipynb` | `046d9f9` `b11f692` `7cade0e` |
 
-**验证**：Fock 相关 218 passed（2026-08-12 复核；全套件 923 passed）。
+**验证**：Fock 相关 263 passed（2026-08-12 复核；全套件 968 passed）。
 
 ---
 
@@ -151,14 +151,17 @@ Mirrors the Gaussian phase structure (Q4). Each phase ships a demo exit.
 2. Threshold (p_click) and PNR expectations agree where both apply.
 3. Tutorial: same physical experiment simulated in both representations, results reconciled.
 
-### F6 — Interop
+### F6 — Interop (done 2026-08-12)
 
 **Build:** Fock ↔ external tools (Strawberry Fields `[sf]` extra, round-trip golden), density-matrix export format documented.
 
+**Done (2026-08-12):** `tools/gen_sf_golden.py`（SF venv 一次性生成，版本锁 metadata）+ `tests/_golden/sf_fock_golden.npz`（8 组 dm golden，零运行时依赖）+ `tests/test_sf_golden_f6.py`（9 测试，不 import SF，复数 dm 逐位 atol 1e-9）+ `docs/sf-roundtrip-fock.md`（约定表含 BS 映射 / 密度导出格式 / 陷阱）。
+
 **Exit criteria**
 
-1. Round-trip golden tests (no runtime dep on external tools).
-2. Interop docs with copy-paste scripts (mirror `docs/sf-roundtrip.md`).
+1. Round-trip golden tests (no runtime dep on external tools). — done（npz 静态对照）
+2. Interop docs with copy-paste scripts (mirror `docs/sf-roundtrip.md`). — done
+3. Density-matrix export format documented. — done（`FockDensity.rho` (N^m,N^m) C-order ↔ SF `dm()` 逐位）
 
 ---
 
@@ -222,7 +225,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 | Sparse | FockSparse（COO，m≤10） | —（F3 done） |
 | AD | `cvsim/fock_ad.py`（顶层，backend= + grad vs fd 3 参数） | —（F4 done） |
 | Bridges | bridge.py elements + F5 核对套件 + notebook 08 | —（F5 done） |
-| Interop | — | SF round-trip (F6) |
+| Interop | SF golden 对照（npz，零依赖）+ `docs/sf-roundtrip-fock.md` | —（F6 done） |
 
 ## 10. Open questions
 
@@ -234,6 +237,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 0.5.0 | 2026-08-12 | F6 落地：SF fock golden 对照套件（npz，零运行时依赖）+ `docs/sf-roundtrip-fock.md` + 密度导出格式文档化（commit TBD 主会话提交后回填；Fock 263 / 全套 968 tests） |
 | 0.4.0 | 2026-08-12 | F5 落地：交叉核对套件 + notebook 08 + 状态节/gap 表同步（commit `76a961e` `dd92c8f`；Fock 254 / 全套 959 tests） |
 | 0.3.0 | 2026-08-12 | F4 落地：顶层 `cvsim/fock_ad.py` + notebook 07 + 状态节/架构树/gap 表同步（commit 链 `046d9f9`…`7cade0e`；Fock 218 / 全套 923 tests） |
 | 0.2.0 | 2026-08-11 | F1–F3 落地：架构树 / gap 表 / roadmap 同步至实现状态（commit 链 `34f3fb6`…`3f4b132`，165 tests） |
