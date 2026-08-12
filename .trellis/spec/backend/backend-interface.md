@@ -22,6 +22,7 @@
 
 - `cvsim/backend.py` — backend protocol
 - `cvsim/ad.py` — differentiable chain (`apply_gaussian`, `log_neg_loss`; jnp mirror of `cvsim/gaussian/analyse.py` formulas, cross-linked comments)
+- `cvsim/fock_ad.py` — Fock differentiable chain (`squeeze_u`/`bs_u`/`kerr_diag`/`cat_fidelity`/`bs_overlap`; numpy path reuses `cvsim/fock/gates.py` + `channels._kraus_ops` as a constant tensor + einsum `'kam,mn,kbn->ab'`; jax path is the jnp mirror, Phase F4)
 
 ## Test doctrine
 
