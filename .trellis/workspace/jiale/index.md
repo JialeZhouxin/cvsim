@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 53
+- **Total Sessions**: 54
 - **Last Active**: 2026-08-13
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1880 | Active |
+| `journal-1.md` | ~1913 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 54 | 2026-08-13 | 心智模型校准文档（Q1-Q12 访谈锁定 + AGENTS.md 指针） | `3d83ebb` | `master` |
 | 53 | 2026-08-13 | Fock Lab GUI — 同壳双后端（F7） | `7b29cf2` | `master` |
 | 52 | 2026-08-12 | GBS 薄封装: pnr_probs / gbs_sample / threshold_sample | `4c87373` | `master` |
 | 51 | 2026-08-12 | vision-fock 正文渐进标注同步（延续架构整理） | `a392c38` | `master` |

@@ -1878,3 +1878,36 @@ grilling 十问+Q11 全锁: 同壳双后端/双卡并列/采样对照/白名单�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 54: 心智模型校准文档（Q1-Q12 访谈锁定 + AGENTS.md 指针）
+
+**Date**: 2026-08-13
+**Task**: 心智模型校准文档（Q1-Q12 访谈锁定 + AGENTS.md 指针）
+**Branch**: `master`
+
+### Summary
+
+用户发起心智模型校准访谈（认知科学视角），Q1-Q12 逐项锁定：三表示=同一物理四维切分（结构/成本/光学操作/输出形式）、锚点=实验流水线、教学=场景驱动、选型=测量类型主+精确度兜底、学习=直觉→数学→代码、验证=数值对账主+写作辅、决策=维度表主+小步迭代兜底、表达=逻辑语言+具身认知（结构映射四问顶层协议+反模式清单）。交付：根目录心智模型校准文档.md + AGENTS.md 认知校准指针（首次纳入 git）。OCR 0 findings。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3d83ebb` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
