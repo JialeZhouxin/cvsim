@@ -31,6 +31,7 @@ The lab frontend is intentionally minimal: vanilla ES modules, zero dependencies
 `ops.js` `OPS` and `ir.py` describe the **same** `circuit_v0` contract (ops, params, schema). When changing ops:
 
 1. Update `ops.js` metadata (label/params/defaults) **and** `ir.py` validation together.
+2. Dual-backend (F7+): each op carries `backends: ["gaussian"|"fock"]`; per-backend param-name translation lives in explicit tables (`FOCK_UI_TO_V1_PARAM` / `FOCK_V1_TO_UI_PARAM` in ops.js/editor.js) — never inline ad-hoc renames. UI param names stay gaussian-flavored (`T`, `phi`); Fock IR keeps `eta`, `r`-only.
 2. Keep `stateFromJson` (frontend) and `load_circuit` (backend) aligned on required vs optional fields (`advanced: true` params may be absent).
 3. Add/adjust `tests/editor.test.mjs` for new ops.
 

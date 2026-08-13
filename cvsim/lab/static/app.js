@@ -560,6 +560,11 @@ async function doBatch() {
   try {
     const payload = toV1Json(editor.getState());
     payload.shots = 1000;
+    payload.seed = Number(seedInput.value);
+    if (!Number.isInteger(payload.seed) || payload.seed < 0) {
+      setStatus("seed 必须是非负整数", false);
+      return;
+    }
     const resp = await fetch("/batch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

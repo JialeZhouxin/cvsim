@@ -36,10 +36,13 @@ def test_vacuum_default_unchanged():
 
 
 def test_initial_single_mode_and_gates():
-    """initial works for 1-mode and gates act on it (displace |0⟩ → |1⟩ peak)."""
+    """initial works for 1-mode and gates act on it (D(α)|2⟩ → amplitude
+    moves away from the bare Fock peak; α=1e-9 would be a silent no-op)."""
     c = FockCircuit(1, cutoff=10, initial=[2])
-    st = c.displace(0, alpha=1e-9).run()
-    assert np.argmax(np.abs(st.amps)) == 2
+    st = c.displace(0, alpha=0.5).run()
+    # ⟨2|D(α)|2⟩ = e^{−|α|²/2} L₂(|α|²) ≈ 0.47 for |α|=0.5 — clearly changed
+    assert abs(st.amps[2]) < 0.9
+    assert np.isclose(float(np.sum(np.abs(st.amps) ** 2)), 1.0, atol=TOL)
 
 
 def test_initial_validation_fail_fast():

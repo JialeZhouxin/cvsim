@@ -24,9 +24,12 @@ test("histBars: sample overlay — counts/shots, pad missing, cap 30", () => {
   assert.equal(bars[0].sample, 0.5);
   assert.equal(bars[1].sample, 0);
   assert.equal(bars[2].sample, 0.5);
-  // counts longer than probs → padded theory 0
-  const long = histBars([1.0], [1000], 1000);
-  assert.equal(long[0].theory, 1);
+  // counts longer than probs → padded theory 0, sample aligned
+  const long = histBars([1.0], [400, 600], 1000);
+  assert.deepEqual(long, [
+    { n: 0, theory: 1, sample: 0.4 },
+    { n: 1, theory: 0, sample: 0.6 },
+  ]);
   // cap at 30
   const big = histBars(Array(50).fill(0), Array(50).fill(10), 1000);
   assert.equal(big.length, 30);
