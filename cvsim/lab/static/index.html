@@ -85,12 +85,17 @@
         <p id="wigner-note" class="hint" hidden>理想本征态，无有限 Wigner（不伪造数据）</p>
       </div>
       <div class="wigner__colorbar" aria-hidden="true"><span id="colorbar-max" class="mono">—</span><canvas id="colorbar-canvas" width="8" height="128"></canvas><span id="colorbar-min" class="mono">—</span></div>
-    </div>
-
-    <div class="meters" id="meters-panel">
-      <div class="meter"><span class="meter__label">纯度</span><span id="m-purity" class="meter__value mono">—</span></div>
-      <div class="meter"><span class="meter__label">平均光子数</span><span id="m-nbar" class="meter__value mono">—</span></div>
-      <div class="meter"><span class="meter__label">对数负度</span><span id="m-logneg" class="meter__value mono">—</span></div>
+      <div class="wigner__side" id="wigner-side">
+        <div class="state-block" id="rbar-block" hidden>
+          <h2>均值 r̄ <span id="nmode-tag" class="mono panel__meta"></span></h2>
+          <table class="mat" id="rbar-table"><caption class="sr-only">各模式均值</caption></table>
+        </div>
+        <div class="meters" id="meters-panel">
+          <div class="meter"><span class="meter__label">纯度</span><span id="m-purity" class="meter__value mono">—</span></div>
+          <div class="meter"><span class="meter__label">平均光子数</span><span id="m-nbar" class="meter__value mono">—</span></div>
+          <div class="meter"><span class="meter__label">对数负度</span><span id="m-logneg" class="meter__value mono">—</span></div>
+        </div>
+      </div>
     </div>
 
     <section id="fock-panel" class="fock" hidden aria-label="Fock 结果面板">
@@ -161,12 +166,8 @@
     </details>
 
     <details id="state-grid" class="fold state-fold">
-      <summary>均值 r̄ / 协方差 V <span id="state-summary" class="scan__summary" hidden></span></summary>
+      <summary>协方差 V <span id="state-summary" class="scan__summary" hidden></span></summary>
       <div class="state-grid">
-        <div class="state-block">
-          <h2>均值 r̄ <span id="nmode-tag" class="mono panel__meta"></span></h2>
-          <table class="mat" id="rbar-table"><caption class="sr-only">各模式均值</caption></table>
-        </div>
         <div class="state-block">
           <h2>协方差 V <span class="mono panel__meta">xxpp</span></h2>
           <div class="mat-scroll"><table class="mat" id="v-table"><caption class="sr-only">协方差矩阵</caption></table></div>

@@ -47,6 +47,21 @@ const LUT = buildLut();
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("wigner-canvas");
+const wignerBox = document.querySelector(".wigner");
+const wignerFrame = document.querySelector(".wigner__frame");
+const wignerSide = $("wigner-side");
+const wignerColorbar = document.querySelector(".wigner__colorbar");
+
+/* frame 正方形 = min(可用宽, 可用高)：可用宽 = colorbar 左缘 - gap。
+   CSS 无原生解（aspect-ratio 遇双 definite 失效、container-type 高度塌缩）→ JS 算 */
+function fitWignerFrame() {
+  if (!wignerBox || !wignerFrame || !wignerColorbar) return;
+  const gap = parseFloat(getComputedStyle(wignerBox).gap || "16");
+  const availW = wignerColorbar.offsetLeft - gap;
+  const s = Math.max(64, Math.min(availW, wignerBox.clientHeight));
+  wignerFrame.style.width = s + "px";
+  wignerFrame.style.height = s + "px";
+}
 const colorbar = $("colorbar-canvas");
 const statusEl = $("status");
 const runBtn = $("run-btn");
@@ -209,6 +224,9 @@ new ResizeObserver(() => {
   drawAxes(lastLim);
 }).observe(canvas);
 
+/* 容器尺寸变化（窗口/面板/fock 切换）→ 重算正方形画布 */
+new ResizeObserver(fitWignerFrame).observe(wignerBox);
+
 function render(result, mode) {
   /* #8: 新 run 使旧 scan 摘要失效——折叠摘要清空 */
   const scanSummary = $("scan-summary");
@@ -219,6 +237,7 @@ function render(result, mode) {
     return;
   }
   drawWignerResult(result);
+  $("rbar-block").hidden = false; // 均值表常驻侧列（有数据才显示）
 
   const m = result.meters;
   $("m-purity").textContent = fmt(m.purity);
@@ -283,7 +302,9 @@ function syncBackendPanels(backend) {
   $("scan-panel").hidden = fock;   // v0 无 Fock scan（/scan+fock → 422）
   $("state-grid").hidden = fock;   // Fock 无 r̄/V 表（态摘要走护栏卡）
   $("meters-panel").hidden = fock; // Fock meters 在护栏卡
+  $("wigner-side").hidden = fock;  // Fock 侧列全藏 → 画布满宽
   $("fock-panel").hidden = !fock;
+  fitWignerFrame(); // side 显隐变化 → 重算正方形画布
 }
 
 /* ── run pipeline: debounce (120ms) + seq guard ────────── */

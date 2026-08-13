@@ -16,6 +16,11 @@ body {
   overflow-x: clip;
 }
 
+/* hidden 属性兜底：作者 display 样式（flex/grid）不得覆盖 [hidden] */
+[hidden] {
+  display: none !important;
+}
+
 .lite,
 .panel__head,
 .meters,
@@ -302,16 +307,13 @@ body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-md);
 }
 
 .wigner__frame {
-  /* 白色画布本身成正方形 — 从高度推宽度（height:100% + aspect-ratio），永不溢出、恒等比 */
-  aspect-ratio: 1 / 1;
-  height: 100%;
-  max-width: 100%;
+  /* 正方形尺寸由 app.js fitWignerFrame 计算（min(可用宽, 可用高)），恒等比不溢出 */
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -321,6 +323,14 @@ body {
   background: var(--color-paper-2);
   padding: var(--space-sm);
   position: relative;
+}
+
+.wigner__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+  align-self: stretch;
 }
 
 .wigner__plot {
@@ -370,8 +380,9 @@ body {
 /* ── meters ────────────────────────────────────────────── */
 .meters {
   display: flex;
-  gap: var(--space-lg);
-  margin: var(--space-sm) 0;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
