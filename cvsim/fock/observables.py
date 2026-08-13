@@ -439,8 +439,8 @@ def _marginal_density(state: FockLike, mode: int) -> np.ndarray:
             return state.rho
         rho4 = state.rho.reshape(N, N, N, N)
         if mode == 0:
-            return np.einsum("abad->bd", rho4)
-        return np.einsum("abcb->ac", rho4)
+            return np.einsum("abcb->ac", rho4)
+        return np.einsum("abad->bd", rho4)
     if state.nmode == 1:
         if mode != 0:
             raise IndexError(f"mode {mode} out of range for nmode=1")

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cvsim.fock import FockDensity, FockState
+from cvsim.fock import FockCircuit, FockDensity, FockState
 from cvsim.fock.analyse import (
     entropy_vn,
     fidelity,
@@ -47,19 +47,38 @@ def test_entropy_vn_maximally_mixed() -> None:
 def test_partial_trace_pure_product() -> None:
     st = FockState.fock2(1, 2, 10)
     out = partial_trace(st, 0)
-    np.testing.assert_allclose(out.rho, FockDensity.from_pure(FockState.fock(2, 10)).rho, atol=1e-12)
+    np.testing.assert_allclose(out.rho, FockDensity.from_pure(FockState.fock(1, 10)).rho, atol=1e-12)
     out1 = partial_trace(st, 1)
-    np.testing.assert_allclose(out1.rho, FockDensity.from_pure(FockState.fock(1, 10)).rho, atol=1e-12)
+    np.testing.assert_allclose(out1.rho, FockDensity.from_pure(FockState.fock(2, 10)).rho, atol=1e-12)
 
 
 def test_partial_trace_density_product() -> None:
     d = FockDensity.from_pure(FockState.fock2(1, 2, 8))
     out = partial_trace(d, 0)
-    ref = FockDensity.from_pure(FockState.fock(2, 8))
+    ref = FockDensity.from_pure(FockState.fock(1, 8))
     np.testing.assert_allclose(out.rho, ref.rho, atol=1e-12)
     out1 = partial_trace(d, 1)
-    ref1 = FockDensity.from_pure(FockState.fock(1, 8))
+    ref1 = FockDensity.from_pure(FockState.fock(2, 8))
     np.testing.assert_allclose(out1.rho, ref1.rho, atol=1e-12)
+
+
+def test_partial_trace_asymmetric_coherent_mode0() -> None:
+    """Regression (F7 found): 2-mode einsum indices were swapped — keep=0
+    returned the mode-1 marginal. Asymmetric state catches it: mode 0
+    coherent, mode 1 vacuum."""
+    st = FockCircuit(2, cutoff=8).displace(0, alpha=1.0).run()
+    out0 = partial_trace(st, 0)
+    p0 = np.real(np.diag(out0.rho))
+    mean0 = float(np.sum(np.arange(8) * p0))
+    assert abs(mean0 - 1.0) < 1e-4  # coherent |α|²=1, cutoff-8 tail ≈ 7e-6
+    out1 = partial_trace(st, 1)
+    np.testing.assert_allclose(
+        out1.rho, FockDensity.from_pure(FockState.fock(0, 8)).rho, atol=1e-12
+    )
+    # density-input path (same swap bug in observables._marginal_density)
+    d = FockDensity.from_pure(st)
+    mean0d = float(np.sum(np.arange(8) * np.real(np.diag(partial_trace(d, 0).rho))))
+    assert abs(mean0d - 1.0) < 1e-4
 
 
 def test_partial_trace_keep_both_identity() -> None:

@@ -66,7 +66,7 @@ def partial_trace(
             rho4 = state.rho.reshape(N, N, N, N)
         else:
             rho4 = np.einsum("ab,cd->abcd", state.amps, state.amps.conj())
-        red = np.einsum("abad->bd", rho4) if m == 0 else np.einsum("abcb->ac", rho4)
+        red = np.einsum("abcb->ac", rho4) if m == 0 else np.einsum("abad->bd", rho4)
         return FockDensity(rho=red, nmode=1)
     raise NotImplementedError(
         f"partial_trace: nmode={nmode} not supported (dense m≤2; sparse F3)"
