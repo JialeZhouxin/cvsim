@@ -20,6 +20,11 @@ from cvsim.fock.circuit import FockCircuit
 
 SCHEMA = "circuit_v1"
 
+#: Top-level fields carried through by the Lab (view/seed/ui are UI concerns,
+#: ADR-0003 #8; ``backend`` selects the representation, ``initial`` is parsed
+#: below as a real field). ``cutoff`` is handled separately (not ignored).
+EXTENSION_FIELDS = frozenset({"view", "seed", "ui", "backend"})
+
 
 @dataclass(frozen=True)
 class OpMeta:
@@ -104,7 +109,7 @@ def validate_ir(data: dict[str, Any]) -> None:
     if not isinstance(nmode, int) or isinstance(nmode, bool) or nmode < 1:
         raise ValueError(f"nmode must be an int >= 1, got {nmode!r}")
     for key in data:
-        if key in ("schema", "nmode", "ops", "cutoff"):
+        if key in ("schema", "nmode", "ops", "cutoff", "initial") or key in EXTENSION_FIELDS:
             continue
         raise ValueError(f"unknown top-level field {key!r}")
     cutoff = data.get("cutoff")
@@ -121,6 +126,24 @@ def validate_ir(data: dict[str, Any]) -> None:
             raise ValueError(
                 f"cutoff must be an int >= 1 or a list of nmode ints, got {cutoff!r}"
             )
+    cutoffs = (
+        [cutoff] * nmode
+        if isinstance(cutoff, int)
+        else (cutoff if isinstance(cutoff, list) else [10] * nmode)
+    )
+    initial = data.get("initial")
+    if initial is not None:
+        if (
+            not isinstance(initial, list)
+            or len(initial) != nmode
+            or not all(isinstance(n, int) and not isinstance(n, bool) for n in initial)
+        ):
+            raise ValueError(
+                f"initial must be a list of nmode={nmode} ints, got {initial!r}"
+            )
+        for i, (n, c) in enumerate(zip(initial, cutoffs, strict=True)):
+            if not 0 <= n < c:
+                raise ValueError(f"initial[{i}]={n} must be in [0, {c})")
     if not isinstance(data.get("ops"), list):
         raise ValueError("ops must be a list")
     for op in data["ops"]:
@@ -162,6 +185,8 @@ def to_ir(circuit: FockCircuit) -> dict[str, Any]:
     doc: dict[str, Any] = {"schema": SCHEMA, "nmode": circuit.nmode, "ops": ops}
     if cutoff != 10:
         doc["cutoff"] = cutoff
+    if circuit.initial is not None and any(n != 0 for n in circuit.initial):
+        doc["initial"] = list(circuit.initial)
     return doc
 
 
@@ -209,10 +234,12 @@ def _build_op(circuit: FockCircuit, op: str, modes: tuple[int, ...], kw: dict) -
 
 
 def from_ir(data: dict[str, Any]) -> FockCircuit:
-    """Rebuild a FockCircuit from a circuit_v1 dict (with cutoff)."""
+    """Rebuild a FockCircuit from a circuit_v1 dict (with cutoff/initial)."""
     validate_ir(data)
     cutoff = data.get("cutoff", 10)
-    circuit = FockCircuit(data["nmode"], cutoff=cutoff)
+    circuit = FockCircuit(
+        data["nmode"], cutoff=cutoff, initial=data.get("initial")
+    )
     for node in data["ops"]:
         meta = OP_META[node["op"]]
         kw = dict(meta.defaults)

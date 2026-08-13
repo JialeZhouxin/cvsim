@@ -127,6 +127,7 @@ FOCK_PUBLIC = {
     "FockState",
     "FockDensity",
     "FockSparse",
+    "FockCircuit",  # F7: circuit DSL + initial (per-mode number-state initial)
     # leakage trio (F1)
     "truncation_leakage",
     "check_leakage",

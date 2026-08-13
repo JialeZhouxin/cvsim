@@ -5,6 +5,7 @@ from cvsim.fock.analyse import (
     partial_trace,
 )
 from cvsim.fock.channels import amplifier, apply_kraus, loss, phase_noise
+from cvsim.fock.circuit import FockCircuit
 from cvsim.fock.density import FockDensity
 from cvsim.fock.gates import (
     apply_unitary,
@@ -49,6 +50,7 @@ __all__ = [
     "FockSparse",
     "FockState",
     "FockDensity",
+    "FockCircuit",
     "truncation_leakage",
     "check_leakage",
     "estimate_leakage",

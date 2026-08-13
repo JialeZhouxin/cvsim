@@ -216,10 +216,17 @@ class FockCircuit:
         # results == {'m_n': 3}
 
     ``cutoff`` may be a per-mode list (equal cutoffs required on the modes
-    of each two-mode gate).
+    of each two-mode gate). ``initial`` sets a per-mode Fock number-state
+    initial state (``None`` = vacuum — old files unchanged); each entry
+    must satisfy ``0 <= n_i < cutoffs[i]``.
     """
 
-    def __init__(self, nmode: int, cutoff: int | list[int] = 10) -> None:
+    def __init__(
+        self,
+        nmode: int,
+        cutoff: int | list[int] = 10,
+        initial: list[int] | None = None,
+    ) -> None:
         if nmode < 1:
             raise ValueError("nmode must be >= 1")
         if isinstance(cutoff, int):
@@ -232,7 +239,34 @@ class FockCircuit:
             raise ValueError("cutoffs must be >= 1")
         self.nmode = nmode
         self.cutoffs = cutoffs
+        self.initial = self._validate_initial(initial, cutoffs)
         self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
+
+    @staticmethod
+    def _validate_initial(
+        initial: list[int] | None, cutoffs: list[int]
+    ) -> list[int] | None:
+        """Per-mode Fock number-state occupation list; None = vacuum."""
+        if initial is None:
+            return None
+        if not isinstance(initial, (list, tuple)):
+            raise ValueError(
+                f"initial must be a list of ints, got {initial!r}"
+            )
+        if len(initial) != len(cutoffs):
+            raise ValueError(
+                f"initial len {len(initial)} != nmode {len(cutoffs)}"
+            )
+        for i, (n, c) in enumerate(zip(initial, cutoffs, strict=True)):
+            if (
+                not isinstance(n, int)
+                or isinstance(n, bool)
+                or not 0 <= n < c
+            ):
+                raise ValueError(
+                    f"initial[{i}]={n!r} must be an int in [0, {c})"
+                )
+        return list(initial)
 
     # -- composition ------------------------------------------------------
 
@@ -241,11 +275,13 @@ class FockCircuit:
             raise ValueError(f"nmode mismatch: {self.nmode} vs {other.nmode}")
         if self.cutoffs != other.cutoffs:
             raise ValueError(f"cutoffs mismatch: {self.cutoffs} vs {other.cutoffs}")
+        if self.initial != other.initial:
+            raise ValueError(f"initial mismatch: {self.initial} vs {other.initial}")
         self._ops.extend(other._ops)
         return self
 
     def __add__(self, other: FockCircuit) -> FockCircuit:
-        c = FockCircuit(self.nmode, self.cutoffs)
+        c = FockCircuit(self.nmode, self.cutoffs, initial=self.initial)
         c._ops = list(self._ops)
         c += other
         return c
@@ -413,7 +449,9 @@ class FockCircuit:
             self._ops, self.nmode,
             break_ops=_BREAK_OPS, remove_mode_ops=_REMOVE_MODE_OPS,
         )
-        return CompiledFock(self.nmode, self.cutoffs, segments, params)
+        return CompiledFock(
+            self.nmode, self.cutoffs, segments, params, initial=self.initial
+        )
 
     def run(self, *, rng=None, **params: float) -> Any:
         """Execute with parameter values (single path: compile then run).
@@ -426,7 +464,10 @@ class FockCircuit:
     # -- inspection --------------------------------------------------------
 
     def __repr__(self) -> str:
-        lines = [f"FockCircuit({self.nmode}, cutoff={self.cutoffs})"]
+        lines = [f"FockCircuit({self.nmode}, cutoff={self.cutoffs}"]
+        if self.initial is not None:
+            lines[-1] += f", initial={self.initial}"
+        lines[-1] += ")"
         for op_name, modes, fixed, pnames, refs in self._ops:
             args = [str(m) for m in modes]
             for k, v in fixed.items():
@@ -459,14 +500,23 @@ class CompiledFock(CompiledCircuit):
     """Compiled Fock circuit: Kronecker per-op merged segments (ADR-0004)."""
 
     def __init__(
-        self, nmode: int, cutoffs: list[int], segments: list, params: frozenset[str]
+        self,
+        nmode: int,
+        cutoffs: list[int],
+        segments: list,
+        params: frozenset[str],
+        initial: list[int] | None = None,
     ) -> None:
         super().__init__(nmode, segments, params)
         self.cutoffs = list(cutoffs)
+        self.initial = None if initial is None else list(initial)
 
     def _init_state(self) -> FockState:
         amps = np.zeros(tuple(self.cutoffs), dtype=complex)
-        amps[(0,) * self.nmode] = 1.0
+        if self.initial is None:
+            amps[(0,) * self.nmode] = 1.0  # vacuum (legacy default)
+        else:
+            amps[tuple(self.initial)] = 1.0  # per-mode Fock number state
         return FockState(amps=amps)
 
     def _apply_merged(self, ops, nmode, values, st):
