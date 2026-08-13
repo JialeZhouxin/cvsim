@@ -301,20 +301,26 @@ body {
 .wigner {
   flex: 1;
   min-height: 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--space-md);
-  align-items: stretch;
 }
 
 .wigner__frame {
-  flex: 1;
+  /* 白色画布本身成正方形 — 从高度推宽度（height:100% + aspect-ratio），永不溢出、恒等比 */
+  aspect-ratio: 1 / 1;
+  height: 100%;
+  max-width: 100%;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
   background: var(--color-paper-2);
   padding: var(--space-sm);
+  position: relative;
 }
 
 .wigner__plot {
@@ -329,7 +335,7 @@ body {
   width: 100%;
   height: 100%;
   border: 1px solid var(--color-rule);
-  /* dpr 渲染（app.js drawHeatmap）— 无马赛克；热图铺满白色画布（plot），轴 SVG 同尺寸跟随 */
+  /* dpr 渲染（app.js drawHeatmap）— 无马赛克；热图铺满正方形画布，轴 SVG 同尺寸跟随 */
 }
 
 .axis-svg {
@@ -1088,4 +1094,15 @@ body {
 
 .gate.is-dragging {
   opacity: 0.4;
+}
+
+#wigner-note {
+  /* 浮层叠在热图上，不占布局 → plot 全高 → 画布与热图同为正方形 */
+  position: absolute;
+  left: var(--space-sm);
+  bottom: var(--space-xs);
+  margin: 0;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklch, var(--color-paper-2) 88%, transparent);
 }
