@@ -45,6 +45,15 @@ from cvsim.gaussian import (
     two_mode_squeeze,
 )
 from cvsim.gaussian.ir import IRNode, SCHEMA, CircuitV1, validate_ir
+from cvsim.fock import (
+    FockCircuit,
+    FockDensity,
+    FockState,
+    mean_photon as fock_mean_photon,
+    partial_trace as fock_partial_trace,
+    pnrd_probs,
+)
+from cvsim.fock.ir import validate_ir as validate_fock_ir
 from cvsim.wigner import wigner_grid
 
 SCHEMA_V0 = "circuit_v0"
@@ -58,6 +67,17 @@ LAB_WHITELIST = frozenset(
         "displace", "phase", "squeeze", "fourier", "loss", "amplifier",
         "beamsplitter", "two_mode_squeeze", "mz",
         "measure_homodyne", "measure_heterodyne",
+    }
+)
+#: Fock backend op whitelist (vision-gaussian-lab-ui §4.7, F7). Core Fock IR
+#: also carries interferometer/apply_unitary/apply_kraus — valid IR, not
+#: unlocked in the Fock Lab UI (matrix editor deferred, anti-whitelist creed).
+FOCK_WHITELIST = frozenset(
+    {
+        "displace", "phase", "squeeze", "kerr", "beamsplitter",
+        "two_mode_squeeze", "mach_zehnder", "cz", "cx",
+        "loss", "amplifier", "phase_noise",
+        "measure_pnr", "measure_homodyne", "measure_heterodyne",
     }
 )
 #: v0-only source ops — translated away by :func:`translate_v0` (no source
@@ -98,20 +118,26 @@ class View:
     wigner_mode: int = 0
     lim: float = 5.0
     n: int = 64
+    joint_modes: list[int] | None = None  # Fock: 2-mode joint heatmap modes
 
 
 @dataclass
 class LabCircuit:
     """Lab-loaded circuit: core :class:`CircuitV1` + UI extension fields.
 
-    ``seed`` / ``view`` / ``ui`` are Lab concerns (core IR ignores them,
-    ADR-0003 #8); they ride along in the JSON as extension fields.
+    ``seed`` / ``view`` / ``ui`` / ``backend`` / ``initial`` are Lab
+    concerns (core IR ignores or carries them, ADR-0003 #8). Fock backend:
+    ``core`` is None and ``raw`` holds the validated JSON dict (Fock
+    execution rebuilds via ``FockCircuit.from_ir``).
     """
 
-    core: CircuitV1
+    core: CircuitV1 | None = None
+    backend: str = "gaussian"
     seed: int = 0
     view: View = field(default_factory=View)
     ui: dict[str, Any] = field(default_factory=dict)
+    raw: dict[str, Any] = field(default_factory=dict)
+    initial: list[int] | None = None
 
 
 @dataclass
@@ -263,13 +289,28 @@ def _parse_view(raw: Any) -> View:
     n = raw.get("n", 64)
     if not isinstance(n, int) or isinstance(n, bool) or n < 2 or n > 512:
         raise CircuitV0Error("view.n must be an int in [2, 512]")
-    return View(wigner_mode=wigner_mode, lim=float(lim), n=n)
+    jm = raw.get("joint_modes")
+    if jm is not None and (
+        not isinstance(jm, list)
+        or len(jm) != 2
+        or jm[0] == jm[1]
+        or not all(isinstance(m, int) and not isinstance(m, bool) and m >= 0 for m in jm)
+    ):
+        raise CircuitV0Error(
+            "view.joint_modes must be a list of two distinct non-negative ints"
+        )
+    return View(
+        wigner_mode=wigner_mode, lim=float(lim), n=n,
+        joint_modes=None if jm is None else list(jm),
+    )
 
 
 def load_circuit(data: dict[str, Any]) -> LabCircuit:
     """Load + validate a circuit payload: v1 native, v0 via :func:`translate_v0`.
 
-    Then enforce the Lab whitelist (UI concept; core-only ops → 422).
+    Routes by ``backend`` (default ``gaussian`` — old files unchanged): the
+    Fock path validates against ``cvsim.fock.ir`` + FOCK_WHITELIST and keeps
+    the raw dict; the Gaussian path enforces LAB_WHITELIST as before.
     """
     if not isinstance(data, dict):
         raise CircuitV0Error("payload must be a JSON object")
@@ -280,6 +321,20 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
             f"unsupported schema {data.get('schema')!r}; expected {SCHEMA!r} or "
             f"{SCHEMA_V0!r}"
         )
+    backend = data.get("backend", "gaussian")
+    if backend not in ("gaussian", "fock"):
+        raise CircuitV0Error(
+            f"backend must be 'gaussian' or 'fock', got {backend!r}"
+        )
+    view = _parse_view(data.get("view", {}))
+    seed = data.get("seed", 0)
+    if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
+        raise CircuitV0Error("seed must be a non-negative int")
+    ui = data.get("ui", {})
+    if not isinstance(ui, dict):
+        raise CircuitV0Error("ui must be an object")
+    if backend == "fock":
+        return _load_fock(data, seed, view, ui)
     try:
         core = validate_ir(data)
     except ValueError as e:
@@ -292,14 +347,44 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
                 f"ops[{node.id or '?'}]: op {node.op!r} not in Lab whitelist: "
                 f"{sorted(LAB_WHITELIST)}"
             )
-    view = _parse_view(data.get("view", {}))
-    seed = data.get("seed", 0)
-    if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
-        raise CircuitV0Error("seed must be a non-negative int")
-    ui = data.get("ui", {})
-    if not isinstance(ui, dict):
-        raise CircuitV0Error("ui must be an object")
     return LabCircuit(core=core, seed=seed, view=view, ui=ui)
+
+def _load_fock(
+    data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]
+) -> LabCircuit:
+    """Fock backend load: FOCK_WHITELIST first, then fock IR validation.
+
+    Whitelist is a UI concept (ADR-0003 #3): ops outside it are rejected
+    with a whitelist message even when they are valid core Fock IR ops
+    (interferometer / apply_unitary / apply_kraus). Checking before
+    validate_fock_ir also gives the whitelist message for ops that are
+    not Fock core ops at all (e.g. fourier).
+    """
+    for node in data.get("ops", []):
+        op = node.get("op") if isinstance(node, dict) else None
+        if op not in FOCK_WHITELIST:
+            nid = node.get("id") if isinstance(node, dict) else "?"
+            raise CircuitV0Error(
+                f"ops[{nid or '?'}]: op {op!r} not in Fock Lab "
+                f"whitelist: {sorted(FOCK_WHITELIST)}"
+            )
+    try:
+        validate_fock_ir(data)
+    except ValueError as e:
+        raise CircuitV0Error(str(e)) from e
+    initial = data.get("initial")
+    if initial is not None and (
+        not isinstance(initial, list)
+        or not all(
+            isinstance(n, int) and not isinstance(n, bool) and n >= 0
+            for n in initial
+        )
+    ):
+        raise CircuitV0Error("initial must be a list of non-negative ints")
+    return LabCircuit(
+        core=None, backend="fock", seed=seed, view=view, ui=ui,
+        raw=data, initial=initial,
+    )
 
 
 # -- execution --------------------------------------------------------------
@@ -586,4 +671,250 @@ def scan_circuit(circuit: LabCircuit, sweep: dict[str, Any]) -> dict[str, Any]:
         "modes_A": list(modes_A),
         "xs": xs.tolist(),
         "ys": ys,
+    }
+
+# -- Fock backend execution (F7) ---------------------------------------------
+
+#: Cap on the higher-cutoff comparison tensor for the leakage estimate
+#: (vision-fock §7 memory budget; honest null above it).
+_LEAKAGE_DIM_CAP = 2_000_000
+
+def _fock_mode_probs(state: FockState | FockDensity, mode: int) -> np.ndarray:
+    """Single-mode photon-number marginal via public ``pnrd_probs``;
+    m>2 states fall back to direct amplitude/diagonal marginalization
+    (``partial_trace`` is documented dense m≤2)."""
+    try:
+        keep = fock_partial_trace(state, keep=[mode])
+        return np.asarray(pnrd_probs(keep), dtype=float)
+    except (IndexError, ValueError, NotImplementedError):
+        if isinstance(state, FockState):
+            p = np.abs(state.amps) ** 2
+            axes = tuple(i for i in range(state.nmode) if i != mode)
+            return np.asarray(p.sum(axis=axes), dtype=float)
+        p = np.real(np.diag(state.rho)).reshape((state.cutoff,) * state.nmode)
+        axes = tuple(i for i in range(state.nmode) if i != mode)
+        return np.asarray(p.sum(axis=axes), dtype=float)
+
+def _fock_mean_photon(state: FockState | FockDensity, mode: int) -> float:
+    try:
+        return float(fock_mean_photon(state, mode=mode))
+    except IndexError:  # m>2: marginal × n (arithmetic on public pnrd_probs)
+        p = _fock_mode_probs(state, mode)
+        return float(np.sum(np.arange(p.size) * p))
+
+def _fock_purity(state: FockState | FockDensity) -> float | None:
+    if isinstance(state, FockState):
+        return 1.0
+    try:
+        return float(np.trace(state.rho @ state.rho).real)
+    except (ValueError, np.linalg.LinAlgError):
+        return None
+
+def _fock_leakage(raw: dict[str, Any], state: FockState | FockDensity) -> float | None:
+    """Truncation leakage meter: analytic tail for factory states; otherwise
+    a higher-cutoff re-run comparison (vision-fock §5 rule 1). Density
+    (post-channel) and conditional states → honest None (never fabricated)."""
+    if not isinstance(state, FockState):
+        return None
+    if state.tail is not None:
+        return float(state.tail)
+    cutoffs = list(state.amps.shape)
+    cut2 = [min(2 * c, 60) for c in cutoffs]
+    if cut2 == cutoffs:
+        return None
+    if int(np.prod(cut2)) > _LEAKAGE_DIM_CAP:
+        return None
+    if any(
+        n.get("op", "").startswith("measure_") for n in raw.get("ops", [])
+    ):
+        return None
+    try:
+        fc2 = FockCircuit.from_ir({**raw, "cutoff": cut2})
+        st2 = fc2.run()
+        sl = tuple(slice(0, c) for c in cutoffs)
+        return float(1.0 - np.sum(np.abs(st2.amps[sl]) ** 2))
+    except (ValueError, AttributeError, np.linalg.LinAlgError):
+        return None
+
+def _fock_wigner(
+    state: FockState | FockDensity, view: View
+) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """Single-mode Wigner via partial_trace + wigner_grid (Fock branch).
+    cutoff > 20 degrades the grid to N=48 (design §2.4 perf budget)."""
+    mode = view.wigner_mode
+    if mode >= state.nmode:
+        raise CircuitV0Error(
+            f"view.wigner_mode {mode} out of range (nmode={state.nmode})"
+        )
+    try:
+        keep = fock_partial_trace(state, keep=[mode])
+        max_c = (
+            max(state.amps.shape)
+            if isinstance(state, FockState)
+            else state.cutoff
+        )
+        n = min(view.n, 48) if max_c > 20 else view.n
+        return wigner_grid(keep, lim=view.lim, n=n)
+    except (ValueError, FloatingPointError, np.linalg.LinAlgError):
+        return None  # singular conditional state: honest null
+
+def _fock_joint(
+    state: FockState | FockDensity, view: View, measured: list
+) -> dict[str, Any] | None:
+    """2-mode joint photon-number grid (≤30×30, design §2.3). null when no
+    joint_modes / <2 modes / measurement collapse ambiguity."""
+    jm = view.joint_modes
+    if (
+        not jm
+        or len(jm) != 2
+        or state.nmode < 2
+        or jm[0] == jm[1]
+        or measured
+        or not all(0 <= m < state.nmode for m in jm)
+    ):
+        return None
+    try:
+        keep2 = fock_partial_trace(state, keep=list(jm))
+        g = np.asarray(pnrd_probs(keep2), dtype=float)
+        return {"modes": list(jm), "grid": g[:30, :30].tolist()}
+    except (IndexError, ValueError, NotImplementedError, np.linalg.LinAlgError):
+        return None
+
+def _fock_measured(raw: dict[str, Any], results: dict) -> list[dict[str, Any]]:
+    """Measurement outcomes in node order (name-keyed results dict → list)."""
+    out: list[dict[str, Any]] = []
+    for node in raw.get("ops", []):
+        if not isinstance(node, dict) or not node.get("op", "").startswith("measure_"):
+            continue
+        params = node.get("params") or {}
+        name = params.get("name")
+        if name is None or name not in results:
+            continue
+        val = results[name]
+        if isinstance(val, complex):
+            val = [val.real, val.imag]
+        elif isinstance(val, np.generic):
+            val = val.item()
+        out.append(
+            {"op": node["op"], "mode": node["modes"][0],
+             "name": name, "outcome": val}
+        )
+    return out
+
+def run_fock_circuit(
+    circuit: LabCircuit, rng: np.random.Generator | None = None
+) -> dict[str, Any]:
+    """Fock /run + /sample shared path: FockCircuit.from_ir → run(rng).
+
+    Deterministic per circuit when rng is None (seed field, default 0);
+    every measurement node conditions the state (FockCircuit semantics).
+    """
+    fc = FockCircuit.from_ir(circuit.raw)
+    out = fc.run(rng=rng)
+    if isinstance(out, tuple):
+        state, results = out
+    else:
+        state, results = out, {}
+    measured = _fock_measured(circuit.raw, results)
+    wigner = _fock_wigner(state, circuit.view) if state.nmode > 0 else None
+    dist_mode = circuit.view.wigner_mode
+    if dist_mode >= state.nmode:
+        raise CircuitV0Error(
+            f"view.wigner_mode {dist_mode} out of range (nmode={state.nmode})"
+        )
+    probs = _fock_mode_probs(state, dist_mode)
+    joint = _fock_joint(state, circuit.view, measured)
+    mean_list = [_fock_mean_photon(state, i) for i in range(state.nmode)]
+    cutoffs = (
+        list(state.amps.shape)
+        if isinstance(state, FockState)
+        else [state.cutoff] * state.nmode
+    )
+    return {
+        "schema": SCHEMA,
+        "backend": "fock",
+        "nmode": state.nmode,
+        "cutoffs": cutoffs,
+        "wigner": (
+            {"x": wigner[0][0].tolist(), "p": wigner[1][:, 0].tolist(),
+             "W": wigner[2].tolist()}
+            if wigner is not None
+            else None
+        ),
+        "dist": {"mode": dist_mode, "probs": probs.tolist()},
+        "joint": joint,
+        "meters": {
+            "mean_photon": float(np.sum(mean_list)),
+            "mean_photon_per_mode": mean_list,
+            "purity": _fock_purity(state),
+            "leakage": _fock_leakage(circuit.raw, state),
+        },
+        "measured": measured,
+    }
+
+def batch_fock_circuit(
+    circuit: LabCircuit, shots: int, seed: int
+) -> dict[str, Any]:
+    """Fock /batch: PNR batch sampling vs the exact distribution.
+
+    No measurement nodes: multinomial draw on the selected view (joint
+    grid when view.joint_modes is set, else the wigner_mode marginal) —
+    same draw ``pnr_sample_batch`` performs. Measurement nodes: per-shot
+    condition-chain runs, outcome-vector histogram (honest, unoptimized).
+    """
+    rng = np.random.default_rng(seed)
+    fc = FockCircuit.from_ir(circuit.raw)
+    has_measure = any(
+        n.get("op", "").startswith("measure_")
+        for n in circuit.raw.get("ops", [])
+    )
+    if has_measure:
+        names = [
+            (n.get("params") or {}).get("name")
+            for n in circuit.raw.get("ops", [])
+            if n.get("op", "").startswith("measure_")
+        ]
+        counts: dict[str, int] = {}
+        for _ in range(shots):
+            _, results = fc.run(rng=rng)
+            key = str(tuple(results.get(n) for n in names))
+            counts[key] = counts.get(key, 0) + 1
+        return {
+            "backend": "fock", "shots": shots, "seed": seed,
+            "measured_names": names, "counts": counts,
+        }
+    state = fc.run()
+    jm = circuit.view.joint_modes
+    if (
+        jm
+        and len(jm) == 2
+        and state.nmode >= 2
+        and jm[0] != jm[1]
+        and all(0 <= m < state.nmode for m in jm)
+    ):
+        try:
+            keep2 = fock_partial_trace(state, keep=list(jm))
+            g = np.asarray(pnrd_probs(keep2), dtype=float)[:30, :30]
+        except (IndexError, ValueError, NotImplementedError, np.linalg.LinAlgError):
+            raise CircuitV0Error(
+                f"batch: joint modes {jm} unsupported on this state"
+            ) from None
+        flat = g.ravel()
+        idx = rng.choice(flat.size, size=shots, p=flat)
+        return {
+            "backend": "fock", "shots": shots, "seed": seed,
+            "modes": list(jm), "shape": list(g.shape),
+            "counts": np.bincount(idx, minlength=flat.size).tolist(),
+        }
+    mode = circuit.view.wigner_mode
+    if mode >= state.nmode:
+        raise CircuitV0Error(
+            f"view.wigner_mode {mode} out of range (nmode={state.nmode})"
+        )
+    p = _fock_mode_probs(state, mode)
+    idx = rng.choice(p.size, size=shots, p=p)
+    return {
+        "backend": "fock", "shots": shots, "seed": seed,
+        "modes": [mode], "shape": [int(p.size)],
+        "counts": np.bincount(idx, minlength=p.size).tolist(),
     }

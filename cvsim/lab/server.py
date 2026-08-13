@@ -1,7 +1,8 @@
-"""Thin FastAPI backend for the Gaussian Lab.
+"""Thin FastAPI backend for the Gaussian/Fock Lab (dual backend, F7).
 
 Import boundary (vision §6.2): only ``cvsim.lab`` (which itself only imports
-``cvsim.gaussian`` public ``__all__`` + ``cvsim.wigner``). No private imports.
+``cvsim.gaussian`` public ``__all__`` + ``cvsim.wigner`` + ``cvsim.fock``
+public). No private imports.
 """
 
 from __future__ import annotations
@@ -17,13 +18,15 @@ from cvsim.lab import (
     SCHEMA,
     CircuitV0Error,
     RunResult,
+    batch_fock_circuit,
     load_circuit,
     run_circuit,
+    run_fock_circuit,
     sample_circuit,
     scan_circuit,
 )
 
-app = FastAPI(title="cvsim Gaussian Lab", version="0.1.0")
+app = FastAPI(title="cvsim Lab (Gaussian/Fock)", version="0.2.0")
 
 
 @app.get("/health")
@@ -69,6 +72,12 @@ def _payload(
 def run(body: dict[str, Any]) -> dict[str, Any]:
     try:
         circuit = load_circuit(body)
+        if circuit.backend == "fock":
+            # deterministic per circuit (seed field, default 0): same JSON
+            # → same run (incl. measured outcomes) — reproducible meters
+            return run_fock_circuit(
+                circuit, np.random.default_rng(circuit.seed)
+            )
         result = run_circuit(circuit)
     except (CircuitV0Error, ValueError) as e:
         # ValueError covers library-side guards (loss T range, wigner_grid,
@@ -82,11 +91,43 @@ def sample(body: dict[str, Any]) -> dict[str, Any]:
     """Measure once: explicit seed → true sampling of all measurement nodes."""
     try:
         circuit = load_circuit(body)
+        if circuit.backend == "fock":
+            payload = run_fock_circuit(
+                circuit, np.random.default_rng(circuit.seed)
+            )
+            payload["seed"] = circuit.seed
+            payload["sampled"] = True
+            return payload
         result = sample_circuit(circuit, np.random.default_rng(circuit.seed))
     except (CircuitV0Error, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return _payload(result, seed=circuit.seed, sampled=True)
 
+
+@app.post("/batch")
+def batch(body: dict[str, Any]) -> dict[str, Any]:
+    """Fock batch sampling (F7): UI default 1000 shots; shots validated 1..1e5.
+
+    Gaussian backend → 422 (v0 has no Gaussian batch).
+    """
+    try:
+        if not isinstance(body, dict):
+            raise CircuitV0Error("payload must be a JSON object")
+        shots = body.pop("shots", 1000)
+        circuit = load_circuit(body)
+        if circuit.backend != "fock":
+            raise CircuitV0Error(
+                "batch requires backend='fock' (v0 has no Gaussian batch)"
+            )
+        if (
+            not isinstance(shots, int)
+            or isinstance(shots, bool)
+            or not 1 <= shots <= 100_000
+        ):
+            raise CircuitV0Error("shots must be an int in [1, 100000]")
+        return batch_fock_circuit(circuit, shots, circuit.seed)
+    except (CircuitV0Error, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 @app.post("/scan")
 def scan(body: dict[str, Any]) -> dict[str, Any]:
@@ -100,6 +141,10 @@ def scan(body: dict[str, Any]) -> dict[str, Any]:
     try:
         sweep = body.pop("sweep", None)
         circuit = load_circuit(body)
+        if circuit.backend == "fock":
+            raise CircuitV0Error(
+                "scan is not available for the fock backend (v0)"
+            )
         if not isinstance(sweep, dict):
             raise CircuitV0Error("sweep must be an object")
         return scan_circuit(circuit, sweep)
