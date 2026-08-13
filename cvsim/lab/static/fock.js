@@ -133,7 +133,7 @@ function cssVar(name, fallback) {
 
 /** Grouped bars: theory (accent) + sample (error) side by side. */
 function drawBars(svg, bars) {
-  const W = 320, H = 150, padL = 22, padR = 8, padT = 8, padB = 18;
+  const W = 320, H = 150, padL = 34, padR = 8, padT = 8, padB = 18;
   const vmax = Math.max(1e-12, ...bars.map((b) => Math.max(b.theory, b.sample)));
   const accent = cssVar("--color-accent", "#2e63d1");
   const error = cssVar("--color-error", "#c33");
@@ -141,12 +141,26 @@ function drawBars(svg, bars) {
   const ink = cssVar("--color-ink", "#333");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.replaceChildren();
+  // y 轴：0/0.5/1 网格线 + 数值刻度
+  const hOf = (v) => (v / vmax) * (H - padT - padB);
+  for (const f of [0, 0.5, 1]) {
+    const y = H - padB - hOf(vmax * f);
+    svg.append(el("line", {
+      x1: padL, y1: y, x2: W - padR, y2: y, stroke: rule,
+      "stroke-width": f === 0 ? 1 : 0.5,
+      ...(f === 0 ? {} : { "stroke-dasharray": "3 3" }),
+    }));
+    const t = el("text", {
+      x: padL - 4, y: y + 3, "text-anchor": "end", fill: ink, "font-size": 8,
+    });
+    t.textContent = (vmax * f).toFixed(2);
+    svg.append(t);
+  }
   // baseline
   svg.append(el("line", { x1: padL, y1: H - padB, x2: W - padR, y2: H - padB, stroke: rule, "stroke-width": 1 }));
   const n = Math.max(1, bars.length);
   const slot = (W - padL - padR) / n;
   const barW = Math.max(1, Math.min(8, slot * 0.34));
-  const hOf = (v) => (v / vmax) * (H - padT - padB);
   for (const b of bars) {
     const x = padL + b.n * slot + slot * 0.14;
     if (b.theory > 0) {
