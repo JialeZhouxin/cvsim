@@ -28,7 +28,7 @@ The lab uses **Hallmark Cobalt** (genre `modern-minimal` · macrostructure `Work
 
 | Token group | Members | Contract |
 |-------------|---------|----------|
-| Colors | `--color-paper[-2|-3]`, `--color-rule`, `--color-neutral`, `--color-muted`, `--color-ink`, `--color-accent[-soft]`, `--color-focus`, `--color-error[-soft]`, `--color-success`, `--color-axis` | paper-2/paper-3 = inset surfaces (frames, meters); rule = borders; ink = text; accent-soft/error-soft = tinted fills; axis = canvas overlay only |
+| Colors | `--color-paper[-2|-3]`, `--color-rule`, `--color-neutral`, `--color-muted`, `--color-ink`, `--color-accent[-soft]`, `--color-focus`, `--color-error[-soft]`, `--color-success`, `--color-warning[-soft]`, `--color-axis` | paper-2/paper-3 = inset surfaces (frames, meters); rule = borders; ink = text; accent-soft/error-soft = tinted fills; warning = Fock truncation-leakage >1% meter (F7); axis = canvas overlay only |
 | Type | `--font-display`, `--font-body`, `--font-mono` | Display for headings/wordmark only; body everywhere else |
 | Type scale | `--text-xs`…`--text-lg` | Base `1rem`; labels/notes `--text-sm` or `--text-xs` |
 | Spacing | `--space-xs`…`--space-3xl` | No raw `px`/`rem` spacing values in `style.css` |

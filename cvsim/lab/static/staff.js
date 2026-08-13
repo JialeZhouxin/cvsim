@@ -292,7 +292,7 @@ export function initStaff(root, api) {
     body.className = "gate-card__params";
     let any = false;
     for (const [k, d] of Object.entries(meta.params)) {
-      if (d.advanced) continue; // nbar/nmode: JSON-only
+      if (d.advanced || d.string) continue; // nbar/nmode JSON-only; name id-managed (F7)
       any = true;
       const wrap = document.createElement("label");
       wrap.className = "param";

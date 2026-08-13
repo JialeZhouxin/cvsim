@@ -3,6 +3,7 @@
 
 import { initEditor, loadJson } from "./editor.js";
 import { OPS, sourceModes, toV1Json } from "./ops.js";
+import { initFockPanel } from "./fock.js";
 
 /* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
 const DEFAULT_JSON = {
@@ -194,6 +195,30 @@ function render(result, mode) {
   const scanSummary = $("scan-summary");
   scanSummary.hidden = true;
   scanSummary.textContent = "";
+  if (result.backend === "fock") {
+    renderFock(result, mode);
+    return;
+  }
+  drawWignerResult(result);
+
+  const m = result.meters;
+  $("m-purity").textContent = fmt(m.purity);
+  $("m-nbar").textContent = fmt(m.mean_photon);
+  $("m-logneg").textContent = m.log_negativity === undefined ? "—" : fmt(m.log_negativity);
+
+  $("nmode-tag").textContent = `nmode ${result.nmode}`;
+  const nm = result.nmode;
+  /* backend covariance layout is split: [x0..x_{m-1}, p0..p_{m-1}] —
+     label rows/cols in that order (interleaved xpxpxp would mislabel m≥2) */
+  const modeHead = (i) => `mode ${i < nm ? i : i - nm}·${i < nm ? "x" : "p"}`;
+  renderMatrix($("rbar-table"), nm * 2, 1, modeHead, (r) => fmt(result.rbar[r]));
+  renderMatrix($("v-table"), nm * 2, nm * 2, modeHead, (r, c) => fmt(result.V[r][c]));
+
+  renderModeSelect(nm, mode);
+}
+
+/** Shared Wigner draw (gaussian + fock paths). */
+function drawWignerResult(result) {
   if (!result.wigner) {
     // singular conditional state: no finite Wigner, never fabricated
     const ctx = canvas.getContext("2d");
@@ -210,21 +235,10 @@ function render(result, mode) {
     drawHeatmap(W);
     drawAxes(x[x.length - 1]); // lim = +x max
   }
+}
 
-  const m = result.meters;
-  $("m-purity").textContent = fmt(m.purity);
-  $("m-nbar").textContent = fmt(m.mean_photon);
-  $("m-logneg").textContent = m.log_negativity === undefined ? "—" : fmt(m.log_negativity);
-
-  $("nmode-tag").textContent = `nmode ${result.nmode}`;
-  const nm = result.nmode;
-  /* backend covariance layout is split: [x0..x_{m-1}, p0..p_{m-1}] —
-     label rows/cols in that order (interleaved xpxpxp would mislabel m≥2) */
-  const modeHead = (i) => `mode ${i < nm ? i : i - nm}·${i < nm ? "x" : "p"}`;
-  renderMatrix($("rbar-table"), nm * 2, 1, modeHead, (r) => fmt(result.rbar[r]));
-  renderMatrix($("v-table"), nm * 2, nm * 2, modeHead, (r, c) => fmt(result.V[r][c]));
-
-  /* mode selector: rebuild options to nmode */
+/** mode selector: rebuild options to nmode (shared wigner/dist selector). */
+function renderModeSelect(nm, mode) {
   modeSelect.replaceChildren();
   for (let k = 0; k < nm; k++) {
     const opt = document.createElement("option");
@@ -233,6 +247,22 @@ function render(result, mode) {
     if (k === Number(mode)) opt.selected = true;
     modeSelect.appendChild(opt);
   }
+}
+
+/* F7: Fock 结果面板 — Wigner（复用）+ PNR 分布柱 + joint heatmap +
+   截断护栏；gaussian-only 面板（meters/scan/state）隐藏。 */
+function renderFock(result, mode) {
+  drawWignerResult(result);
+  renderModeSelect(result.nmode, mode);
+  fockPanel.renderResult(result);
+}
+
+function syncBackendPanels(backend) {
+  const fock = backend === "fock";
+  $("scan-panel").hidden = fock;   // v0 无 Fock scan（/scan+fock → 422）
+  $("state-grid").hidden = fock;   // Fock 无 r̄/V 表（态摘要走护栏卡）
+  $("meters-panel").hidden = fock; // Fock meters 在护栏卡
+  $("fock-panel").hidden = !fock;
 }
 
 /* ── run pipeline: debounce (120ms) + seq guard ────────── */
@@ -261,9 +291,10 @@ function showMeasurement(body) {
     const li = document.createElement("li");
     const out = Array.isArray(m.outcome)
       ? `(${m.outcome.map((v) => Number(v).toFixed(4)).join(", ")})`
-      : Number(m.outcome).toFixed(4);
+      : (Number.isInteger(m.outcome) ? String(m.outcome) : Number(m.outcome).toFixed(4));
     const phi = m.phi !== undefined ? ` φ=${Number(m.phi).toFixed(3)}` : "";
-    li.textContent = `${m.op} · mode ${m.mode}${phi} → ${out}`;
+    const nm = m.name !== undefined ? ` ${m.name}` : "";
+    li.textContent = `${m.op}${nm} · mode ${m.mode}${phi} → ${out}`;
     mOutcomes.appendChild(li);
   }
   measurementPanel.hidden = false;
@@ -520,11 +551,49 @@ async function doScan() {
   }
 }
 
+/* F7: Batch 1000（固定 shots，/batch 端点）— 双色叠画采样对照 */
+async function doBatch() {
+  latestSeq = ++seqCounter;
+  const seq = latestSeq;
+  setBusy(true);
+  const t0 = performance.now();
+  try {
+    const payload = toV1Json(editor.getState());
+    payload.shots = 1000;
+    const resp = await fetch("/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await resp.json();
+    if (seq !== latestSeq) return; // stale response: drop
+    if (!resp.ok) {
+      setStatus(resp.status + " · " + (body.detail || "批量抽样失败"), false);
+      return;
+    }
+    fockPanel.renderBatch(body);
+    setStatus(`batch ${body.shots} shots · seed ${body.seed} · ${(performance.now() - t0).toFixed(0)} ms`);
+  } catch (e) {
+    if (seq !== latestSeq) return;
+    setStatus("网络错误: " + e.message, false);
+  } finally {
+    if (seq === latestSeq) setBusy(false); // stale request must not clear busy
+  }
+}
+
 /* ── editor wiring ─────────────────────────────────────── */
+const fockPanel = initFockPanel($("fock-panel"), {
+  getState: () => editor.getState(),
+  setCircuit: (patch) => editor.setCircuit(patch),
+  setJointModes: (modes) => editor.setView({ joint_modes: modes }),
+  onBatch: doBatch,
+  onStatus: setStatus,
+});
+
 const editor = initEditor(document.querySelector(".workbench"), {
   defaultScene: DEFAULT_JSON,
   onRun: scheduleRun,
-  onState: () => { refreshScanNodes(); }, // sweep selects mirror the graph
+  onState: (state) => { refreshScanNodes(); syncBackendPanels(state.backend); }, // sweep selects mirror the graph
   onStatus: setStatus,
   onPickSweep: (id) => {
     // L5: opening a sweepable gate's param card syncs the scan target
@@ -606,6 +675,7 @@ async function init() {
     const h = await (await fetch("/health")).json();
     $("version-tag").textContent = "cvsim " + h.cvsim + " · " + h.schema;
   } catch { /* offline header keeps the — */ }
+  syncBackendPanels(editor.getState().backend);
   editor.render();
   refreshScanNodes();
 }

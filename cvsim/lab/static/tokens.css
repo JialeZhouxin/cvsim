@@ -17,6 +17,9 @@
   --color-error: oklch(55% 0.2 25);
   --color-error-soft: oklch(96% 0.015 25);
   --color-success: oklch(58% 0.15 155);
+  /* warning — truncation-leakage >1% meter (F7), design §3.4 泄漏黄 */
+  --color-warning: oklch(62% 0.16 85);
+  --color-warning-soft: oklch(96% 0.03 85);
   /* canvas overlay axis — ice-cyan: complementary to inferno LUT (no cyan in it) */
   --color-axis: oklch(85% 0.09 210);
 

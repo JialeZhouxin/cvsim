@@ -1,7 +1,10 @@
-/* Gaussian Lab L4 — op metadata (12 ops: whitelist subset, mirrors ir.py).
+/* Gaussian Lab F7 — op metadata (whitelist subset, mirrors ir.py).
    `sweep: [min, max]` marks a real-numeric param as sweepable by /scan with
    an adaptive default range (mirrors ir.py SWEEPABLE_PARAMS); params without
-   `sweep` (alpha, nmode…) are not sweepable. */
+   `sweep` (alpha, nmode…) are not sweepable.
+   `backends: ["gaussian"|"fock"]` = per-backend palette table (F7 双后端;
+   mirrors ir.py LAB_WHITELIST / FOCK_WHITELIST). `string: true` params
+   (measure result names) never get sliders — JSON/id-managed. */
 "use strict";
 
 export const TAU = 2 * Math.PI;
@@ -13,6 +16,7 @@ export const OPS = {
     label: "真空模",
     kind: "source",
     modes: 1,
+    backends: ["gaussian"], // Fock 无源托盘：nmode 由「＋模」按钮管理（内部仍用 vacuum 计模）
     tip: "真空模：提供 nmode 个真空模式（零均值、单位协方差）",
     params: { nmode: { min: 1, max: 16, step: 1, def: 1, advanced: true } },
   },
@@ -21,6 +25,7 @@ export const OPS = {
     kind: "source",
     modes: 2,
     palette: false,
+    backends: ["gaussian"],
     tip: "TMSV：双模压缩真空，EPR 纠缠源（r 为压缩强度）",
     params: { r: { min: -3, max: 3, step: 0.01, def: 0.6, sweep: [0, 2] } },
   },
@@ -29,12 +34,14 @@ export const OPS = {
     kind: "source",
     modes: 1,
     palette: false, // L5.5: 统一为 vacuum + displace 门表达，保留定义以载入旧 JSON
+    backends: ["gaussian"],
     tip: "相干态：真空经位移 α 得到，经典振幅态",
     params: { alpha: { min: -5, max: 5, step: 0.05, def: 1.0 } },
   },
   squeeze: {
     label: "压缩",
     kind: "single",
+    backends: ["gaussian", "fock"],
     tip: "压缩：挤压正交涨落（r<0 压缩 x，r>0 压缩 p），产生低于真空噪声的涨落",
     params: {
       r: { min: -3, max: 3, step: 0.01, def: 0.4, sweep: [0, 2] },
@@ -44,18 +51,21 @@ export const OPS = {
   phase: {
     label: "相位",
     kind: "single",
+    backends: ["gaussian", "fock"],
     tip: "相位：对模式施加相移 φ，旋转相空间",
     params: { phi: { min: 0, max: TAU, step: 0.01, def: Math.PI / 2, sweep: [0, Math.PI] } },
   },
   fourier: {
     label: "傅里叶",
     kind: "single",
+    backends: ["gaussian"], // gaussian-only：不在 FOCK_WHITELIST
     tip: "傅里叶：90° 相空间旋转，位置 ↔ 动量互换",
     params: {},
   },
   displace: {
     label: "位移",
     kind: "single",
+    backends: ["gaussian", "fock"],
     tip: "位移：相空间平移 α，真空 + 位移即相干态",
     params: { alpha: { min: -5, max: 5, step: 0.05, def: 1.0 } },
   },
@@ -63,6 +73,7 @@ export const OPS = {
     label: "损耗",
     kind: "single",
     channel: true,
+    backends: ["gaussian", "fock"],
     tip: "损耗：透过率 T 的纯损耗通道（T=1 无损耗），耦合真空环境",
     params: {
       T: { min: 0.01, max: 1, step: 0.01, def: 0.8, sweep: [0, 1] },
@@ -73,6 +84,7 @@ export const OPS = {
     label: "放大",
     kind: "single",
     channel: true,
+    backends: ["gaussian", "fock"],
     tip: "放大：增益 G 的相位不敏感放大（附带自发辐射噪声）",
     params: {
       G: { min: 1, max: 8, step: 0.05, def: 2, sweep: [1, 4] },
@@ -82,6 +94,7 @@ export const OPS = {
   beamsplitter: {
     label: "分束器",
     kind: "two",
+    backends: ["gaussian", "fock"],
     tip: "分束器：θ 角分束耦合两模，产生干涉与纠缠",
     params: {
       theta: { min: 0, max: TAU, step: 0.01, def: Math.PI / 4, sweep: [0, Math.PI] },
@@ -91,6 +104,7 @@ export const OPS = {
   mz: {
     label: "马赫-曾德尔",
     kind: "two",
+    backends: ["gaussian"], // gaussian 组合名 mz；fock 用 mach_zehnder（IR 名不同）
     tip: "马赫-曾德尔：两分束器夹相移，可编程干涉仪",
     params: {
       theta: { min: 0, max: Math.PI, step: 0.01, def: Math.PI / 4, sweep: [0, Math.PI] },
@@ -100,6 +114,7 @@ export const OPS = {
   two_mode_squeeze: {
     label: "双模压缩",
     kind: "two",
+    backends: ["gaussian", "fock"],
     tip: "双模压缩：两模关联挤压，产生 EPR 型纠缠",
     params: { r: { min: -3, max: 3, step: 0.01, def: 0.4, sweep: [0, 2] } },
   },
@@ -107,6 +122,7 @@ export const OPS = {
     label: "外差测量",
     kind: "single",
     measure: true,
+    backends: ["gaussian", "fock"],
     tip: "外差测量：投影到相干态 |β⟩，返回复振幅结果",
     params: {},
   },
@@ -114,8 +130,57 @@ export const OPS = {
     label: "零差测量",
     kind: "single",
     measure: true,
+    backends: ["gaussian", "fock"],
     tip: "零差测量：投影到正交分量 x_φ，返回实数结果",
     params: { phi: { min: 0, max: TAU, step: 0.01, def: 0, optional: true } },
+  },
+  /* ── Fock-only (F7, mirrors ir.py FOCK_WHITELIST) ─────────── */
+  kerr: {
+    label: "Kerr",
+    kind: "single",
+    backends: ["fock"],
+    tip: "Kerr：非线性相位 χ·n²（光子数依赖相位），猫态协议 displace+Kerr(π/2) 的关键门",
+    params: { chi: { min: 0, max: TAU, step: 0.01, def: Math.PI / 2 } },
+  },
+  cz: {
+    label: "CZ",
+    kind: "two",
+    backends: ["fock"],
+    tip: "CZ：受控相位门（Fock qudit 编码），weight 为耦合强度",
+    params: { weight: { min: -2, max: 2, step: 0.01, def: 1 } },
+  },
+  cx: {
+    label: "CX",
+    kind: "two",
+    backends: ["fock"],
+    tip: "CX：受控 X 门（Fock qudit 编码），weight 为耦合强度",
+    params: { weight: { min: -2, max: 2, step: 0.01, def: 1 } },
+  },
+  mach_zehnder: {
+    label: "马赫-曾德尔",
+    kind: "two",
+    backends: ["fock"],
+    tip: "马赫-曾德尔：两分束器夹相移，可编程干涉仪（Fock IR 名 mach_zehnder）",
+    params: {
+      theta: { min: 0, max: Math.PI, step: 0.01, def: Math.PI / 4 },
+      phi: { min: 0, max: Math.PI, step: 0.01, def: Math.PI / 2 },
+    },
+  },
+  phase_noise: {
+    label: "相位噪声",
+    kind: "single",
+    channel: true,
+    backends: ["fock"],
+    tip: "相位噪声：σ 强度的高斯相位噪声通道（转密度态）",
+    params: { sigma: { min: 0, max: 5, step: 0.01, def: 0 } },
+  },
+  measure_pnr: {
+    label: "PNR 测量",
+    kind: "single",
+    measure: true,
+    backends: ["fock"],
+    tip: "光子数分辨测量：投影到光子数基，按序坍缩并移除被测模",
+    params: { name: { string: true, def: "", optional: true } },
   },
 };
 
@@ -132,6 +197,13 @@ export function opGroup(op) {
 
 export const OP_NAMES = Object.keys(OPS);
 
+/** Palette ops for one representation backend (F7). Ops whose `backends`
+    list includes ``backend``; palette:false ops are still excluded by
+    opGroup at render time. */
+export function backendOps(backend) {
+  return Object.keys(OPS).filter((op) => OPS[op].backends.includes(backend));
+}
+
 /** Default params object for an op (advanced params included, for JSON fidelity). */
 export function paramsFromOp(op) {
   if (!Object.hasOwn(OPS, op)) throw new TypeError(`Unknown op: ${op}`); // OCR guard
@@ -139,6 +211,20 @@ export function paramsFromOp(op) {
   for (const [k, d] of Object.entries(OPS[op].params)) out[k] = d.def;
   return out;
 }
+
+/** F7: per-backend palette table — OPS key lists (not the metadata map).
+    Mirrors ir.py FOCK_WHITELIST (no interferometer/apply_unitary/apply_kraus). */
+export const FOCK_PALETTE = Object.freeze(
+  ["displace", "phase", "squeeze", "kerr", "beamsplitter",
+   "two_mode_squeeze", "mach_zehnder", "cz", "cx",
+   "loss", "amplifier", "phase_noise",
+   "measure_pnr", "homodyne", "heterodyne"].sort()
+);
+export const GAUSSIAN_PALETTE = Object.freeze(
+  ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier",
+   "displace", "loss", "amplifier", "beamsplitter", "mz",
+   "two_mode_squeeze", "heterodyne", "homodyne"].sort()
+);
 
 /** Source modes contributed so far (vacuum nmode / coherent=1; tmsv=2 legacy). */
 export function sourceModes(nodes) {
@@ -292,6 +378,7 @@ export function removeSource(nodes, srcId) {
 
 export function updateParam(node, key, value) {
   const d = OPS[node.op]?.params?.[key];
+  if (d?.string) return node; // F7: result names are id-managed, never slider-edited
   const v = Number(value);
   if (!d || !Number.isFinite(v)) return node; // OCR: unknown key / NaN rejected
   return { ...node, params: { ...node.params, [key]: Math.min(Math.max(v, d.min), d.max) } };
@@ -310,6 +397,12 @@ const UI_TO_V1_OP = {
 };
 //: v1 IR param name for phase is ``theta`` (core builder 1:1, ADR-0003 #3).
 const UI_TO_V1_PARAM = { phase: { phi: "theta" } };
+//: Fock IR param mapping (fock core speaks eta for loss; squeeze has only r).
+//  keyed by v1 op name; null value = param dropped on the fock path.
+const FOCK_UI_TO_V1_PARAM = {
+  loss: { T: "eta", nbar: null }, // fock loss is pure (no thermal nbar)
+  squeeze: { phi: null },          // fock squeeze has only r
+};
 
 /** Build the circuit_v1 payload the backend consumes (schema from ADR-0003).
     Sources are expanded (vacuum counts nmode; tmsv → two_mode_squeeze;
@@ -338,18 +431,50 @@ export function toV1Json(state) {
       continue;
     }
     const out = { id: n.id, op: UI_TO_V1_OP[n.op] || n.op, params: {} };
-    const pnames = UI_TO_V1_PARAM[out.op] || {};
-    for (const [k, v] of Object.entries(n.params)) out.params[pnames[k] || k] = v;
+    const pnames = state.backend === "fock"
+      ? { ...(UI_TO_V1_PARAM[out.op] || {}), ...(FOCK_UI_TO_V1_PARAM[out.op] || {}) }
+      : (UI_TO_V1_PARAM[out.op] || {});
+    for (const [k, v] of Object.entries(n.params)) {
+      const pk = pnames[k];
+      if (pk === null) continue; // fock: param absent from the fock IR (loss nbar / squeeze phi)
+      out.params[pk !== undefined ? pk : k] = v;
+    }
+    // F7: v1 measure ops carry a result name (Fock IR requires it; Gaussian
+    // accepts it). Keep an explicitly loaded name, else the node id.
+    if (out.op.startsWith("measure_")) {
+      const nm = n.params && typeof n.params.name === "string" && n.params.name.length
+        ? n.params.name : n.id;
+      out.params.name = nm;
+    }
     out.modes = n.modes !== undefined ? n.modes : [n.mode];
     ops.push(out);
     if (n.ui && Number.isFinite(n.ui.x)) staff[out.id] = n.ui.x; // staff layout
   }
-  return {
+  const outDoc = {
     schema: "circuit_v1",
     nmode,
     seed: Number.isInteger(state.seed) ? state.seed : 0,
     ops,
-    view: state.view,
+    view: {},
     ui: Object.keys(staff).length ? { staff } : {},
   };
+  // F7 extensions: backend 缺省 gaussian（不写 = 旧文件字节不变）；
+  // initial 非全零才写；cutoff 非默认（全 10）才写，均匀写 int 否则 list。
+  if (state.backend === "fock") outDoc.backend = "fock";
+  const v = state.view && typeof state.view === "object" ? state.view : {};
+  outDoc.view = { wigner_mode: v.wigner_mode, lim: v.lim, n: v.n };
+  if (Array.isArray(v.joint_modes) && v.joint_modes.length === 2) {
+    outDoc.view.joint_modes = v.joint_modes;
+  }
+  if (state.backend === "fock" && Array.isArray(state.initial)
+      && state.initial.some((n) => n !== 0)) {
+    outDoc.initial = state.initial.slice(0, nmode);
+  }
+  if (state.backend === "fock" && Array.isArray(state.cutoffs)) {
+    const cut = state.cutoffs.slice(0, nmode);
+    if (cut.some((c) => c !== 10)) {
+      outDoc.cutoff = cut.every((c) => c === cut[0]) ? cut[0] : cut;
+    }
+  }
+  return outDoc;
 }

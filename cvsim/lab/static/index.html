@@ -29,8 +29,14 @@
     <div class="panel__head">
       <h1>电路序列</h1>
       <div class="panel__actions">
+        <label class="hint" for="backend-select">backend</label>
+        <select id="backend-select" class="select mono" title="表示后端（Gaussian/Fock 同壳双后端）">
+          <option value="gaussian">gaussian</option>
+          <option value="fock">fock</option>
+        </select>
         <button id="undo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Z">撤销</button>
         <button id="redo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Shift+Z / Ctrl+Y">重做</button>
+        <button id="add-mode-btn" type="button" class="btn btn--ghost" hidden title="Fock：新增一个模式">＋模</button>
         <button id="save-btn" type="button" class="btn btn--ghost">保存 JSON</button>
         <label class="btn btn--ghost" for="load-input">载入 JSON<input id="load-input" type="file" accept=".json,application/json" class="sr-only"></label>
         <label class="hint" for="seed-input">seed</label>
@@ -42,6 +48,10 @@
     </div>
     <p class="hint">拖动器件到轨道放置；水平位置 = 时序；双模器件拖到第一条轨道后点击第二条轨道。</p>
     <div id="staff" class="staff" aria-live="polite" aria-label="五线谱电路编辑区"></div>
+    <div id="initial-card" class="initial-card" hidden aria-label="Fock 初始态">
+      <h2 class="initial-card__title">初始态 <span class="hint">Fock 数态（每模光子数，0..cutoff−1；缺省全真空）</span></h2>
+      <div id="initial-inputs" class="initial-card__inputs"></div>
+    </div>
     <details class="json-fold">
       <summary>circuit_v0 JSON（与图形双向同步）</summary>
       <label class="sr-only" for="json-input">circuit_v0 JSON（与图形双向同步）</label>
@@ -74,6 +84,52 @@
       <div class="meter"><span class="meter__label">平均光子数</span><span id="m-nbar" class="meter__value mono">—</span></div>
       <div class="meter"><span class="meter__label">对数负度</span><span id="m-logneg" class="meter__value mono">—</span></div>
     </div>
+
+    <section id="fock-panel" class="fock" hidden aria-label="Fock 结果面板">
+      <div class="fock__cards">
+        <div class="fock__card">
+          <h2 class="fock__title">PNR 分布 <span class="hint mono">mode <span id="fock-dist-mode">—</span></span></h2>
+          <svg id="fock-dist-svg" class="fock__plot" role="img" aria-label="光子数概率分布柱状图（理论蓝 / 采样红）"></svg>
+          <div class="fock__actions">
+            <button id="batch-btn" type="button" class="btn btn--primary">Batch 1000</button>
+            <span id="batch-seed" class="hint mono"></span>
+          </div>
+          <div id="fock-batch-meas" class="fock__meas" hidden aria-label="批量抽样测量结果直方图"></div>
+        </div>
+        <div class="fock__card">
+          <h2 class="fock__title">joint P(n₀,n₁) <span class="hint">≤30×30</span></h2>
+          <div class="fock__actions">
+            <label class="hint" for="joint-m0">mode</label>
+            <select id="joint-m0" class="select mono"></select>
+            <label class="hint" for="joint-m1">mode</label>
+            <select id="joint-m1" class="select mono"></select>
+          </div>
+          <div class="fock__heatpair">
+            <figure class="fock__heatwrap"><svg id="fock-joint-svg" class="fock__heat" role="img" aria-label="理论联合分布热图"></svg><figcaption class="hint">理论 P</figcaption></figure>
+            <figure class="fock__heatwrap"><svg id="fock-batch-svg" class="fock__heat" role="img" aria-label="Batch 采样联合频率热图"></svg><figcaption class="hint">采样 1000</figcaption></figure>
+          </div>
+          <p id="joint-note" class="hint" hidden>joint 分布需要 ≥2 模且无测量坍缩</p>
+        </div>
+        <div class="fock__card">
+          <h2 class="fock__title">截断护栏</h2>
+          <div class="fock__meterrow">
+            <div class="meter"><span class="meter__label">泄漏</span><span id="fock-leak" class="meter__value mono">—</span></div>
+            <div class="meter"><span class="meter__label">平均光子数</span><span id="fock-nbar" class="meter__value mono">—</span></div>
+            <div class="meter"><span class="meter__label">纯度</span><span id="fock-purity" class="meter__value mono">—</span></div>
+          </div>
+          <div class="param">
+            <label class="hint" for="cutoff-slider">cutoff</label>
+            <input id="cutoff-slider" type="range" min="1" max="30" step="1" value="10">
+            <span id="cutoff-val" class="mono hint">10</span>
+          </div>
+          <p id="fock-slow-note" class="hint" hidden>cutoff &gt; 20：Wigner 计算较慢（网格自动降为 48×48）</p>
+          <details class="fold fock__fold">
+            <summary>per-mode 覆盖</summary>
+            <div id="cutoff-overrides" class="fock__overrides"></div>
+          </details>
+        </div>
+      </div>
+    </section>
 
     <details id="scan-panel" class="scan fold" aria-label="参数扫描">
       <summary>参数扫描 E_N <span id="scan-summary" class="scan__summary" hidden></span></summary>

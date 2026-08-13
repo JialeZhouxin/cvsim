@@ -3,16 +3,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  OPS, OP_NAMES, TAU, paramsFromOp, sourceModes, opGroup,
+  OPS, OP_NAMES, TAU, paramsFromOp, sourceModes, opGroup, backendOps,
+  FOCK_PALETTE, GAUSSIAN_PALETTE,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
   sortNodes, sourceRows, removeSource, updateParam, updateMode, toV1Json,
   cellOccupied,
 } from "../cvsim/lab/static/ops.js";
 import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
 
-const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze"];
+const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze", "kerr", "cz", "cx", "mach_zehnder", "phase_noise", "measure_pnr"];
 
-test("ops metadata: 14 ops (tmsv kept for JSON compat, palette:false)", () => {
+test("ops metadata: 20 ops (tmsv/coherent kept for JSON compat, palette:false)", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
   assert.equal(OPS.tmsv.palette, false); // legacy source: loadable, not in palette
   assert.equal(OPS.coherent.palette, false); // L5.5: unified into vacuum + displace gate
@@ -29,11 +30,86 @@ test("UX: opGroup — source/gate/channel/measure, palette:false → null", () =
   assert.equal(opGroup("beamsplitter"), "gate");
   assert.equal(opGroup("mz"), "gate");
   assert.equal(opGroup("two_mode_squeeze"), "gate");
+  assert.equal(opGroup("kerr"), "gate");
+  assert.equal(opGroup("cz"), "gate");
+  assert.equal(opGroup("cx"), "gate");
+  assert.equal(opGroup("mach_zehnder"), "gate");
   assert.equal(opGroup("loss"), "channel");
   assert.equal(opGroup("amplifier"), "channel");
+  assert.equal(opGroup("phase_noise"), "channel");
   assert.equal(opGroup("heterodyne"), "measure");
   assert.equal(opGroup("homodyne"), "measure");
+  assert.equal(opGroup("measure_pnr"), "measure");
   assert.equal(opGroup("nope"), null);
+});
+
+test("F7: backends metadata — per-backend palette tables", () => {
+  // gaussian-only
+  assert.deepEqual(OPS.fourier.backends, ["gaussian"]);
+  assert.deepEqual(OPS.vacuum.backends, ["gaussian"]);
+  assert.deepEqual(OPS.mz.backends, ["gaussian"]);
+  // fock-only
+  assert.deepEqual(OPS.kerr.backends, ["fock"]);
+  assert.deepEqual(OPS.cz.backends, ["fock"]);
+  assert.deepEqual(OPS.cx.backends, ["fock"]);
+  assert.deepEqual(OPS.measure_pnr.backends, ["fock"]);
+  assert.deepEqual(OPS.mach_zehnder.backends, ["fock"]);
+  assert.deepEqual(OPS.phase_noise.backends, ["fock"]);
+  // shared
+  assert.deepEqual(OPS.displace.backends, ["gaussian", "fock"]);
+  assert.deepEqual(OPS.beamsplitter.backends, ["gaussian", "fock"]);
+  assert.deepEqual(OPS.homodyne.backends, ["gaussian", "fock"]);
+  // every op declares its backend table
+  for (const op of OP_NAMES) {
+    assert.ok(Array.isArray(OPS[op].backends) && OPS[op].backends.length > 0, `${op} 缺 backends`);
+  }
+});
+
+test("F7: backendOps — Fock 托盘集正确（含 kerr/cz/cx/measure_pnr，无 interferometer/apply_unitary/fourier）", () => {
+  assert.deepEqual(backendOps("fock").sort(), [...FOCK_PALETTE]);
+  assert.ok(backendOps("fock").includes("kerr"));
+  assert.ok(backendOps("fock").includes("cz"));
+  assert.ok(backendOps("fock").includes("cx"));
+  assert.ok(backendOps("fock").includes("measure_pnr"));
+  assert.ok(backendOps("fock").includes("homodyne"));
+  assert.ok(backendOps("fock").includes("heterodyne"));
+  assert.ok(backendOps("fock").includes("phase_noise"));
+  assert.ok(backendOps("fock").includes("mach_zehnder"));
+  // 反白名单教义：矩阵编辑器 defer
+  assert.ok(!backendOps("fock").includes("interferometer"));
+  assert.ok(!backendOps("fock").includes("apply_unitary"));
+  assert.ok(!backendOps("fock").includes("fourier"));
+  assert.ok(!backendOps("fock").includes("mz"));
+  // Fock 无源节点托盘
+  assert.ok(!backendOps("fock").includes("vacuum"));
+  assert.ok(!backendOps("fock").includes("coherent"));
+  assert.ok(!backendOps("fock").includes("tmsv"));
+  // gaussian 托盘
+  assert.deepEqual(backendOps("gaussian").sort(), [...GAUSSIAN_PALETTE]);
+  assert.ok(backendOps("gaussian").includes("fourier"));
+  assert.ok(!backendOps("gaussian").includes("kerr"));
+  assert.ok(!backendOps("gaussian").includes("measure_pnr"));
+});
+
+test("F7: fock op metadata — params sane, measure_pnr name is a string param", () => {
+  assert.equal(OPS.kerr.kind, "single");
+  assert.equal(OPS.kerr.params.chi.min, 0);
+  assert.equal(OPS.kerr.params.chi.max, TAU);
+  assert.equal(OPS.kerr.params.chi.def, Math.PI / 2);
+  assert.equal(OPS.cz.kind, "two");
+  assert.equal(OPS.cz.params.weight.def, 1);
+  assert.equal(OPS.cx.kind, "two");
+  assert.equal(OPS.phase_noise.params.sigma.def, 0);
+  assert.equal(OPS.mach_zehnder.kind, "two");
+  assert.equal(OPS.measure_pnr.measure, true);
+  assert.equal(OPS.measure_pnr.params.name.string, true); // string param: no slider
+  assert.deepEqual(paramsFromOp("measure_pnr"), { name: "" });
+  assert.deepEqual(paramsFromOp("kerr"), { chi: Math.PI / 2 });
+  const pnr = addNode([], "measure_pnr");
+  assert.equal(pnr[0].mode, 0);
+  assert.equal(pnr[0].params.name, "");
+  // string params never slider-edited
+  assert.equal(updateParam(pnr[0], "name", "x").params.name, "");
 });
 
 test("ops metadata: param ranges sane", () => {
@@ -284,7 +360,7 @@ test("OCR guards: clamp, unknown keys", () => {
   assert.equal(updateParam(nodes[0], "T", NaN).params.T, 0.8);
   assert.equal(updateParam(nodes[0], "nope", 1).params.T, 0.8);
   // unknown op rejected
-  assert.throws(() => paramsFromOp("mach_zehnder"), TypeError);
+  assert.throws(() => paramsFromOp("interferometer"), TypeError);
 });
 
 test("OCR guards: id collision after import, proto keys, dup ids", () => {
@@ -575,9 +651,14 @@ test("v1: stateFromJson inverts native v1 doc (implicit vacuum, op remap)", () =
 test("v1: stateFromJson rejects core-only ops (Lab whitelist)", () => {
   const payload = {
     schema: "circuit_v1", nmode: 2,
-    ops: [{ op: "cz", modes: [0, 1], params: { weight: 0.5 } }],
+    ops: [{ op: "interferometer", modes: [0, 1], params: { U: [[1, 0], [0, 1]] } }],
   };
   assert.ok(stateFromJson(payload).error);
+  const au = {
+    schema: "circuit_v1", nmode: 1,
+    ops: [{ op: "apply_unitary", modes: [0], params: { U: [[1, 0], [0, 1]] } }],
+  };
+  assert.ok(stateFromJson(au).error); // 矩阵编辑器 defer（反白名单教义）
 });
 
 test("v1: auto id never collides with explicit id", () => {
@@ -607,4 +688,180 @@ test("v1: displace array alpha round-trips (UI takes real part)", () => {
   // save again: back to v1 with a real scalar (UI real-part semantics)
   const again = toV1Json(state);
   assert.equal(again.ops.find((o) => o.op === "displace").params.alpha, 0.3);
+});
+
+/* ── F7: backend / initial / cutoff JSON sync ───────────── */
+
+test("F7: toV1Json — backend 缺省 gaussian（不写字段，旧文件字节不变）", () => {
+  const st = { seed: 0, nodes: addNode([], "vacuum"), view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "gaussian", initial: null, cutoffs: [10] };
+  const payload = toV1Json(st);
+  assert.equal(payload.backend, undefined); // 缺省 gaussian = 旧 JSON 零破坏
+  assert.equal(payload.initial, undefined);
+  assert.equal(payload.cutoff, undefined);
+  // fock 显式写 backend
+  const fockPayload = toV1Json({ ...st, backend: "fock" });
+  assert.equal(fockPayload.backend, "fock");
+  assert.equal(fockPayload.initial, undefined); // 全零 initial 不写
+  assert.equal(fockPayload.cutoff, undefined);  // 默认 10 不写
+});
+
+test("F7: toV1Json — initial 非全零才写；cutoff 均匀 int / 非均匀 list", () => {
+  const base = {
+    seed: 0,
+    nodes: addNode(addNode([], "vacuum"), "vacuum"),
+    view: { wigner_mode: 0, lim: 5.0, n: 64 },
+    ui: {},
+    backend: "fock",
+  };
+  const hom = toV1Json({ ...base, initial: [1, 1], cutoffs: [12, 12] });
+  assert.deepEqual(hom.initial, [1, 1]);
+  assert.equal(hom.cutoff, 12); // 均匀 → int
+  const mixed = toV1Json({ ...base, initial: [0, 2], cutoffs: [10, 15] });
+  assert.deepEqual(mixed.initial, [0, 2]);
+  assert.deepEqual(mixed.cutoff, [10, 15]); // 非均匀 → list
+  // gaussian backend 忽略 initial/cutoff
+  const g = toV1Json({ ...base, backend: "gaussian", initial: [1, 1], cutoffs: [12, 12] });
+  assert.equal(g.initial, undefined);
+  assert.equal(g.cutoff, undefined);
+});
+
+test("F7: toV1Json — measure ops carry a result name (Fock IR requires it)", () => {
+  const nodes = [
+    addNode([], "vacuum")[0],
+    { id: "n1", op: "homodyne", params: { phi: 1.2 }, mode: 0 },
+    { id: "n2", op: "heterodyne", params: {}, mode: 1 },
+    { id: "n3", op: "measure_pnr", params: { name: "" }, mode: 2 },
+  ];
+  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock" });
+  assert.equal(payload.ops[0].params.name, "n1"); // 未命名 → 节点 id
+  assert.equal(payload.ops[1].params.name, "n2");
+  assert.equal(payload.ops[2].params.name, "n3");
+  // 显式载入的 name 保留
+  const named = toV1Json({
+    nodes: [{ id: "n9", op: "measure_pnr", params: { name: "m_n" }, mode: 0 }],
+    view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock",
+  });
+  assert.equal(named.ops[0].params.name, "m_n");
+});
+
+test("F7: stateFromJson — backend/initial/cutoff 解析 + 校验", () => {
+  const base = {
+    schema: "circuit_v1", nmode: 2, seed: 0,
+    ops: [{ op: "kerr", modes: [0], params: { chi: 1.5 } }],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  const g = stateFromJson(base);
+  assert.equal(g.error, undefined);
+  assert.equal(g.state.backend, "gaussian"); // 缺省
+  assert.equal(g.state.initial, null);
+  assert.deepEqual(g.state.cutoffs, [10, 10]);
+  const f = stateFromJson({ ...base, backend: "fock", initial: [1, 0], cutoff: 12 });
+  assert.equal(f.error, undefined);
+  assert.equal(f.state.backend, "fock");
+  assert.deepEqual(f.state.initial, [1, 0]);
+  assert.deepEqual(f.state.cutoffs, [12, 12]);
+  // per-mode list
+  const pl = stateFromJson({ ...base, backend: "fock", cutoff: [10, 14] });
+  assert.deepEqual(pl.state.cutoffs, [10, 14]);
+  // 非法值
+  assert.ok(stateFromJson({ ...base, backend: "bosonic" }).error);
+  assert.ok(stateFromJson({ ...base, initial: [1] }).error); // 长度不符
+  assert.ok(stateFromJson({ ...base, initial: [1, -1] }).error);
+  assert.ok(stateFromJson({ ...base, cutoff: 0 }).error);
+  assert.ok(stateFromJson({ ...base, cutoff: [10] }).error);
+  assert.ok(stateFromJson({ ...base, cutoff: "x" }).error);
+  // round-trip: save → load 一致（含 kerr + initial）
+  const rt = stateFromJson(toV1Json(f.state));
+  assert.equal(rt.error, undefined);
+  assert.equal(rt.state.backend, "fock");
+  assert.deepEqual(rt.state.initial, [1, 0]);
+  assert.deepEqual(rt.state.cutoffs, [12, 12]);
+  assert.equal(rt.state.nodes.find((n) => n.op === "kerr").params.chi, 1.5);
+});
+
+test("F7: stateFromJson — view.joint_modes 解析 + 校验", () => {
+  const base = {
+    schema: "circuit_v1", nmode: 2, seed: 0, ops: [],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  const g = stateFromJson(base);
+  assert.equal(g.error, undefined);
+  assert.equal(g.state.view.joint_modes, null);
+  const j = stateFromJson({ ...base, view: { ...base.view, joint_modes: [1, 0] } });
+  assert.equal(j.error, undefined);
+  assert.deepEqual(j.state.view.joint_modes, [1, 0]);
+  // round-trip: toV1Json omits null, keeps pair
+  assert.equal(toV1Json(g.state).view.joint_modes, undefined);
+  assert.deepEqual(toV1Json(j.state).view.joint_modes, [1, 0]);
+  // invalid pairs rejected
+  assert.ok(stateFromJson({ ...base, view: { ...base.view, joint_modes: [0, 0] } }).error);
+  assert.ok(stateFromJson({ ...base, view: { ...base.view, joint_modes: [0] } }).error);
+  assert.ok(stateFromJson({ ...base, view: { ...base.view, joint_modes: [0, -1] } }).error);
+});
+
+test("F7: v0 路径同样解析 backend/initial（无 backend 字段 → gaussian）", () => {
+  const v0 = {
+    schema: "circuit_v0",
+    nodes: [
+      { id: "s", op: "vacuum", params: { nmode: 2 } },
+      { id: "k", op: "kerr", params: { chi: 1.5 }, mode: 0 },
+    ],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+    backend: "fock",
+    initial: [0, 1],
+  };
+  const { state, error } = stateFromJson(v0);
+  assert.equal(error, undefined);
+  assert.equal(state.backend, "fock");
+  assert.deepEqual(state.initial, [0, 1]);
+  assert.equal(state.nodes[1].params.chi, 1.5);
+  assert.equal(state.nodes[1].params.name, undefined); // kerr has no name param
+  // initial 长度 vs v0 源计模
+  const bad = stateFromJson({ ...v0, initial: [1] });
+  assert.ok(bad.error);
+});
+
+test("F7: toV1Json — fock param mapping (loss T→eta 掉 nbar, squeeze 掉 phi)", () => {
+  const base = { view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, seed: 0 };
+  const nodes = [
+    { id: "n1", op: "loss", params: { T: 0.8, nbar: 0.1 }, mode: 0 },
+    { id: "n2", op: "squeeze", params: { r: 0.4, phi: 1.2 }, mode: 1 },
+    { id: "n3", op: "phase", params: { phi: 0.7 }, mode: 0 },
+  ];
+  const f = toV1Json({ ...base, backend: "fock", nodes, initial: null, cutoffs: [] });
+  assert.deepEqual(f.ops[0].params, { eta: 0.8 }); // nbar dropped (fock loss is pure)
+  assert.deepEqual(f.ops[1].params, { r: 0.4 });   // phi dropped (fock squeeze has only r)
+  assert.deepEqual(f.ops[2].params, { theta: 0.7 }); // phase theta shared
+  // gaussian 路径字节不变
+  const g = toV1Json({ ...base, backend: "gaussian", nodes, initial: null, cutoffs: [] });
+  assert.deepEqual(g.ops[0].params, { T: 0.8, nbar: 0.1 });
+  assert.deepEqual(g.ops[1].params, { r: 0.4, phi: 1.2 });
+});
+
+test("F7: stateFromV1 — fock 载入（loss eta→T、squeeze 无 phi、name 保留）+ round-trip", () => {
+  const payload = {
+    schema: "circuit_v1", backend: "fock", nmode: 2, seed: 0,
+    ops: [
+      { id: "l", op: "loss", modes: [0], params: { eta: 0.8 } },
+      { id: "s", op: "squeeze", modes: [1], params: { r: 0.4 } },
+      { id: "m", op: "measure_pnr", modes: [0], params: { name: "m_n" } },
+    ],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  const loss = state.nodes.find((n) => n.op === "loss");
+  assert.equal(loss.params.T, 0.8);
+  assert.equal(loss.params.nbar, 0); // advanced default
+  const sq = state.nodes.find((n) => n.op === "squeeze");
+  assert.equal(sq.params.r, 0.4);
+  assert.equal(sq.params.phi, 0); // fock 路径 phi optional → default
+  const pnr = state.nodes.find((n) => n.op === "measure_pnr");
+  assert.equal(pnr.params.name, "m_n"); // 显式 name 保留
+  // round-trip: save → load 一致（eta 往返）
+  const rt = stateFromJson(toV1Json(state));
+  assert.equal(rt.error, undefined);
+  const rtLoss = rt.state.nodes.find((n) => n.op === "loss");
+  assert.equal(rtLoss.params.T, 0.8);
+  assert.deepEqual(toV1Json(rt.state).ops.find((o) => o.op === "loss").params, { eta: 0.8 });
 });
