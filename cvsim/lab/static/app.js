@@ -58,7 +58,11 @@ function fitWignerFrame() {
   if (!wignerBox || !wignerFrame || !wignerColorbar) return;
   const gap = parseFloat(getComputedStyle(wignerBox).gap || "16");
   const availW = wignerColorbar.offsetLeft - gap;
-  const s = Math.max(64, Math.min(availW, wignerBox.clientHeight));
+  const h = wignerBox.clientHeight;
+  /* 单列（<80rem）页面流：高度无约束 → 画布 = 列宽；三列：min(宽, 高) */
+  const s = window.matchMedia("(min-width: 80rem)").matches
+    ? Math.max(64, Math.min(availW, h))
+    : Math.max(64, availW);
   wignerFrame.style.width = s + "px";
   wignerFrame.style.height = s + "px";
 }
@@ -304,6 +308,7 @@ function syncBackendPanels(backend) {
   $("meters-panel").hidden = fock; // Fock meters 在护栏卡
   $("wigner-side").hidden = fock;  // Fock 侧列全藏 → 画布满宽
   $("fock-panel").hidden = !fock;
+  $("fock-charts").hidden = !fock; // PNR/joint 分布行
   fitWignerFrame(); // side 显隐变化 → 重算正方形画布
 }
 
@@ -629,7 +634,7 @@ async function doBatch() {
 }
 
 /* ── editor wiring ─────────────────────────────────────── */
-const fockPanel = initFockPanel($("fock-panel"), {
+const fockPanel = initFockPanel(document, {
   getState: () => editor.getState(),
   setCircuit: (patch) => editor.setCircuit(patch),
   setJointModes: (modes) => editor.setView({ joint_modes: modes }),

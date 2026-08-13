@@ -530,6 +530,7 @@ body {
   }
 }
 
+
 /* ── L2: palette / node list / params ──────────────────── */
 .palette__groups,
 .palette__group {
@@ -987,16 +988,12 @@ body {
 }
 
 /* ── F7: Fock 面板（同壳双后端）────────────────────────── */
-/* 双列卡（少滚动）：护栏卡 + PNR 卡并排，joint 卡全宽 */
+/* 护栏卡（fock-panel 右列）；分布图卡在 fock-charts（下方行） */
 .fock__cards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--space-md);
   margin-top: var(--space-md);
-}
-
-.fock__card:last-child {
-  grid-column: 1 / -1;
 }
 
 .fock__card {
@@ -1004,6 +1001,36 @@ body {
   border-radius: var(--radius-md);
   background: var(--color-paper-2);
   padding: var(--space-md);
+}
+
+/* Fock 三列：Wigner 大图（左）+ 护栏卡（右）+ PNR/joint 行（下） */
+.result:has(#fock-panel:not([hidden])) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "head head"
+    "wigner fock"
+    "charts charts"
+    "meas meas";
+  gap: var(--space-lg);
+}
+
+.result:has(#fock-panel:not([hidden])) .panel__head { grid-area: head; }
+.result:has(#fock-panel:not([hidden])) .wigner { grid-area: wigner; }
+.result:has(#fock-panel:not([hidden])) #fock-panel { grid-area: fock; }
+.result:has(#fock-panel:not([hidden])) #fock-charts { grid-area: charts; }
+.result:has(#fock-panel:not([hidden])) #measurement-panel { grid-area: meas; }
+
+.fock__charts {
+  display: flex;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.fock__charts .fock__card {
+  flex: 1;
+  min-width: 0;
 }
 
 .fock__title {
@@ -1033,11 +1060,12 @@ body {
   display: flex;
   gap: var(--space-lg);
   align-items: flex-start;
-  flex-wrap: wrap;
 }
 
 .fock__heatwrap {
   margin: 0;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -1045,7 +1073,8 @@ body {
 
 .fock__heat {
   display: block;
-  width: min(10rem, 100%);
+  width: 100%;
+  max-width: 100%;
   height: auto;
   aspect-ratio: 1;
   border: 1px solid var(--color-rule);
@@ -1116,4 +1145,19 @@ body {
   padding: 0 var(--space-xs);
   border-radius: var(--radius-sm);
   background: color-mix(in oklch, var(--color-paper-2) 88%, transparent);
+}
+
+/* Fock 窄屏单列堆叠：Wigner → 护栏 → PNR/joint（页面流，无高度限制）
+   必须位于 F7 基础三列规则之后（同特异性，后者胜） */
+@media (max-width: 79.99rem) {
+  .result:has(#fock-panel:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto auto;
+    grid-template-areas:
+      "head"
+      "wigner"
+      "fock"
+      "charts"
+      "meas";
+  }
 }
