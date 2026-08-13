@@ -120,15 +120,19 @@ function drawHeatmap(W) {
     }
   }
   octx.putImageData(img, 0, 0);
-  const css = Math.max(64, Math.round(canvas.clientWidth || 256));
-  const px = Math.min(1024, Math.round(css * (window.devicePixelRatio || 1)));
-  canvas.width = px;
-  canvas.height = px;
+  /* 热图铺满 plot：宽高分别按 clientWidth/clientHeight × dpr（不再假设正方形） */
+  const cw = Math.max(64, Math.round(canvas.clientWidth || 256));
+  const ch = Math.max(64, Math.round(canvas.clientHeight || 256));
+  const dpr = window.devicePixelRatio || 1;
+  const pw = Math.min(1024, Math.round(cw * dpr));
+  const ph = Math.min(1024, Math.round(ch * dpr));
+  canvas.width = pw;
+  canvas.height = ph;
   const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, px, px);
+  ctx.clearRect(0, 0, pw, ph);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(off, 0, 0, px, px);
+  ctx.drawImage(off, 0, 0, pw, ph);
   /* colorbar */
   const cb = colorbar.getContext("2d");
   for (let k = 0; k < 128; k++) {
