@@ -14,6 +14,9 @@ The lab uses **Hallmark Cobalt** (genre `modern-minimal` · macrostructure `Work
 
 | Decision | Value | Reason |
 |----------|-------|--------|
+| Panels | Containerized `.panel` (border + `paper-2` + radius + `--space-md` pad) | Gestalt grouping: three columns read as blocks |
+| Toolbar | `btn-group` clusters + vertical separators, run group right-pinned | Hick's/Proximity; min-content of a cluster must stay under the column width (`minmax(0,1fr)` grid) or the panel overflows the viewport and hit-testing breaks |
+| Fock cards | 2-column grid, joint card spans full width | Less vertical stacking = less scrolling |
 | Color space | OKLCH everywhere | Perceptual uniformity; tune neutrals via one hue (250°) |
 | Neutrals | Cool, tinted 250° (paper → ink, L→D) | Cool-white paper suits data/dark-heatmap work |
 | Accent | Electric cobalt `oklch(55% 0.19 260)` | Theme identity; focus reuses accent |
@@ -40,13 +43,13 @@ The lab uses **Hallmark Cobalt** (genre `modern-minimal` · macrostructure `Work
 
 | Width | Layout | Columns |
 |-------|--------|---------|
-| `< 80rem` (1280px) | Single column, `max-width: 90rem` centered, normal page scroll | 1fr |
+| `< 80rem` (1280px) | Single column, `max-width: 90rem` centered, normal page scroll | `minmax(0, 1fr)` |
 | `≥ 80rem` | 3-column workbench, **full width (no max-width cap)** | `13rem minmax(0, 1fr) minmax(0, 1.2fr)` |
 
 - **Column semantics**: palette `13rem` (fixed) · circuit editor `1fr` · results/Wigner `1.2fr` (heatmap benefits from extra width).
 - **`80rem` is the only layout breakpoint.** Below it the 3 columns are too narrow to be usable (the seq toolbar and node rows wrap, overflowing the column).
 - The 3-column grid itself bounds line length — no `max-width` cap there; a centered gutter on ultrawide screens is wasted workspace.
-- **Above-the-fold workbench**: at `≥ 80rem`, `html, body` are locked to `100dvh` with `overflow: hidden` — the page never scrolls (a real wheel does nothing). Content is compressed so the **default view has no scrollbars at all**: scan panel + state tables are `<details>` folds (start collapsed), the Wigner canvas is capped at `min(column width, calc(100dvh - 31rem))`, node rows and the JSON textarea are compacted. Expanding a fold may exceed the column — that column then scrolls (`:has(.fold[open])` → `overflow-y: auto`) so expanded content stays reachable.
+- **Above-the-fold workbench**: at `≥ 80rem`, `html, body` are locked to `100dvh` with `overflow: hidden` — the page never scrolls (a real wheel does nothing). Content is compressed so the **default view has no scrollbars at all**: scan panel + state tables are `<details>` folds (start collapsed), the Wigner canvas flexes to fit the results column (`#wigner-canvas` absolute + `aspect-ratio: 1`, dpr-rendered — no rem estimate, no `image-rendering: pixelated`), node rows and the JSON textarea are compacted. Expanding a fold may exceed the column — that column then scrolls (`:has(.fold[open])` → `overflow-y: auto`) so expanded content stays reachable.
 - **`<details>` gotcha**: author `display` rules (e.g. `.scan__controls { display: flex }`) override the UA's collapse `display:none` — `.fold:not([open]) > *:not(summary) { display: none }` must stay in `style.css`. Same rule required for **every custom `<details>` class** — palette groups are `<details class="palette__group">` (default open, collapsible) with `.palette__group:not([open]) > *:not(summary) { display: none }` + hidden `::marker` + `::after` ▸ arrow (rotate on `[open]`). New collapsible containers must copy this pattern; forgetting it silently breaks collapse.
 - **Toolbar overflow rule**: any `.panel__actions` must wrap (`flex-wrap: wrap`) — a non-wrapping toolbar spills into the results column, where the Wigner canvas covers the buttons. Guarded by the probe hit-test check.
 
