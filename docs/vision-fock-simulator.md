@@ -5,8 +5,8 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md). This doc is the Fock peer; cross-representation rules (bridges) are owned by the Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-08-12
-**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F6 complete (2026-08-12)**
+**Last updated:** 2026-08-13
+**Status:** Vision locked by brainstorm (Q1–Q12, 2026-08-10); **F1–F7 complete (2026-08-13)**
 **Codebase today:** `cvsim/fock` F1–F3 + 顶层 `cvsim/fock_ad.py`（F4，ADR-0001 约束下 backend 只能顶层）
 
 ---
@@ -21,8 +21,9 @@ F1–F5 切片已全部落地并归档；以下愿景正文 F6+ 部分仍然有�
 | **F2** analyse/measure/api-freeze | entropy_vn/log_negativity/fidelity/partial_trace + pnr/homodyne/heterodyne（sample/condition）+ generic-m + **FOCK_PUBLIC 冻结**（35 导出） | `15c3815` `c355443` `9b7e432` |
 | **F3** circuit/ir/batch/sparse | `FockCircuit`（任意 m、per-mode cutoffs、Kronecker 逐 op）+ `to_ir`/`from_ir` + `pnr_sample_batch`（10³ 向量化）+ `FockSparse`（COO，m≤10 锚） | `4d95065` `5057149` `60e2119` `3f4b132` |
 | **F4** differentiable designer | 顶层 `cvsim/fock_ad.py`（squeeze_u/bs_u/kerr_diag/cat_fidelity/bs_overlap — numpy 真源复用 + jnp 镜像）+ backend 参数化共享测试（grad vs fd 3 参数）+ `tutorials/07_fock_ad_designer.ipynb` | `046d9f9` `b11f692` `7cade0e` |
+| **F7** GUI（同壳双后端） | Lab GUI 加 backend 切换（Gaussian/Fock）：Fock 白名单托盘（displace/phase/squeeze/kerr/BS/TMS/MZ/CZ/CX + loss/amplifier/phase_noise + PNR/homodyne/heterodyne 测量）、结果面板（Wigner + PNR 分布柱 + joint 2D heatmap + Batch 1000 采样对照 + 截断护栏）、`FockCircuit.initial` 数态初始态、IR `initial` 扩展字段（详见 `vision-gaussian-lab-ui.md` §2.2/§4.x） | `08-13-fock-gui` |
 
-**验证**：Fock 相关 263 passed（2026-08-12 复核；全套件 968 passed）。
+**验证**：Fock 相关 263 passed（2026-08-12 复核；全套件 968 passed）。F7 后全套 pytest + node 测试绿（2026-08-13）。
 
 ---
 
@@ -151,6 +152,16 @@ Mirrors the Gaussian phase structure (Q4). Each phase ships a demo exit.
 2. Threshold (p_click) and PNR expectations agree where both apply.
 3. Tutorial: same physical experiment simulated in both representations, results reconciled.
 
+### F7 — GUI（同壳双后端，done 2026-08-13）
+
+**Build:** Gaussian Lab GUI 扩展为 **Gaussian/Fock 同壳双后端**（`backend` 扩展字段，缺省 `gaussian` 旧 JSON 零破坏）。电路编辑器（staff 五线谱/拖拽/参数浮层/撤销/Save-Load）两后端共用；托盘 per-backend 分表（Fock 白名单：displace/phase/squeeze/kerr/beamsplitter/two_mode_squeeze/mach_zehnder/cz/cx + loss/amplifier/phase_noise + measure_pnr/measure_homodyne/measure_heterodyne；**无** interferometer/apply_unitary — 矩阵编辑器 defer）；结果面板 = Wigner（复用 `wigner_grid` Fock 路径）+ PNR 分布柱 + joint 2D heatmap（≤30×30）+ Batch 1000 采样对照 + 截断护栏（cutoff 1..30 + 泄漏仪表，>1% 黄）。`FockCircuit.initial` per-mode Fock 数态初始态（真空缺省）；cat 由 displace+Kerr(π/2) 协议构建（教学剧本，不加 cat 源）。测量走 `FockCircuit` 现成 condition 链（R6 零新物理）。
+
+**Exit criteria**
+
+1. HOM 主剧本（initial [1,1] + BS(π/4) → P(1,1)≈0）无手写 Python ≤5 分钟。
+2. Golden fixture：Fock JSON → `/run` 结果与等价 `FockCircuit` 脚本一致（atol 约定）。
+3. 旧高斯 JSON（无 `backend`）行为不变；无 `cvsim.*._*` private import；pytest + node 全套绿。
+
 ### F6 — Interop (done 2026-08-12)
 
 **Build:** Fock ↔ external tools (Strawberry Fields `[sf]` extra, round-trip golden), density-matrix export format documented.
@@ -229,7 +240,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 ## 10. Open questions
 
-1. **Fock GUI (Q9):** long-term required; compatibility with the Gaussian Lab GUI (shared `circuit_v0` JSON schema evolution, editor whitelist, backend abstraction) **to be assessed** — assessment gated on simulator roadmap completion (F3+). Until then: no Fock GUI (Lab vision locked).
+1. **Fock GUI (Q9):** **unlocked 2026-08-13**（task `08-13-fock-gui`，F7）— 同壳双后端 landed：共享 `circuit_v1` + `backend` 扩展字段（缺省 `gaussian`，旧文件零破坏），编辑器共用、托盘/结果面板 per-backend 分表。Compatibility assessment closed: 白名单制 + 零第二套物理（执行全走 `FockCircuit` 现成语义）。详见 `vision-gaussian-lab-ui.md` §2.2/§4.x。
 2. **Tensor networks:** long-term research item, not committed (§1.3).
 3. **General-m density:** F2 assumes m up to 4 dense; density for m>4 deferred to sparse era.
 
@@ -237,6 +248,7 @@ Marker idea: `@pytest.mark.phaseF1` etc. — mirror Gaussian §9.
 
 | Version | Date | Change |
 |---------|------|--------|
+| 0.6.0 | 2026-08-13 | F7 落地：GUI 同壳双后端解锁（Q9 关闭）+ `FockCircuit.initial`（`initial: list[int]`，真空缺省）+ IR `initial` 字段 + FOCK_PUBLIC 冻结表 +`FockCircuit` 导出（构造参数 `initial` 无新符号）；§0 状态表 / §4 F7 切片 / §10 Q9 同步 |
 | 0.5.0 | 2026-08-12 | F6 落地：SF fock golden 对照套件（npz，零运行时依赖）+ `docs/sf-roundtrip-fock.md` + 密度导出格式文档化（commit `e85af5c` `9e5f6a8`；Fock 263 / 全套 968 tests） |
 | 0.4.0 | 2026-08-12 | F5 落地：交叉核对套件 + notebook 08 + 状态节/gap 表同步（commit `76a961e` `dd92c8f`；Fock 254 / 全套 959 tests） |
 | 0.3.0 | 2026-08-12 | F4 落地：顶层 `cvsim/fock_ad.py` + notebook 07 + 状态节/架构树/gap 表同步（commit 链 `046d9f9`…`7cade0e`；Fock 218 / 全套 923 tests） |

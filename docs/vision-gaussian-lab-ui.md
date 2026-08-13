@@ -5,9 +5,9 @@
 > **Physics / API SoT remains:** [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md) + [`api-stability.md`](./api-stability.md).  
 > **This doc wins** for UI scope, interaction, and v0 acceptance. If it conflicts with simulator vision on **math/conventions**, simulator vision wins and this doc must be amended.
 
-**Last updated:** 2026-08-05  
-**Status:** Locked direction after grilling (user chose “按推荐走”); L0–L4 landed (L4 = F-LAB-SCAN + amp/MZ whitelist, undo separate task)
-**Codebase today:** Lab UI package landed through L4; backend calls public `cvsim.gaussian` + `cvsim.wigner` only.
+**Last updated:** 2026-08-13  
+**Status:** Locked direction after grilling (user chose “按推荐走”); L0–L5 landed; **F7 Fock 同壳双后端 landed（2026-08-13，§2.2 解锁 + §4.7 白名单）**
+**Codebase today:** Lab UI package landed through L5 + F7；backend calls public `cvsim.gaussian` + `cvsim.wigner` only（Fock 后端 public `cvsim.fock` only）。
 
 ---
 
@@ -41,7 +41,7 @@
 |------|------|
 | 多用户账号 / 权限 | 单机单用户 |
 | 云端算力 | 计算只在本机 |
-| Fock / Bosonic UI | 高斯专用；路由层不留「以后接 Fock」的半吊子 hook |
+| Fock / Bosonic UI | **Fock 已解锁（2026-08-13，task `08-13-fock-gui`，同壳双后端，见 §4.7）**；Bosonic UI 仍砍 |
 | 真机硬件控制 | 无 device backend |
 | 3D 光路 / 光学桌隐喻 | 2D 节点图即可 |
 | 协作编辑 | — |
@@ -127,7 +127,20 @@ Exceeding these counts requires amending this doc first.
 | **P1** | 参数扫描曲线（如 \(E_N(r)\)，**landed L4**）；**撤销栈（landed 08-06：Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y + 按钮，`createHistory` 快照栈）**；多文档 |
 | **L5** | **五线谱式电路编辑器**（landed）：每模一轨道、拖放放置、双模两步选择、水平 x=时序、参数浮层 |
 
-### 4.6 Wigner policy
+### 4.7 Fock backend whitelist（同壳双后端，2026-08-13）
+
+`backend: "fock"` 路径的托盘白名单（`cvsim/lab/ir.py FOCK_WHITELIST` + `ops.js` per-backend 元数据，三视图同步）：
+
+| 组 | ✅ Fock 托盘 | ❌ defer |
+|----|-------------|----------|
+| Gates | `displace` `phase` `squeeze` `kerr` `beamsplitter` `two_mode_squeeze` `mach_zehnder` `cz` `cx` | `interferometer` / `apply_unitary`（矩阵编辑器 = 通用 IDE，反白名单教义） |
+| Channels | `loss` `amplifier` `phase_noise` | generic `(X,Y)` |
+| Measurements | `measure_pnr` `measure_homodyne` `measure_heterodyne` | — |
+| Sources | **无源节点托盘**（真空起手 + `initial` 数态初始态卡；`nmode` 由「＋模」按钮管理） | `thermal` / cat 源节点（cat = displace+Kerr(π/2) 协议教学路径） |
+
+Fock 结果面板：单模 Wigner（复用 `wigner_grid` Fock 分支）+ PNR 分布柱（`pnrd_probs`）+ joint 2 模 2D heatmap（≤30×30）+ Batch 1000 采样对照（双色叠画）+ 截断护栏（cutoff 1..30 + 泄漏仪表 >1% 黄 + cutoff>20 慢速提示）。v0 无 Fock scan 面板（`/scan`+fock → 422，P1）。
+
+### 4.8 Wigner policy
 
 | Rule | Value |
 |------|--------|
@@ -202,12 +215,13 @@ Exceeding these counts requires amending this doc first.
 - `cvsim.gaussian` public `__all__`
 - `cvsim.wigner.wigner_grid`（及文档化的公开 wigner 辅助）
 - `cvsim.conventions` 只读常量（若需要展示）
+- **Fock 后端（2026-08-13 解锁）**：`cvsim.fock` public only（`FockCircuit`/`pnrd_probs`/`mean_photon`/`truncation_leakage`/`partial_trace` 等 `__all__` 导出；IR 校验 `cvsim.fock.ir`）
 
 **Forbidden**
 
-- `cvsim.gaussian._*` / 任何 private
+- `cvsim.gaussian._*` / `cvsim.fock._*` / 任何 private
 - 在 Lab 内复制 `analyse` / symplectic 公式「图个方便」
-- 调用 Fock/Bosonic 包（v0）
+- 调用 Bosonic 包；Fock 路径内调用 `cvsim.gaussian`（representation 隔离，ADR-0001 精神）
 
 ### 6.3 Randomness
 
@@ -347,4 +361,5 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 | 0.4.0 | 2026-08-03 | **L2 landed**: sequence editor — palette DnD (8 ops: tmsv/coherent/squeeze/phase/displace/loss/beamsplitter/heterodyne) appends nodes, per-node param sliders (debounce 120ms + seq guard), ↑/↓/delete, JSON⇄graph two-way sync (400ms rebuild, frozen-graph on invalid), wigner_mode selector; A3 T=1 TMSV log_neg = -log₂(e⁻²ʳ) verified; 10 node tests + suite 412. No canvas/edges (ordered-node semantics kept), no modes_A selector (2-mode unique bipartition; add with 3-mode circuits), no undo (P1) / save-load-sampling (L3). |
 | 0.5.0 | 2026-08-04 | **L3 landed**: Save/Load (A5) + Measure once (A6) — `POST /sample` with explicit `seed` (`np.random.default_rng`), true sampling of all measurement nodes in node order with conditioning chain (homodyne `homodyne_sample_and_condition` keeps mode, heterodyne removes mode), homodyne op + `phi` param (default 0) in IR/ops/palette; browser Save (download `circuit_v0.json`, seed only, no outcomes) / Load (FileReader → double validation → rebuild → auto `/run`, invalid keeps current circuit); conditional-state view (outcomes + seed + singular marker; homodyne singular view → `wigner: null` + meters.singular, no fabricated data; purity/log_neg → None, mean_photon honest); `/run` stays pure (no RNG, L2-identical); 12 backend L3 tests + 4 API + 5 node + 2 UI (suite 429, node 17). No seed write-back to JSON, no localStorage, no undo / batch sampling / sweep (L4). |
 | 0.6.0 | 2026-08-04 | **L4 landed**: F-LAB-SCAN `POST /scan` — sweep `{node_id, param, min, max, n, modes_A}` over real-numeric params only (`alpha`/`nmode` excluded; per-op sweepable set mirrors ops.js `sweep` metadata), measurement-node circuits rejected 422 (E_N undefined on conditional states), per-point `log_negativity(state, modes_A)` (singular → `null`), pure no-RNG, `n ∈ [2,200]`, linear `xs`; whitelist §4 amended + ir.py WHITELIST + ops.js palette: `amplifier` (`G` main, `nbar` advanced default 0 = quantum-limited, G<1/nbar<0 → 422 via library guard) and `mz` (`BS(θ)→phase(φ,m0)→BS(θ)` lab composition, two-mode op, unitary → E_N preserved, equivalence tests atol 1e-12); scan panel (node/param selects + min/max/n + modes_A 1..nmode-1 default [0] + zero-dep SVG polyline with null breaks; sweep config is UI-session state, never written back to circuit_v0). Suite 469, node 20. No undo (separate task), no multi-param scan, no scan persistence, no new backend gates. |
+| 0.8.0 | 2026-08-13 | **F7 landed：Fock 同壳双后端** — `backend` 扩展字段（缺省 `gaussian` 零破坏）；Fock 托盘白名单 §4.7（kerr/cz/cx/mach_zehnder/phase_noise/measure_pnr；无 interferometer/apply_unitary）；结果面板（Wigner + PNR 分布柱 + joint 2D heatmap + Batch 1000 采样对照 + 截断护栏）；`FockCircuit.initial` 数态初始态（cat 不加源，displace+Kerr(π/2) 协议）；`/batch` 端点；`/scan`+fock → 422（v0 无 Fock scan）；§2.2 砍项表 amend（Fock 解锁，Bosonic 仍砍）；task `08-13-fock-gui` |
 | 0.7.0 | 2026-08-05 | **L5 landed**: staff 五线谱编辑器（替换列表式前端；`circuit_v0` IR + 后端零改动）。每模一横向轨道（行序 = mode 升序），水平 x = 时序；执行序 = 数组序 = 按 **(x, 模序号)** 稳定排序（双模取 `modes[0]`；源恒前）；单模门拖到轨道落定 `mode`；双模门（BS/MZ/双模压缩）两步放置——拖到轨道 A → 半透明预览 + 高亮 + 状态提示 → 点击轨道 B 落定，Esc/空白取消、同模拒绝；`ui.x` 持久化于节点 `ui` 字段（旧 JSON 无 `ui.x` 按数组序排格子，源无布局）；源重构：palette = `vacuum`(+1 模，`nmode` advanced JSON-only) + `coherent`，`tmsv` 出托盘（JSON-only 兼容，旧文件可载入运行），删源连带删除作用其模上的门（先确认）；参数编辑 = 点击门/源弹浮层卡（滑块+数字，实时 JSON 同步 + 就地重跑）；门拖动改 x 重排、悬停 × 删除；可扫门浮层自动同步 scan 目标；JSON 文本域收为折叠区（双向同步 + frozen-graph 保留）；托盘图标化两列紧凑。Suite 470, node 28, staff probe 16/16 headless CDP。No undo, no parallel columns（IR 线性顺序语义保留）, no 双模门拖放改 modes。 |
