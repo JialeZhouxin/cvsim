@@ -491,9 +491,13 @@ export function initEditor(root, hooks) {
         card.addEventListener("dragstart", (e) => {
           suppressEmit = true;
           e.dataTransfer.setData("text/plain", op);
+          e.dataTransfer.effectAllowed = "copy";
+          e.dataTransfer.dropEffect = "copy";
+          card.classList.add("is-dragging");
           staff.setDragPayload({ kind: "op", op });
         });
         card.addEventListener("dragend", () => {
+          card.classList.remove("is-dragging");
           staff.setDragPayload(null);
           suppressEmit = false;
           emit(toV1Json(state), "graph"); // drop/取消后单次 emit

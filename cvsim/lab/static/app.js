@@ -97,16 +97,18 @@ function drawHeatmap(W) {
     throw new Error("Invalid Wigner grid");
   }
   const n = W.length;
-  canvas.width = n;
-  canvas.height = n;
-  const ctx = canvas.getContext("2d");
+  /* 离屏 n×n LUT → 主画布按显示尺寸 × dpr 重绘（无马赛克） */
+  const off = document.createElement("canvas");
+  off.width = n;
+  off.height = n;
+  const octx = off.getContext("2d");
   let wmin = Infinity, wmax = -Infinity;
   for (const row of W) for (const v of row) { if (v < wmin) wmin = v; if (v > wmax) wmax = v; }
   const span = wmax - wmin || 1;
   /* #6: colorbar min/max 刻度（axisVal 格式，与坐标轴一致） */
   $("colorbar-max").textContent = axisVal(wmax);
   $("colorbar-min").textContent = axisVal(wmin);
-  const img = ctx.createImageData(n, n);
+  const img = octx.createImageData(n, n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
       const t = Math.min(255, Math.max(0, Math.round(((W[j][i] - wmin) / span) * 255)));
@@ -117,7 +119,16 @@ function drawHeatmap(W) {
       img.data[o + 3] = 255;
     }
   }
-  ctx.putImageData(img, 0, 0);
+  octx.putImageData(img, 0, 0);
+  const css = Math.max(64, Math.round(canvas.clientWidth || 256));
+  const px = Math.min(1024, Math.round(css * (window.devicePixelRatio || 1)));
+  canvas.width = px;
+  canvas.height = px;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, px, px);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(off, 0, 0, px, px);
   /* colorbar */
   const cb = colorbar.getContext("2d");
   for (let k = 0; k < 128; k++) {
@@ -133,6 +144,7 @@ function drawHeatmap(W) {
    paper halo (paint-order: stroke) so they read on any heatmap region. */
 const SVG_NS = "http://www.w3.org/2000/svg";
 let lastLim = 5;
+let lastWigner = null; // latest W grid — ResizeObserver 重绘用（dpr）
 
 function el(tag, attrs) {
   const e = document.createElementNS(SVG_NS, tag);
@@ -188,7 +200,10 @@ function drawAxes(lim) {
   }
 }
 
-new ResizeObserver(() => drawAxes(lastLim)).observe(canvas);
+new ResizeObserver(() => {
+  if (lastWigner) drawHeatmap(lastWigner.W);
+  drawAxes(lastLim);
+}).observe(canvas);
 
 function render(result, mode) {
   /* #8: 新 run 使旧 scan 摘要失效——折叠摘要清空 */
@@ -221,6 +236,7 @@ function render(result, mode) {
 function drawWignerResult(result) {
   if (!result.wigner) {
     // singular conditional state: no finite Wigner, never fabricated
+    lastWigner = null;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const cb = colorbar.getContext("2d");
@@ -232,6 +248,7 @@ function drawWignerResult(result) {
   } else {
     wignerNote.hidden = true;
     const { x, p, W } = result.wigner;
+    lastWigner = result.wigner;
     drawHeatmap(W);
     drawAxes(x[x.length - 1]); // lim = +x max
   }

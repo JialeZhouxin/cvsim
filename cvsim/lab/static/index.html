@@ -29,21 +29,29 @@
     <div class="panel__head">
       <h1>电路序列</h1>
       <div class="panel__actions">
-        <label class="hint" for="backend-select">backend</label>
-        <select id="backend-select" class="select mono" title="表示后端（Gaussian/Fock 同壳双后端）">
-          <option value="gaussian">gaussian</option>
-          <option value="fock">fock</option>
-        </select>
-        <button id="undo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Z">撤销</button>
-        <button id="redo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Shift+Z / Ctrl+Y">重做</button>
-        <button id="add-mode-btn" type="button" class="btn btn--ghost" hidden title="Fock：新增一个模式">＋模</button>
-        <button id="save-btn" type="button" class="btn btn--ghost">保存 JSON</button>
-        <label class="btn btn--ghost" for="load-input">载入 JSON<input id="load-input" type="file" accept=".json,application/json" class="sr-only"></label>
-        <label class="hint" for="seed-input">seed</label>
-        <input id="seed-input" type="number" min="0" step="1" class="input mono" value="0" title="抽样随机种子">
-        <button id="sample-btn" type="button" class="btn btn--primary">Measure once</button>
-        <button id="reset-btn" type="button" class="btn btn--ghost">重置示例</button>
-        <button id="run-btn" type="button" class="btn btn--primary">运行</button>
+        <div class="btn-group">
+          <label class="hint" for="backend-select">backend</label>
+          <select id="backend-select" class="select mono" title="表示后端（Gaussian/Fock 同壳双后端）">
+            <option value="gaussian">gaussian</option>
+            <option value="fock">fock</option>
+          </select>
+        </div>
+        <div class="btn-group">
+          <button id="undo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Z">撤销</button>
+          <button id="redo-btn" type="button" class="btn btn--ghost" disabled title="Ctrl+Shift+Z / Ctrl+Y">重做</button>
+          <button id="add-mode-btn" type="button" class="btn btn--ghost" hidden title="Fock：新增一个模式">＋模</button>
+          <button id="reset-btn" type="button" class="btn btn--ghost">重置示例</button>
+        </div>
+        <div class="btn-group">
+          <button id="save-btn" type="button" class="btn btn--ghost">保存 JSON</button>
+          <label class="btn btn--ghost" for="load-input">载入 JSON<input id="load-input" type="file" accept=".json,application/json" class="sr-only"></label>
+        </div>
+        <div class="btn-group btn-group--run">
+          <label class="hint" for="seed-input">seed</label>
+          <input id="seed-input" type="number" min="0" step="1" class="input mono" value="0" title="抽样随机种子">
+          <button id="sample-btn" type="button" class="btn btn--primary">Measure once</button>
+          <button id="run-btn" type="button" class="btn btn--primary">运行</button>
+        </div>
       </div>
     </div>
     <p class="hint">拖动器件到轨道放置；水平位置 = 时序；双模器件拖到第一条轨道后点击第二条轨道。</p>

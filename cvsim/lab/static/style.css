@@ -2,6 +2,8 @@
  * enrichment: none · nav: N1a minimal · footer: Ft2 inline
  * offline-substitution: Space Grotesk → Bahnschrift; JetBrains Mono → Cascadia Code
  * (CDN unavailable — local workbench; system font stacks only)
+ * redesign 2026-08-14: 布局重构 — 面板容器化 + btn-group 分组 + Fock 双列卡 +
+ * Wigner dpr 渲染 + 拖拽反馈（Hick's/Fitts's/Proximity/少滚动）
  */
 *,
 *::before,
@@ -121,10 +123,19 @@ body {
 }
 
 /* ── workbench layout ─────────────────────────────────── */
+/* panel 容器化：三列各自成块（Gestalt 分组/层次） */
+.panel {
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  padding: var(--space-md);
+}
+
 .workbench {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr;
+  /* minmax(0,1fr)：单列可收缩，避免 toolbar min-content 撑爆视口 */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2xl);
   padding: var(--space-2xl) var(--space-lg) var(--space-3xl);
   width: 100%;
@@ -188,14 +199,31 @@ body {
 
 .panel__actions {
   display: flex;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   flex-wrap: wrap;
   min-width: 0;
+  align-items: center;
   justify-content: flex-end;
 }
 
 .panel__actions > * {
   flex-shrink: 0;
+}
+
+/* 工具栏分组（Proximity：相近相关）+ 竖分隔线 */
+.btn-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.btn-group + .btn-group {
+  padding-left: var(--space-md);
+  border-left: 1px solid var(--color-rule);
+}
+
+.btn-group--run {
+  gap: var(--space-xs);
 }
 
 /* ── buttons · 8 states ───────────────────────────────── */
@@ -222,12 +250,12 @@ body {
 }
 
 .btn--primary {
-  background: var(--color-ink);
+  background: var(--color-accent);
   color: var(--color-paper);
 }
 
 .btn--primary:hover {
-  background: color-mix(in srgb, var(--color-accent) 85%, var(--color-paper));
+  background: color-mix(in srgb, var(--color-accent) 80%, var(--color-ink));
 }
 
 .btn--primary:active {
@@ -263,15 +291,26 @@ body {
 }
 
 /* ── Wigner ────────────────────────────────────────────── */
+/* 结果列 flex 链：canvas 高度自适应列高（画布匹配容器，无 rem hack） */
+.result {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .wigner {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: var(--space-md);
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .wigner__frame {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
   background: var(--color-paper-2);
@@ -280,16 +319,19 @@ body {
 
 .wigner__plot {
   position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 #wigner-canvas {
-  display: block;
-  width: 100%;
-  max-width: calc(100dvh - 31rem);
-  margin-inline: auto;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
   aspect-ratio: 1;
-  image-rendering: pixelated;
   border: 1px solid var(--color-rule);
+  /* dpr 渲染（app.js drawHeatmap）— 无马赛克；浏览器不再拉伸像素 */
 }
 
 .axis-svg {
@@ -325,8 +367,8 @@ body {
 .meters {
   display: flex;
   gap: var(--space-lg);
-  margin: var(--space-lg) 0 var(--space-2xl);
-  padding: var(--space-md) var(--space-lg);
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm) var(--space-lg);
   background: var(--color-paper-2);
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
@@ -553,6 +595,10 @@ body {
 .palette__item:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.palette__item.is-dragging {
+  opacity: 0.35;
 }
 
 /* L5: seq panel is a column so the staff canvas flexes to fill it */
@@ -926,10 +972,16 @@ body {
 }
 
 /* ── F7: Fock 面板（同壳双后端）────────────────────────── */
+/* 双列卡（少滚动）：护栏卡 + PNR 卡并排，joint 卡全宽 */
 .fock__cards {
   display: grid;
-  gap: var(--space-lg);
-  margin-top: var(--space-lg);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.fock__card:last-child {
+  grid-column: 1 / -1;
 }
 
 .fock__card {
@@ -955,7 +1007,7 @@ body {
 .fock__plot {
   display: block;
   width: 100%;
-  max-width: 22rem;
+  max-width: 100%;
   height: auto;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-sm);
@@ -978,8 +1030,9 @@ body {
 
 .fock__heat {
   display: block;
-  width: 10rem;
-  height: 10rem;
+  width: min(10rem, 100%);
+  height: auto;
+  aspect-ratio: 1;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-sm);
   background: var(--color-paper);
@@ -1033,4 +1086,8 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
   gap: var(--space-sm);
+}
+
+.gate.is-dragging {
+  opacity: 0.4;
 }

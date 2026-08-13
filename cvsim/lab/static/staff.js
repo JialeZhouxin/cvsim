@@ -140,9 +140,15 @@ export function initStaff(root, api) {
         api.onDragStart?.();
         e.dataTransfer.setData("text/plain", `move:${g.node.id}`);
         e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.dropEffect = "move";
+        el.classList.add("is-dragging");
         dragPayload = { kind: "move", id: g.node.id };
       });
-      el.addEventListener("dragend", () => { dragPayload = null; api.onDragEnd?.(); });
+      el.addEventListener("dragend", () => {
+        el.classList.remove("is-dragging");
+        dragPayload = null;
+        api.onDragEnd?.();
+      });
       gatesEl.appendChild(el);
     }
 
@@ -162,6 +168,11 @@ export function initStaff(root, api) {
        keeps drops/click working regardless of the actual target) */
     grid.addEventListener("dragover", (e) => {
       e.preventDefault();
+      e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === "move" ? "move" : "copy";
+      /* 拖到 staff 上/下边缘自动滚动（Fitts's Law：远目标可达） */
+      const rr = root.getBoundingClientRect();
+      if (e.clientY < rr.top + 56) root.scrollTop -= 14;
+      else if (e.clientY > rr.bottom - 56) root.scrollTop += 14;
       const rowEl = e.target.closest(".staff__row");
       if (!rowEl) return;
       const gridRect = grid.getBoundingClientRect();
