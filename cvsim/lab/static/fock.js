@@ -146,12 +146,10 @@ function drawBars(svg, bars) {
   for (const f of [0, 0.5, 1]) {
     const y = H - padB - hOf(vmax * f);
     svg.append(el("line", {
-      x1: padL, y1: y, x2: W - padR, y2: y, stroke: rule,
-      "stroke-width": f === 0 ? 1 : 0.5,
-      ...(f === 0 ? {} : { "stroke-dasharray": "3 3" }),
+      x1: padL, y1: y, x2: W - padR, y2: y, stroke: rule, "stroke-width": f === 0 ? 1.5 : 1,
     }));
     const t = el("text", {
-      x: padL - 4, y: y + 3, "text-anchor": "end", fill: ink, "font-size": 8,
+      x: padL - 5, y: y + 4, "text-anchor": "end", fill: ink, "font-size": 10,
     });
     t.textContent = (vmax * f).toFixed(2);
     svg.append(t);
