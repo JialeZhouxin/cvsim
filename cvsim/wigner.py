@@ -104,6 +104,48 @@ def wigner_fock(state: FockState | FockDensity, x: float, p: float) -> float:
     return float(total.real)
 
 
+def _wigner_grid_fock(
+    rho: np.ndarray, X: np.ndarray, P: np.ndarray
+) -> np.ndarray:
+    """Vectorized Wigner grid for Fock states (same kernel as
+    :func:`wigner_fock`, evaluated over the full grid per (n, m) pair).
+
+    The scalar path is an O(grid) loop of O(N²) kernels — ~0.5 s for
+    n=64, N=10. Vectorizing over the grid first drops that to ~10 ms:
+    ``eval_genlaguerre`` runs on the whole 64×64 array per pair.
+    """
+    N = rho.shape[0]
+    alpha = (X + 1j * P) / np.sqrt(2.0)
+    r2 = np.abs(alpha) ** 2
+    pref = np.exp(-2.0 * r2) / np.pi
+    W = np.zeros_like(X, dtype=float)
+    for n in range(N):
+        for m in range(N):
+            rnm = rho[n, m]
+            if abs(rnm) < 1e-16:
+                continue
+            if n <= m:
+                lag = eval_genlaguerre(n, m - n, 4.0 * r2)
+                kern = (
+                    pref
+                    * ((-1.0) ** n)
+                    * np.sqrt(factorial(n) / factorial(m))
+                    * (2.0 * np.conj(alpha)) ** (m - n)
+                    * lag
+                )
+            else:
+                lag = eval_genlaguerre(m, n - m, 4.0 * r2)
+                kern = (
+                    pref
+                    * ((-1.0) ** m)
+                    * np.sqrt(factorial(m) / factorial(n))
+                    * (2.0 * alpha) ** (n - m)
+                    * lag
+                )
+            W += (rnm * kern).real
+    return W
+
+
 def wigner_grid(
     state: GaussianState | BosonicState | FockState | FockDensity,
     lim: float = 5.0,
@@ -120,7 +162,14 @@ def wigner_grid(
     elif isinstance(state, BosonicState):
         fn = lambda x, p: wigner_bosonic(state, x, p)
     elif isinstance(state, (FockState, FockDensity)):
-        fn = lambda x, p: wigner_fock(state, x, p)
+        if state.nmode != 1:
+            raise ValueError("wigner_grid: single-mode only")
+        rho = (
+            state.rho
+            if isinstance(state, FockDensity)
+            else np.outer(state.amps, state.amps.conj())
+        )
+        return X, P, _wigner_grid_fock(rho, X, P)
     else:
         raise TypeError(
             "state must be GaussianState, BosonicState, FockState, or FockDensity"
