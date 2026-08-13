@@ -1,0 +1,11 @@
+[ocr] Summary: 6 file(s) reviewed, 1 comment(s), ~1898377 token(s) used (input: ~1871817, output: ~26560), cache(read: ~1419648, write: ~0), 6m29s elapsed
+Review partially complete: 1 finding(s); 2 of 6 selected item(s) failed.
+
+[2m─── tests/test_fock_initial.py:38-42 ───[0m
+[94m[test · low][0m Weak test + stale docstring. Docstring says "displace |0⟩ → |1⟩ peak" but initial=[2]
+puts the state at |2⟩, and alpha=1e-9 makes D(α) numerically a no-op (|⟨1|ψ⟩| ≈ 1.4e-9, |⟨3|ψ⟩| ≈
+1.7e-9). argmax stays 2 trivially, so the test cannot detect a regression where gates are silently
+dropped for initial states. Use a meaningful alpha (e.g. 1.0) and assert the amplitudes actually
+changed (e.g. `abs(st.amps[2]) < 1.0` or compare against analytic D(α)|2⟩).
+
+

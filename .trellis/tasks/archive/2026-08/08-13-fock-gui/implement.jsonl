@@ -1,0 +1,11 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `py -3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "backend 规范入口（pre-dev checklist + quality check）"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "物理契约/测试/禁止模式"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "ValueError fail-fast + 422 映射"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范入口"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "static/ 模块规则"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "纯逻辑 vs DOM 布线 + op 元数据契约"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "模块单例 + 纯转换 + JSON 同步"}
+{"file": ".trellis/spec/frontend/design-system.md", "reason": "Cobalt 主题 tokens"}
+{"file": "docs/vision-gaussian-lab-ui.md", "reason": "Lab UI SoT（§2.2 解锁/§4 白名单/agent rules）"}
+{"file": "docs/vision-fock-simulator.md", "reason": "Fock SoT（§10 Q9/FOCK_PUBLIC/roadmap）"}
