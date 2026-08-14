@@ -1,6 +1,6 @@
 # User Model（动态状态）
 
-> Schema 与规则见 [认知适配协议.md](./认知适配协议.md)。本文件每轮对话后更新。
+> Schema 与规则见全局技能 `user-model` 内 `认知适配协议.md`。本文件每轮对话后更新。
 > 来源标记：Observed（用户明确说过/做过）/ Inferred（从行为推断）/ Verified（验证过）。
 
 **版本**: 0.5
