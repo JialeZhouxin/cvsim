@@ -123,6 +123,9 @@ addopts       = [
     "--strict-markers",
     "--tb=short",
 ]
+markers = [
+    "phaseB1: Bosonic B1 tests (gates/channels/measures K=1 alignment + freeze)",
+]
 filterwarnings = [
     "error:cvsim.*",
     "ignore::DeprecationWarning:scipy.*",

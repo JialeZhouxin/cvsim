@@ -247,6 +247,13 @@ def _diag_peaks(state: BosonicState) -> tuple[list[np.ndarray], list[float], np.
 def gkp_logical_overlap(state_a: BosonicState, state_b: BosonicState) -> complex:
     """Teaching logical-ish overlap via diagonal-peak Gram.
 
+    .. deprecated::
+        B1 (architecture A12): retained for teaching, but **deprecated** —
+        it is a diagonal-peak approximation (real-mean components only) and
+        is not the frozen core surface. Use the future closed-form
+        ``pure_fidelity`` (B2/B4, Gaussian overlap kernel) for GKP logical
+        fidelity. Behavior unchanged; do not build new code on it.
+
     Uses only real-mean components: c_i=√w_i, T_ij=⟨g_i^a|g_j^b⟩,
     ov = Σ_ij c_i c_j T_ij (self-overlap ≈1 for full Gram states).
 

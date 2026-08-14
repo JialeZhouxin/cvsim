@@ -5,6 +5,7 @@ See docs/api-stability.md. Removing/renaming an entry is a MAJOR bump.
 
 from __future__ import annotations
 
+import cvsim.bosonic as bosonic
 import cvsim.gaussian as g
 from cvsim.conventions import HBAR, QUAD_ORDER, omega, vacuum_cov, vacuum_mean
 
@@ -189,3 +190,64 @@ def test_fock_methods_frozen():
     assert callable(fock.FockState.squeezed)
     assert callable(fock.FockState.cat)
     assert callable(fock.FockDensity.thermal)
+
+
+# -- BOSONIC (B1 exit: freeze the export surface, mirror of FOCK_PUBLIC) -----
+
+BOSONIC_PUBLIC = {
+    # states + factories
+    "BosonicState",
+    "Component",
+    "even_cat",
+    "odd_cat",
+    "gkp0",
+    "gkp1",
+    "gkp_logical_overlap",  # deprecated (A12): teaching only, not core surface
+    "coherent",
+    # channels (B1)
+    "loss",
+    "amplifier",
+    "phase_noise",
+    # observables / measures (B1: measure.py home for all measures)
+    "weight_sum",
+    "mean_photon",
+    "homodyne_mean",
+    "homodyne_var",
+    "homodyne_sample",
+    "homodyne_sample_and_condition",
+    "homodyne_condition",
+    "heterodyne_sample",
+    "heterodyne_condition",
+    "heterodyne_sample_and_condition",
+    "p_click",
+    "sample_threshold",
+    # gates (B1: full Gaussian named set)
+    "squeeze",
+    "displace",
+    "phase",
+    "fourier",
+    "beamsplitter",
+    "mach_zehnder",
+    "two_mode_squeeze",
+    "cz",
+    "cx",
+    "interferometer",
+}
+
+
+def test_bosonic_all_matches_freeze():
+    assert set(bosonic.__all__) == BOSONIC_PUBLIC
+
+
+def test_bosonic_all_importable():
+    for name in bosonic.__all__:
+        assert getattr(bosonic, name) is not None
+
+
+def test_bosonic_homodyne_import_paths_unchanged():
+    """B1: homodyne moved to measure.py (re-export) — package paths intact."""
+    assert callable(bosonic.homodyne_mean)
+    assert callable(bosonic.homodyne_var)
+    assert callable(bosonic.homodyne_sample)
+    assert callable(bosonic.homodyne_sample_and_condition)
+    assert callable(bosonic.homodyne_condition)

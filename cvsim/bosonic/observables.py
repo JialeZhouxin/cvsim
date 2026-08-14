@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsim.bosonic.state import BosonicState, Component
+from cvsim.bosonic.state import (  # noqa: F401  (re-export: weight_sum moved to state.py, B1)
+    BosonicState,
+    Component,
+    weight_sum,
+)
 
 _IM_TOL = 1e-8
 _SIG_EPS = 1e-14
-
-
-def weight_sum(state: BosonicState) -> complex:
-    """∑ w_k — should be 1 for a normalized density-operator decomposition."""
-    return sum(c.w for c in state.components)
 
 
 def _nmode(state: BosonicState) -> int:

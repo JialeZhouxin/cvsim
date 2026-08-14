@@ -48,7 +48,8 @@ A regression test (`tests/test_public_api.py`) freezes that set. **Removing or r
 | Batch samplers | `homodyne_sample_batch`, `heterodyne_sample_batch`, `GaussianState.sample_quadratures` — vectorized, `size=10³` standard; outcome-only, iid, no per-shot conditioning |
 | `circuit_v0` IR (lab) | **Retired** (ADR-0003). Old files still load: Lab translates v0 → v1 on load (`translate_v0`); sources (vacuum/tmsv/coherent) expand to v1 ops, `edges` dropped |
 | `cvsim.wigner` | Teaching grids; signature may gain kwargs |
-| `cvsim.fock` / `cvsim.bosonic` | Sibling reps; not the Phase 2 freeze focus |
+| `cvsim.fock` | Sibling rep; not the Phase 2 freeze focus (F2 exit freezes `__all__` in `test_public_api.py`) |
+| `cvsim.bosonic` | **B1 frozen surface** (A11, B1 exit): `__all__` = `BOSONIC_PUBLIC` freeze in `test_public_api.py`; `gkp_logical_overlap` deprecated (teaching, diagonal-peak); B2+ additions go through this table |
 | Demo scripts under `cvsim.demos` / `examples/` | May move or rename without major bump |
 
 ### 2.3 Private (no stability promise)
