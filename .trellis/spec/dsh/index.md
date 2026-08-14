@@ -25,7 +25,7 @@ $env:TRELLIS_CONTEXT_ID = "dsh-a0a78738e15e"
 ### 3. Contracts
 
 - **技能安装位置**：项目 `.agents/skills/trellis-*`（DSH rank 200，项目作用域，热刷新；不从 `.claude/skills` 读）。frontmatter 不得改动；`trellis update` 不管理该目录，升级后手动重同步。
-- **面包屑插件**：`@deepseek-ai/dsh-trellis-breadcrumb`，源码 `tools/dsh-trellis-breadcrumb/`，部署副本在 dsh 安装根 `node_modules/@deepseek-ai/`；`~/.dsh/profiles/web/cordis.patch.yml` 以 `- insert:` 挂载；进程重启后生效。
+- **面包屑插件**：`@deepseek-ai/dsh-trellis-breadcrumb`，源码 `tools/dsh-trellis-breadcrumb/`，部署副本在 **`~/.dsh/profiles/web/node_modules/@deepseek-ai/`**（boot loader 的解析基座是 profile 目录；放安装根 node_modules 会被 `ERR_MODULE_NOT_FOUND` 拒绝）；`cordis.patch.yml` 以 `- insert:` 挂载；**代码更新必须真重启**（HMR 能热挂行，但依赖追踪跳过 node_modules，模块缓存不失效，挂的是旧代码）。
 - **注入消息**：user-role，`source: { kind: "trellis-breadcrumb", form: "text" }`，文本 = `Active task: <path>` + `<workflow-state:STATUS>` 块（正文取自 `.trellis/workflow.md` 标签，单源）。
 - **子代理派遣**：`subagent` 工具，prompt 首行 `Active task: <task path from task.py current>`，主体用 `.claude/agents/trellis-{implement,check,research}.md` 内容。
 - **运行中 web 进程**：`node <dsh安装根>/node_modules/@deepseek-ai/dsh/lib/bin.js web`；安装根即 `E:\03_Learning\deepseekharness\node_modules`（bundle 与插件都从该处解析）。
@@ -88,4 +88,6 @@ $env:TRELLIS_CONTEXT_ID = "dsh-a0a78738e15e"
 >
 > **Warning**: `trellis update` 只管理 `.claude/` 平台文件；`.agents/skills/` 与 `tools/dsh-trellis-breadcrumb/` 的手动同步是长期维护点（升级后需重拷贝 + 重部署插件）。
 >
-> **Warning**: 插件改动后必须重启 web 进程（PID 每次不同，用命令行找：`Get-CimInstance Win32_Process -Filter "Name='node.exe'"` 过滤 `@deepseek-ai/dsh`）才生效。
+> **Warning**: 插件改动后必须重启 web 进程才生效（HMR 只重跑 apply()，不重载 node_modules 模块）。重启后验证：stderr 无 `ERR_MODULE_NOT_FOUND`，且状态变更后下一轮 pre-step 上下文出现 `<workflow-state:*>` 块。
+>
+> **Warning**: 测试从安装根副本跑（`E:\03_Learning\deepseekharness\node_modules\@deepseek-ai\dsh-trellis-breadcrumb\test.mjs`）— `@deepseek-ai/dsh-llm` 只在该处可解析；profile 副本仅用于加载。改动后两处都要同步。
