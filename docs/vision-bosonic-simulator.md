@@ -5,9 +5,9 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md); Fock peer in [`vision-fock-simulator.md`](./vision-fock-simulator.md). Cross-representation rules owned by Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-08-13
-**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); B0–B7 路线已拍板，未开工
-**Codebase today:** `cvsim/bosonic` teaching MVP（state/cat/gkp/gates/channels/observables，单模 homodyne 教学切）
+**Last updated:** 2026-08-14
+**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B1 done (2026-08-14)**：基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结 33 名）；B2 组件工程 next
+**Codebase today:** `cvsim/bosonic` B1 生产面（state/cat/gkp/gates 11 门/channels 3/measure.py 三测量/observables 矩；单模 homodyne 教学切，B3 换精确）
 
 ---
 
@@ -221,15 +221,15 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 
 | Feature | Now | Gap |
 |---------|-----|-----|
-| State factories | BosonicState/Component + even/odd cat + gkp0/gkp1 | factory completion (B1) |
-| Gates | displace/phase/squeeze/BS/TMS | fourier/mz/cz/cx/interferometer + K=1 alignment (B1) |
-| Channels | loss | amplifier/phase_noise (B1) |
-| Measures | homodyne teaching (mean/var/sample/condition) | exact edge + conditional (B3); heterodyne/threshold (B1) |
-| Component engineering | — | merge/truncate/underflow/normalization + leakage (B2) |
-| Analyse | mean_photon | purity/entropy/fidelity component-weighted (B2/B4) |
-| Circuit DSL | — | BosonicCircuit + IR (B5) |
-| Reconciliation | — | R1 layered suite (B4) |
-| GUI | — | G1 three-piece (B6) |
+| State factories | BosonicState/Component + even/odd cat + gkp0/gkp1 + coherent | —（B1 done） |
+| Gates | 11 门（D/R/S/F/BS/MZ/S₂/CZ/CX/interferometer）K=1 atol 对齐 | —（B1 done） |
+| Channels | loss/amplifier/phase_noise（X,Y 逐分量仿射） | —（B1 done） |
+| Measures | measure.py：homodyne 教学切（mean/var/sample/condition）+ heterodyne 教学切 + threshold outcome-only | exact edge + conditional + 混合态 heterodyne 精确化（B3） |
+| Component engineering | — | merge/truncate/underflow/normalization + leakage + is_hermitian（B2） |
+| Analyse | mean_photon | purity/overlap/pure_fidelity 闭式（B2/B4）；entropy defer |
+| Circuit DSL | — | BosonicCircuit + IR + run_steps（B5） |
+| Reconciliation | — | R1 layered suite（B4） |
+| GUI | — | G1 three-piece（B6） |
 | Bridges | from_gaussian wrap | B7 |
 
 ## 10. Open questions
@@ -245,3 +245,4 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 |---------|------|--------|
 | 0.1.0 | 2026-08-13 | Vision created from grill Q1–Q13: GKP QEC teaching main stage + production backend; C1–C4 pillars; A1 single-mode anchor (arbitrary-m architecture); R1 layered reconciliation; P1 bricks-not-protocols; M1 measure surface; B1 circuit third consumer; G1 GUI three-piece; B0–B7 roadmap; non-goals (Kerr/protocols/multi-mode/PNR/AD) |
 | 0.1.1 | 2026-08-14 | 架构层 amend（grill A1–A12，任务 08-14-bosonic-architecture）：A4 测量并入 measure.py（observables 只留矩）；A5 homodyne 精确采样策略锁 CDF 网格反演（§2.3）；组件工程补 is_hermitian（A3）。详见 design.md + ADR-0006 |
+| 0.2.0 | 2026-08-14 | **B0–B1 done**（任务 08-14-bosonic-b1，commit `fe94357`）：门全集 11（K=1 atol 1e-10）、通道 3、measure.py（homodyne/heterodyne 教学切 + threshold outcome-only）、coherent 工厂、BOSONIC_PUBLIC 冻结 33 名、phaseB1 markers；全套 1059 passed。§0 状态 / §9 gap 表同步；契约层 `.trellis/spec/cvsim/` 新建 |
