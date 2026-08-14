@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 54
-- **Last Active**: 2026-08-13
+- **Total Sessions**: 55
+- **Last Active**: 2026-08-14
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1913 | Active |
+| `journal-1.md` | ~1952 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 55 | 2026-08-14 | DSH Trellis 工作流适配（技能迁移+面包屑插件） | `0923831`, `5b98a7e`, `ee5f4eb`, `a47d683`, `389af56`, `2706b72`, `99e54cc` | `master` |
 | 54 | 2026-08-13 | 心智模型校准文档（Q1-Q12 访谈锁定 + AGENTS.md 指针） | `3d83ebb` | `master` |
 | 53 | 2026-08-13 | Fock Lab GUI — 同壳双后端（F7） | `7b29cf2` | `master` |
 | 52 | 2026-08-12 | GBS 薄封装: pnr_probs / gbs_sample / threshold_sample | `4c87373` | `master` |

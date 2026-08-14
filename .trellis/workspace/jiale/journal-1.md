@@ -1911,3 +1911,42 @@ grilling 十问+Q11 全锁: 同壳双后端/双卡并列/采样对照/白名单�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 55: DSH Trellis 工作流适配（技能迁移+面包屑插件）
+
+**Date**: 2026-08-14
+**Task**: DSH Trellis 工作流适配（技能迁移+面包屑插件）
+**Branch**: `master`
+
+### Summary
+
+Trellis 完整适配 DSH：9 技能迁移至项目 .agents/skills（目录热刷新验证）；dsh-trellis-breadcrumb 插件（pre-step 注入 workflow-state，OCR 三轮修复含路径穿越）；spec/dsh code-spec；TRELLIS_CONTEXT_ID 身份约定。全程 Trellis task 流程验证。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0923831` | (see git log) |
+| `5b98a7e` | (see git log) |
+| `ee5f4eb` | (see git log) |
+| `a47d683` | (see git log) |
+| `389af56` | (see git log) |
+| `2706b72` | (see git log) |
+| `99e54cc` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
