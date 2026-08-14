@@ -86,20 +86,26 @@ try {
 	const secondText = lastText(second);
 	assert.ok(secondText !== null && secondText.includes("<workflow-state:planning>"), "status change must re-inject planning");
 
-	// 3b. Traversal guard: malicious current_task must not crash or read outside root
+	// 3b. Traversal guard: escaping current_task must not read outside root.
+	// Decoy task.json (in_progress) planted at the escape target: a broken
+	// guard reads it and the planning assertion fails; the guard keeps planning.
 	const escapeDir = await mkdtemp(join(tmpdir(), "trellis-bc-"));
+	const decoy = join(tmpdir(), "escape");
 	try {
 		await mkdir(join(escapeDir, ".trellis", ".runtime", "sessions"), { recursive: true });
 		await writeFile(join(escapeDir, ".trellis", "workflow.md"), WORKFLOW);
 		await writeFile(join(escapeDir, ".trellis", ".runtime", "sessions", "dsh-test-session.json"),
-			JSON.stringify({ platform: "session", current_task: "../../escape" }));
+			JSON.stringify({ platform: "session", current_task: "../escape" }));
+		await mkdir(decoy, { recursive: true });
+		await writeFile(join(decoy, "task.json"), JSON.stringify({ status: "in_progress" }));
 		const escapeAgent = makeAgent(escapeDir);
 		const escapeDecision = await runPreStep(escapeAgent);
 		const escapeText = lastText(escapeDecision);
 		assert.ok(escapeText !== null && escapeText.includes("<workflow-state:planning>"),
-			"escaping current_task must fall back to planning, no crash");
+			"escaping current_task must fall back to planning, decoy task.json must not be read");
 	} finally {
 		await rm(escapeDir, { recursive: true, force: true });
+		await rm(decoy, { recursive: true, force: true });
 	}
 } finally {
 	await rm(fixture, { recursive: true, force: true });
