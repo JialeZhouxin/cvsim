@@ -41,13 +41,18 @@ const lastText = (decision) => decision.messages.at(-1)?.content?.[0]?.text ?? n
 
 async function fixtureProject(workflow, sessionFile, taskStatus) {
 	const dir = await mkdtemp(join(tmpdir(), "trellis-bc-"));
-	await mkdir(join(dir, ".trellis", ".runtime", "sessions"), { recursive: true });
-	await writeFile(join(dir, ".trellis", "workflow.md"), workflow);
-	await writeFile(join(dir, ".trellis", ".runtime", "sessions", sessionFile),
-		JSON.stringify({ platform: "session", current_task: "task-1" }));
-	await mkdir(join(dir, "task-1"));
-	await writeFile(join(dir, "task-1", "task.json"), JSON.stringify({ status: taskStatus }));
-	return dir;
+	try {
+		await mkdir(join(dir, ".trellis", ".runtime", "sessions"), { recursive: true });
+		await writeFile(join(dir, ".trellis", "workflow.md"), workflow);
+		await writeFile(join(dir, ".trellis", ".runtime", "sessions", sessionFile),
+			JSON.stringify({ platform: "session", current_task: "task-1" }));
+		await mkdir(join(dir, "task-1"));
+		await writeFile(join(dir, "task-1", "task.json"), JSON.stringify({ status: taskStatus }));
+		return dir;
+	} catch (error) {
+		await rm(dir, { recursive: true, force: true });
+		throw error;
+	}
 }
 
 const WORKFLOW = [
@@ -70,7 +75,7 @@ try {
 	const again = await runPreStep(agent);
 	assert.ok(again.messages.length === 0, "same state must not re-inject");
 
-	// 3. Status change planning -> in_progress re-injects (digest differs)
+	// 3. Status change re-injects (digest differs): in_progress -> planning
 	const agent2 = makeAgent(fixture);
 	const first = await runPreStep(agent2);
 	const firstText = lastText(first);
@@ -80,6 +85,22 @@ try {
 	const second = await runPreStep(agent2);
 	const secondText = lastText(second);
 	assert.ok(secondText !== null && secondText.includes("<workflow-state:planning>"), "status change must re-inject planning");
+
+	// 3b. Traversal guard: malicious current_task must not crash or read outside root
+	const escapeDir = await mkdtemp(join(tmpdir(), "trellis-bc-"));
+	try {
+		await mkdir(join(escapeDir, ".trellis", ".runtime", "sessions"), { recursive: true });
+		await writeFile(join(escapeDir, ".trellis", "workflow.md"), WORKFLOW);
+		await writeFile(join(escapeDir, ".trellis", ".runtime", "sessions", "dsh-test-session.json"),
+			JSON.stringify({ platform: "session", current_task: "../../escape" }));
+		const escapeAgent = makeAgent(escapeDir);
+		const escapeDecision = await runPreStep(escapeAgent);
+		const escapeText = lastText(escapeDecision);
+		assert.ok(escapeText !== null && escapeText.includes("<workflow-state:planning>"),
+			"escaping current_task must fall back to planning, no crash");
+	} finally {
+		await rm(escapeDir, { recursive: true, force: true });
+	}
 } finally {
 	await rm(fixture, { recursive: true, force: true });
 }
