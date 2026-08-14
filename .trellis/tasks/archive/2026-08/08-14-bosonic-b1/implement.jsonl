@@ -1,0 +1,7 @@
+{"file": "docs/vision-bosonic-simulator.md", "reason": "B1 exit 1-3 定义 + §2 约定冻结面 + B1 门/通道/测量清单（M1）+ A12 deprecated 依据"}
+{"file": "docs/adr/0005-bosonic-production-vision.md", "reason": "M1 测量面决策：threshold outcome-only 语义、heterodyne 对齐 Gaussian"}
+{"file": "docs/adr/0006-bosonic-architecture.md", "reason": "A4 测量并入 measure.py / A11 BOSONIC_PUBLIC 冻结时点 / A8 工厂白名单（coherent 缺口）"}
+{"file": ".trellis/tasks/archive/2026-08/08-14-bosonic-architecture/design.md", "reason": "A2 门签名 1:1 对齐 / A3 weight_sum 归位 / A12 gkp_logical_overlap deprecated 处理"}
+{"file": "cvsim/gaussian/gates.py", "reason": "K=1 对齐参照：5 门签名 + S_* 封装模式 + validate_u 语义"}
+{"file": "cvsim/gaussian/channels.py", "reason": "amplifier/phase_noise 的 X,Y 数学与参数校验参照"}
+{"file": "cvsim/gaussian/observables.py", "reason": "heterodyne_condition 公式（删模/重排）+ p_click 语义参照"}

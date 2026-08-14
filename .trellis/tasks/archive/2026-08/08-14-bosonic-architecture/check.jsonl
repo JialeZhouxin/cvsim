@@ -1,0 +1,4 @@
+{"file": "docs/vision-bosonic-simulator.md", "reason": "验收：§3 模块树 amend（A4）+ §2.3 A5 采样策略 + §11 文档控制行"}
+{"file": "docs/adr/0006-bosonic-architecture.md", "reason": "验收：A5 CDF 反演 + A8 initial 工厂规格，含否决项与权衡"}
+{"file": "CONTEXT.md", "reason": "验收：权重归一化 + CDF 网格反演术语已落 glossary"}
+{"file": ".trellis/tasks/08-14-bosonic-architecture/design.md", "reason": "验收：A1-A12 决策总表 + 模块架构 + 理由/权衡/B 映射完整性"}

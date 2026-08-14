@@ -1,0 +1,5 @@
+{"file": "docs/vision-bosonic-simulator.md", "reason": "战略层唯一事实源：B0-B7/支柱/非目标/§2 约定，design.md 的全部约束来源"}
+{"file": "docs/adr/0005-bosonic-production-vision.md", "reason": "grill Q1-Q13 决策记录：主舞台 GKP 教学、R1 分层对账、P1 积木不协议、M1 测量面"}
+{"file": "docs/vision-gaussian-simulator.md", "reason": "门签名/通道/测量语义 1:1 对齐参照（B1 出口 K=1 atol）+ circuit_common 第一消费者"}
+{"file": "docs/vision-fock-simulator.md", "reason": "FOCK_PUBLIC 冻结先例（A11）、截断纪律双阈值先例（A6）、circuit_common 第二消费者 + IR initial 先例（A8）"}
+{"file": "docs/adr/0003-circuit-v1-ir.md", "reason": "IR schema 兼容约束：EXTENSION_FIELDS/op 编码，A8 initial 形状的边界条件"}
