@@ -5,16 +5,17 @@
 // `[workflow-state:STATUS]` block from `.trellis/workflow.md` as a durable
 // user-role message — the DSH equivalent of Trellis' UserPromptSubmit hook
 // (inject-workflow-state.py). Non-Trellis projects get zero output; failures
-// fail open (log + no injection).
+// of this plugin's own logic fail open (log + no injection), upstream
+// failures propagate.
 //
 // Convention: DSH sessions run trellis scripts with
 // `TRELLIS_CONTEXT_ID=dsh-<session.id>` so the runtime session file is
-// `dsh-<session.id>.json`; when absent, the newest session file wins
-// (single-user local fallback).
+// `dsh-<session.id>.json`; that file wins regardless of mtime, other files
+// fall back by newest (single-user local).
 
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 
 export const name = "trellis-breadcrumb";
@@ -23,18 +24,17 @@ export const Config = {};
 
 const WORKFLOW_TAG = /\[workflow-state:([A-Za-z0-9_-]+)\]([\s\S]*?)\[\/workflow-state:\1\]/g;
 const FALLBACK = "Refer to workflow.md for current step.";
+const digest = (text) => createHash("sha256").update(text).digest("hex");
 
 export function apply(ctx) {
 	ctx.on("agent/pre-step", async ({ agent, messages, signal }, next) => {
-		let decision;
+		const decision = await next();
+		if (decision.kind === "reject") return decision;
+		signal.throwIfAborted();
 		try {
-			decision = await next();
-			if (decision.kind === "reject") return decision;
-			signal.throwIfAborted();
 			const text = await renderBreadcrumb(agent);
 			if (text === null) return decision;
-			const digest = createHash("sha256").update(text).digest("hex");
-			if (visibleDigest(agent) === digest) return decision;
+			if (visibleDigest(agent) === digest(text)) return decision;
 			const message = createUserMessage({
 				content: [{ type: "text", text }],
 				source: { kind: "trellis-breadcrumb", form: "text" }
@@ -48,7 +48,7 @@ export function apply(ctx) {
 			};
 		} catch (error) {
 			ctx.logger?.warn?.(`trellis-breadcrumb: ${error?.message ?? error}`);
-			return decision ?? { kind: "enter", messages };
+			return decision;
 		}
 	});
 }
@@ -64,20 +64,30 @@ async function renderBreadcrumb(agent) {
 		blocks.set(match[1], match[2].trim());
 	}
 	const activeTask = await resolveActiveTask(root, agent.session.id);
-	let status = "no_task";
+	let status = activeTask === null ? "no_task" : "planning";
 	if (activeTask !== null) {
-		const taskJson = await readFile(join(root, activeTask, "task.json"), "utf8").catch(() => null);
-		if (taskJson !== null) {
-			try {
-				status = JSON.parse(taskJson).status ?? "planning";
-			} catch {
-				status = "planning";
+		const taskPath = contained(root, activeTask);
+		if (taskPath !== null) {
+			const taskJson = await readFile(join(taskPath, "task.json"), "utf8").catch(() => null);
+			if (taskJson !== null) {
+				try {
+					status = JSON.parse(taskJson).status ?? "planning";
+				} catch {
+					status = "planning";
+				}
 			}
 		}
 	}
 	const body = blocks.get(status) ?? FALLBACK;
 	const block = `<workflow-state:${status}>\n${body}\n</workflow-state:${status}>`;
 	return activeTask === null ? block : `Active task: ${activeTask}\n${block}`;
+}
+
+/** Resolve a repo-relative task path and require containment under root. */
+function contained(root, relPath) {
+	const target = resolve(root, relPath);
+	const prefix = root.endsWith(sep) ? root : root + sep;
+	return target === root || target.startsWith(prefix) ? target : null;
 }
 
 /** Nearest ancestor of cwd containing `.trellis/workflow.md`, or null. */
@@ -94,8 +104,9 @@ async function findTrellisRoot(cwd) {
 }
 
 /**
- * Active task path from `.trellis/.runtime/sessions/`, preferring the
- * `dsh-<session.id>.json` file, else the newest session file.
+ * Active task path from `.trellis/.runtime/sessions/`. The session file
+ * matching `dsh-<session.id>` wins regardless of mtime; otherwise the newest
+ * file decides (single-user fallback).
  */
 async function resolveActiveTask(root, sessionId) {
 	const sessionsDir = join(root, ".trellis", ".runtime", "sessions");
@@ -103,16 +114,16 @@ async function resolveActiveTask(root, sessionId) {
 	if (files === null) return null;
 	const jsons = files.filter((file) => file.endsWith(".json"));
 	const preferred = `dsh-${sessionId}.json`;
-	const ordered = jsons.includes(preferred)
-		? [preferred, ...jsons.filter((file) => file !== preferred)]
-		: jsons;
-	const entries = [];
-	for (const file of ordered) {
+	const infos = (await Promise.all(jsons.map(async (file) => {
 		const info = await stat(join(sessionsDir, file)).catch(() => null);
-		if (info !== null) entries.push({ file, mtime: info.mtimeMs });
-	}
-	entries.sort((a, b) => b.mtime - a.mtime);
-	for (const { file } of entries) {
+		return info === null ? null : { file, mtime: info.mtimeMs };
+	}))).filter((entry) => entry !== null);
+	infos.sort((a, b) => {
+		if (a.file === preferred) return -1;
+		if (b.file === preferred) return 1;
+		return b.mtime - a.mtime;
+	});
+	for (const { file } of infos) {
 		const data = await readFile(join(sessionsDir, file), "utf8").then(JSON.parse).catch(() => null);
 		if (data !== null && typeof data.current_task === "string" && data.current_task !== "") {
 			return data.current_task;
@@ -130,7 +141,7 @@ function visibleDigest(agent) {
 		if (!visible.has(event.seq)) continue;
 		const block = event.data.content.find((part) => part.type === "text");
 		if (block === undefined) return null;
-		return createHash("sha256").update(block.text).digest("hex");
+		return digest(block.text);
 	}
 	return null;
 }
