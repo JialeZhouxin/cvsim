@@ -1,5 +1,15 @@
 # Design — 动态用户模型协议
 
+## 精简修订（2026-08-14，交付后复盘）
+
+Schema 机制瘦身，4 文件结构不变：
+
+1. **深度层级 L0-L8 → 3 档**（浅/中/深）：旧 9 级只有 3 个决策位（没听过/懂点/真懂），L0 与 L2 回答行为相同
+2. **来源标记 4 → 3**：删 Assumed——与 §3.4"禁止凭空加 known"冲突的死字段
+3. **last_verified 简化**：日期列保留，删"标回 Inferred"两步降级；超 30 天 → 回答按浅一档处理 + 提示复验
+4. **偏好字段 11 → 7**：删 technical_precision（=优先级首项，重复）、reasoning_steps、information_density、verbosity（无执行行为的模糊量表）
+5. seed 迁移：L3-L4→中，L5-L6→深，L2→浅；user-model.md 版本 0.2
+
 ## 文件布局
 
 ```

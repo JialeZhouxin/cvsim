@@ -17,8 +17,8 @@ description: 维护用户的动态认知模型（user-model.md）并按其适配
 
 回答涉及的概念逐个对照 known / uncertain：
 
-- **known（L3+）**：直接用，不解释
-- **known（L0-L2）**：一句话带过机制
+- **known（深/中）**：直接用（深可上数学；中补一句因果）
+- **known（浅）**：一句话带过机制
 - **uncertain / 不在表里**：按最小上下文处理（见下）
 - **偏好检查**：直觉先行、术语保留、假设显式、类比慎用
 
@@ -38,8 +38,8 @@ description: 维护用户的动态认知模型（user-model.md）并按其适配
 
 按协议 §3 更新 `user-model.md`：
 
-- **升级**：正确复述/应用 → Verified；主动解释机制 → depth+1；能纠错 → Verified
-- **降级**：明确不懂 → uncertain；30 天未验证 → 标回 Inferred
+- **升级**：正确复述/应用 → Verified；主动解释机制 → 档位提升；能纠错 → Verified
+- **降级**：明确不懂 → uncertain；30 天未复验 → 按浅一档处理
 - **禁止**：没追问 ≠ 懂了；Inferred 不能直接当 Verified；凭空加 known
 - 更新 `最后更新` 时间戳，追加对话日志
 
