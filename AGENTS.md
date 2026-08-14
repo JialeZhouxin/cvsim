@@ -23,4 +23,4 @@ Managed by Trellis. Edits outside this block are preserved; edits inside may be 
 ## 认知校准（读 AGENTS.md 必读）
 
 - **术语**（说什么）：[CONTEXT.md](./CONTEXT.md)
-- **认知框架**（怎么想、怎么说）：[心智模型校准文档.md](./心智模型校准文档.md) — 解释任何概念前先做结构映射（§0 四问），表达用逻辑语言 + 具身认知，避开反模式清单（§3.2）
+- **用户模型**（怎么讲）：[认知适配协议.md](./认知适配协议.md) + [user-model.md](./user-model.md) — 解释前读用户模型，按已知/不确定适配表达（user-model skill：`.pi/skills/user-model/`）

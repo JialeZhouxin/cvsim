@@ -30,7 +30,7 @@ preferences:  {analogy, technical_precision, terminology, assumption_explicitnes
 |----------|------|
 | known 深/中 | 直接用（深可上数学，中补因果） |
 | known 浅 | 一句话带过机制 |
-| uncertain / 不在表 | 最小上下文（流水线一环 → 一句话机制 → 只补需要的）|
+| uncertain / 不在表 | 最小上下文（一句话机制 → 只补需要的）|
 | 用户困惑 | 下移表达深度，换入口（直觉→数学→代码 往回退），不重新讲 |
 | 用户说太简单 | 上移，不再解释 |
 
@@ -53,7 +53,5 @@ preferences:  {analogy, technical_precision, terminology, assumption_explicitnes
 ## 引用链
 
 ```
-认知适配协议.md ──► 心智模型校准文档.md（§0 四问 / §3.1 / §3.2）
-       │
-       └─────────► CONTEXT.md（术语）
+认知适配协议.md ──► CONTEXT.md（术语）
 ```
