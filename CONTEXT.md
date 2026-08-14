@@ -29,8 +29,32 @@ _Avoid_: 张量网络（远期研究项，非承诺）, 稠密大 m
 _Avoid_: CVCircuit 单类泛化, 重复实现两套编译
 
 **Bosonic 表示**:
-多组分态：{(V_k, r̄_k, w_k)} 权重加权的 Gaussian 分量。
+多组分态：{(V_k, r̄_k, w_k)} 权重加权的 Gaussian 分量；r̄ 与 w 可复（虚部编码干涉中心）。K=1 退化即 Gaussian。生产级愿景见 `docs/vision-bosonic-simulator.md`（ADR-0005）。
 _Avoid_: 混合高斯表示
+
+**权重归一化 (weight normalization)**:
+归一化判据 = **Σ_k w_k = 1**（每分量 trace-1 高斯，复数求和结果必须实 = 1；`weight_sum` 公共 API）。Σ|w_k| ≠ 1 一般（交叉项抵消），不得当归一。厄米性 = **共轭对闭合**：每个 (V, r̄, w) 分量必须存在配对 (V, r̄*, w*)，`is_hermitian` 校验，工厂与条件化后必测。
+_Avoid_: Σ|w| 当归一, 只有实峰分量
+
+**组件工程 (component engineering)**:
+Bosonic 特有数值纪律（C2）：近邻峰合并 / 小权重截断（amp_cutoff）/ 下溢 / 归一化；截断质量用**组件截断泄漏**度量（丢弃权重质量 + 合并畸变估计），纪律镜像 Fock 截断工程（warn >1e-6，fail >1e-3，永不静默截断）。
+_Avoid_: 峰压缩（不量化）, 隐藏合并
+
+**测量精确化 (measurement precision)**:
+C3 主工程：homodyne 采样从教学切（实中心对角峰池，交叉项出池）升级为**精确边缘分布 + 精确条件化**（含复权重干涉核）。教学切与生产切都诚实标注，不得混用。**精确采样策略（A5, ADR-0006）**：CDF 网格反演 —— P(x)=Σw_k p_k(x) 是复权重混合（无正概率权重，拒绝采样不可行）；δx ≤ σ_min/5 自动网格 + uniform/searchsorted 反演，条件化同一核。
+_Avoid_: 教学采样当精确用, 拒绝采样（GKP 不可行）
+
+**分层对账 (layered reconciliation)**:
+C4 对账纪律（R1）：层 1 = 退化情形对解析/Fock 闭式（K=1 即 Gaussian、小 cat、coherent/thermal）atol 1e-7 硬约束；层 2 = GKP 内禀恒等式 + Fock 高 cutoff 数值互证。**GKP 无解析基准，层 2 是互证不是对账**。
+_Avoid_: GKP 有解析基准, 只对退化情形
+
+**协议进教程 (protocols-in-tutorials)**:
+P1 立场：模拟器只供积木（工厂/门/测量/analyse），GKP 纠错循环等协议写教程/GUI 剧本，不进库 API。对齐 Fock "algorithms are users' business"。
+_Avoid_: 协议库, gkp_qec_round 式库 API
+
+**分步执行 (step execution)**:
+GUI 新能力（G1）：纠错链每步条件化后中间态可查，治"流程黑盒"。Fock F7 无此能力，Bosonic GUI 新增。
+_Avoid_: 断点调试（工程语义）, 单步回放
 
 **circuit_v1**:
 核心正式电路 IR schema（`cvsim/gaussian/ir.py`，ADR-0003）：顶层 `nmode` + `ops` 列表，无源概念（coherent≡displace、tmsv≡two_mode_squeeze、thermal≡amplifier），全 op 集 1:1 对齐 GaussianCircuit；`view/seed/ui` 为顶层扩展字段（核心忽略）。
