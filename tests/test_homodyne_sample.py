@@ -28,11 +28,20 @@ def test_g_squeeze_var():
 
 
 def test_b_from_gaussian_matches_g_repro():
+    """B3: bosonic CDF inversion samples from the same edge distribution as the
+    Gaussian package (K=1 wrap). Same seed → same sequence of outcomes only if
+    both paths share the sampler; B3 uses CDF inversion vs Gaussian's direct
+    normal, so we verify the distributions match statistically instead of
+    value-by-value."""
     st_g = squeeze(GaussianState.vacuum(1), 0.4)
     st_b = BosonicState.from_gaussian(st_g)
-    o_g = g_sample(st_g, rng=np.random.default_rng(42))
-    o_b = b_sample(st_b, rng=np.random.default_rng(42))
-    assert abs(o_g - o_b) < 1e-12
+    rng_g = np.random.default_rng(42)
+    rng_b = np.random.default_rng(42)
+    xs_g = np.array([g_sample(st_g, rng=rng_g) for _ in range(5000)])
+    xs_b = b_sample(st_b, rng=rng_b, shots=5000)
+    # same distribution: mean and variance match
+    assert abs(xs_g.mean() - xs_b.mean()) < 0.08
+    assert abs(xs_g.var(ddof=1) - xs_b.var(ddof=1)) < 0.08
 
 
 def test_even_cat_both_peaks():
@@ -40,7 +49,7 @@ def test_even_cat_both_peaks():
     rx = np.sqrt(2.0) * alpha
     rng = np.random.default_rng(2)
     st = even_cat(alpha)
-    xs = np.array([b_sample(st, rng=rng) for _ in range(400)])
+    xs = b_sample(st, rng=rng, shots=400)
     # neighbourhood of each peak
     n_plus = int(np.sum(np.abs(xs - rx) < 1.2))
     n_minus = int(np.sum(np.abs(xs + rx) < 1.2))

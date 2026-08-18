@@ -218,6 +218,7 @@ BOSONIC_PUBLIC = {
     "mean_photon",
     "homodyne_mean",
     "homodyne_var",
+    "homodyne_pdf",
     "homodyne_sample",
     "homodyne_sample_and_condition",
     "homodyne_condition",

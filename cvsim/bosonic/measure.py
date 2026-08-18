@@ -1,13 +1,15 @@
-"""Bosonic measurements (A4): homodyne (re-export) + heterodyne + threshold.
+"""Bosonic measurements (A4): homodyne + heterodyne + threshold.
 
-Homodyne implementation stays in ``observables.py`` (single source until B3
-rewrites it); this module re-exports it so ``cvsim.bosonic.homodyne_*``
-import paths are unchanged.
+Homodyne implementation lives in ``observables.py`` (CDF grid inversion
+exact edge distribution, B3); this module re-exports it so
+``cvsim.bosonic.homodyne_*`` import paths are unchanged. ``homodyne_pdf``
+is the exact edge density ``P(x_φ) = Σ_k w_k p_k(x)`` on a grid (complex
+weights kept, interference terms included).
 
 Heterodyne (B1) is a **teaching cut**: sample and condition both use the
 real-diagonal-component pool only (components with real r̄ and Re(w) > 0,
-mirroring the homodyne teaching cut). K=1 states match the Gaussian package
-exactly. Exact mixed-state heterodyne (complex centres/weights, CDF
+mirroring the pre-B3 homodyne teaching cut). K=1 states match the Gaussian
+package exactly. Exact mixed-state heterodyne (complex centres/weights, CDF
 strategy) is deferred to B3 — do not use on mixed states for production.
 
 Threshold is outcome-only ({0,1}, no state update); the post-click state
@@ -24,6 +26,7 @@ from cvsim.bosonic.observables import (
     _check_mode,
     homodyne_condition,  # noqa: F401  (re-export: single implementation source)
     homodyne_mean,  # noqa: F401
+    homodyne_pdf,  # noqa: F401
     homodyne_sample,  # noqa: F401
     homodyne_sample_and_condition,  # noqa: F401
     homodyne_var,  # noqa: F401

@@ -25,12 +25,16 @@
 
 - heterodyne（B1）= **教学切**：sample/condition 只用实对角分量池（`imag_tol=1e-12` 过滤），K=1 与 Gaussian 严格对齐；混合态精确化（CDF 反演）属 B3，同 homodyne。
 - homodyne（B1）= 教学切（`homodyne_sample` 实峰池）→ B3 换 CDF 网格反演（ADR-0006）。
+- **B3 已落地（2026-08-18）**：`homodyne_sample` 已不是教学切，改为 CDF 网格反演精确采样（`observables.py`）；新增 `homodyne_pdf` 公共 API（BOSONIC_PUBLIC +1 名）。返回类型 `float` → `np.ndarray (shots,)`——**破坏性变更**，调用方需取 `[0]` 或 `outcomes[i]`。`homodyne_condition` 未动（已是精确 Born-rule 闭式）。
+- 仅 `heterodyne` 仍是教学切（实对角分量池，spec §4 原条目）。
 - 教学切 API 的 docstring 必须显式标注"teaching cut, not production"——防被当生产用。
 
 ## 5. deprecation 纪律
 
 - pyproject `filterwarnings = ["error:cvsim.*"]`：cvsim 模块发 `DeprecationWarning` → pytest error。**deprecation 只能写 docstring**（`.. deprecated::` 块），零运行时 warning。
 - 先例：`gkp_logical_overlap`（B1，指向 B2/B4 `pure_fidelity`）。
+
+> **Warning**: `filterwarnings = ["error:cvsim.*"]` 的 `cvsim.*` 匹配的是 warning **消息文本**（regex），不是模块名。`warnings.warn("homodyne_pdf: ...")` 消息以 `homodyne_pdf:` 开头，不匹配 `cvsim.*` → **不**被转 error，可安全运行时 warn（B3 负 Re(S) clip 即用此）。若要让 warning 变 error，消息须以 `cvsim.` 开头。
 
 ## 6. B2 组件工程
 
@@ -40,15 +44,24 @@
 - 组件工程不自动归一化、不修改输入；推荐显式先 `merge` 后 `truncate`，分别保存报告。
 - B2 不改变 B1 门、通道、测量的隐式行为；精确测量仍属 B3。
 
+## 6.1 B3 测量精度（homodyne CDF 网格反演）
+
+- `homodyne_pdf(state, mode=0, phi=0.0, *, n_grid=None, lim=None) -> (xs, P)`：精确边分布 `P(x_φ) = Σ_k w_k p_k(x)`，复权重/复 r̄ 全保留（干涉项）；`P = max(Re S, 0)`，负值 clip + warn；`is_hermitian` 兑底 Im≈0。
+- `homodyne_sample(state, mode=0, phi=0.0, *, rng=None, n_grid=None, lim=None, shots=1000) -> np.ndarray (shots,)`：CDF cumsum + `searchsorted(rng.uniform)` 反演，向量化。
+- 网格自动规则：`δx = σ_min/5`（最窄峰），范围 = 质心 ± 6σ_max（最宽峰），`n_grid = ceil(60·σ_max/σ_min)+1`。override `n_grid`+`lim` 同设则 `linspace(-lim, lim, n_grid)`。
+- **Born 一致性局限**（vision §4 B3 判据 2）：`homodyne_condition` 的高斯近似 `V'` 与 outcome 无关（`V' = V − vvᵀ/σ`），积分 `∫P·ρ_post·do` **不**恢复原 V——这是高斯流形近似本质，非 Born 违反。判据 2 只验：① 后验 `weight_sum==1`（每点）、② `∫P·mean_post·do == 原 mean`、③ `∫Σ_k w_k L_k·do == Σ_k w_k == 1`。完整 V 调和属 B4 R1 layer 2。
+
 ## 7. 门/通道对齐模式
 
 - 门 = 薄封装 `apply_symplectic(state, S_*(...))`，签名 1:1 复制 `cvsim/gaussian/gates.py`（含 `interferometer(..., *, validate_u=True)`）。
 - 通道 = 逐分量 `V_k ← X V_k Xᵀ + Y`，权重不动，V 对称化；X/Y 数学复制 Gaussian channels.py（amplifier `X=√G·I, Y=(G−1)(nbar+½)·I`；phase_noise `X=e^{−σ²/2}·I, Y=(1−e^{−σ²})·½·I`）。
 - 任何 K=1 对齐改动必须有 `BosonicState.from_gaussian` 包装态 vs `cvsim.gaussian` 的 atol 测试。
 
-## 7. 验证命令
+## 8. 验证命令
 
 ```powershell
-.venv\Scripts\python.exe -m pytest -q                                   # 全套（1059+）
+.venv\Scripts\python.exe -m pytest -q                                   # 全套（1094+）
 .venv\Scripts\python.exe -m pytest -m phaseB1 -q                        # B1 切片
+.venv\Scripts\python.exe -m pytest -m phaseB2 -q                        # B2 切片
+.venv\Scripts\python.exe -m pytest -m phaseB3 -q                        # B3 切片
 ```
