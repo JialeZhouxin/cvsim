@@ -6,7 +6,7 @@
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md); Fock peer in [`vision-fock-simulator.md`](./vision-fock-simulator.md). Cross-representation rules owned by Gaussian vision §6 unless amended here.
 
 **Last updated:** 2026-08-17
-**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B3 done (2026-08-18)**：基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结 39 名）+ 组件工程（merge/truncate/underflow/normalize + LeakReport + is_hermitian，phaseB2 marker）+ 测量精度（homodyne CDF 网格反演精确采样 + homodyne_pdf，phaseB3 marker）；B4 调和对账 next
+**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B4 done (2026-08-18)**：基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结 41 名）+ 组件工程（merge/truncate/underflow/normalize + LeakReport + is_hermitian，phaseB2 marker）+ 测量精度（homodyne CDF 网格反演 + homodyne_pdf，phaseB3 marker）+ 调和对账（purity/pure_fidelity 闭式 + R1 分层套件，phaseB4 marker）；B5 BosonicCircuit next
 **Codebase today:** `cvsim/bosonic` B1 生产面（state/cat/gkp/gates 11 门/channels 3/measure.py 三测量/observables 矩；单模 homodyne 教学切，B3 换精确）
 
 ---
