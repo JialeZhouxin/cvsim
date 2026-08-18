@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 58
-- **Last Active**: 2026-08-18
+- **Total Sessions**: 59
+- **Last Active**: 2026-08-19
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~73 | Active |
+| `journal-2.md` | ~106 | Active |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 59 | 2026-08-19 | Bosonic B5 BosonicCircuit 电路 DSL——circuit_v1 第三消费者 | `125aae4` | `master` |
 | 58 | 2026-08-18 | Bosonic B4 调和对账——purity/pure_fidelity 闭式 + R1 分层套件 | `d96fa3a` | `master` |
 | 57 | 2026-08-18 | Bosonic B3 测量精度——homodyne CDF 网格反演精确采样 | `fb3cea7` | `master` |
 | 56 | 2026-08-18 | Bosonic B2 组件工程归档收口 | `a91914e`, `f220390`, `bc622c0`, `e39ba2e` | `master` |

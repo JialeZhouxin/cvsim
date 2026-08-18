@@ -71,3 +71,36 @@ B4 完成：新增 cvsim/bosonic/analyse.py（purity 对角近似 + pure_fidelit
 ### Next Steps
 
 - None - task complete
+
+
+## Session 59: Bosonic B5 BosonicCircuit 电路 DSL——circuit_v1 第三消费者
+
+**Date**: 2026-08-19
+**Task**: Bosonic B5 BosonicCircuit 电路 DSL——circuit_v1 第三消费者
+**Branch**: `master`
+
+### Summary
+
+B5 完成：BosonicCircuit 三件套（builder + compile + ir）镜像 Gaussian，复用 circuit_common 零修改。新增 BosonicState.remove_mode（partial trace，homodyne 手动删模）。公共面 41→45。16 项 B5 测试（compiled vs naive atol 1e-12、IR roundtrip lossless、测量+feedforward+删模、通道）。Lab 接入延后 B6（vision §6.2 硬边界：lab import bosonic 类比 Fock F7 解锁）。全套 1124 passed。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `125aae4` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
