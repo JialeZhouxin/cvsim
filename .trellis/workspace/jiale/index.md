@@ -7,8 +7,8 @@
 ## Current Status
 
 <!-- @@@auto:current-status -->
-- **Active File**: `journal-1.md`
-- **Total Sessions**: 56
+- **Active File**: `journal-2.md`
+- **Total Sessions**: 57
 - **Last Active**: 2026-08-18
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,8 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~1988 | Active |
+| `journal-2.md` | ~40 | Active |
+| `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 57 | 2026-08-18 | Bosonic B3 测量精度——homodyne CDF 网格反演精确采样 | `fb3cea7` | `master` |
 | 56 | 2026-08-18 | Bosonic B2 组件工程归档收口 | `a91914e`, `f220390`, `bc622c0`, `e39ba2e` | `master` |
 | 55 | 2026-08-14 | DSH Trellis 工作流适配（技能迁移+面包屑插件） | `0923831`, `5b98a7e`, `ee5f4eb`, `a47d683`, `389af56`, `2706b72`, `99e54cc` | `master` |
 | 54 | 2026-08-13 | 心智模型校准文档（Q1-Q12 访谈锁定 + AGENTS.md 指针） | `3d83ebb` | `master` |
