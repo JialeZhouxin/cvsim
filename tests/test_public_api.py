@@ -198,6 +198,11 @@ BOSONIC_PUBLIC = {
     # states + factories
     "BosonicState",
     "Component",
+    "LeakReport",
+    "merge",
+    "truncate",
+    "normalize",
+    "is_hermitian",
     "even_cat",
     "odd_cat",
     "gkp0",

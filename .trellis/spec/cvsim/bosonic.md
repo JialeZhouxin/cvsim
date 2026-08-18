@@ -32,7 +32,15 @@
 - pyproject `filterwarnings = ["error:cvsim.*"]`：cvsim 模块发 `DeprecationWarning` → pytest error。**deprecation 只能写 docstring**（`.. deprecated::` 块），零运行时 warning。
 - 先例：`gkp_logical_overlap`（B1，指向 B2/B4 `pure_fidelity`）。
 
-## 6. 门/通道对齐模式
+## 6. B2 组件工程
+
+- `cvsim.bosonic.component_eng` 提供纯函数 `merge`、`truncate`、`normalize`、`is_hermitian` 与 frozen `LeakReport`。
+- `merge` 默认 `atol=1e-10`、`rtol=1e-8`，按输入顺序稳定贪心分组；代表保留组内第一组件，权重求和，畸变写入报告。
+- `truncate` 默认只删除 `abs(w) < 1e-6` 的组件；丢弃质量 `sum(abs(w))`，超过 `1e-6` 警告、超过 `1e-3` 失败，`validate=True` 时超过警告阈值即失败。
+- 组件工程不自动归一化、不修改输入；推荐显式先 `merge` 后 `truncate`，分别保存报告。
+- B2 不改变 B1 门、通道、测量的隐式行为；精确测量仍属 B3。
+
+## 7. 门/通道对齐模式
 
 - 门 = 薄封装 `apply_symplectic(state, S_*(...))`，签名 1:1 复制 `cvsim/gaussian/gates.py`（含 `interferometer(..., *, validate_u=True)`）。
 - 通道 = 逐分量 `V_k ← X V_k Xᵀ + Y`，权重不动，V 对称化；X/Y 数学复制 Gaussian channels.py（amplifier `X=√G·I, Y=(G−1)(nbar+½)·I`；phase_noise `X=e^{−σ²/2}·I, Y=(1−e^{−σ²})·½·I`）。

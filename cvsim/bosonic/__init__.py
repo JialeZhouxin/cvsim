@@ -1,4 +1,5 @@
 from cvsim.bosonic.cat import even_cat, odd_cat
+from cvsim.bosonic.component_eng import LeakReport, is_hermitian, merge, normalize, truncate
 from cvsim.bosonic.channels import amplifier, loss, phase_noise
 from cvsim.bosonic.gates import (
     beamsplitter,
@@ -33,6 +34,11 @@ from cvsim.bosonic.state import BosonicState, Component, coherent, weight_sum
 __all__ = [
     "BosonicState",
     "Component",
+    "LeakReport",
+    "merge",
+    "truncate",
+    "normalize",
+    "is_hermitian",
     "even_cat",
     "odd_cat",
     "gkp0",

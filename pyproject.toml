@@ -125,6 +125,7 @@ addopts       = [
 ]
 markers = [
     "phaseB1: Bosonic B1 tests (gates/channels/measures K=1 alignment + freeze)",
+    "phaseB2: Bosonic B2 component engineering tests",
 ]
 filterwarnings = [
     "error:cvsim.*",
