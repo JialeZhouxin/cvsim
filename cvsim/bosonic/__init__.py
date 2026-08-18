@@ -28,6 +28,7 @@ from cvsim.bosonic.measure import (
     sample_threshold,
 )
 from cvsim.bosonic.observables import mean_photon
+from cvsim.bosonic.analyse import purity, pure_fidelity
 from cvsim.bosonic.state import BosonicState, Component, coherent, weight_sum
 
 # B1 exit freeze (A11): BOSONIC_PUBLIC — see tests/test_public_api.py.
@@ -51,6 +52,8 @@ __all__ = [
     "weight_sum",
     "coherent",
     "mean_photon",
+    "purity",
+    "pure_fidelity",
     "homodyne_mean",
     "homodyne_var",
     "homodyne_pdf",

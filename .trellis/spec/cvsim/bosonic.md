@@ -51,6 +51,18 @@
 - 网格自动规则：`δx = σ_min/5`（最窄峰），范围 = 质心 ± 6σ_max（最宽峰），`n_grid = ceil(60·σ_max/σ_min)+1`。override `n_grid`+`lim` 同设则 `linspace(-lim, lim, n_grid)`。
 - **Born 一致性局限**（vision §4 B3 判据 2）：`homodyne_condition` 的高斯近似 `V'` 与 outcome 无关（`V' = V − vvᵀ/σ`），积分 `∫P·ρ_post·do` **不**恢复原 V——这是高斯流形近似本质，非 Born 违反。判据 2 只验：① 后验 `weight_sum==1`（每点）、② `∫P·mean_post·do == 原 mean`、③ `∫Σ_k w_k L_k·do == Σ_k w_k == 1`。完整 V 调和属 B4 R1 layer 2。
 
+## 6.2 B4 调和对账（analyse 闭式 + R1 分层套件）
+
+- `cvsim.bosonic.analyse`（新文件）：`purity` + `pure_fidelity`。
+- `purity(state, *, validate=False) -> float`：`μ = Σ_k |w_k|² / (2^m·√det V_k)`——**teaching 对角近似**（非严格 `Tr(ρ²)`，忽略非对角项 `Tr(ρ_i ρ_j)`）。GKP/cat 分量空间分离时误差极小；强重叠态偏差大。`validate=True` 走 `is_hermitian`；`det V_k≤0` 抛 ValueError。严格混合态纯度需 `overlap`（未实现）。
+- `pure_fidelity(state_a, state_b) -> float`：`|⟨ψ|φ⟩|²`，**等 V 限制**（两态所有分量 V 必须相同，否则 ValueError）。Gram `T[i,j]=_gauss_overlap(V, r_i^a, r_j^b)`（复用 gkp.py），`⟨ψ|φ⟩=c_aᴴ·T·c_b`（c=√w，复平方根保相位）。通用双 V 公式留 B7。
+- `gkp_logical_overlap`（deprecated）由 `pure_fidelity` 替代；等 V 同 grid 退化对齐（L2c）。
+- **R1 分层对账**（`tests/test_b4_bosonic_reconciliation.py`，全 `@phaseB4`）：
+  - layer 1（L1a-L1e）：退化情形 atol（K=1 squeezed/coherent vs Gaussian、K=2 混合 purity 自洽、cat 4 分量 mean_photon、cat vs Fock cutoff=30 homodyne_pdf）。
+  - layer 2（L2a-L2e）：GKP 内部恒等式（self-fidelity≈1、vs deprecated logical_overlap 对账、post-condition 自洽、loss 后 purity<1）。
+  - **GKP 无解析基准**（已锁）：layer 2 是内部互验，tolerance 放宽（self-fidelity atol 1e-5，GKP Gram 归一化数值精度限）。
+- Born 一致性局限（B3）：`homodyne_condition` 的 `V'` 与 outcome 无关，`∫P·ρ_post·do` 不恢复原 V——高斯近似本质，非 Born 违反。判据 2 只验权重归一+质心重构+似然归一。完整 V 调和需 `overlap`（未实现）。
+
 ## 7. 门/通道对齐模式
 
 - 门 = 薄封装 `apply_symplectic(state, S_*(...))`，签名 1:1 复制 `cvsim/gaussian/gates.py`（含 `interferometer(..., *, validate_u=True)`）。
@@ -60,8 +72,9 @@
 ## 8. 验证命令
 
 ```powershell
-.venv\Scripts\python.exe -m pytest -q                                   # 全套（1094+）
+.venv\Scripts\python.exe -m pytest -q                                   # 全套（1105+）
 .venv\Scripts\python.exe -m pytest -m phaseB1 -q                        # B1 切片
 .venv\Scripts\python.exe -m pytest -m phaseB2 -q                        # B2 切片
 .venv\Scripts\python.exe -m pytest -m phaseB3 -q                        # B3 切片
+.venv\Scripts\python.exe -m pytest -m phaseB4 -q                        # B4 切片
 ```

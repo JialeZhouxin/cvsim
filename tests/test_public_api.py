@@ -216,6 +216,8 @@ BOSONIC_PUBLIC = {
     # observables / measures (B1: measure.py home for all measures)
     "weight_sum",
     "mean_photon",
+    "purity",
+    "pure_fidelity",
     "homodyne_mean",
     "homodyne_var",
     "homodyne_pdf",
