@@ -38,3 +38,36 @@ B3 完成：homodyne_sample 换 CDF 网格反演（删旧实峰池，复权重�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 58: Bosonic B4 调和对账——purity/pure_fidelity 闭式 + R1 分层套件
+
+**Date**: 2026-08-18
+**Task**: Bosonic B4 调和对账——purity/pure_fidelity 闭式 + R1 分层套件
+**Branch**: `master`
+
+### Summary
+
+B4 完成：新增 cvsim/bosonic/analyse.py（purity 对角近似 + pure_fidelity 等 V 限制 Gram 矩阵）；公共面 39→41（+purity +pure_fidelity），phaseB4 marker。10 项 B4 测试（layer 1 退化 L1a-L1e atol 1e-7+ + layer 2 GKP 恒等式 L2a-L2e，GKP 无解析基准内部互验）。L2d/L2e 因等 V 限制改用 self-fidelity/purity。替代 deprecated gkp_logical_overlap。全套 1105 passed。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d96fa3a` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
