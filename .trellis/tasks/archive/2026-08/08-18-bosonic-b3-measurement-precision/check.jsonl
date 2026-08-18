@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/cvsim/index.md", "reason": "跨表示硬约束：导入边界、警告即错误、pytest markers、约定冻结——check 必验"}
+{"file": ".trellis/spec/cvsim/bosonic.md", "reason": "Bosonic 契约：教学切 docstring 标注纪律、BOSONIC_PUBLIC 冻结、B2 组件工程边界——check 必验"}
+{"file": "docs/vision-bosonic-simulator.md", "reason": "§4 B3 出口判据 3 条——check 必验是否全达"}
+{"file": ".trellis/tasks/08-18-bosonic-b3-measurement-precision/prd.md", "reason": "Acceptance Criteria 4 条 + 约束——check 对照"}
+{"file": ".trellis/tasks/08-18-bosonic-b3-measurement-precision/design.md", "reason": "坑 §4 + 测试设计 §5——check 验证覆盖"}

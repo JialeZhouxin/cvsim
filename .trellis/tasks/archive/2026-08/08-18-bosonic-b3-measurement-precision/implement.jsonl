@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/cvsim/index.md", "reason": "跨表示硬约束：导入边界 ADR-0001、警告即错误、pytest markers 纪律、约定冻结"}
+{"file": ".trellis/spec/cvsim/bosonic.md", "reason": "Bosonic 契约：模块边界（禁 import bridge）、空态语义、复真空重叠陷阱、教学切边界（B1→B3）、deprecation 纪律、B2 组件工程边界"}
+{"file": "docs/vision-bosonic-simulator.md", "reason": "物理事实源 §2.3 homodyne 采样策略 CDF 网格反演 + §4 B3 出口判据（3 条）+ §9 gap 表 Measures 行"}
+{"file": "docs/adr/0006-bosonic-architecture.md", "reason": "决策 1 B3 homodyne 精确采样 = CDF 网格反演：数学策略、否决项（拒绝采样/解析反演/对角峰池）、网格自动规则、条件化同核、后果"}
+{"file": ".trellis/tasks/08-18-bosonic-b3-measurement-precision/prd.md", "reason": "本任务 PRD：R1-R4 需求、4 条出口判据、约束"}
+{"file": ".trellis/tasks/08-18-bosonic-b3-measurement-precision/design.md", "reason": "本任务设计：数学 §2、API 契约 §3、坑 §4、测试设计 §5"}
