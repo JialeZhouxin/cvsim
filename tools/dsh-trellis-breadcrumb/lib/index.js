@@ -20,7 +20,15 @@ import { createUserMessage } from "@deepseek-ai/dsh-llm";
 
 export const name = "trellis-breadcrumb";
 export const inject = ["agents"];
-export const Config = {};
+// cordis rc.6 requires Config to implement the Standard Schema interface
+// (cordis resolveConfig: runtime.Config["~standard"].validate(config)).
+export const Config = {
+	"~standard": {
+		version: 1,
+		vendor: "trellis-breadcrumb",
+		validate: (value) => ({ value })
+	}
+};
 
 const WORKFLOW_TAG = /\[workflow-state:([A-Za-z0-9_-]+)\]([\s\S]*?)\[\/workflow-state:\1\]/g;
 const FALLBACK = "Refer to workflow.md for current step.";
