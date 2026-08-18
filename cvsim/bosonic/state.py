@@ -72,6 +72,35 @@ class BosonicState:
             ]
         )
 
+    def remove_mode(self, mode: int) -> BosonicState:
+        """Remove a mode from every component (partial trace, weights unchanged).
+
+        Per component: delete the x and p rows/cols for *mode*, then repack
+        the remaining (x_0..x_{m-1}, p_0..p_{m-1}) into xxpp order. Used by
+        circuit ``measure_homodyne`` (B3 ``homodyne_condition`` does not drop
+        the mode). A 0-mode state (all modes measured) is returned as an empty
+        component list.
+        """
+        if not self.components:
+            return BosonicState(components=[])
+        m = self.nmode
+        if not 0 <= mode < m:
+            raise IndexError(f"mode {mode} out of range for nmode={m}")
+        idx_A = [mode, m + mode]
+        idx_B = [i for i in range(2 * m) if i not in idx_A]
+        keep = sorted(i for i in range(m) if i != mode)
+        pack = list(keep) + [m + k for k in keep]
+        pos = {ax: j for j, ax in enumerate(idx_B)}
+        perm = [pos[ax] for ax in pack]
+        out: list[Component] = []
+        for c in self.components:
+            if not idx_B:
+                continue
+            Vn = c.V[np.ix_(idx_B, idx_B)][np.ix_(perm, perm)]
+            rn = c.rbar[idx_B][perm]
+            out.append(Component(V=Vn, rbar=rn, w=c.w))
+        return BosonicState(components=out)
+
 
 def coherent(alpha: complex, nmode: int = 1, mode: int = 0) -> BosonicState:
     """Coherent state |α⟩: single vacuum component displaced to r̄=√2(Re α, Im α).

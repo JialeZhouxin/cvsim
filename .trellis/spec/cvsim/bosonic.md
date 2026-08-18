@@ -63,6 +63,16 @@
   - **GKP 无解析基准**（已锁）：layer 2 是内部互验，tolerance 放宽（self-fidelity atol 1e-5，GKP Gram 归一化数值精度限）。
 - Born 一致性局限（B3）：`homodyne_condition` 的 `V'` 与 outcome 无关，`∫P·ρ_post·do` 不恢复原 V——高斯近似本质，非 Born 违反。判据 2 只验权重归一+质心重构+似然归一。完整 V 调和需 `overlap`（未实现）。
 
+## 6.3 B5 BosonicCircuit 电路 DSL（circuit_v1 第三消费者）
+
+- `cvsim.bosonic.circuit.BosonicCircuit`：镜像 GaussianCircuit builder（11 门 + 3 通道 + 3 测量）+ composition + `compile()`/`run()` + `to_ir()`/`from_ir()`。复用 `circuit_common`（ParamRef/partition/compile_segments/CompiledCircuit，ADR-0004）零修改。
+- `cvsim.bosonic.compile.CompiledBosonic`：`_init_state`=vacuum，`_apply_merged`=`apply_symplectic(st, S, d)`（逐分量，复刻 Gaussian `_instantiate`+`_factor`，复用 `cvsim.symplectic`）。K=1 恒定（gate 不增分量）。
+- `cvsim.bosonic.ir`：circuit_v1 to_ir/from_ir + validate_ir，**无扩展字段**（初态 vacuum，K=1 恒定）。复刻 Gaussian ir 的 OP_META/encode/decode（去 mz）。
+- `BosonicState.remove_mode(mode)`（state.py）：逐分量 partial trace（V_k 删 2 行 2 列 + xxpp 重排，w 不变）。homodyne 手动删模（B3 homodyne_condition 不删）；heterodyne 已内置删模。
+- 测量语义：homodyne `homodyne_sample_and_condition(shots=1)` → `results[name]=float(outcomes[0])` → `post.remove_mode`；heterodyne `heterodyne_sample_and_condition` → `results[name]=complex(beta)` → post（已删模）；threshold outcome-only 无删模。
+- **Lab 接入延后 B6**：vision §6.2 硬边界禁 lab import bosonic（类比 Fock F7 解锁）；B5 只落 IR 库（circuit_v1 schema 兼容），Lab `backend="bosonic"` 路由 + `run_bosonic_circuit` + Wigner view 属 B6 GUI。
+- phaseB5 marker；BOSONIC_PUBLIC 41→45（+BosonicCircuit +ParamRef re-export +to_ir +from_ir）。
+
 ## 7. 门/通道对齐模式
 
 - 门 = 薄封装 `apply_symplectic(state, S_*(...))`，签名 1:1 复制 `cvsim/gaussian/gates.py`（含 `interferometer(..., *, validate_u=True)`）。
@@ -72,9 +82,10 @@
 ## 8. 验证命令
 
 ```powershell
-.venv\Scripts\python.exe -m pytest -q                                   # 全套（1105+）
+.venv\Scripts\python.exe -m pytest -q                                   # 全套（1124+）
 .venv\Scripts\python.exe -m pytest -m phaseB1 -q                        # B1 切片
 .venv\Scripts\python.exe -m pytest -m phaseB2 -q                        # B2 切片
 .venv\Scripts\python.exe -m pytest -m phaseB3 -q                        # B3 切片
 .venv\Scripts\python.exe -m pytest -m phaseB4 -q                        # B4 切片
+.venv\Scripts\python.exe -m pytest -m phaseB5 -q                        # B5 切片
 ```

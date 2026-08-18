@@ -1,4 +1,6 @@
 from cvsim.bosonic.cat import even_cat, odd_cat
+from cvsim.bosonic.circuit import BosonicCircuit
+from cvsim.circuit_common import ParamRef
 from cvsim.bosonic.component_eng import LeakReport, is_hermitian, merge, normalize, truncate
 from cvsim.bosonic.channels import amplifier, loss, phase_noise
 from cvsim.bosonic.gates import (
@@ -29,6 +31,7 @@ from cvsim.bosonic.measure import (
 )
 from cvsim.bosonic.observables import mean_photon
 from cvsim.bosonic.analyse import purity, pure_fidelity
+from cvsim.bosonic.ir import from_ir, to_ir
 from cvsim.bosonic.state import BosonicState, Component, coherent, weight_sum
 
 # B1 exit freeze (A11): BOSONIC_PUBLIC — see tests/test_public_api.py.
@@ -36,6 +39,8 @@ from cvsim.bosonic.state import BosonicState, Component, coherent, weight_sum
 __all__ = [
     "BosonicState",
     "Component",
+    "BosonicCircuit",
+    "ParamRef",
     "LeakReport",
     "merge",
     "truncate",
@@ -54,6 +59,8 @@ __all__ = [
     "mean_photon",
     "purity",
     "pure_fidelity",
+    "to_ir",
+    "from_ir",
     "homodyne_mean",
     "homodyne_var",
     "homodyne_pdf",
