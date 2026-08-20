@@ -31,9 +31,10 @@
       <div class="panel__actions">
         <div class="btn-group">
           <label class="hint" for="backend-select">backend</label>
-          <select id="backend-select" class="select mono" title="表示后端（Gaussian/Fock 同壳双后端）">
+          <select id="backend-select" class="select mono" title="表示后端（Gaussian/Fock/Bosonic 同壳后端）">
             <option value="gaussian">gaussian</option>
             <option value="fock">fock</option>
+            <option value="bosonic">bosonic</option>
           </select>
         </div>
         <div class="btn-group">
@@ -56,8 +57,8 @@
     </div>
     <p class="hint">拖动器件到轨道放置；水平位置 = 时序；双模器件拖到第一条轨道后点击第二条轨道。</p>
     <div id="staff" class="staff" aria-live="polite" aria-label="五线谱电路编辑区"></div>
-    <div id="initial-card" class="initial-card" hidden aria-label="Fock 初始态">
-      <h2 class="initial-card__title">初始态 <span class="hint">Fock 数态（每模光子数，0..cutoff−1；缺省全真空）</span></h2>
+    <div id="initial-card" class="initial-card" hidden aria-label="初始态">
+      <h2 class="initial-card__title">初始态 <span class="hint">每模初始态（Fock 数态 / Bosonic GKP 源；缺省真空）</span></h2>
       <div id="initial-inputs" class="initial-card__inputs"></div>
     </div>
     <details class="json-fold">
@@ -145,6 +146,30 @@
           </div>
           <p id="joint-note" class="hint" hidden>joint 分布需要 ≥2 模且无测量坍缩</p>
         </div>
+    </section>
+
+    <section id="bosonic-panel" class="bosonic fold" hidden aria-label="Bosonic 结果面板">
+      <div class="bosonic__card">
+        <h2 class="bosonic__title">GKP 纠错保真度 <span class="hint">扫描 loss 透射率 T → 逻辑保真度（rounds 平均）</span></h2>
+        <div class="bosonic__actions">
+          <label class="hint" for="bos-target">target</label>
+          <select id="bos-target" class="select mono">
+            <option value="gkp0">gkp0</option>
+            <option value="gkp1">gkp1</option>
+          </select>
+          <label class="hint" for="bos-rounds">rounds</label>
+          <input id="bos-rounds" type="number" class="input mono" min="1" max="100" step="1" value="5" title="每个 γ 点的随机次数（平均）">
+          <button id="bos-fidelity-btn" type="button" class="btn btn--primary">Sweep loss</button>
+        </div>
+        <svg id="bos-fidelity-svg" class="bosonic__plot" role="img" aria-label="loss 透射率 vs 逻辑保真度曲线"></svg>
+        <p id="bos-fidelity-note" class="hint" hidden></p>
+      </div>
+      <div class="bosonic__card">
+        <h2 class="bosonic__title">分步执行 <span class="hint">测量/通道断点中间态摘要</span></h2>
+        <input id="bos-step" type="range" class="bosonic__range" min="0" max="0" step="1" value="0" disabled>
+        <div class="bosonic__steplabel"><span id="bos-step-tag" class="mono">—</span><span id="bos-step-info" class="hint"></span></div>
+        <p id="bos-step-meters" class="hint mono"></p>
+      </div>
     </section>
 
     <details id="scan-panel" class="scan fold" aria-label="参数扫描">

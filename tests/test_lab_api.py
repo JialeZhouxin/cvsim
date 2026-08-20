@@ -158,15 +158,16 @@ def test_sample_endpoint_422_bad_circuit():
 
 
 def test_a8_no_private_or_other_rep_imports():
-    """Vision §6.2 hard boundary: no private / Bosonic imports in lab.
+    """Vision §6.2 hard boundary: Lab only public rep imports.
 
-    Fock public imports are legal since F7 (same-shell dual backend).
+    Fock public imports are legal since F7; Bosonic public imports are
+    legal since B6 (same-shell third backend). Private imports stay banned.
     """
     root = Path(__file__).resolve().parents[1]
     banned = [
         "gaussian._",
         "fock._",
-        "bosonic",
+        "bosonic._",
     ]
     for rel in ["cvsim/lab/ir.py", "cvsim/lab/server.py", "cvsim/lab/__init__.py"]:
         src = (root / rel).read_text(encoding="utf-8")

@@ -70,8 +70,18 @@
 - `cvsim.bosonic.ir`：circuit_v1 to_ir/from_ir + validate_ir，**无扩展字段**（初态 vacuum，K=1 恒定）。复刻 Gaussian ir 的 OP_META/encode/decode（去 mz）。
 - `BosonicState.remove_mode(mode)`（state.py）：逐分量 partial trace（V_k 删 2 行 2 列 + xxpp 重排，w 不变）。homodyne 手动删模（B3 homodyne_condition 不删）；heterodyne 已内置删模。
 - 测量语义：homodyne `homodyne_sample_and_condition(shots=1)` → `results[name]=float(outcomes[0])` → `post.remove_mode`；heterodyne `heterodyne_sample_and_condition` → `results[name]=complex(beta)` → post（已删模）；threshold outcome-only 无删模。
-- **Lab 接入延后 B6**：vision §6.2 硬边界禁 lab import bosonic（类比 Fock F7 解锁）；B5 只落 IR 库（circuit_v1 schema 兼容），Lab `backend="bosonic"` 路由 + `run_bosonic_circuit` + Wigner view 属 B6 GUI。
+- **Lab 接入延后 B6（已解锁 2026-08-19）**：vision §6.2 硬边界类比 Fock F7 解锁；B5 先落 IR 库（circuit_v1 schema 兼容），B6 补 Lab `backend="bosonic"` 路由（`BOSONIC_WHITELIST` + `_load_bosonic` + `run_bosonic_circuit`）+ Wigner view + fidelity sweep + 分步执行。
 - phaseB5 marker；BOSONIC_PUBLIC 41→45（+BosonicCircuit +ParamRef re-export +to_ir +from_ir）。
+
+## 6.4 B6 GUI 三件套（同壳第三后端）
+
+- **initial 扩展字段（R1）**：IR `initial` 字段 = per-mode 态名列表（`null`/`"gkp0"`/`"gkp1"`，仅无参态；缺省=真空）；`BosonicCircuit(initial=...)` 接受 `BosonicState` 或列表；`tensor_product(states)`（state.py）逐分量直积：K 乘、V 块对角、r̄ 拼接、w 乘；to_ir/from_ir 序列化 initial（对含非真空才写）。
+- **双 V overlap（R3）**：`_gauss_overlap_two_V(Va,Vb,r_i,r_j)`（gkp.py）`2ᴹ(detVa·detVb)^{¼}/√det(Va+Vb)·exp(−¼Δrᵀ(Va+Vb)⁻¹Δr)`；`pure_fidelity` 逐分量 V（破 B4 等 V 锁）。等 V=V₀ 精确退化 `exp(−⅛ΔrᵀV₀⁻¹Δr)` ≡ B4 内核（layer2 测试不破）。
+- **GKP 位移纠错主剧本（R2）**：`initial:[gkp0,gkp1] + cz(0,1,1) + loss(0,T) + measure_homodyne(1,φ) + displace(0,α=$ref)`。**正确 quadrature = φ=π/2（测 ancilla p，CZ 耦合读法）**，gain=1。T=1 时可达保真度≈1（数值截断容差 1e-3）；outcome 落 teeth 决定纠错质量（GKP 本性，rounds 平均教学呈现）。fidelity>1 是截断态已知现象（B4 caveat），GUI 展示 clamp。
+- **Lab 三后端**：`BOSONIC_WHITELIST`（11 门+3 通道+3 测量，含 cz/cx/interferometer/gaussian_channel/measure_threshold）；`fidelity_sweep`（stochastic，每 γ 点固定 seed，`rounds` 平均，target `{state, mode}`）；`detail="steps"` 一次返断点快照（op/nmode/meters/wigner）；`/fidelity` 端点 bosonic-only（否则 422）。`/scan` 对 bosonic → 422（sweep 带 RNG 走 /fidelity）。
+- **前端**：`ops.js` 18 个 bosonic op（含 3 个 JSON-only：interferometer/gaussian_channel/measure_threshold 进 palette 定义但矩阵参数面板不编辑）；初始卡 per-mode GKP 源；结果面板 = Wigner（复用）+ fidelity 曲线 + 分步滑条；bosonic 时藏 scan/state-grid（无单一 V）。
+- phaseB6 marker；`test_a8_no_private_or_other_rep_imports` 随 vision §6.2 更新（bosonic public 解锁，`bosonic._` 仍禁）；`test_b6_bosonic_gui.py` 21 项（IR initial / 双 V / QEC / Lab golden / steps / fidelity / 旧 JSON 不变）。
+- **测向锁定**：GUI 默认剧本 φ=π/2 测 p（Q2 原拍 x 为引导误判，数值证 p 才对）；fidelity 曲线不锁单调性（GKP 阈值 + outcome 依赖是教学点，非 bug）。
 
 ## 7. 门/通道对齐模式
 
@@ -88,4 +98,6 @@
 .venv\Scripts\python.exe -m pytest -m phaseB3 -q                        # B3 切片
 .venv\Scripts\python.exe -m pytest -m phaseB4 -q                        # B4 切片
 .venv\Scripts\python.exe -m pytest -m phaseB5 -q                        # B5 切片
+.venv\Scripts\python.exe -m pytest -m phaseB6 -q                        # B6 切片
+node --test tests/editor.test.mjs tests/fock.test.mjs                 # 前端纯逻辑（node）
 ```

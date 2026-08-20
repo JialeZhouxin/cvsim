@@ -5,8 +5,8 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md); Fock peer in [`vision-fock-simulator.md`](./vision-fock-simulator.md). Cross-representation rules owned by Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-08-17
-**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B5 done (2026-08-18)**：基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结 45 名）+ 组件工程（merge/truncate/underflow/normalize + LeakReport + is_hermitian，phaseB2 marker）+ 测量精度（homodyne CDF 网格反演 + homodyne_pdf，phaseB3 marker）+ 调和对账（purity/pure_fidelity 闭式 + R1 分层套件，phaseB4 marker）+ BosonicCircuit DSL（circuit_v1 第三消费者 + to_ir/from_ir，phaseB5 marker）；B6 GUI next
+**Last updated:** 2026-08-19
+**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B6 done (2026-08-19)**：基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结 45 名）+ 组件工程（merge/truncate/underflow/normalize + LeakReport + is_hermitian，phaseB2 marker）+ 测量精度（homodyne CDF 网格反演 + homodyne_pdf，phaseB3 marker）+ 调和对账（purity/pure_fidelity 闭式 + R1 分层套件，phaseB4 marker）+ BosonicCircuit DSL（circuit_v1 第三消费者 + to_ir/from_ir，phaseB5 marker）+ **GUI 三件套**（initial 态源 + 双 V fidelity + Lab 同壳第三后端：palette whitelist / fidelity sweep / 分步执行，phaseB6 marker，vision §6.2 解锁）；B7 bridges+tutorials next
 **Codebase today:** `cvsim/bosonic` B1 生产面（state/cat/gkp/gates 11 门/channels 3/measure.py 三测量/observables 矩；单模 homodyne 教学切，B3 换精确）
 
 ---

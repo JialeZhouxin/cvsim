@@ -987,6 +987,89 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ── B6: Bosonic 面板（同壳第三后端）────────────────── */
+.bosonic {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.bosonic__card {
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  padding: var(--space-md);
+}
+
+/* Bosonic 两列：Wigner 大图（左）+ 结果面板（右） */
+.result:has(#bosonic-panel:not([hidden])) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head head"
+    "wigner bosonic"
+    "meas meas";
+  gap: var(--space-lg);
+}
+
+.result:has(#bosonic-panel:not([hidden])) .panel__head { grid-area: head; }
+.result:has(#bosonic-panel:not([hidden])) .wigner { grid-area: wigner; }
+.result:has(#bosonic-panel:not([hidden])) #bosonic-panel { grid-area: bosonic; }
+.result:has(#bosonic-panel:not([hidden])) #measurement-panel { grid-area: meas; }
+
+.bosonic__title {
+  font-size: var(--text-base);
+  margin: 0 0 var(--space-sm);
+}
+
+.bosonic__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin: var(--space-sm) 0;
+}
+
+.bosonic__plot {
+  display: block;
+  width: 100%;
+  height: 200px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-sm);
+  background: var(--color-paper);
+}
+
+.bosonic__line {
+  stroke: var(--color-accent, #4f8ef7);
+  stroke-width: 2;
+}
+
+.bosonic__grid-line {
+  stroke: var(--color-rule);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.bosonic__label {
+  fill: var(--color-text-dim, #888);
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+}
+
+.bosonic__range {
+  width: 100%;
+  margin: var(--space-sm) 0;
+}
+
+.bosonic__steplabel {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
 /* ── F7: Fock 面板（同壳双后端）────────────────────────── */
 /* 护栏卡（fock-panel 右列）；分布图卡在 fock-charts（下方行） */
 .fock__cards {
@@ -1160,4 +1243,10 @@ body {
       "charts"
       "meas";
   }
+}
+
+/* B6: feedforward alpha badge (bosonic displace with {$ref, gain}) */
+.gate-card__feed {
+  color: var(--color-accent, #4f8ef7);
+  font-size: 12px;
 }

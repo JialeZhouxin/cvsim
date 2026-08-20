@@ -193,9 +193,27 @@ class CompiledBosonic(CompiledCircuit):
     """Compiled Bosonic circuit: immutable segment snapshot; run() instantiates.
 
     Public surface: ``nmode``, ``params``, ``run(**values)`` (ADR-0004).
+    ``initial`` (B6) is the — optional — prepared initial state (vacuum when
+    None); K=1-vacuum semantics of B5 are preserved for default circuits.
     """
 
+    def __init__(
+        self,
+        nmode: int,
+        segments: list,
+        params: frozenset[str],
+        initial: BosonicState | None = None,
+    ) -> None:
+        super().__init__(nmode, segments, params)
+        self._initial = initial
+
     def _init_state(self) -> BosonicState:
+        if self._initial is not None:
+            if self._initial.nmode != self.nmode:
+                raise ValueError(
+                    f"initial state nmode {self._initial.nmode} != circuit nmode {self.nmode}"
+                )
+            return self._initial
         return BosonicState.vacuum(self.nmode)
 
     def _apply_merged(self, ops: list[tuple], nmode: int, values: dict, st: BosonicState) -> BosonicState:
@@ -203,3 +221,24 @@ class CompiledBosonic(CompiledCircuit):
 
     def _run_op(self, op, st, results, values, *, rng=None):
         return _run_op(op, st, results, values, rng=rng)
+
+    def run_steps(self, *, rng=None, **values):
+        """Run compiled segments capturing a per-break-point snapshot (B6).
+
+        Returns ``(final_state, results, steps)`` where ``steps`` is a list of
+        ``(op_name, state)`` after each channel/measurement break point.
+        Merged gate segments are not snapshotted (no intermediate inspection
+        inside a gate run).
+        """
+        st = self._init_state()
+        results: dict = {}
+        steps: list[tuple[str, BosonicState]] = []
+        for seg in self._segments:
+            if seg[0] == "merged":
+                _, nmode, ops = seg
+                st = self._apply_merged(ops, nmode, values, st)
+                continue
+            op = seg[1]
+            st, results = self._run_op(op, st, results, values, rng=rng)
+            steps.append((str(op[0]), st))
+        return st, results, steps

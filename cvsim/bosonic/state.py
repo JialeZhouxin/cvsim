@@ -14,6 +14,40 @@ def weight_sum(state: BosonicState) -> complex:
     return sum(c.w for c in state.components)
 
 
+def tensor_product(states: list[BosonicState]) -> BosonicState:
+    """Tensor product of 1-mode Bosonic states → multi-mode state (B6).
+
+    Component-wise Cartesian product: ``K = Π K_k``, ``V = blockdiag``,
+    ``r̄ = concat``, ``w = Π w_k``. Used by ``BosonicCircuit(initial=...)``
+    to assemble per-mode state sources (gkp0 ⊗ gkp1, …).
+    """
+    states = [s for s in states if s is not None]
+    if not states:
+        raise ValueError("tensor_product: need at least one state")
+    from itertools import product
+
+    mode_counts = [s.nmode for s in states]
+    total_modes = sum(mode_counts)
+    out: list[Component] = []
+    for combo in product(*(s.components for s in states)):
+        V = np.zeros((2 * total_modes, 2 * total_modes), dtype=float)
+        rbar = np.zeros(2 * total_modes, dtype=complex)
+        mode_offset = 0
+        for c, nmode in zip(combo, mode_counts, strict=True):
+            # Each input component is xxpp locally; place its x block and p
+            # block at global xxpp indices instead of concatenating x,p pairs.
+            idx = list(range(mode_offset, mode_offset + nmode))
+            idx += list(range(total_modes + mode_offset, total_modes + mode_offset + nmode))
+            V[np.ix_(idx, idx)] = c.V
+            rbar[idx] = c.rbar
+            mode_offset += nmode
+        w = 1.0 + 0.0j
+        for c in combo:
+            w = w * c.w
+        out.append(Component(V=V, rbar=rbar, w=w))
+    return BosonicState(components=out)
+
+
 @dataclass
 class Component:
     """One Gaussian peak: covariance, (possibly complex) mean, complex weight."""

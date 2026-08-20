@@ -52,7 +52,7 @@ OP_META: dict[str, OpMeta] = {
     "loss": OpMeta("one", {"T": "num", "nbar": "num"}, {"T": 1.0, "nbar": 0.0}),
     "amplifier": OpMeta("any", {"G": "num", "nbar": "num"}, {"G": 1.0, "nbar": 0.0}),
     "phase_noise": OpMeta("any", {"sigma": "num"}, {"sigma": 0.0}),
-    "gaussian_channel": OpMeta("none", {"X": "matrix", "Y": "matrix", "d": "matrix"}, {}),
+    "gaussian_channel": OpMeta("none", {"X": "matrix", "Y": "matrix", "d": "matrix"}, {"d": None}),
     "measure_homodyne": OpMeta("one", {"phi": "num", "name": "str"}, {"phi": 0.0}),
     "measure_heterodyne": OpMeta("one", {"name": "str"}, {}),
     "measure_threshold": OpMeta("one", {"name": "str"}, {}),
@@ -285,7 +285,12 @@ def to_ir(circuit: BosonicCircuit) -> dict[str, Any]:
         for k, ref in refs.items():
             params[k] = {"$ref": ref.source, "gain": ref.gain}
         ops.append({"op": op_name, "modes": list(modes), "params": params})
-    return {"schema": SCHEMA, "nmode": circuit.nmode, "ops": ops}
+    out: dict[str, Any] = {"schema": SCHEMA, "nmode": circuit.nmode, "ops": ops}
+    # B6 R1: serialize the per-mode name-list initial (custom BosonicState
+    # initials are not IR-expressible; omitted → vacuum default on rebuild).
+    if circuit._initial_spec is not None:
+        out["initial"] = circuit._initial_spec
+    return out
 
 
 def _build_op(circuit: BosonicCircuit, op: str, modes: tuple[int, ...], kw: dict[str, Any]) -> None:
@@ -332,7 +337,7 @@ def _build_op(circuit: BosonicCircuit, op: str, modes: tuple[int, ...], kw: dict
 def from_ir(data: dict[str, Any]) -> BosonicCircuit:
     """Rebuild a :class:`BosonicCircuit` from a circuit_v1 dict."""
     doc = validate_ir(data)
-    circuit = BosonicCircuit(doc.nmode)
+    circuit = BosonicCircuit(doc.nmode, initial=data.get("initial"))
     for node in doc.ops:
         meta = OP_META[node.op]
         kw = dict(meta.defaults)

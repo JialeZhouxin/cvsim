@@ -310,6 +310,16 @@ export function initStaff(root, api) {
       const lab = document.createElement("span");
       lab.className = "param__name mono";
       lab.textContent = k;
+      // B6: bosonic feedforward alpha = {$ref, gain} object — read-only badge
+      if (node.params[k] && typeof node.params[k] === "object") {
+        const o = node.params[k];
+        const badge = document.createElement("span");
+        badge.className = "param__name mono gate-card__feed";
+        badge.textContent = `$ref → ${o.$ref ?? "?"} · gain ${o.gain ?? 1}（JSON 编辑）`;
+        wrap.append(lab, badge);
+        body.appendChild(wrap);
+        continue;
+      }
       const range = document.createElement("input");
       range.type = "range";
       range.min = d.min;

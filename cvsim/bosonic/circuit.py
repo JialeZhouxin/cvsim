@@ -31,12 +31,51 @@ class BosonicCircuit:
         state, results = c.run()
     """
 
-    def __init__(self, nmode: int) -> None:
+    def __init__(self, nmode: int, initial: "BosonicState | list[str | None] | None" = None) -> None:
         if nmode < 1:
             raise ValueError("nmode must be >= 1")
         self.nmode = nmode
+        self._initial: BosonicState | None = None
+        self._initial_spec: list[str | None] | None = None
+        if initial is not None:
+            if isinstance(initial, BosonicState):
+                self._initial = initial
+            elif isinstance(initial, list):
+                if len(initial) != nmode:
+                    raise ValueError(
+                        f"initial: list length {len(initial)} != nmode {nmode} "
+                        "(one state name per mode)"
+                    )
+                self._initial_spec = list(initial)
+                self._initial = self._resolve_initial(initial)
+            else:
+                raise TypeError(
+                    f"initial must be a BosonicState or a list of state names, got {type(initial).__name__}"
+                )
         # _ops entries: (name, orig_modes, fixed, params, refs)
         self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
+
+    @staticmethod
+    def _resolve_initial(initial: list) -> BosonicState:
+        """Resolve a per-mode list of state-source names to a BosonicState.
+
+        Items: ``None`` = vacuum, ``"gkp0"`` / ``"gkp1"``; tensor-multiplied
+        component-wise for the multi-mode initial state (B6 R1).
+        """
+        from cvsim.bosonic.gkp import gkp0, gkp1
+        from cvsim.bosonic.state import tensor_product
+
+        states: list[BosonicState] = []
+        for item in initial:
+            if item is None:
+                states.append(BosonicState.vacuum(1))
+            elif item == "gkp0":
+                states.append(gkp0())
+            elif item == "gkp1":
+                states.append(gkp1())
+            else:
+                raise ValueError(f"initial: unknown state source {item!r} (None|'gkp0'|'gkp1')")
+        return tensor_product(states)
 
     # -- L3: circuit composition ------------------------------------------
 
@@ -179,7 +218,7 @@ class BosonicCircuit:
     def compile(self) -> CompiledBosonic:
         from cvsim.bosonic.compile import _compile_segments, CompiledBosonic
         segments, params = _compile_segments(self._ops, self.nmode)
-        return CompiledBosonic(self.nmode, segments, params)
+        return CompiledBosonic(self.nmode, segments, params, initial=self._initial)
 
     def run(
         self, *, rng: np.random.Generator | None = None, **params: float

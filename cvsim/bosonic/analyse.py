@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 
 from cvsim.bosonic.component_eng import is_hermitian
-from cvsim.bosonic.gkp import _gauss_overlap
+from cvsim.bosonic.gkp import _gauss_overlap_two_V
 from cvsim.bosonic.state import BosonicState
 
 _SIG_EPS = 1e-12
@@ -57,40 +57,37 @@ def purity(state: BosonicState, *, validate: bool = False) -> float:
 
 
 def pure_fidelity(state_a: BosonicState, state_b: BosonicState) -> float:
-    """Pure-state fidelity ``|⟨ψ|φ⟩|²`` (equal-V restriction).
+    """Pure-state fidelity ``|⟨ψ|φ⟩|²`` (general two-V, B6).
 
-    ``|ψ⟩ = Σ_i c_i |g_i⟩``, ``|φ⟩ = Σ_j d_j |g_j'⟩`` with **equal V** across
-    all components of both states. Gram matrix
-    ``T[i,j] = _gauss_overlap(V, r_i^a, r_j^b)``, inner product
-    ``⟨ψ|φ⟩ = c_aᴴ · T · c_b`` (c = √w, complex roots preserve phase).
+    ``|ψ⟩ = Σ_i c_i |g_i⟩``, ``|φ⟩ = Σ_j d_j |g_j'⟩`` with per-component
+    covariances. Gram matrix ``T[i,j] = _gauss_overlap_two_V(V_i^a, V_j^b,
+    r_i^a, r_j^b)`` (real means; complex centers deferred to B7 bridges),
+    inner product ``⟨ψ|φ⟩ = c_aᴴ · T · c_b`` (c = √w, complex roots preserve
+    phase). At equal V across all components it reduces exactly to the B4
+    kernel, so equal-V callers see identical values.
 
-    **Limitation**: requires all component covariances of both states to be
-    equal (same V). General two-V Gaussian overlap (Braunstein formula) is
-    deferred to B7 bridges.
+    GKP QEC: loss γ reshapes the data covariance vs the ideal gkp0, so the
+    two-V path is what makes the fidelity-vs-γ curve physically honest.
 
     Raises
     ------
     ValueError
-        If component V matrices differ across the two states.
+        If either state is empty, or ``is_hermitian`` fails for real weights
+        (not Hermitian-closed).
     """
     comps_a = state_a.components
     comps_b = state_b.components
-    V_ref = comps_a[0].V
-    for c in comps_a:
-        if not np.allclose(c.V, V_ref, atol=1e-10):
-            raise ValueError("pure_fidelity: components of state_a have differing V")
-    for c in comps_b:
-        if not np.allclose(c.V, V_ref, atol=1e-10):
-            raise ValueError("pure_fidelity: state_b V differs from state_a V (equal-V only)")
+    if not comps_a or not comps_b:
+        raise ValueError("pure_fidelity: empty state (no components)")
     # c vectors (complex sqrt of weights, phase preserved)
     c_a = np.array([np.sqrt(c.w) for c in comps_a], dtype=complex)
     c_b = np.array([np.sqrt(c.w) for c in comps_b], dtype=complex)
-    # Gram matrix T[i,j] = ⟨g_i^a|g_j^b⟩ (real means; _gauss_overlap takes real)
-    r_a = [c.rbar.real for c in comps_a]
-    r_b = [c.rbar.real for c in comps_b]
+    # Gram matrix T[i,j] = ⟨g_i^a|g_j^b⟩ (real means; two-V kernel)
     T = np.zeros((len(comps_a), len(comps_b)), dtype=float)
-    for i, ri in enumerate(r_a):
-        for j, rj in enumerate(r_b):
-            T[i, j] = _gauss_overlap(V_ref, ri, rj)
+    for i, ca2 in enumerate(comps_a):
+        for j, cb2 in enumerate(comps_b):
+            T[i, j] = _gauss_overlap_two_V(
+                ca2.V, cb2.V, ca2.rbar.real, cb2.rbar.real
+            )
     inner = c_a.conj() @ T @ c_b
     return float(abs(inner) ** 2)

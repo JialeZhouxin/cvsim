@@ -216,12 +216,13 @@ Fock 结果面板：单模 Wigner（复用 `wigner_grid` Fock 分支）+ PNR 分
 - `cvsim.wigner.wigner_grid`（及文档化的公开 wigner 辅助）
 - `cvsim.conventions` 只读常量（若需要展示）
 - **Fock 后端（2026-08-13 解锁）**：`cvsim.fock` public only（`FockCircuit`/`pnrd_probs`/`mean_photon`/`truncation_leakage`/`partial_trace` 等 `__all__` 导出；IR 校验 `cvsim.fock.ir`）
+- **Bosonic 后端（2026-08-19 解锁）**：`cvsim.bosonic` public only（`BosonicCircuit`/`gkp0`/`gkp1`/`pure_fidelity` 等 `__all__` 导出；IR 校验 `cvsim.bosonic.ir` 走 `BOSONIC_WHITELIST`）
 
 **Forbidden**
 
-- `cvsim.gaussian._*` / `cvsim.fock._*` / 任何 private
+- `cvsim.gaussian._*` / `cvsim.fock._*` / `cvsim.bosonic._*` / 任何 private
 - 在 Lab 内复制 `analyse` / symplectic 公式「图个方便」
-- 调用 Bosonic 包；Fock 路径内调用 `cvsim.gaussian`（representation 隔离，ADR-0001 精神）
+- Fock 路径内调用 `cvsim.gaussian`；Bosonic 路径内调用 `cvsim.gaussian`/`cvsim.fock`（representation 隔离，ADR-0001 精神）
 
 ### 6.3 Randomness
 

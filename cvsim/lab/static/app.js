@@ -240,6 +240,10 @@ function render(result, mode) {
     renderFock(result, mode);
     return;
   }
+  if (result.backend === "bosonic") {
+    renderBosonic(result, mode);
+    return;
+  }
   drawWignerResult(result);
   $("rbar-block").hidden = false; // 均值表常驻侧列（有数据才显示）
 
@@ -301,14 +305,136 @@ function renderFock(result, mode) {
   fockPanel.renderResult(result);
 }
 
+/* B6: Bosonic 结果面板 — Wigner（复用）+ meters（purity/mean_photon）+
+   分步执行滑条（/run?detail=steps 断点快照；fidelity 曲线走独立 Sweep 按钮）。 */
+function renderBosonic(result, mode) {
+  drawWignerResult(result);
+  const m = result.meters || {};
+  $("m-purity").textContent = fmt(m.purity);
+  $("m-nbar").textContent = fmt(m.mean_photon);
+  $("m-logneg").textContent = "—"; // bosonic 无 log_negativity
+  $("nmode-tag").textContent = `nmode ${result.nmode}`;
+  renderModeSelect(result.nmode, mode);
+  renderBosonicSteps(result.steps);
+}
+
+function renderBosonicSteps(steps) {
+  const slider = $("bos-step");
+  const tag = $("bos-step-tag");
+  const info = $("bos-step-info");
+  const meters = $("bos-step-meters");
+  if (!Array.isArray(steps) || steps.length === 0) {
+    slider.disabled = true;
+    slider.max = 0;
+    tag.textContent = "—";
+    info.textContent = "（仅含测量/通道断点快照；纯高斯段并入首步）";
+    meters.textContent = "";
+    return;
+  }
+  slider.disabled = false;
+  slider.max = String(steps.length - 1);
+  // 保底：滑条已停在边界时选最后一步（最终态）
+  if (!Number.isFinite(Number(slider.value)) || Number(slider.value) >= steps.length) {
+    slider.value = String(steps.length - 1);
+  }
+  const show = (k) => {
+    const s = steps[Number(k)];
+    tag.textContent = `step ${k}/${steps.length - 1}`;
+    const opDesc = (op) => op.replace("measure_", "measure·").replace(/_/g, " ");
+    info.textContent = `${opDesc(s.op)} · nmode ${s.nmode}`;
+    const mp = s.meters && s.meters.mean_photon;
+    const pu = s.meters && s.meters.purity;
+    meters.textContent = `⟨n⟩ ${fmt(mp)}  ·  purity ${fmt(pu)}`;
+    // Step slider drives Wigner evolution, not only text meters.
+    if (s.wigner) drawWignerResult({ wigner: s.wigner });
+  };
+  slider.oninput = () => show(slider.value);
+  show(slider.value);
+}
+
+/* B6: fidelity sweep — 自动找第一个 loss 节点，Post /fidelity（bosonic 专属；
+   沿用后端中 ψ?fixed seed，前端 rounds 平均）。 */
+function drawFidSvg(xs, ys) {
+  const svg = $("bos-fidelity-svg");
+  const note = $("bos-fidelity-note");
+  const pts = xs.map((x, i) => ({ x: Number(x), y: ys[i] }))
+                .filter((p) => p.y !== null && Number.isFinite(p.y))
+                // Truncated GKP can overshoot numerically; clamp display only.
+                .map((p) => ({ ...p, y: Math.min(1, Math.max(0, p.y)) }));
+  note.hidden = false;
+  if (pts.length === 0) {
+    note.textContent = "无有效保真度点（检查 loss 节点）";
+    svg.replaceChildren();
+    return;
+  }
+  const W = svg.clientWidth || 560;
+  const H = 200;
+  const pad = { l: 46, r: 14, t: 14, b: 26 };
+  const x0 = Math.min(...pts.map((p) => p.x));
+  const x1 = Math.max(...pts.map((p) => p.x));
+  const y0 = Math.min(0, ...pts.map((p) => p.y));
+  let y1 = Math.max(...pts.map((p) => p.y));
+  y1 = Math.max(y1, y0 + 1e-9);
+  const X = (x) => pad.l + ((x - x0) / (x1 - x0 || 1)) * (W - pad.l - pad.r);
+  const Y = (y) => pad.t + (1 - (y - y0) / (y1 - y0)) * (H - pad.t - pad.b);
+  const path = pts.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)} ${Y(p.y).toFixed(1)}`).join(" ");
+  const cy = Y(0);
+  const dots = pts.map((p) =>
+    `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3"/>`).join("");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML =
+    `<line x1="0" y1="${cy}" x2="${W}" y2="${cy}" class="bosonic__grid-line"/>
+     <path d="${path}" fill="none" class="bosonic__line"/>${dots}` +
+    `<text x="${pad.l}" y="${H - 6}" class="bosonic__label">loss 透射率 T</text>` +
+    `<text x="8" y="${pad.t}" class="bosonic__label">F</text>`;
+  note.textContent = `fidelity vs loss T · ${pts.length} 点 · rounds 平均（同 seed 三个投点色块为随机相位）`;
+  note.hidden = false;
+}
+
+async function runBosonicFidelity() {
+  const state = editor.getState();
+  const nodes = state.nodes;
+  const lossSeq = nodes.find((n) => n.op === "loss");
+  if (!lossSeq) {
+    $("bos-fidelity-note").textContent = "需先在电路加一个 loss 节点（透射率 T 被扫描）";
+    $("bos-fidelity-note").hidden = false;
+    return;
+  }
+  const payload = toV1Json(state);
+  const rounds = Math.max(1, Math.min(100, Number($("bos-rounds").value) || 5));
+  payload.sweep = { node_id: lossSeq.id, param: "T", min: 0.5, max: 1.0, n: 7,
+                    target: { state: $("bos-target").value, mode: 0 } };
+  payload.rounds = rounds;
+  setStatus(`fidelity sweep · loss=${lossSeq.id} · rounds=${rounds}`);
+  try {
+    const resp = await fetch("/fidelity", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await resp.json();
+    if (!resp.ok) {
+      $("bos-fidelity-note").textContent = (body.detail || "fidelity sweep 失败") + "（详情可用 /run）";
+      $("bos-fidelity-note").hidden = false;
+      setStatus(resp.status + " · " + (body.detail || "fidelity sweep 失败"), false);
+      return;
+    }
+    drawFidSvg(body.xs, body.ys);
+    setStatus(`fidelity · ${body.ys.filter((y) => y !== null).length} 点`);
+  } catch (e) {
+    setStatus("网络错误: " + e.message, false);
+  }
+}
+
 function syncBackendPanels(backend) {
   const fock = backend === "fock";
-  $("scan-panel").hidden = fock;   // v0 无 Fock scan（/scan+fock → 422）
-  $("state-grid").hidden = fock;   // Fock 无 r̄/V 表（态摘要走护栏卡）
-  $("meters-panel").hidden = fock; // Fock meters 在护栏卡
-  $("wigner-side").hidden = fock;  // Fock 侧列全藏 → 画布满宽
+  const bosonic = backend === "bosonic";
+  $("scan-panel").hidden = fock || bosonic; // bosonic 扫掠走 /fidelity（带 RNG）
+  $("state-grid").hidden = fock || bosonic; // bosonic 无单一 V 矩阵（K 分量）
   $("fock-panel").hidden = !fock;
   $("fock-charts").hidden = !fock; // PNR/joint 分布行
+  $("bosonic-panel").hidden = !bosonic;
+  $("meters-panel").hidden = false; // Fock 藏；gaussian/bosonic 常显
+  $("wigner-side").hidden = fock;    // Fock 藏（侧列全藏）；gaussian/bosonic 保留
   fitWignerFrame(); // side 显隐变化 → 重算正方形画布
 }
 
@@ -355,7 +481,10 @@ async function doRun(circuitJson, seq) {
     const resp = await fetch("/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(circuitJson),
+      // B6: bosonic 一次拉全部分步快照（断点中间态）；gaussian/fock 忽略 detail
+      body: JSON.stringify(circuitJson.backend === "bosonic"
+        ? { ...circuitJson, detail: "steps" }
+        : circuitJson),
     });
     const body = await resp.json();
     if (seq !== latestSeq) return; // stale response: drop
@@ -730,6 +859,10 @@ async function init() {
   syncBackendPanels(editor.getState().backend);
   editor.render();
   refreshScanNodes();
+  const bosFid = $("bos-fidelity-btn");
+  if (bosFid) bosFid.addEventListener("click", runBosonicFidelity);
+  const bosTrg = $("bos-target");
+  if (bosTrg) bosTrg.addEventListener("change", runBosonicFidelity);
 }
 
 init();

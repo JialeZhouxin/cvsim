@@ -24,18 +24,38 @@ CrossMode = Literal["none", "nn", "full"]
 LatticeMode = Literal["1d", "2d"]
 
 
+def _gauss_overlap_two_V(Va: np.ndarray, Vb: np.ndarray, r_i: np.ndarray, r_j: np.ndarray) -> float:
+    """⟨g_a|g_b⟩ between equal-... general two-V pure Gaussians (B6).
+
+    S = 2^m · (detVa·detVb)^{1/4} / √det(Va+Vb)
+        · exp(−¼ Δrᵀ (Va+Vb)⁻¹ Δr),   Δr = r_i − r_j,  m = nmode.
+
+    Real means (ħ=1); complex centers deferred to B7 bridges. At equal V
+    this reduces exactly to ``_gauss_overlap``: det(2V)=2^{2m}detV ⇒ factor
+    2^m·√detV/2^m·√detV = 1, leaving exp(−⅛ dr V⁻¹ dr).
+    """
+    Va = np.asarray(Va, dtype=float)
+    Vb = np.asarray(Vb, dtype=float)
+    ri = np.asarray(r_i, dtype=float).real
+    rj = np.asarray(r_j, dtype=float).real
+    m = Va.shape[0] // 2
+    Sum = Va + Vb
+    dr = ri - rj
+    q = float(dr @ np.linalg.solve(Sum, dr))
+    _, logdet_sum = np.linalg.slogdet(Sum)
+    _, logdet_a = np.linalg.slogdet(Va)
+    _, logdet_b = np.linalg.slogdet(Vb)
+    factor = (2.0**m) * np.exp(0.25 * (logdet_a + logdet_b) - 0.5 * logdet_sum)
+    return float(factor * np.exp(-0.25 * q))
+
+
 def _gauss_overlap(V: np.ndarray, r_i: np.ndarray, r_j: np.ndarray) -> float:
     """⟨g_i|g_j⟩ for equal-V pure Gaussians, real means (ħ=1 teaching).
 
     S = exp(−⅛ Δrᵀ V⁻¹ Δr). Matches 1d: exp(−δx²/(4ε)); 2d: exp(−|Δr|²/(4ε)).
+    Convenience wrapper over ``_gauss_overlap_two_V(V, V, r_i, r_j)``.
     """
-    V = np.asarray(V, dtype=float)
-    ri = np.asarray(r_i, dtype=float).real
-    rj = np.asarray(r_j, dtype=float).real
-    dr = ri - rj
-    Vin = np.linalg.inv(V)
-    q = float(dr @ Vin @ dr)
-    return float(np.exp(-0.125 * q))
+    return _gauss_overlap_two_V(V, V, r_i, r_j)
 
 
 def _append_cross_pair_vec(

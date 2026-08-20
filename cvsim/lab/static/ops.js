@@ -41,7 +41,7 @@ export const OPS = {
   squeeze: {
     label: "压缩",
     kind: "single",
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "压缩：挤压正交涨落（r<0 压缩 x，r>0 压缩 p），产生低于真空噪声的涨落",
     params: {
       r: { min: -3, max: 3, step: 0.01, def: 0.4, sweep: [0, 2] },
@@ -51,21 +51,21 @@ export const OPS = {
   phase: {
     label: "相位",
     kind: "single",
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "相位：对模式施加相移 φ，旋转相空间",
     params: { phi: { min: 0, max: TAU, step: 0.01, def: Math.PI / 2, sweep: [0, Math.PI] } },
   },
   fourier: {
     label: "傅里叶",
     kind: "single",
-    backends: ["gaussian"], // gaussian-only：不在 FOCK_WHITELIST
+    backends: ["gaussian", "bosonic"], // gaussian 名 + b6 门全集
     tip: "傅里叶：90° 相空间旋转，位置 ↔ 动量互换",
     params: {},
   },
   displace: {
     label: "位移",
     kind: "single",
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "位移：相空间平移 α，真空 + 位移即相干态",
     params: { alpha: { min: -5, max: 5, step: 0.05, def: 1.0 } },
   },
@@ -73,7 +73,7 @@ export const OPS = {
     label: "损耗",
     kind: "single",
     channel: true,
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "损耗：透过率 T 的纯损耗通道（T=1 无损耗），耦合真空环境",
     params: {
       T: { min: 0.01, max: 1, step: 0.01, def: 0.8, sweep: [0, 1] },
@@ -84,7 +84,7 @@ export const OPS = {
     label: "放大",
     kind: "single",
     channel: true,
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "放大：增益 G 的相位不敏感放大（附带自发辐射噪声）",
     params: {
       G: { min: 1, max: 8, step: 0.05, def: 2, sweep: [1, 4] },
@@ -94,7 +94,7 @@ export const OPS = {
   beamsplitter: {
     label: "分束器",
     kind: "two",
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "分束器：θ 角分束耦合两模，产生干涉与纠缠",
     params: {
       theta: { min: 0, max: TAU, step: 0.01, def: Math.PI / 4, sweep: [0, Math.PI] },
@@ -114,7 +114,7 @@ export const OPS = {
   two_mode_squeeze: {
     label: "双模压缩",
     kind: "two",
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "双模压缩：两模关联挤压，产生 EPR 型纠缠",
     params: { r: { min: -3, max: 3, step: 0.01, def: 0.4, sweep: [0, 2] } },
   },
@@ -122,17 +122,20 @@ export const OPS = {
     label: "外差测量",
     kind: "single",
     measure: true,
-    backends: ["gaussian", "fock"],
+    backends: ["gaussian", "fock", "bosonic"],
     tip: "外差测量：投影到相干态 |β⟩，返回复振幅结果",
-    params: {},
+    params: { name: { string: true, def: "", optional: true } },
   },
   homodyne: {
     label: "零差测量",
     kind: "single",
     measure: true,
-    backends: ["gaussian", "fock"],
-    tip: "零差测量：投影到正交分量 x_φ，返回实数结果",
-    params: { phi: { min: 0, max: TAU, step: 0.01, def: 0, optional: true } },
+    backends: ["gaussian", "fock", "bosonic"],
+    tip: "零差测量：投影到正交分量 x_φ，返回实数结果；name 供后续 feedforward $ref 引用",
+    params: {
+      phi: { min: 0, max: TAU, step: 0.01, def: 0, optional: true },
+      name: { string: true, def: "", optional: true },
+    },
   },
   /* ── Fock-only (F7, mirrors ir.py FOCK_WHITELIST) ─────────── */
   kerr: {
@@ -145,21 +148,21 @@ export const OPS = {
   cz: {
     label: "CZ",
     kind: "two",
-    backends: ["fock"],
+    backends: ["fock", "bosonic"],
     tip: "CZ：受控相位门（Fock qudit 编码），weight 为耦合强度",
     params: { weight: { min: -2, max: 2, step: 0.01, def: 1 } },
   },
   cx: {
     label: "CX",
     kind: "two",
-    backends: ["fock"],
+    backends: ["fock", "bosonic"],
     tip: "CX：受控 X 门（Fock qudit 编码），weight 为耦合强度",
     params: { weight: { min: -2, max: 2, step: 0.01, def: 1 } },
   },
   mach_zehnder: {
     label: "马赫-曾德尔",
     kind: "two",
-    backends: ["fock"],
+    backends: ["fock", "bosonic"],
     tip: "马赫-曾德尔：两分束器夹相移，可编程干涉仪（Fock IR 名 mach_zehnder）",
     params: {
       theta: { min: 0, max: Math.PI, step: 0.01, def: Math.PI / 4 },
@@ -170,7 +173,7 @@ export const OPS = {
     label: "相位噪声",
     kind: "single",
     channel: true,
-    backends: ["fock"],
+    backends: ["fock", "bosonic"],
     tip: "相位噪声：σ 强度的高斯相位噪声通道（转密度态）",
     params: { sigma: { min: 0, max: 5, step: 0.01, def: 0 } },
   },
@@ -180,6 +183,32 @@ export const OPS = {
     measure: true,
     backends: ["fock"],
     tip: "光子数分辨测量：投影到光子数基，按序坍缩并移除被测模",
+    params: { name: { string: true, def: "", optional: true } },
+  },
+  /* ── Bosonic-only (B6, mirrors ir.py BOSONIC_WHITELIST) ───── */
+  interferometer: {
+    label: "干涉仪",
+    kind: "two",
+    palette: false, // 矩阵参数 JSON-only（类比 Fock apply_unitary defer）
+    backends: ["bosonic"],
+    tip: "干涉仪：任意酉 U 矩阵（JSON-only，面板不编辑）",
+    params: {},
+  },
+  gaussian_channel: {
+    label: "高斯通道",
+    kind: "single",
+    channel: true,
+    palette: false, // X/Y/d 矩阵参数 JSON-only
+    backends: ["bosonic"],
+    tip: "高斯通道：一般 (X,Y,d) CPTP 通道（JSON-only，面板不编辑）",
+    params: {},
+  },
+  measure_threshold: {
+    label: "阈值测量",
+    kind: "single",
+    measure: true,
+    backends: ["bosonic"],
+    tip: "阈值测量：单光子存在探测（on/off），返回 0/1，不删模",
     params: { name: { string: true, def: "", optional: true } },
   },
 };
@@ -461,6 +490,12 @@ export function toV1Json(state) {
   // F7 extensions: backend 缺省 gaussian（不写 = 旧文件字节不变）；
   // initial 非全零才写；cutoff 非默认（全 10）才写，均匀写 int 否则 list。
   if (state.backend === "fock") outDoc.backend = "fock";
+  if (state.backend === "bosonic") outDoc.backend = "bosonic";
+  // B6: bosonic per-mode 态名（非全真空才写；缺省不写 = 真空）
+  if (state.backend === "bosonic" && Array.isArray(state.initial)
+      && state.initial.slice(0, nmode).some((v) => v !== null)) {
+    outDoc.initial = state.initial.slice(0, nmode);
+  }
   const v = state.view && typeof state.view === "object" ? state.view : {};
   outDoc.view = { wigner_mode: v.wigner_mode, lim: v.lim, n: v.n };
   if (Array.isArray(v.joint_modes) && v.joint_modes.length === 2) {

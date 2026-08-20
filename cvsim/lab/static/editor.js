@@ -115,16 +115,24 @@ export function stateFromJson(payload) {
 function parseExtensions(payload, nmode) {
   let backend = "gaussian";
   if (payload.backend !== undefined) {
-    if (payload.backend !== "gaussian" && payload.backend !== "fock") {
-      return { error: "backend 必须是 gaussian 或 fock" };
+    if (payload.backend !== "gaussian" && payload.backend !== "fock"
+        && payload.backend !== "bosonic") {
+      return { error: "backend 必须是 gaussian、fock 或 bosonic" };
     }
     backend = payload.backend;
   }
   let initial = null;
   if (payload.initial !== undefined && payload.initial !== null) {
-    if (!Array.isArray(payload.initial) || payload.initial.length !== nmode
-        || payload.initial.some((n) => !Number.isInteger(n) || n < 0)) {
-      return { error: `initial 必须是 ${nmode} 个非负整数` };
+    if (!Array.isArray(payload.initial) || payload.initial.length !== nmode) {
+      return { error: `initial 必须是长度为 ${nmode} 的数组` };
+    }
+    const bad = payload.initial.some((n) =>
+      backend === "fock" ? (!Number.isInteger(n) || n < 0)
+      : !(n === null || n === "gkp0" || n === "gkp1"));
+    if (bad) {
+      return { error: backend === "fock"
+        ? `initial 必须是 ${nmode} 个非负整数`
+        : `initial 每项只能是 null / gkp0 / gkp1` };
     }
     initial = [...payload.initial];
   }
@@ -205,7 +213,12 @@ function stateFromV1(payload) {
       ? { ...(V1_TO_UI_PARAM[uiOp] || {}), ...(FOCK_V1_TO_UI_PARAM[uiOp] || {}) }
       : (V1_TO_UI_PARAM[uiOp] || {});
     const params = { ...o.params };
-    if (uiOp === "displace" && Array.isArray(params.alpha)) {
+    const isBosonic = payload.backend === "bosonic";
+    if (uiOp === "displace" && isBosonic && params.alpha
+        && typeof params.alpha === "object" && !Array.isArray(params.alpha)) {
+      // B6: bosonic feedforward — alpha is {$ref, gain} object, kept verbatim
+      node.params.alpha = { ...params.alpha };
+    } else if (uiOp === "displace" && Array.isArray(params.alpha)) {
       // v1 alpha is [re, im]; the UI slider controls the real part only
       params.alpha = typeof params.alpha[0] === "number" ? params.alpha[0] : NaN;
     }
@@ -222,6 +235,10 @@ function stateFromV1(payload) {
         }
         node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
         continue;
+      }
+      if (isBosonic && uiOp === "displace" && k === "alpha"
+          && node.params.alpha && typeof node.params.alpha === "object") {
+        continue; // feedforward object already preserved above
       }
       if (typeof v !== "number" || !Number.isFinite(v)) {
         return { error: `ops[${i}].params.${k} 必须是有限数值` };
@@ -530,6 +547,14 @@ export function initEditor(root, hooks) {
       if (nm >= 2 && !Array.isArray(view.joint_modes)) {
         view = { ...view, joint_modes: [0, 1] }; // HOM 剧本：joint 卡默认开
       }
+    } else if (next === "bosonic") {
+      if (!nodes.some((n) => n.op === "vacuum")) {
+        let vid = "vac0";
+        for (let k = 1; nodes.some((n) => n.id === vid); k++) vid = "vac" + k;
+        nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
+      }
+      const nm = sourceModes(nodes);
+      initial = padTo(initial, nm, null); // B6: per-mode GKP 源名（真空）
     }
     state = { ...state, backend: next, nodes, view, initial, cutoffs };
     render();
@@ -549,14 +574,17 @@ export function initEditor(root, hooks) {
       nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
     }
     const nm = sourceModes(nodes);
+    const fill = state.backend === "bosonic" ? null : 0;
     state = { ...state, nodes,
-      initial: padTo(state.initial, nm, 0), cutoffs: padTo(state.cutoffs, nm, 10) };
+      initial: padTo(state.initial, nm, fill), cutoffs: padTo(state.cutoffs, nm, 10) };
     render();
   }
 
   function setInitial(i, v) {
     const nm = sourceModes(state.nodes);
-    const next = Array(nm).fill(0).map((_, k) => (state.initial ? state.initial[k] : 0));
+    const fill = state.backend === "bosonic" ? null : 0;
+    const next = Array(nm).fill(fill).map((_, k) =>
+      (state.initial ? state.initial[k] : fill));
     next[i] = v;
     pushHistory();
     state = { ...state, initial: next };
@@ -565,13 +593,51 @@ export function initEditor(root, hooks) {
     emit(toV1Json(state), "graph");
   }
 
+  /* B6: bosonic 初始态 = 每模 GKP 源选择（真空/gkp0/gkp1；缺省真空） */
+  function renderBosonicInitial() {
+    const nm = sourceModes(state.nodes);
+    const initial = state.initial;
+    if (dom.initialInputs.dataset.nmode === String(nm)) return;
+    dom.initialInputs.dataset.nmode = String(nm);
+    dom.initialInputs.replaceChildren();
+    for (let i = 0; i < nm; i++) {
+      const wrap = document.createElement("label");
+      wrap.className = "param";
+      const lab = document.createElement("span");
+      lab.className = "param__name mono";
+      lab.textContent = `mode ${i}`;
+      const sel = document.createElement("select");
+      sel.className = "select mono";
+      const cur = initial ? initial[i] : null;
+      for (const [val, text] of [[null, "真空"], ["gkp0", "gkp0"], ["gkp1", "gkp1"]]) {
+        const opt = document.createElement("option");
+        opt.value = val === null ? "" : val;
+        opt.textContent = text;
+        if (val === cur) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      sel.addEventListener("change", () => {
+        const v = sel.value === "" ? null : sel.value;
+        setInitial(i, v);
+      });
+      wrap.append(lab, sel);
+      dom.initialInputs.appendChild(wrap);
+    }
+  }
+
   function renderFockControls() {
     const fock = state.backend === "fock";
+    const bosonic = state.backend === "bosonic";
     if (dom.addModeBtn) dom.addModeBtn.hidden = !fock;
+    if (fock === bosonic && !fock) { // neither
+      if (dom.backendSelect) dom.backendSelect.value = state.backend;
+      if (dom.initialCard) { dom.initialCard.hidden = true; dom.initialInputs.dataset.nmode = ""; dom.initialInputs.replaceChildren(); }
+      return;
+    }
     if (dom.backendSelect) dom.backendSelect.value = state.backend;
     if (!dom.initialCard) return;
-    dom.initialCard.hidden = !fock;
-    if (!fock) { dom.initialInputs.replaceChildren(); return; }
+    dom.initialCard.hidden = false;
+    if (bosonic) { renderBosonicInitial(); return; }
     const nm = sourceModes(state.nodes);
     const cutoffs = state.cutoffs;
     const initial = state.initial;

@@ -11,9 +11,9 @@ import {
 } from "../cvsim/lab/static/ops.js";
 import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
 
-const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze", "kerr", "cz", "cx", "mach_zehnder", "phase_noise", "measure_pnr"];
+const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze", "kerr", "cz", "cx", "mach_zehnder", "phase_noise", "measure_pnr", "interferometer", "gaussian_channel", "measure_threshold"];
 
-test("ops metadata: 20 ops (tmsv/coherent kept for JSON compat, palette:false)", () => {
+test("ops metadata: 23 ops (B6 +3 bosonic JSON-only / threshold) (tmsv/coherent kept for JSON compat, palette:false)", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
   assert.equal(OPS.tmsv.palette, false); // legacy source: loadable, not in palette
   assert.equal(OPS.coherent.palette, false); // L5.5: unified into vacuum + displace gate
@@ -43,22 +43,28 @@ test("UX: opGroup — source/gate/channel/measure, palette:false → null", () =
   assert.equal(opGroup("nope"), null);
 });
 
-test("F7: backends metadata — per-backend palette tables", () => {
+test("F7/B6: backends metadata — per-backend palette tables", () => {
   // gaussian-only
-  assert.deepEqual(OPS.fourier.backends, ["gaussian"]);
   assert.deepEqual(OPS.vacuum.backends, ["gaussian"]);
   assert.deepEqual(OPS.mz.backends, ["gaussian"]);
   // fock-only
   assert.deepEqual(OPS.kerr.backends, ["fock"]);
-  assert.deepEqual(OPS.cz.backends, ["fock"]);
-  assert.deepEqual(OPS.cx.backends, ["fock"]);
   assert.deepEqual(OPS.measure_pnr.backends, ["fock"]);
-  assert.deepEqual(OPS.mach_zehnder.backends, ["fock"]);
-  assert.deepEqual(OPS.phase_noise.backends, ["fock"]);
-  // shared
-  assert.deepEqual(OPS.displace.backends, ["gaussian", "fock"]);
-  assert.deepEqual(OPS.beamsplitter.backends, ["gaussian", "fock"]);
-  assert.deepEqual(OPS.homodyne.backends, ["gaussian", "fock"]);
+  // bosonic-only
+  assert.deepEqual(OPS.interferometer.backends, ["bosonic"]);
+  assert.deepEqual(OPS.gaussian_channel.backends, ["bosonic"]);
+  assert.deepEqual(OPS.measure_threshold.backends, ["bosonic"]);
+  // gaussian + bosonic
+  assert.deepEqual(OPS.fourier.backends, ["gaussian", "bosonic"]);
+  // fock + bosonic（cz/cx/phase_noise/mach_zehnder 亦 bosonic）
+  assert.deepEqual(OPS.cz.backends, ["fock", "bosonic"]);
+  assert.deepEqual(OPS.cx.backends, ["fock", "bosonic"]);
+  assert.deepEqual(OPS.phase_noise.backends, ["fock", "bosonic"]);
+  assert.deepEqual(OPS.mach_zehnder.backends, ["fock", "bosonic"]);
+  // shared three-backend
+  assert.deepEqual(OPS.displace.backends, ["gaussian", "fock", "bosonic"]);
+  assert.deepEqual(OPS.beamsplitter.backends, ["gaussian", "fock", "bosonic"]);
+  assert.deepEqual(OPS.homodyne.backends, ["gaussian", "fock", "bosonic"]);
   // every op declares its backend table
   for (const op of OP_NAMES) {
     assert.ok(Array.isArray(OPS[op].backends) && OPS[op].backends.length > 0, `${op} 缺 backends`);
@@ -360,7 +366,8 @@ test("OCR guards: clamp, unknown keys", () => {
   assert.equal(updateParam(nodes[0], "T", NaN).params.T, 0.8);
   assert.equal(updateParam(nodes[0], "nope", 1).params.T, 0.8);
   // unknown op rejected
-  assert.throws(() => paramsFromOp("interferometer"), TypeError);
+  assert.throws(() => paramsFromOp("even_cat"), TypeError);
+  assert.throws(() => paramsFromOp("zzz_unknown"), TypeError);
 });
 
 test("OCR guards: id collision after import, proto keys, dup ids", () => {
@@ -425,7 +432,7 @@ test("L3: homodyne visible with phi default 0 / max TAU", () => {
   assert.equal(OPS.homodyne.kind, "single");
   assert.equal(OPS.homodyne.params.phi.def, 0);
   assert.equal(OPS.homodyne.params.phi.max, TAU);
-  assert.deepEqual(paramsFromOp("homodyne"), { phi: 0 });
+  assert.deepEqual(paramsFromOp("homodyne"), { phi: 0, name: "" });
   const node = addNode([], "homodyne");
   assert.equal(node[0].mode, 0);
   assert.equal(node[0].params.phi, 0);
@@ -764,7 +771,12 @@ test("F7: stateFromJson — backend/initial/cutoff 解析 + 校验", () => {
   const pl = stateFromJson({ ...base, backend: "fock", cutoff: [10, 14] });
   assert.deepEqual(pl.state.cutoffs, [10, 14]);
   // 非法值
-  assert.ok(stateFromJson({ ...base, backend: "bosonic" }).error);
+  // B6: bosonic 合法（initial 为 GKP 态名/null；非法值拒收）
+  const bo = stateFromJson({ ...base, backend: "bosonic", initial: ["gkp0", null] });
+  assert.equal(bo.error, undefined);
+  assert.equal(bo.state.backend, "bosonic");
+  assert.deepEqual(bo.state.initial, ["gkp0", null]);
+  assert.ok(stateFromJson({ ...base, backend: "bosonic", initial: ["even_cat", null] }).error); // 未知态名
   assert.ok(stateFromJson({ ...base, initial: [1] }).error); // 长度不符
   assert.ok(stateFromJson({ ...base, initial: [1, -1] }).error);
   assert.ok(stateFromJson({ ...base, cutoff: 0 }).error);

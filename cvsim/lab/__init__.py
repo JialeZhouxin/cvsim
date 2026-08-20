@@ -13,7 +13,9 @@ from cvsim.lab.ir import (
     RunResult,
     View,
     batch_fock_circuit,
+    fidelity_sweep,
     load_circuit,
+    run_bosonic_circuit,
     run_circuit,
     run_fock_circuit,
     sample_circuit,
@@ -33,5 +35,7 @@ __all__ = [
     "scan_circuit",
     "run_fock_circuit",
     "batch_fock_circuit",
+    "run_bosonic_circuit",
+    "fidelity_sweep",
     "translate_v0",
 ]

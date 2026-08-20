@@ -19,7 +19,9 @@ from cvsim.lab import (
     CircuitV0Error,
     RunResult,
     batch_fock_circuit,
+    fidelity_sweep,
     load_circuit,
+    run_bosonic_circuit,
     run_circuit,
     run_fock_circuit,
     sample_circuit,
@@ -71,12 +73,19 @@ def _payload(
 @app.post("/run")
 def run(body: dict[str, Any]) -> dict[str, Any]:
     try:
+        detail = body.pop("detail", None) if isinstance(body, dict) else None
         circuit = load_circuit(body)
         if circuit.backend == "fock":
             # deterministic per circuit (seed field, default 0): same JSON
             # → same run (incl. measured outcomes) — reproducible meters
             return run_fock_circuit(
                 circuit, np.random.default_rng(circuit.seed)
+            )
+        if circuit.backend == "bosonic":
+            return run_bosonic_circuit(
+                circuit,
+                np.random.default_rng(circuit.seed),
+                steps=(detail == "steps"),
             )
         result = run_circuit(circuit)
     except (CircuitV0Error, ValueError) as e:
@@ -93,6 +102,13 @@ def sample(body: dict[str, Any]) -> dict[str, Any]:
         circuit = load_circuit(body)
         if circuit.backend == "fock":
             payload = run_fock_circuit(
+                circuit, np.random.default_rng(circuit.seed)
+            )
+            payload["seed"] = circuit.seed
+            payload["sampled"] = True
+            return payload
+        if circuit.backend == "bosonic":
+            payload = run_bosonic_circuit(
                 circuit, np.random.default_rng(circuit.seed)
             )
             payload["seed"] = circuit.seed
@@ -148,6 +164,29 @@ def scan(body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(sweep, dict):
             raise CircuitV0Error("sweep must be an object")
         return scan_circuit(circuit, sweep)
+    except (CircuitV0Error, ValueError) as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+@app.post("/fidelity")
+def fidelity(body: dict[str, Any]) -> dict[str, Any]:
+    """B6: Bosonic fidelity-vs-param sweep (GKP QEC γ curve).
+
+    Body = circuit (bosonic) + ``sweep`` segment + ``seed`` + ``rounds``. Unlike
+    ``/scan`` (pure E_N), this path is stochastic (homodyne + feedforward), so
+    each point is a seeded run; ``rounds>1`` averages seeds. Gaussian/Fock
+    backend → 422.
+    """
+    try:
+        sweep = body.pop("sweep", None)
+        rounds = body.pop("rounds", 1)
+        circuit = load_circuit(body)
+        if circuit.backend != "bosonic":
+            raise CircuitV0Error(
+                "fidelity sweep requires backend='bosonic'"
+            )
+        if not isinstance(sweep, dict):
+            raise CircuitV0Error("sweep must be an object")
+        return fidelity_sweep(circuit, sweep, seed=circuit.seed, rounds=rounds)
     except (CircuitV0Error, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
