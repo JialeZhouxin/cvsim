@@ -6,7 +6,7 @@
 
 ## Overview
 
-The lab uses **Hallmark Cobalt** (genre `modern-minimal` · macrostructure `Workbench` · theme `Cobalt` · nav `N1a minimal` · footer `Ft2 inline`). The theme is **offline-substituted**: zero CDN, system font stacks only (Space Grotesk → Bahnschrift, JetBrains Mono → Cascadia Code). All design values live as `:root` custom properties in `tokens.css`; `style.css` only references them.
+The lab uses the **Dark Scope** theme — dark instrument-panel style (oscilloscope/lab-gear aesthetic), replacing the former Hallmark Cobalt light theme. The theme is **offline-substituted**: zero CDN, system font stacks only (Space Grotesk → Bahnschrift, JetBrains Mono → Cascadia Code). All design values live as `:root` custom properties in `tokens.css`; `style.css` only references them.
 
 ---
 
@@ -14,16 +14,17 @@ The lab uses **Hallmark Cobalt** (genre `modern-minimal` · macrostructure `Work
 
 | Decision | Value | Reason |
 |----------|-------|--------|
-| Panels | Containerized `.panel` (border + `paper-2` + radius + `--space-md` pad) | Gestalt grouping: three columns read as blocks |
+| Panels | Containerized `.panel` (border + `paper-2` + radius + `--space-md` pad); dark theme inverts depth — `paper > paper-2 > paper-3` go **darker** (recessed instrument slots, not raised cards) | Gestalt grouping: three columns read as blocks; brightness (not border) carries the hierarchy |
 | Toolbar | `btn-group` clusters + vertical separators, run group right-pinned | Hick's/Proximity; min-content of a cluster must stay under the column width (`minmax(0,1fr)` grid) or the panel overflows the viewport and hit-testing breaks |
 | Fock cards | 2-column grid, joint card spans full width | Less vertical stacking = less scrolling |
-| Color space | OKLCH everywhere | Perceptual uniformity; tune neutrals via one hue (250°) |
-| Neutrals | Cool, tinted 250° (paper → ink, L→D) | Cool-white paper suits data/dark-heatmap work |
-| Accent | Electric cobalt `oklch(55% 0.19 260)` | Theme identity; focus reuses accent |
+| Color space | OKLCH everywhere | Perceptual uniformity; tune neutrals via one hue (240°) |
+| Neutrals | Dark, cool-tinted 240° (paper L17% → ink L92%), low-chroma | Dark scope reads like an instrument face; inferno heatmap glows on deep backgrounds |
+| Accent | Electric cobalt `oklch(72% 0.18 255)` — brightened vs light theme so it reads as an "operation lamp" on dark | Theme identity; focus reuses accent |
 | Axis overlay | Ice-cyan `oklch(85% 0.09 210)` | Complementary to the inferno LUT — inferno has no cyan, so the axis never fights the heatmap |
 | Type system | 2+1: display / body / mono | Body = Segoe UI stack; mono only for JSON, tables, meters (tabular-nums) |
 | Scale | Major third 1.25, max 5 sizes (`--text-xs`…`--text-lg`) | No 6th size; if a component "needs" one, the layout is wrong |
 | Spacing | 4pt scale (`--space-xs`…`--space-3xl`) | `--space-md` (0.75rem) is the default gap |
+| Controls | `.btn` / `.select` / `.input` share one height `--control-h` (2rem) | Same-row controls sit in one instrument slot; textarea (multi-line) and palette drag chips are excluded |
 | Motion | Durations `instant/micro/short/med` (0/90/150/240ms) + 3 eases | Default: `--dur-micro` + `--ease-out` |
 | Elevation | Single `--shadow-1` | One level is enough for a workbench surface |
 
@@ -36,6 +37,7 @@ The lab uses **Hallmark Cobalt** (genre `modern-minimal` · macrostructure `Work
 | Type scale | `--text-xs`…`--text-lg` | Base `1rem`; labels/notes `--text-sm` or `--text-xs` |
 | Spacing | `--space-xs`…`--space-3xl` | No raw `px`/`rem` spacing values in `style.css` |
 | Radii | `--radius-sm` (4px), `--radius-md` (6px) | md = cards/frames/inputs; sm = pills/tags |
+| Controls | `--control-h` (2rem) | btns/selects/inputs share one height; textarea & drag chips exempt |
 | Motion | `--dur-*`, `--ease-*` | Transitions only; hover states use `--dur-micro` |
 | Elevation | `--shadow-1` | Cards/frames that need separation |
 
@@ -73,6 +75,10 @@ In `tests/lab_scan_probe.mjs` (headless Edge CDP, zero-dep):
 - scrollbar check at ≥1280 — in the folded default view, no panel may exceed its column (`scrollHeight > clientHeight`)
 - reset column scroll between widths: panel `scrollTop` survives width switches and skews hit-test coordinates
 
+In `tests/lab_control_height_probe.mjs` (headless Edge CDP, zero-dep):
+
+- every **visible** `.btn` / `.select` / `.input` computes to exactly one height value (the `--control-h` slot); a second unique height fails the probe
+
 ---
 
 ## Anti-Patterns
@@ -81,7 +87,7 @@ In `tests/lab_scan_probe.mjs` (headless Edge CDP, zero-dep):
 - New token per component ("one-off" tokens) — reuse the scale instead
 - A 6th type size or 5pt spacing step "just for this component"
 - Referencing `tokens.css` values in JS instead of reading `getComputedStyle` (see `app.js` axis/rule color reads)
-- Copying Hallmark token values into another theme without re-auditing the axis/LUT pairing (heatmap colors are physics-adjacent, not decorative)
+- Copying token values from another theme without re-auditing the axis/LUT pairing (heatmap colors are physics-adjacent, not decorative)
 
 ---
 

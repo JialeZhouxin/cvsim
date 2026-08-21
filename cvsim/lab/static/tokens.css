@@ -49,6 +49,9 @@
   --radius-sm: 4px;
   --radius-md: 6px;
 
+  /* controls — unified interactive slot height (btn/select/input 同高) */
+  --control-h: 2rem;
+
   /* motion */
   --dur-instant: 0ms;
   --dur-micro: 90ms;
