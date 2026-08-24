@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 60
+- **Total Sessions**: 61
 - **Last Active**: 2026-08-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~139 | Active |
+| `journal-2.md` | ~199 | Active |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 61 | 2026-08-24 | Lab Gaussian 执行路径统一——删 _apply 13 分支 dispatch | `bafc534` | `master` |
 | 60 | 2026-08-24 | Bosonic B6 GUI 任务清账 + 基线复验 1147 绿 | `17d9073` | `master` |
 | 59 | 2026-08-19 | Bosonic B5 BosonicCircuit 电路 DSL——circuit_v1 第三消费者 | `125aae4` | `master` |
 | 58 | 2026-08-18 | Bosonic B4 调和对账——purity/pure_fidelity 闭式 + R1 分层套件 | `d96fa3a` | `master` |

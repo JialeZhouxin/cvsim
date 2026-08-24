@@ -137,3 +137,63 @@ B5 完成：BosonicCircuit 三件套（builder + compile + ir）镜像 Gaussian�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 61: Lab Gaussian 执行路径统一——删 _apply 13 分支 dispatch
+
+**Date**: 2026-08-24
+**Task**: Lab Gaussian 执行路径统一——删 _apply 13 分支 dispatch
+**Branch**: `master`
+
+### Summary
+
+Session summary was not supplied.
+
+### Main Changes
+
+## 改动
+`cvsim/lab/ir.py`（+154/-143，1 文件）——删 `_apply` 13 分支非测量 dispatch + `_logical_phys`/`_remove_phys`/`_state_after`，统一执行路径到 `GaussianCircuit.from_ir().compile()` 的 `_segments` 遍历。
+
+## 决策（grilling Q1-Q6 全 A）
+- Q1=A Lab 保留 mean path（`/run` 确定性），非测量 op 交编译合并段
+- Q2=A 测量 op（homodyne/heterodyne）留 Lab 自家路径 + entry 元信息
+- Q3=A1 Lab 遍历 `compiled._segments`，merged 调 `_apply_merged`，测量走自家（接受访问私有 `_segments`）
+- Q4=A scan 路径统一 `GaussianCircuit`，用 symbolic param `$param`，删 `_state_after`
+- Q5=A `_meters`/`_build_result` 留 Lab，不动结果组装胶水
+- Q6=C Gaussian Lab 不支持 threshold，保持报错
+
+## 语义保真
+- homodyne 删模、heterodyne 不删模（镜像 `gaussian/compile.py:_run_op`）
+- `measured` entry 结构不变（op/mode/phi/outcome，前端 app.js + 6 测试断言）
+- scan 纯函数无 RNG，symbolic param 绑定 = 原替换值，输出数值不变
+- Lab 特有校验保留：amplifier modes=[] 拒绝、通道 op 必填参数（`_LAB_REQUIRED_PARAMS`，不允许 core defaults）
+
+## 验证
+- 全量 pytest：**1147 passed / 4 skipped / 3 warnings**（171.66s，零回归）
+- ruff：clean
+- mypy：lab/ir.py 9 错（旧版 16，减少；无新类别，全是既有 `core: CircuitV1|None` union-attr / `safe` untyped / fock generic 技术债）
+
+## 架构收益
+Gaussian Lab 不再重复 `gaussian/circuit.py` 的 op dispatch；新后端加法从"抄一份 dispatch + 胶水"降为"写结果组装"。`circuit_common` 已是真深度（三表示继承 `CompiledCircuit`），Lab 现也坐上这趟车。
+
+## 残留
+- bafc534 archive auto-commit 把 lab/ir.py 代码与任务归档混在一起（commit message `chore(task): archive` 含 feat 代码），未拆分。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bafc534` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
