@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/cvsim/index.md", "reason": "cvsim 三表示契约入口——B6 backend 路由/公共面/测试规范"}
+{"file": ".trellis/spec/cvsim/bosonic.md", "reason": "Bosonic 可执行契约——IR initial 升级/双 V fidelity/steps/Lab 解锁（§6.4 新增）"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端质量网关——palette/panel/step UI 规范"}
+{"file": ".trellis/spec/frontend/design-system.md", "reason": "前端设计系统——visual consistency（B6 三面板复用）"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "前端状态管理——step execution/probe 契约"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Lab server 422 契约——新端点 /fidelity 错误面"}
+{"file": ".trellis/spec/backend/scan-api.md", "reason": "/scan 现有契约——/fidelity sweep 参考 + 不复用纯函数理由"}
