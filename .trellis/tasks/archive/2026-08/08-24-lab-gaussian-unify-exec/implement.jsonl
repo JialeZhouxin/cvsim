@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `py -3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/cvsim/index.md", "reason": "导入边界硬约束"}
+{"file": ".trellis/spec/backend/scan-api.md", "reason": "scan 契约不可破"}
+{"file": "docs/adr/0001-cvsim-module-boundaries.md", "reason": "模块边界契约"}
