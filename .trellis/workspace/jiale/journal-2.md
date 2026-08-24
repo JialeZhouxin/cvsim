@@ -104,3 +104,36 @@ B5 完成：BosonicCircuit 三件套（builder + compile + ir）镜像 Gaussian�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 60: Bosonic B6 GUI 任务清账 + 基线复验 1147 绿
+
+**Date**: 2026-08-24
+**Task**: Bosonic B6 GUI 任务清账 + 基线复验 1147 绿
+**Branch**: `master`
+
+### Summary
+
+全套 pytest 1147 passed/4 skipped/6 warnings (249.65s)。B6 任务收尾：task.json 补 commit=f3f2848 + completedAt；start→finish→archive；auto-commit 17d9073。active tasks=0。B0-B6 done，B7 bridges+tutorials 为下一开放项。
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `17d9073` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
