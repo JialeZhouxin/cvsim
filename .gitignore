@@ -14,3 +14,38 @@ build/
 
 # headless probe artifacts
 .probe-*/
+
+# AI/Trellis tooling (not part of the simulator)
+.trellis/
+.agents/
+.pi/
+.pi-loop.json
+.claude/
+.reasonix/
+.workbuddy/
+.hallmark
+
+# internal notes / personal context (not part of the simulator)
+CONTEXT.md
+user-model.md
+AGENTS.md
+00-CV核心原理.md
+00-CV核心原理.html
+01-Fock表示原理.md
+01-Fock表示原理.html
+02-Gaussian表示原理.md
+02-Gaussian表示原理.html
+03-Bosonic表示原理.md
+03-Bosonic表示原理.html
+04-Fock四问详解与Gaussian模拟器原理.md
+04-Fock四问详解与Gaussian模拟器原理.html
+术语表.md
+术语表.html
+README.html
+overview.md
+nul
+pytest-full.log
+.control-height.png
+.pi-loop.json.lock
+.pi-subagents/
+

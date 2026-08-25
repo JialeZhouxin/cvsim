@@ -1,4 +1,0 @@
-{"file": "cvsim/gaussian/observables.py", "reason": "G sample + mean/var"}
-{"file": "cvsim/bosonic/observables.py", "reason": "B mixture sample"}
-{"file": "cvsim/bosonic/cat.py", "reason": "cat dual peaks"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "contract"}

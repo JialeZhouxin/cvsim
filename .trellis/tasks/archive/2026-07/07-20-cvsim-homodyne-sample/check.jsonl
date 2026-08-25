@@ -1,4 +1,0 @@
-{"file": ".trellis/tasks/07-20-cvsim-homodyne-sample/prd.md", "reason": "AC-S*"}
-{"file": ".trellis/tasks/07-20-cvsim-homodyne-sample/design.md", "reason": "mixture rule"}
-{"file": "cvsim/gaussian/observables.py", "reason": "edge moments"}
-{"file": "cvsim/bosonic/cat.py", "reason": "diag peaks"}

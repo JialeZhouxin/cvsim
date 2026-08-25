@@ -1,5 +1,0 @@
-{"file": "cvsim/fock/observables.py", "reason": "sample reuse + condition"}
-{"file": "cvsim/fock/__init__.py", "reason": "export"}
-{"file": "tests/test_fock_homodyne.py", "reason": "baseline"}
-{"file": "cvsim/gaussian/observables.py", "reason": "API mirror"}
-{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}

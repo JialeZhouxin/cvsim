@@ -1,5 +1,0 @@
-{"file": "docs/vision-fock-simulator.md", "reason": "检查项：3 条退出判据是否全覆盖（atol 1e-7 套件 / threshold+PNR 双表示一致 / 双表示教程对账）"}
-{"file": "cvsim/bridge.py", "reason": "检查项：零新公开 API（现有面足够）；泄漏纪律（never-silent reject 规则）落地为测试断言"}
-{"file": "tests/test_bridge.py", "reason": "检查项：F5 套件与既有 25 测试不重复、风格一致、atol 基准对齐"}
-{"file": "tutorials/_build_05.py", "reason": "检查项：notebook 生成模式一致性；公共 API-only（无 dq/DeepQuantum）"}
-{"file": "tests/test_public_api.py", "reason": "检查项：FOCK_PUBLIC 冻结零改动（bridge 顶层、fock 包零改动）"}

@@ -1,2 +1,0 @@
-[ocr] Summary: 5 file(s) reviewed, 0 comment(s), ~2250260 token(s) used (input: ~2204914, output: ~45346), cache(read: ~1662336, write: ~0), 10m1s elapsed
-Review partially complete: 0 finding(s); 4 of 5 selected item(s) failed.

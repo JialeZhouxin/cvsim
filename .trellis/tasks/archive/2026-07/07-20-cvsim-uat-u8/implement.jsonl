@@ -1,4 +1,0 @@
-{"file": "cvsim/demos/user_acceptance.py", "reason": "add U8"}
-{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "docs"}
-{"file": "cvsim/bosonic/observables.py", "reason": "condition+sample API"}
-{"file": "cvsim/fock/channels.py", "reason": "fock loss API"}

@@ -1,2 +1,0 @@
-{"file": ".trellis/tasks/07-28-tutorial-gaussian-circuit-l34/prd.md", "reason": "Acceptance criteria: build ok, run all ok, plots show, API updated"}
-{"file": "tutorials/_build_notebooks.py", "reason": "Check: notebook cells render correctly in Jupyter"}

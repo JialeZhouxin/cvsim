@@ -1,6 +1,0 @@
-{"file": "cvsim/fock/observables.py", "reason": "mean var sample"}
-{"file": "cvsim/fock/gates.py", "reason": "annihilation a"}
-{"file": "cvsim/fock/__init__.py", "reason": "export"}
-{"file": "cvsim/gaussian/observables.py", "reason": "G align numbers"}
-{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}
-{"file": "cvsim/README.md", "reason": "matrix"}

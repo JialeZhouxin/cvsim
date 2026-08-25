@@ -1,5 +1,0 @@
-[bug · medium] range.min/max set as strings; num input also missing min/max. range.value then
-[other · low] num.value = v before clamping; v only ever reaches updateParam via input events, so
-[bug · medium] Two-mode gate: modeB < modeA possible. completePlacing only rejects modeB === modeA,
-[bug · medium] Drop x = (e.clientX - grid.left - SRC_W) / GATE_W — rarely integer.
-[maintainability · low] onOpen declared in api contract but never invoked anywhere in file. Dead

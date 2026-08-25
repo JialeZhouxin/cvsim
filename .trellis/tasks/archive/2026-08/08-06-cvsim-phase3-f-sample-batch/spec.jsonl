@@ -1,1 +1,0 @@
-{"file": "docs/api-stability.md", "reason": "sample_batch 是 api-stability §2.2 thin/may grow 新条目; 现有 sample 函数返回类型冻结"}

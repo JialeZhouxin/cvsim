@@ -1,4 +1,0 @@
-[ocr]   ✘ file_read failed: file "cvsim/lab/static/tokens.cssอโಣಾ" not found: git show b007e47:cvsim/lab/static/tokens.cssอโಣಾ: exit status 128: fatal: path 'cvsim/lab/static/tokens.cssอโಣಾ' does not exist in 'b007e47'
-
-[ocr] Summary: 2 file(s) reviewed, 0 comment(s), ~77673 token(s) used (input: ~73429, output: ~4244), 1m20s elapsed
-Review complete: 0 finding(s) across 2 selected item(s).

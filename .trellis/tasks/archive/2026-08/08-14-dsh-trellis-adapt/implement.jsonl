@@ -1,3 +1,0 @@
-{"file": ".trellis/spec/guides/index.md", "reason": "cross-package thinking guides — 本任务跨 DSH 插件/技能/工作流三面，先读指南"}
-{"file": ".trellis/spec/backend/index.md", "reason": "backend 层规范索引 — 插件为 JS/Node 后端组件，走其质量与错误处理约定"}
-{"file": ".trellis/workflow.md", "reason": "workflow-state 面包屑契约 — 插件注入块的单源（[workflow-state:STATUS] 标签语义）"}

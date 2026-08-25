@@ -1,8 +1,0 @@
-{"file": ".trellis/spec/backend/directory-structure.md", "reason": "新建 cvsim/ 包时对齐目录与模块边界约定"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "实现与自检脚本的质量底线"}
-{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "三表示共享 conventions，避免过早抽象 Circuit"}
-{"file": "README.md", "reason": "MVP 硬验收 = 最小闭环四步"}
-{"file": "术语表.md", "reason": "ħ=1、正交序、真空约定"}
-{"file": "02-Gaussian表示原理.md", "reason": "M1 辛更新与 det V / 纯态条件"}
-{"file": "04-Fock四问详解与Gaussian模拟器原理.md", "reason": "三表示四问、挤压公式、cutoff 经验"}
-{"file": "03-Bosonic表示原理.md", "reason": "M3 cat 四组件与权重结构"}

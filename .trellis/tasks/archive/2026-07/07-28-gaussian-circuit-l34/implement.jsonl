@@ -1,6 +1,0 @@
-{"file": ".trellis/tasks/07-28-gaussian-circuit-l34/prd.md", "reason": "PRD with requirements and acceptance criteria"}
-{"file": "cvsim/gaussian/circuit.py", "reason": "Reference: existing L2 GaussianCircuit implementation to extend"}
-{"file": "cvsim/gaussian/gates.py", "reason": "Reference: displace gate signature for ParamRef compatibility"}
-{"file": "cvsim/gaussian/observables.py", "reason": "Reference: homodyne_sample_and_condition for measurement impl"}
-{"file": "cvsim/gaussian/state.py", "reason": "Reference: GaussianState internals for mode removal helper"}
-{"file": "cvsim/symplectic.py", "reason": "Reference: d_displace for displacement via affine map (ParamRef → real at run time)"}

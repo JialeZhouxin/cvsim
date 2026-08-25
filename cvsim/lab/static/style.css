@@ -639,21 +639,31 @@ body {
   overflow: auto;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-md);
-  background: var(--color-paper-2);
+  /* ghost graticule fills the whole surface: vertical cell rules + dimmed
+     wires continue past the last real lane (real rows overlay the brighter
+     wire at the same y via .staff__row::before). Rhythm coupled to
+     ROW_H = 44 in staff.js — change both together. */
+  background-color: var(--color-paper-2);
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 21.5px,
+      color-mix(in srgb, var(--color-rule) 30%, transparent) 21.5px 22.5px,
+      transparent 22.5px 44px
+    ),
+    repeating-linear-gradient(
+      to right,
+      transparent 0 71px,
+      color-mix(in srgb, var(--color-rule) 80%, transparent) 71px 72px
+    );
+  background-position-x: 0, 132px;
   outline: none;
   position: relative;
 }
 
 .staff__grid {
   position: relative;
-  /* L5.5: pre-defined cell columns — faint vertical rule at every cell
-     boundary; shifted by SRC_W so lines fall exactly on 72px column edges */
-  background: repeating-linear-gradient(
-    to right,
-    transparent 0 71px,
-    color-mix(in srgb, var(--color-rule) 80%, transparent) 71px 72px
-  );
-  background-position-x: 132px;
+  /* cell-column rules moved to .staff (ghost graticule spans full height) */
 }
 
 .staff__row {
@@ -697,6 +707,29 @@ body {
 }
 
 .staff__source--arm,
+.staff__source-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff__source-del {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.staff__source-del:hover {
+  color: var(--color-error);
+}
+
 /* Goal-Gradient: while a two-mode gate waits for its second lane, show a
    "click here" affordance on the other lanes (not on the armed one) */
 .staff__lane-hint {

@@ -309,6 +309,30 @@ test("L5: removeSource — cascades gates on its lanes only", () => {
   assert.equal(removeSource(nodes, "nope").nodes.length, nodes.length);
 });
 
+test("L5: removeSource — remaps surviving gates below the deleted row", () => {
+  // lanes: va=0, vb=1（删）, vc=2, vd(tmsv)=3..4；删后 vd 提供 2..3，下方门全部 -1
+  const nodes = [
+    { id: "va", op: "vacuum", params: {} },
+    { id: "vb", op: "vacuum", params: {} },
+    { id: "vc", op: "vacuum", params: {} },
+    { id: "vd", op: "tmsv", params: { r: 0.6 } },
+    { id: "pa", op: "phase", params: { phi: 1 }, mode: 0, ui: { x: 1 } },
+    { id: "pb", op: "squeeze", params: { r: 0.4 }, mode: 1, ui: { x: 1 } },
+    { id: "pc", op: "phase", params: { phi: 2 }, mode: 2, ui: { x: 2 } },
+    { id: "bs", op: "beamsplitter", params: { theta: 0.5 }, modes: [2, 3], ui: { x: 3 } },
+    { id: "czg", op: "cz", params: {}, modes: [3, 4], ui: { x: 4 } },
+  ];
+  const { nodes: kept, removed } = removeSource(nodes, "vb");
+  assert.deepEqual(removed, ["vb", "pb"]); // lane 1 上的门级联删除
+  const byId = Object.fromEntries(kept.map((n) => [n.id, n]));
+  assert.deepEqual(kept.map((n) => n.id), ["va", "vc", "vd", "pa", "pc", "bs", "czg"]);
+  assert.equal(byId.pa.mode, 0);           // 删除行上方不动
+  assert.equal(byId.pc.mode, 1);           // 下方单模门 -1
+  assert.deepEqual(byId.bs.modes, [1, 2]); // 下方双模门整体 -1
+  assert.deepEqual(byId.czg.modes, [2, 3]);
+  assert.equal(sourceModes(kept), 4);      // nmode 5 → 4
+});
+
 test("L5: toV1Json — v1 payload, sources expanded, no ui.x on ops", () => {
   let nodes = addNode([], "vacuum");
   nodes = placeSingle(nodes, "phase", 0, 3.5);

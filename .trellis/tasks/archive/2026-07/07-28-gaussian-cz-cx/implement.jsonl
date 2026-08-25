@@ -1,4 +1,0 @@
-{"file": ".trellis/tasks/07-28-gaussian-cz-cx/prd.md", "reason": "PRD with requirements and acceptance criteria"}
-{"file": "cvsim/symplectic.py", "reason": "Reference: existing S matrix patterns (S_squeeze, S_beamsplitter, S_two_mode_squeeze)"}
-{"file": "cvsim/gaussian/gates.py", "reason": "Reference: existing gate wrapper patterns (squeeze, beamsplitter, two_mode_squeeze)"}
-{"file": "cvsim/gaussian/__init__.py", "reason": "Reference: export patterns in __all__"}

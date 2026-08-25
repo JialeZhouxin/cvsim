@@ -1,6 +1,0 @@
-{"file": "cvsim/fock/state.py", "reason": "单模基线"}
-{"file": "cvsim/fock/gates.py", "reason": "ladder+expm 扩展"}
-{"file": "cvsim/fock/observables.py", "reason": "norm/n 扩展"}
-{"file": "tests/test_m2_fock.py", "reason": "回归"}
-{"file": "cvsim/demos/m2_fock_cutoff_scan.py", "reason": "单模 demo 不破"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Fock 合同"}

@@ -1,6 +1,0 @@
-{"file": "cvsim/fock/density.py", "reason": "nmode 2"}
-{"file": "cvsim/fock/channels.py", "reason": "2-mode loss"}
-{"file": "cvsim/fock/observables.py", "reason": "mean pnrd 2d"}
-{"file": "cvsim/fock/gates.py", "reason": "dens nmode guard"}
-{"file": "tests/test_fock_loss.py", "reason": "regression"}
-{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}

@@ -385,11 +385,12 @@ export function sourceRows(nodes) {
   return rows;
 }
 
-/** Delete a source + all gates acting on its lanes (backend would reject
-    out-of-range modes). Returns {nodes, removed}. */
+/** Delete a source + all gates acting on its lanes; surviving gates below
+    the deleted row shift up by k (lanes renumber). Returns {nodes, removed}. */
 export function removeSource(nodes, srcId) {
   const row = sourceRows(nodes).find((r) => r.srcId === srcId);
   if (!row) return { nodes, removed: [] };
+  const k = row.modeEnd - row.modeStart;
   const removed = [srcId];
   const keep = [];
   for (const n of nodes) {
@@ -400,7 +401,12 @@ export function removeSource(nodes, srcId) {
       ? (n.modes[0] >= row.modeStart && n.modes[0] < row.modeEnd)
         || (n.modes[1] >= row.modeStart && n.modes[1] < row.modeEnd)
       : n.mode >= row.modeStart && n.mode < row.modeEnd;
-    if (hits) removed.push(n.id); else keep.push(n);
+    if (hits) { removed.push(n.id); continue; }
+    // two-mode gates touching a deleted lane already died above, so every
+    // survivor is entirely below modeEnd → shift all its lanes up by k
+    keep.push(meta.kind === "two"
+      ? { ...n, modes: n.modes.map((m) => (m >= row.modeEnd ? m - k : m)) }
+      : { ...n, mode: n.mode >= row.modeEnd ? n.mode - k : n.mode });
   }
   return { nodes: keep, removed };
 }

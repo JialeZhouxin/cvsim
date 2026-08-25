@@ -1,5 +1,0 @@
-{"file": ".trellis/spec/backend/index.md", "reason": "backend quality gate for /scan + op expansion"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "singular-view + validation contract to verify against"}
-{"file": ".trellis/spec/backend/error-handling.md", "reason": "422 semantics for new validation paths"}
-{"file": ".trellis/spec/frontend/index.md", "reason": "frontend quality gate (node --check, no console errors, zero-dep)"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "optional/advanced equivalence + component patterns to check"}

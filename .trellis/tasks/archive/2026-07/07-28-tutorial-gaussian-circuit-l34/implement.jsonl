@@ -1,3 +1,0 @@
-{"file": ".trellis/tasks/07-28-tutorial-gaussian-circuit-l34/prd.md", "reason": "PRD with section plan and cell layout"}
-{"file": "tutorials/_build_notebooks.py", "reason": "Reference: current notebook builder to extend"}
-{"file": "cvsim/gaussian/circuit.py", "reason": "Reference: GaussianCircuit API surface to document"}

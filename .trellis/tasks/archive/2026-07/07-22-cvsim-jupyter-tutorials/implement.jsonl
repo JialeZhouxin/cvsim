@@ -1,5 +1,0 @@
-{"file": "cvsim/README.md", "reason": "API matrix"}
-{"file": "cvsim/demos/m1_gaussian_squeeze.py", "reason": "T1 numbers"}
-{"file": "cvsim/demos/m2_fock_cutoff_scan.py", "reason": "T2 numbers"}
-{"file": "cvsim/demos/m3_cat_weights.py", "reason": "T3 numbers"}
-{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "honesty boundary"}

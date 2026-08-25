@@ -89,7 +89,18 @@ export function initStaff(root, api) {
       const armed = placing && r.mode === placing.modeA;
       src.className = `staff__source${r.srcFirst ? "" : " staff__source--cont"}${armed ? " staff__source--arm" : ""}`;
       if (r.srcFirst) {
-        src.textContent = `${OPS[r.srcOp].label}${r.srcOp === "tmsv" ? `(r=${r.srcParams.r ?? 0.6})` : ""}${r.srcOp === "coherent" ? `(α=${r.srcParams.alpha ?? 1})` : ""}`;
+        const label = document.createElement("span");
+        label.textContent = `${OPS[r.srcOp].label}${r.srcOp === "tmsv" ? `(r=${r.srcParams.r ?? 0.6})` : ""}${r.srcOp === "coherent" ? `(α=${r.srcParams.alpha ?? 1})` : ""}`;
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "staff__source-del";
+        del.textContent = "×";
+        del.title = "删除源（连带删除其模上的门）";
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          api.onDelete(r.srcId);
+        });
+        src.append(label, del);
         src.dataset.srcId = r.srcId;
         src.addEventListener("click", () => {
           const n = api.getState().nodes.find((x) => x.id === r.srcId);

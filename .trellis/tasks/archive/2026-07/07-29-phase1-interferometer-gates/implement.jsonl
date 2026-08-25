@@ -1,6 +1,0 @@
-{"file": "docs/vision-gaussian-simulator.md", "reason": "F-INTERFEROMETER and F-GATE-SET specs"}
-{"file": ".trellis/tasks/07-29-phase1-interferometer-gates/prd.md", "reason": "Acceptance"}
-{"file": "cvsim/symplectic.py", "reason": "S_from_unitary + decomposition helpers"}
-{"file": "cvsim/gaussian/gates.py", "reason": "apply_interferometer, fourier, mach_zehnder"}
-{"file": "cvsim/gaussian/__init__.py", "reason": "exports"}
-{"file": "cvsim/gaussian/symplectic.py", "reason": "shim re-exports"}

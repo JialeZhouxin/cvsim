@@ -1,3 +1,0 @@
-{"file": ".trellis/spec/backend/error-handling.md", "reason": "异常类型/延迟导入错误约定"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "测试与代码质量要求"}
-{"file": "docs/gbs-walrus.md", "reason": "GBS adapter 约定 + 薄封装增补目标"}

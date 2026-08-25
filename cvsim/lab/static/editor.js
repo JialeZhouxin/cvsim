@@ -3,7 +3,7 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, backendOps, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, sourceModes, toV1Json, updateParam } from "./ops.js";
+import { OPS, addNode, backendOps, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, removeSource, sourceModes, toV1Json, updateParam } from "./ops.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -445,8 +445,23 @@ export function initEditor(root, hooks) {
       render();
     },
     onDelete: (id) => {
-      pushHistory();
-      state = { ...state, nodes: removeNode(state.nodes, id) };
+      const n = state.nodes.find((y) => y.id === id);
+      if (n && OPS[n.op] && OPS[n.op].kind === "source") {
+        // 删源级联（removeSource）：至少留一个源；删后钳住 wigner_mode 防越界
+        const nSources = state.nodes.filter((y) => OPS[y.op].kind === "source").length;
+        if (nSources <= 1) {
+          hooks.onStatus("至少保留一个源节点", false);
+          return;
+        }
+        pushHistory();
+        const res = removeSource(state.nodes, id);
+        const nm = sourceModes(res.nodes);
+        state = { ...state, nodes: res.nodes,
+          view: { ...state.view, wigner_mode: Math.max(0, Math.min(state.view.wigner_mode, nm - 1)) } };
+      } else {
+        pushHistory();
+        state = { ...state, nodes: removeNode(state.nodes, id) };
+      }
       render();
     },
     onParam: (id, key, value) => {

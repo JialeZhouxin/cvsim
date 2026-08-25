@@ -1,4 +1,0 @@
-{"file": ".trellis/spec/cvsim/index.md", "reason": "cvsim 契约 Quality Check——B6 全 scope 核验"}
-{"file": ".trellis/spec/cvsim/bosonic.md", "reason": "Bosonic 契约——双 V/initial/steps 不破 B1-B5"}
-{"file": ".trellis/spec/frontend/index.md", "reason": "前端质量——palette/panel 探针绿"}
-{"file": ".trellis/spec/backend/error-handling.md", "reason": "422 契约——/fidelity 错误面 + 旧端点不回归"}

@@ -1,5 +1,0 @@
-{"file": "cvsim/gaussian/symplectic.py", "reason": "move source"}
-{"file": "cvsim/bosonic/gates.py", "reason": "import path"}
-{"file": "cvsim/bosonic/state.py", "reason": "duck from_gaussian"}
-{"file": "cvsim/gaussian/gates.py", "reason": "import path"}
-{"file": "cvsim/README.md", "reason": "structure"}

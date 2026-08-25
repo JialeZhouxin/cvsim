@@ -1,5 +1,0 @@
-{"file": "cvsim/bosonic/observables.py", "reason": "replace drop-cross condition"}
-{"file": "cvsim/gaussian/observables.py", "reason": "G formula parity"}
-{"file": "tests/test_bosonic_condition.py", "reason": "rewrite AC"}
-{"file": "cvsim/bosonic/cat.py", "reason": "cross centres"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "contract update"}

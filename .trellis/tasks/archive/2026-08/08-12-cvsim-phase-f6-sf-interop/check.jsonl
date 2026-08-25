@@ -1,5 +1,0 @@
-{"file": "docs/vision-fock-simulator.md", "reason": "检查项：2 条退出判据全覆盖（golden 无 SF 运行时依赖 / interop docs mirror 先例）；密度导出格式文档化"}
-{"file": "cvsim/fock/gates.py", "reason": "检查项：对照逐位正确（复数幅度 atol 1e-9，非概率）；相位约定全对齐；cvsim 零改动"}
-{"file": "cvsim/fock/density.py", "reason": "检查项：thermal dm 导出 vs SF dm() 逐位一致；序（C-order）正确"}
-{"file": "tools/gen_sf_golden.py", "reason": "检查项：可复现（版本锁/日期/命令）；每个 prog 新建 Engine（复用残留陷阱）；npz metadata 完整"}
-{"file": "docs/sf-roundtrip.md", "reason": "检查项：F6 文档结构 mirror（约定表/双向脚本/陷阱/重新生成）；脚本段真实可跑（非虚构）"}

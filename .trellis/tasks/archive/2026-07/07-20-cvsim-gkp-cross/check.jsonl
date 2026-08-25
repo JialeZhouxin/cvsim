@@ -1,4 +1,0 @@
-{"file": ".trellis/tasks/07-20-cvsim-gkp-cross/prd.md", "reason": "AC-X*"}
-{"file": ".trellis/tasks/07-20-cvsim-gkp-cross/design.md", "reason": "ov + K"}
-{"file": "cvsim/bosonic/cat.py", "reason": "weight/ov style"}
-{"file": "cvsim/wigner.py", "reason": "complex mean"}

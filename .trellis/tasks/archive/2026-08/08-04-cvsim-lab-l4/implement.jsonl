@@ -1,6 +1,0 @@
-{"file": ".trellis/spec/backend/index.md", "reason": "backend layer entry: pre-dev checklist + quality gate for cvsim/lab backend changes"}
-{"file": ".trellis/spec/backend/error-handling.md", "reason": "/scan and new ops must follow 422 CircuitV0Error semantics (L0-L3 pattern)"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "singular-view contract + validation conventions from L3 learnings"}
-{"file": ".trellis/spec/frontend/index.md", "reason": "frontend layer entry: JS static-file conventions, node --check, offline zero-dep"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "optional/advanced param equivalence, UI component patterns from L3"}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "editor state mirroring, sweep config is UI-session state (no write-back)"}

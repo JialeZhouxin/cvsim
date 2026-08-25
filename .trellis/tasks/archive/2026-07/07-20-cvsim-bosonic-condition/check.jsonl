@@ -1,4 +1,0 @@
-{"file": ".trellis/tasks/07-20-cvsim-bosonic-condition/prd.md", "reason": "AC-C*"}
-{"file": ".trellis/tasks/07-20-cvsim-bosonic-condition/design.md", "reason": "drop complex"}
-{"file": "cvsim/gaussian/observables.py", "reason": "G formula"}
-{"file": "cvsim/bosonic/cat.py", "reason": "diag vs cross"}

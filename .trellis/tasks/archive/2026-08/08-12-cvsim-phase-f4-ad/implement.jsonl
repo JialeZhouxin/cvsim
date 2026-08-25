@@ -1,6 +1,0 @@
-{"file": ".trellis/spec/backend/backend-interface.md", "reason": "双后端协议规则：backend= 关键字参数、numpy 默认零回归、jnp 不可变性(_set)、模块放置 ADR-0001（backend 相关只能顶层，rep 包白名单）、测试 doctrine（conftest backend fixture + grad vs fd bar）"}
-{"file": ".trellis/spec/backend/index.md", "reason": "backend spec 入口与索引（Dual-backend protocol Phase 4 F-AD）"}
-{"file": "docs/vision-fock-simulator.md", "reason": "F4 愿景原文：backend= 参数化、梯度 vs fd 2e-07 bar、numpy/jax 共享测试、Kerr-squeezed under loss notebook；非目标（MPS/云/m>10）"}
-{"file": "cvsim/ad.py", "reason": "Gaussian 可微链模板：backend: 首参、_get_xp 分发、jnp 镜像 + 上游公式交叉注释、诚实 docstring（fock_ad.py 直接镜像此结构）"}
-{"file": "cvsim/fock/gates.py", "reason": "numpy 真源公式（_squeeze_U/_displace_U/BS/S2/CZ/CX 的 expm 路径），fock_ad 的 numpy 路径复用点，jnp 镜像的对账基准"}
-{"file": "cvsim/fock/channels.py", "reason": "_kraus_ops 预构建常数张量（loss 超算符的 numpy 真源，einsum 对账 1.7e-09 已实证）"}

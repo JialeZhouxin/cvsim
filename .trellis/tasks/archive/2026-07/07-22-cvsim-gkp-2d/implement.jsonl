@@ -1,3 +1,0 @@
-{"file": "cvsim/bosonic/gkp.py", "reason": "1d baseline + 2d"}
-{"file": "tests/test_bosonic_gkp_full.py", "reason": "1d full regression"}
-{"file": "cvsim/USER_ACCEPTANCE.md", "reason": "未做"}

@@ -1,4 +1,0 @@
-{"file": ".trellis/spec/backend/error-handling.md", "reason": "Lab 层 CircuitV0Error→422 边界"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "ops.js↔ir.py 契约同步 + 纯逻辑/DOM 分离"}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "模块单例 + 纯函数转移 + JSON 同步"}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "no-framework + node:test + 中文 UI"}

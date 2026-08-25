@@ -1,5 +1,0 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `py -3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
-{"file": ".trellis/spec/backend/index.md", "reason": "backend 编码规范：质量门、禁止模式、测试要求"}
-{"file": ".trellis/spec/backend/directory-structure.md", "reason": "目录结构：新门矩阵先落 cvsim/symplectic.py；backends only apply maps"}
-{"file": "docs/vision-gaussian-simulator.md", "reason": "F-AD 原文（L550-556）+ Phase 4 exit criteria（L650-659）+ 硬约定 §2（xxpp/ħ/Ω）"}
-{"file": ".trellis/tasks/08-10-cvsim-phase4-ad/design.md", "reason": "backend 协议与 19 函数分组设计"}

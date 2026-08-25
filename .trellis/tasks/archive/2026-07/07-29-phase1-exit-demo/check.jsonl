@@ -1,4 +1,0 @@
-{"file": "docs/vision-gaussian-simulator.md", "reason": "Phase 1 退出验收 5 条标准 + §9 测试教义 (atol/golden/invariant)；check 阶段对照的验收源"}
-{"file": ".trellis/tasks/07-29-phase1-exit-demo/prd.md", "reason": "Acceptance Criteria 列表 + Out of scope 边界；check 阶段对照的需求源"}
-{"file": ".trellis/tasks/07-29-phase1-exit-demo/design.md", "reason": "对账清单 9 项预期数值 + 风险回滚点；check 时逐项断言源"}
-{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "代码质量验收准则；脚本须过此条质量门"}
