@@ -17,7 +17,6 @@ v1 semantics (design §0, intentional unification vs v0):
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -34,13 +33,8 @@ from cvsim.gaussian import (
     homodyne_condition,
     homodyne_mean,
     homodyne_sample_and_condition,
-    log_negativity,
-    mean_photon,
-    partial_trace,
-    purity,
 )
 from cvsim.gaussian.ir import SCHEMA, CircuitV1, validate_ir
-from cvsim.wigner import wigner_grid
 
 #: Bosonic backend op whitelist (B6, same-shell third backend). Mirrors the
 #: F7 unlock: the Bosonic builder exposes the full gate/channel/measure set
@@ -94,18 +88,6 @@ SINGLE_MODE_V0 = frozenset(
 )
 TWO_MODE_V0 = frozenset({"beamsplitter", "two_mode_squeeze", "mz"})
 MEASUREMENT_OPS = frozenset({"measure_homodyne", "measure_heterodyne"})
-
-#: real-numeric params sweepable by /scan (mirrors ops.js `sweep` metadata).
-#: complex params (alpha) and structural params (nmode) are excluded.
-SWEEPABLE_PARAMS: dict[str, frozenset[str]] = {
-    "squeeze": frozenset({"r"}),
-    "phase": frozenset({"phi"}),
-    "loss": frozenset({"T"}),
-    "beamsplitter": frozenset({"theta"}),
-    "two_mode_squeeze": frozenset({"r"}),
-    "amplifier": frozenset({"G"}),
-    "mz": frozenset({"theta", "phi"}),
-}
 
 #: Lab-required params for break-point channel ops (core fills OpMeta
 #: defaults silently; Lab rejects defaults to keep the workbench explicit,
@@ -440,67 +422,6 @@ def _load_bosonic(
 
 # -- execution --------------------------------------------------------------
 
-def _meters(state: GaussianState, singular: bool) -> dict[str, Any]:
-    """meters; purity/log_neg are undefined on singular conditional states
-    (det V = 0) → None, never fabricated. mean_photon stays (computable;
-    negative values shown honestly)."""
-    m = state.nmode
-
-    def safe(fn):
-        try:
-            return fn()
-        except (ValueError, FloatingPointError, ZeroDivisionError, np.linalg.LinAlgError):
-            return None
-
-    meters: dict[str, Any] = {
-        "purity": safe(lambda: purity(state)),
-        "mean_photon": mean_photon(state),
-    }
-    meters["mean_photon_per_mode"] = [mean_photon(state, mode=i) for i in range(m)]
-    if m >= 2:
-        meters["log_negativity"] = safe(lambda: log_negativity(state, modes_A=[0]))
-    meters["singular"] = singular
-    return meters
-
-def _build_result(
-    state: GaussianState, view: View, measured: list[dict[str, Any]]
-) -> RunResult:
-    """Assemble RunResult: Wigner view + meters. A singular conditional state
-    (homodyne-conditioned mode, det(2V)=0) has no finite Wigner: report
-    wigner=None + meters.singular instead of fabricating data. All modes
-    measured away (nmode==0) → empty result, no Wigner, honest zero meters."""
-    if state.nmode == 0:
-        return RunResult(
-            nmode=0,
-            rbar=np.zeros(0),
-            V=np.zeros((0, 0)),
-            wigner=None,
-            meters={"purity": None, "mean_photon": 0.0,
-                    "mean_photon_per_mode": [], "log_negativity": None,
-                    "singular": False},
-            measured=measured,
-        )
-    if view.wigner_mode >= state.nmode:
-        raise CircuitV0Error(
-            f"view.wigner_mode {view.wigner_mode} out of range (nmode={state.nmode})"
-        )
-    wigner: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
-    singular = False
-    try:
-        keep = partial_trace(state, keep=[view.wigner_mode])
-        X, P, W = wigner_grid(keep, lim=view.lim, n=view.n)
-        wigner = (X, P, W)
-    except (ValueError, FloatingPointError, np.linalg.LinAlgError):  # singular view
-        singular = True
-    return RunResult(
-        nmode=state.nmode,
-        rbar=state.rbar,
-        V=state.V,
-        wigner=wigner,
-        meters=_meters(state, singular),
-        measured=measured,
-    )
-
 def _apply_measure(
     op_name: str,
     state: GaussianState,
@@ -621,6 +542,7 @@ def _execute(
             state, run_results = compiled._run_op(
                 seg[1], state, run_results, {}, rng=rng,
             )
+    from cvsim.lab.gaussian_backend import _build_result  # D1-A: local import
     return _build_result(state, circuit.view, measured)
 
 
@@ -634,126 +556,3 @@ def sample_circuit(circuit: LabCircuit, rng: np.random.Generator) -> RunResult:
     order; each measurement conditions the state for the next one."""
     return _execute(circuit, rng=rng)
 
-
-# -- scan -------------------------------------------------------------------
-
-def _safe_logneg(state: GaussianState, modes_A: list[int]) -> float | None:
-    """E_N on the current state; None when undefined (singular etc.), never fabricated."""
-    try:
-        v = float(log_negativity(state, modes_A=modes_A))
-        return v if math.isfinite(v) else None
-    except (ValueError, FloatingPointError, np.linalg.LinAlgError):
-        return None
-
-def _inject_symbolic_param(
-    raw: dict[str, Any], node_id: str, param: str
-) -> dict[str, Any]:
-    """Return a deep copy of ``raw`` with ``node_id``'s ``param`` replaced by
-    a symbolic ``{"$param": "sweep_x"}`` reference (ADR-0002 value binding).
-
-    Lets ``scan_circuit`` compile once and bind per sweep point instead of
-    rebuilding+recompiling the IR each time.
-    """
-    import copy
-    out = copy.deepcopy(raw)
-    for node in out.get("ops", []):
-        if node.get("id") == node_id:
-            node["params"][param] = {"$param": "sweep_x"}
-            return out
-    raise CircuitV0Error(f"sweep: unknown node_id {node_id!r}")  # pragma: no cover
-
-def scan_circuit(circuit: LabCircuit, sweep: dict[str, Any]) -> dict[str, Any]:
-    """F-LAB-SCAN: single-param sweep of one node's real-numeric param → E_N curve.
-
-    Pure function (no RNG): same request → same response. The swept param is
-    injected as a symbolic ``$param`` (ADR-0002): the circuit is compiled once,
-    then each sweep point binds the value via ``compiled.run(sweep_x=x)`` — no
-    per-point IR rebuild or recompile. Undefined (singular) points are ``None``
-    (curve break, frontend skips). Measurement nodes anywhere → 422 (E_N is
-    not defined on conditional states; honest rejection).
-    """
-    node_id = _require(sweep, "node_id", str, "sweep")
-    param = _require(sweep, "param", str, "sweep")
-    pmin = _num(sweep.get("min"), "sweep.min", "min")
-    pmax = _num(sweep.get("max"), "sweep.max", "max")
-    if not (math.isfinite(pmin) and math.isfinite(pmax)):
-        raise CircuitV0Error(f"sweep: min/max must be finite (got {pmin}, {pmax})")
-    if not pmin < pmax:
-        raise CircuitV0Error(f"sweep: min must be < max (got {pmin}, {pmax})")
-    n = sweep.get("n")
-    if not isinstance(n, int) or isinstance(n, bool) or not 2 <= n <= 200:
-        raise CircuitV0Error("sweep.n must be an int in [2, 200]")
-
-    core = circuit.core
-    node = next((nd for nd in core.ops if nd.id == node_id), None)
-    if node is None:
-        raise CircuitV0Error(f"sweep: unknown node_id {node_id!r}")
-    if param not in SWEEPABLE_PARAMS.get(node.op, frozenset()):
-        raise CircuitV0Error(
-            f"sweep: param {param!r} is not sweepable for op {node.op!r}"
-        )
-    for nd in core.ops:
-        if nd.op in MEASUREMENT_OPS:
-            raise CircuitV0Error(
-                f"sweep: measurement node {nd.id!r} ({nd.op}) — E_N undefined on "
-                "conditional states"
-            )
-
-    # Compile once with the swept param as a symbolic $param; bind per point.
-    swept_raw = _inject_symbolic_param(circuit.raw, node_id, param)
-    compiled = GaussianCircuit.from_ir(swept_raw).compile()
-    nmode = compiled.nmode
-    modes_A = sweep.get("modes_A", [0])
-    if not isinstance(modes_A, list) or not modes_A:
-        raise CircuitV0Error("sweep.modes_A must be a non-empty list of ints")
-    if len(modes_A) > nmode - 1:
-        raise CircuitV0Error(
-            f"sweep.modes_A: at most nmode-1={nmode - 1} modes (got {len(modes_A)})"
-        )
-    if len(set(modes_A)) != len(modes_A):
-        raise CircuitV0Error("sweep.modes_A: duplicate mode indices")
-    for m in modes_A:
-        if not isinstance(m, int) or isinstance(m, bool) or m < 0 or m >= nmode:
-            raise CircuitV0Error(f"sweep.modes_A: mode {m} out of range (nmode={nmode})")
-
-    xs = np.linspace(pmin, pmax, n)
-    ys: list[float | None] = []
-    for x in xs:
-        st = compiled.run(sweep_x=float(x))  # type: ignore[no-untyped-call]
-        ys.append(_safe_logneg(st, list(modes_A)))
-    return {
-        "node_id": node_id,
-        "param": param,
-        "min": float(pmin),
-        "max": float(pmax),
-        "n": n,
-        "modes_A": list(modes_A),
-        "xs": xs.tolist(),
-        "ys": ys,
-    }
-
-# -- backward-compat re-exports (Fock/Bosonic backends extracted to submodules) -
-# External code that did ``from cvsim.lab.ir import run_fock_circuit`` keeps
-# working; the canonical path is ``from cvsim.lab import run_fock_circuit``.
-from cvsim.lab.bosonic_backend import (  # noqa: E402,F401
-    _bosonic_adaptive_n,
-    _bosonic_meters,
-    _bosonic_reduce_to_mode,
-    _bosonic_single_wigner,
-    _bosonic_wigner_payload,
-    _fidelity_target,
-    fidelity_sweep,
-    run_bosonic_circuit,
-)
-from cvsim.lab.fock_backend import (  # noqa: E402,F401
-    _LEAKAGE_DIM_CAP,
-    _fock_joint,
-    _fock_leakage,
-    _fock_mean_photon,
-    _fock_measured,
-    _fock_mode_probs,
-    _fock_purity,
-    _fock_wigner,
-    batch_fock_circuit,
-    run_fock_circuit,
-)

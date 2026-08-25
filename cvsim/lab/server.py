@@ -18,15 +18,14 @@ from cvsim.lab import (
     SCHEMA,
     CircuitV0Error,
     RunResult,
-    batch_fock_circuit,
     fidelity_sweep,
     load_circuit,
-    run_bosonic_circuit,
     run_circuit,
-    run_fock_circuit,
     sample_circuit,
     scan_circuit,
 )
+from cvsim.lab.bosonic_backend import run_bosonic_circuit
+from cvsim.lab.fock_backend import batch_fock_circuit, run_fock_circuit
 
 app = FastAPI(title="cvsim Lab (Gaussian/Fock)", version="0.2.0")
 

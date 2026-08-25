@@ -169,7 +169,7 @@ def test_a8_no_private_or_other_rep_imports():
         "fock._",
         "bosonic._",
     ]
-    for rel in ["cvsim/lab/ir.py", "cvsim/lab/server.py", "cvsim/lab/__init__.py"]:
+    for rel in ["cvsim/lab/ir.py", "cvsim/lab/server.py", "cvsim/lab/__init__.py", "cvsim/lab/gaussian_backend.py"]:
         src = (root / rel).read_text(encoding="utf-8")
         for b in banned:
             assert b not in src, f"{rel}: banned import pattern {b!r}"
