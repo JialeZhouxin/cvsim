@@ -131,9 +131,8 @@ def beamsplitter(state: FockState, theta: float, phi: float = 0.0) -> FockState:
     out = expm(G) @ vec
     return FockState(amps=out.reshape(N, N))
 
-def two_mode_squeeze(
-    state: FockState, r: float, mode1: int = 0, mode2: int = 1
-) -> FockState:
+
+def two_mode_squeeze(state: FockState, r: float, mode1: int = 0, mode2: int = 1) -> FockState:
     """Two-mode squeeze S2(r) = exp[r(a_i† a_j† - a_i a_j)] (real r). Requires nmode==2.
 
     Aligns with Gaussian xxpp S2: vacuum mean n_i = sinh^2 r (cutoff large).
@@ -155,7 +154,6 @@ def two_mode_squeeze(
     vec = state.amps.reshape(N * N)
     out = expm(G) @ vec
     return FockState(amps=out.reshape(N, N))
-
 
 
 def _quadrature_matrices(N: int) -> tuple[np.ndarray, np.ndarray]:
@@ -219,6 +217,7 @@ def mach_zehnder(
     a = annihilation(N)
     a0 = np.kron(a, eye)
     a1 = np.kron(eye, a)
+
     def G_bs(th: float, ph: float) -> np.ndarray:
         eip = np.exp(1j * ph)
         return th * (eip * a0.conj().T @ a1 - np.conj(eip) * a1.conj().T @ a0)
@@ -249,8 +248,12 @@ def interferometer(state: FockState, U: np.ndarray) -> FockState:
     a0 = np.kron(a, eye)
     a1 = np.kron(eye, a)
     logU = logm(U)
-    H = logU[0, 0] * (a0.conj().T @ a0) + logU[0, 1] * (a0.conj().T @ a1) + \
-        logU[1, 0] * (a1.conj().T @ a0) + logU[1, 1] * (a1.conj().T @ a1)
+    H = (
+        logU[0, 0] * (a0.conj().T @ a0)
+        + logU[0, 1] * (a0.conj().T @ a1)
+        + logU[1, 0] * (a1.conj().T @ a0)
+        + logU[1, 1] * (a1.conj().T @ a1)
+    )
     vec = state.amps.reshape(N * N)
     return FockState(amps=(expm(H) @ vec).reshape(N, N))
 
@@ -282,7 +285,7 @@ def apply_unitary(
     # nmode == 2
     if modes is None:
         if U.shape != (N * N, N * N):
-            raise ValueError(f"U must be ({N*N},{N*N}) for full-space 2-mode")
+            raise ValueError(f"U must be ({N * N},{N * N}) for full-space 2-mode")
         vec = state.amps.reshape(N * N)
         return FockState(amps=(U @ vec).reshape(N, N))
     if len(modes) != 1:

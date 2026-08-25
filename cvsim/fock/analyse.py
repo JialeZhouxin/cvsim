@@ -36,9 +36,7 @@ def entropy_vn(state: FockLike, *, validate: bool = False) -> float:
     return s
 
 
-def partial_trace(
-    state: FockLike, keep: int | Iterable[int]
-) -> FockState | FockDensity:
+def partial_trace(state: FockLike, keep: int | Iterable[int]) -> FockState | FockDensity:
     """Partial trace onto subsystem ``keep`` (mode indices).
 
     Drops all modes not in ``keep`` **without** measurement conditioning.
@@ -65,14 +63,10 @@ def partial_trace(
             rho4 = np.einsum("ab,cd->abcd", state.amps, state.amps.conj())
         red = np.einsum("abcb->ac", rho4) if m == 0 else np.einsum("abad->bd", rho4)
         return FockDensity(rho=red, nmode=1)
-    raise NotImplementedError(
-        f"partial_trace: nmode={nmode} not supported (dense m≤2; sparse F3)"
-    )
+    raise NotImplementedError(f"partial_trace: nmode={nmode} not supported (dense m≤2; sparse F3)")
 
 
-def log_negativity(
-    state: FockState | FockDensity, modes_A: int | Iterable[int]
-) -> float:
+def log_negativity(state: FockState | FockDensity, modes_A: int | Iterable[int]) -> float:
     """Logarithmic negativity E_N of a bipartition (nats).
 
     E_N = ln ||ρ^{T_A}||₁ = ln Σᵢ |λᵢ| over the partial-transposed spectrum.

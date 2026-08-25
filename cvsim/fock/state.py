@@ -83,7 +83,7 @@ class FockState:
         alpha = complex(alpha)
         c = _coherent_amps(cutoff, alpha)
         tail = float(gammainc(cutoff, abs(alpha) ** 2))
-        return cls(amps=c, tail=tail, _source=('coherent', (alpha,)))
+        return cls(amps=c, tail=tail, _source=("coherent", (alpha,)))
 
     @classmethod
     def squeezed(cls, cutoff: int, r: float, phi: float = 0.0) -> FockState:
@@ -100,12 +100,13 @@ class FockState:
         c[0::2] = (
             math.sqrt(1.0 / math.cosh(r))
             * (-1.0) ** kk
-            * np.sqrt(factorial(2 * kk)) / (2.0 ** kk * factorial(kk))
-            * t ** kk
+            * np.sqrt(factorial(2 * kk))
+            / (2.0**kk * factorial(kk))
+            * t**kk
         )
         tail = 1.0 - float(np.sum(abs(c) ** 2))
         c /= np.sqrt(1.0 - tail)
-        return cls(amps=c, tail=tail, _source=('squeezed', (r, phi)))
+        return cls(amps=c, tail=tail, _source=("squeezed", (r, phi)))
 
     @classmethod
     def cat(cls, cutoff: int, alpha: complex, even: bool = True) -> FockState:
@@ -119,7 +120,7 @@ class FockState:
         c /= math.sqrt(2.0 * (1.0 + sign * math.exp(-2.0 * abs(alpha) ** 2)))
         tail = 1.0 - float(np.sum(abs(c) ** 2))
         c /= np.sqrt(1.0 - tail)
-        return cls(amps=c, tail=tail, _source=('cat', (alpha, even)))
+        return cls(amps=c, tail=tail, _source=("cat", (alpha, even)))
 
     def copy(self) -> FockState:
         return FockState(self.amps.copy(), self.tail, self._source)
@@ -187,17 +188,15 @@ def estimate_leakage(state: FockState, cutoff2: int) -> float:
     Requires a factory state (analytic reconstruction); raises otherwise.
     """
     if state._source is None:
-        raise ValueError(
-            "estimate_leakage requires a factory state (coherent/squeezed/cat)"
-        )
+        raise ValueError("estimate_leakage requires a factory state (coherent/squeezed/cat)")
     name, args = state._source
     if cutoff2 <= state.cutoff:
         raise ValueError(f"cutoff2 must be > state.cutoff ({state.cutoff})")
-    if name == 'coherent':
+    if name == "coherent":
         st2 = FockState.coherent(cutoff2, args[0])
-    elif name == 'squeezed':
+    elif name == "squeezed":
         st2 = FockState.squeezed(cutoff2, args[0], args[1])
-    elif name == 'cat':
+    elif name == "cat":
         st2 = FockState.cat(cutoff2, args[0], args[1])
     else:  # pragma: no cover — future factories must register here
         raise ValueError(f"no rebuild path for factory {name!r}")

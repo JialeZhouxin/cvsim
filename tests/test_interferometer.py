@@ -126,9 +126,7 @@ def test_fourier_four_times_identity():
     np.testing.assert_allclose(out.V, st.V, atol=1e-12)
     np.testing.assert_allclose(out.rbar, st.rbar, atol=1e-12)
     # one fourier == phase(pi/2)
-    np.testing.assert_allclose(
-        fourier(st).V, phase(st, 0.5 * np.pi).V, atol=1e-12
-    )
+    np.testing.assert_allclose(fourier(st).V, phase(st, 0.5 * np.pi).V, atol=1e-12)
 
 
 def test_mach_zehnder_matches_manual():
@@ -141,9 +139,9 @@ def test_mach_zehnder_matches_manual():
     np.testing.assert_allclose(via_gate.V, manual.V, atol=1e-12)
     np.testing.assert_allclose(
         via_gate.V,
-        __import__("cvsim.gaussian.gates", fromlist=["apply_symplectic"]).apply_symplectic(
-            st, S_mach_zehnder(2, 0, 1, theta, phi), validate=False
-        ).V,
+        __import__("cvsim.gaussian.gates", fromlist=["apply_symplectic"])
+        .apply_symplectic(st, S_mach_zehnder(2, 0, 1, theta, phi), validate=False)
+        .V,
         atol=1e-12,
     )
 

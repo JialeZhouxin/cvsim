@@ -11,11 +11,24 @@ from cvsim.gaussian import GaussianCircuit, ParamRef
 from cvsim.gaussian.ir import OP_META, SCHEMA, from_ir, to_ir, validate_ir
 
 ALL_OPS = {
-    "squeeze", "displace", "phase", "fourier",
-    "beamsplitter", "two_mode_squeeze", "cz", "cx",
-    "mach_zehnder", "mz", "interferometer",
-    "loss", "amplifier", "phase_noise", "gaussian_channel",
-    "measure_homodyne", "measure_heterodyne", "measure_threshold",
+    "squeeze",
+    "displace",
+    "phase",
+    "fourier",
+    "beamsplitter",
+    "two_mode_squeeze",
+    "cz",
+    "cx",
+    "mach_zehnder",
+    "mz",
+    "interferometer",
+    "loss",
+    "amplifier",
+    "phase_noise",
+    "gaussian_channel",
+    "measure_homodyne",
+    "measure_heterodyne",
+    "measure_threshold",
 }
 
 
@@ -42,9 +55,7 @@ def _big_circuit() -> GaussianCircuit:
     c.amplifier(0, G=1.5, nbar=0.2)
     c.phase_noise(1, sigma=0.05)
     m = 4
-    c.gaussian_channel(
-        np.eye(2 * m), np.zeros((2 * m, 2 * m)), np.zeros(2 * m)
-    )
+    c.gaussian_channel(np.eye(2 * m), np.zeros((2 * m, 2 * m)), np.zeros(2 * m))
     return c
 
 
@@ -55,12 +66,14 @@ def _assert_same_state(a, b, atol: float = 1e-12) -> None:
 
 # --- OP_META completeness -----------------------------------------------------
 
+
 def test_op_meta_covers_all_builders():
     assert set(OP_META) == ALL_OPS
     assert SCHEMA == "circuit_v1"
 
 
 # --- round-trip --------------------------------------------------------------
+
 
 def test_roundtrip_all_ops():
     c = _big_circuit()
@@ -198,17 +211,21 @@ def test_unknown_top_level_field_rejected():
 
 # --- validation matrix ---------------------------------------------------------
 
+
 def _doc(ops, **top):
     return {"schema": "circuit_v1", "nmode": 2, "ops": ops, **top}
 
 
-@pytest.mark.parametrize("data,msg", [
-    ({"schema": "circuit_v0", "nmode": 1, "ops": []}, "unsupported schema"),
-    (_doc([], nmode=0), "nmode must be an int >= 1"),
-    (_doc([], nmode=True), "nmode must be an int >= 1"),
-    (_doc([], nmode=1.5), "nmode must be an int >= 1"),
-    (_doc([], nmode=True), "nmode must be an int >= 1"),
-])
+@pytest.mark.parametrize(
+    "data,msg",
+    [
+        ({"schema": "circuit_v0", "nmode": 1, "ops": []}, "unsupported schema"),
+        (_doc([], nmode=0), "nmode must be an int >= 1"),
+        (_doc([], nmode=True), "nmode must be an int >= 1"),
+        (_doc([], nmode=1.5), "nmode must be an int >= 1"),
+        (_doc([], nmode=True), "nmode must be an int >= 1"),
+    ],
+)
 def test_top_level_validation(data, msg):
     with pytest.raises(ValueError, match=msg):
         validate_ir(data)
@@ -233,14 +250,17 @@ def test_modes_out_of_range_rejected():
         validate_ir(_doc([{"op": "displace", "modes": [5], "params": {"alpha": 1.0}}], nmode=2))
 
 
-@pytest.mark.parametrize("op,modes,msg", [
-    ("squeeze", [0, 1], "requires exactly 1 mode"),
-    ("beamsplitter", [0], "requires exactly 2 modes"),
-    ("amplifier", [0, 1], "at most 1 mode"),
-    ("gaussian_channel", [0], "takes no modes"),
-    ("squeeze", [-1], "non-negative int"),
-    ("squeeze", [True], "non-negative int"),
-])
+@pytest.mark.parametrize(
+    "op,modes,msg",
+    [
+        ("squeeze", [0, 1], "requires exactly 1 mode"),
+        ("beamsplitter", [0], "requires exactly 2 modes"),
+        ("amplifier", [0, 1], "at most 1 mode"),
+        ("gaussian_channel", [0], "takes no modes"),
+        ("squeeze", [-1], "non-negative int"),
+        ("squeeze", [True], "non-negative int"),
+    ],
+)
 def test_bad_modes(op, modes, msg):
     data = _doc([{"op": op, "modes": modes, "params": {}}])
     with pytest.raises(ValueError, match=msg):
@@ -262,8 +282,7 @@ def test_interferometer_accepts_all_modes():
     data = {
         "schema": "circuit_v1",
         "nmode": n,
-        "ops": [{"op": "interferometer", "modes": [0, 1],
-                 "params": {"U": [[1, 0], [0, 1]]}}],
+        "ops": [{"op": "interferometer", "modes": [0, 1], "params": {"U": [[1, 0], [0, 1]]}}],
     }
     assert validate_ir(data).ops[0].op == "interferometer"
 
@@ -280,17 +299,20 @@ def test_unknown_param_name():
         validate_ir(data)
 
 
-@pytest.mark.parametrize("op,params,msg", [
-    ("squeeze", {"r": "0.5"}, "must be a number"),
-    ("squeeze", {"r": True}, "must be a number"),
-    ("displace", {"alpha": [1, 2, 3]}, "must be a number or \\[re, im\\]"),
-    ("displace", {"alpha": "abc"}, "must be a number or \\[re, im\\]"),
-    ("displace", {"alpha": {"$param": ""}}, "\\$param must be a non-empty string"),
-    ("squeeze", {"r": {"$ref": ""}}, "\\$ref source must be a non-empty string"),
-    ("squeeze", {"r": {"$ref": "m", "gain": "x"}}, "\\$ref gain must be a number"),
-    ("squeeze", {"r": {"$param": "x", "extra": 1}}, "\\$param must be the only key"),
-    ("measure_heterodyne", {"name": {"$param": "x"}}, "\\$param not allowed"),
-])
+@pytest.mark.parametrize(
+    "op,params,msg",
+    [
+        ("squeeze", {"r": "0.5"}, "must be a number"),
+        ("squeeze", {"r": True}, "must be a number"),
+        ("displace", {"alpha": [1, 2, 3]}, "must be a number or \\[re, im\\]"),
+        ("displace", {"alpha": "abc"}, "must be a number or \\[re, im\\]"),
+        ("displace", {"alpha": {"$param": ""}}, "\\$param must be a non-empty string"),
+        ("squeeze", {"r": {"$ref": ""}}, "\\$ref source must be a non-empty string"),
+        ("squeeze", {"r": {"$ref": "m", "gain": "x"}}, "\\$ref gain must be a number"),
+        ("squeeze", {"r": {"$param": "x", "extra": 1}}, "\\$param must be the only key"),
+        ("measure_heterodyne", {"name": {"$param": "x"}}, "\\$param not allowed"),
+    ],
+)
 def test_bad_param_kinds(op, params, msg):
     data = _doc([{"op": op, "modes": [0], "params": params}])
     with pytest.raises(ValueError, match=msg):

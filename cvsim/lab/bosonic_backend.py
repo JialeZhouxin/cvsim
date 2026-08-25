@@ -4,6 +4,7 @@ Extracted from ``lab/ir.py``. Bosonic run + Wigner/meters assembly. Imports
 shared types/helpers from ``cvsim.lab.ir`` (no circular import: ir.py does not
 import this module).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -40,7 +41,6 @@ def _bosonic_adaptive_n(state: BosonicState, n: int) -> int:
     return n
 
 
-
 def _bosonic_single_wigner(
     state: BosonicState, mode: int, view: View
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
@@ -59,7 +59,6 @@ def _bosonic_single_wigner(
         return None
 
 
-
 def _bosonic_meters(state: BosonicState) -> dict[str, Any]:
     """Bosonic result meters: purity + per-mode/mean photon (B4/B1 closed forms)."""
     if state.nmode == 0 or not state.components:
@@ -75,7 +74,6 @@ def _bosonic_meters(state: BosonicState) -> dict[str, Any]:
         "mean_photon": float(sum(mean_list)),
         "mean_photon_per_mode": mean_list,
     }
-
 
 
 def run_bosonic_circuit(
@@ -99,9 +97,7 @@ def run_bosonic_circuit(
     measured = _fock_measured(circuit.raw, results)
     wmode = circuit.view.wigner_mode
     if state.nmode > 0 and wmode >= state.nmode:
-        raise CircuitV0Error(
-            f"view.wigner_mode {wmode} out of range (nmode={state.nmode})"
-        )
+        raise CircuitV0Error(f"view.wigner_mode {wmode} out of range (nmode={state.nmode})")
     wigner = None
     if state.nmode > 0:
         wigner = _bosonic_single_wigner(state, wmode, circuit.view)
@@ -110,8 +106,7 @@ def run_bosonic_circuit(
         "backend": "bosonic",
         "nmode": state.nmode,
         "wigner": (
-            {"x": wigner[0][0].tolist(), "p": wigner[1][:, 0].tolist(),
-             "W": wigner[2].tolist()}
+            {"x": wigner[0][0].tolist(), "p": wigner[1][:, 0].tolist(), "W": wigner[2].tolist()}
             if wigner is not None
             else None
         ),
@@ -133,10 +128,7 @@ def run_bosonic_circuit(
     return payload
 
 
-
-def _bosonic_wigner_payload(
-    state: BosonicState, view: View
-) -> dict[str, Any] | None:
+def _bosonic_wigner_payload(state: BosonicState, view: View) -> dict[str, Any] | None:
     """Wigner payload for a step state (view.wigner_mode reduced single-mode)."""
     if state.nmode == 0:
         return None
@@ -147,6 +139,3 @@ def _bosonic_wigner_payload(
     if w is None:
         return None
     return {"x": w[0][0].tolist(), "p": w[1][:, 0].tolist(), "W": w[2].tolist()}
-
-
-

@@ -43,9 +43,7 @@ class GaussianCircuit:
 
     def __iadd__(self, other: GaussianCircuit) -> GaussianCircuit:
         if self.nmode != other.nmode:
-            raise ValueError(
-                f"nmode mismatch: {self.nmode} vs {other.nmode}"
-            )
+            raise ValueError(f"nmode mismatch: {self.nmode} vs {other.nmode}")
         self._ops.extend(other._ops)
         return self
 
@@ -60,57 +58,46 @@ class GaussianCircuit:
     def squeeze(self, mode: int, r: float | str = 0.0, phi: float | str = 0.0) -> GaussianCircuit:
         """Squeeze by ``r`` at angle ``phi`` (same convention as
         ``gates.squeeze`` / ``GaussianState.squeezed``)."""
-        self._ops.append(self._partition('squeeze', [mode], r=r, phi=phi))
+        self._ops.append(self._partition("squeeze", [mode], r=r, phi=phi))
         return self
 
     def displace(
-        self, mode: int,
+        self,
+        mode: int,
         alpha: complex | str | ParamRef = 0.0,
     ) -> GaussianCircuit:
-        self._ops.append(self._partition('displace', [mode], alpha=alpha))
+        self._ops.append(self._partition("displace", [mode], alpha=alpha))
         return self
 
     def phase(self, mode: int, theta: float | str = 0.0) -> GaussianCircuit:
-        self._ops.append(self._partition('phase', [mode], theta=theta))
+        self._ops.append(self._partition("phase", [mode], theta=theta))
         return self
 
     def fourier(self, mode: int = 0) -> GaussianCircuit:
         """Fourier gate on ``mode`` (phase by π/2)."""
-        self._ops.append(self._partition('fourier', [mode]))
+        self._ops.append(self._partition("fourier", [mode]))
         return self
 
     def beamsplitter(
-        self, mode1: int, mode2: int,
+        self,
+        mode1: int,
+        mode2: int,
         theta: float | str = np.pi / 4,
         phi: float | str = 0.0,
     ) -> GaussianCircuit:
-        self._ops.append(
-            self._partition('beamsplitter', [mode1, mode2], theta=theta, phi=phi)
-        )
+        self._ops.append(self._partition("beamsplitter", [mode1, mode2], theta=theta, phi=phi))
         return self
 
-    def two_mode_squeeze(
-        self, mode1: int, mode2: int, r: float | str = 0.0
-    ) -> GaussianCircuit:
-        self._ops.append(
-            self._partition('two_mode_squeeze', [mode1, mode2], r=r)
-        )
+    def two_mode_squeeze(self, mode1: int, mode2: int, r: float | str = 0.0) -> GaussianCircuit:
+        self._ops.append(self._partition("two_mode_squeeze", [mode1, mode2], r=r))
         return self
 
-    def cz(
-        self, mode1: int, mode2: int, weight: float | str = 0.0
-    ) -> GaussianCircuit:
-        self._ops.append(
-            self._partition('cz', [mode1, mode2], weight=weight)
-        )
+    def cz(self, mode1: int, mode2: int, weight: float | str = 0.0) -> GaussianCircuit:
+        self._ops.append(self._partition("cz", [mode1, mode2], weight=weight))
         return self
 
-    def cx(
-        self, mode1: int, mode2: int, weight: float | str = 0.0
-    ) -> GaussianCircuit:
-        self._ops.append(
-            self._partition('cx', [mode1, mode2], weight=weight)
-        )
+    def cx(self, mode1: int, mode2: int, weight: float | str = 0.0) -> GaussianCircuit:
+        self._ops.append(self._partition("cx", [mode1, mode2], weight=weight))
         return self
 
     def mach_zehnder(
@@ -121,38 +108,28 @@ class GaussianCircuit:
         phi: float | str = 0.0,
     ) -> GaussianCircuit:
         """Mach–Zehnder: BS(θ) → phase(φ) on mode1 → BS(π/4)."""
-        self._ops.append(
-            self._partition(
-                'mach_zehnder', [mode1, mode2], theta=theta, phi=phi
-            )
-        )
+        self._ops.append(self._partition("mach_zehnder", [mode1, mode2], theta=theta, phi=phi))
         return self
 
     def interferometer(self, U: np.ndarray) -> GaussianCircuit:
         """Passive interferometer: full nmode×nmode unitary U."""
         U = np.asarray(U, dtype=complex).copy()
         if U.shape != (self.nmode, self.nmode):
-            raise ValueError(
-                f"U shape {U.shape} incompatible with nmode={self.nmode}"
-            )
+            raise ValueError(f"U shape {U.shape} incompatible with nmode={self.nmode}")
         # Store U in fixed kwargs; modes = all logical modes (for mapping).
         self._ops.append(
             (
-                'interferometer',
+                "interferometer",
                 tuple(range(self.nmode)),
-                {'U': U},
+                {"U": U},
                 {},
                 {},
             )
         )
         return self
 
-    def loss(
-        self, mode: int, T: float | str = 1.0, nbar: float = 0.0
-    ) -> GaussianCircuit:
-        self._ops.append(
-            self._partition('loss', [mode], T=T, nbar=nbar)
-        )
+    def loss(self, mode: int, T: float | str = 1.0, nbar: float = 0.0) -> GaussianCircuit:
+        self._ops.append(self._partition("loss", [mode], T=T, nbar=nbar))
         return self
 
     def amplifier(
@@ -163,9 +140,7 @@ class GaussianCircuit:
     ) -> GaussianCircuit:
         """Phase-insensitive amplifier. ``mode=None`` ⇒ all logical modes."""
         modes = [] if mode is None else [mode]
-        self._ops.append(
-            self._partition('amplifier', modes, G=G, nbar=nbar)
-        )
+        self._ops.append(self._partition("amplifier", modes, G=G, nbar=nbar))
         return self
 
     def phase_noise(
@@ -175,9 +150,7 @@ class GaussianCircuit:
     ) -> GaussianCircuit:
         """Phase diffusion (rotation-average). ``mode=None`` ⇒ all modes."""
         modes = [] if mode is None else [mode]
-        self._ops.append(
-            self._partition('phase_noise', modes, sigma=sigma)
-        )
+        self._ops.append(self._partition("phase_noise", modes, sigma=sigma))
         return self
 
     def gaussian_channel(
@@ -206,24 +179,20 @@ class GaussianCircuit:
         if d is not None:
             d = np.asarray(d, dtype=float).copy()
             if d.shape != (2 * m_xy,):
-                raise ValueError(
-                    f"d must be ({2 * m_xy},); got {d.shape}"
-                )
+                raise ValueError(f"d must be ({2 * m_xy},); got {d.shape}")
         # modes empty: full-state op; run() does not remap X/Y through mapping
         self._ops.append(
             (
-                'gaussian_channel',
+                "gaussian_channel",
                 (),
-                {'X': X, 'Y': Y, 'd': d, 'validate': validate},
+                {"X": X, "Y": Y, "d": d, "validate": validate},
                 {},
                 {},
             )
         )
         return self
 
-    def measure_homodyne(
-        self, mode: int, phi: float, name: str
-    ) -> GaussianCircuit:
+    def measure_homodyne(self, mode: int, phi: float, name: str) -> GaussianCircuit:
         """Ideal Homodyne measurement: sample + condition + remove mode.
 
         At ``run()``, this produces a random outcome stored in
@@ -232,16 +201,16 @@ class GaussianCircuit:
         """
         self._ops.append(
             self._partition(
-                'measure_homodyne', [mode],
-                _fixed_str_keys={'name'},
-                phi=phi, name=name,
+                "measure_homodyne",
+                [mode],
+                _fixed_str_keys={"name"},
+                phi=phi,
+                name=name,
             )
         )
         return self
 
-    def measure_heterodyne(
-        self, mode: int, name: str
-    ) -> GaussianCircuit:
+    def measure_heterodyne(self, mode: int, name: str) -> GaussianCircuit:
         """Ideal Heterodyne measurement: sample β + condition + remove mode.
 
         POVM |β⟩⟨β|/π. Outcome stored in ``results[name]`` as ``complex``.
@@ -249,16 +218,15 @@ class GaussianCircuit:
         """
         self._ops.append(
             self._partition(
-                'measure_heterodyne', [mode],
-                _fixed_str_keys={'name'},
+                "measure_heterodyne",
+                [mode],
+                _fixed_str_keys={"name"},
                 name=name,
             )
         )
         return self
 
-    def measure_threshold(
-        self, mode: int, name: str
-    ) -> GaussianCircuit:
+    def measure_threshold(self, mode: int, name: str) -> GaussianCircuit:
         """Threshold (on/off) measurement — outcome-only (grill 2026-08-10).
 
         At ``run()``, produces a random ``0/1`` outcome stored in
@@ -268,8 +236,9 @@ class GaussianCircuit:
         """
         self._ops.append(
             self._partition(
-                'measure_threshold', [mode],
-                _fixed_str_keys={'name'},
+                "measure_threshold",
+                [mode],
+                _fixed_str_keys={"name"},
                 name=name,
             )
         )

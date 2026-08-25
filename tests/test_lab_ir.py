@@ -125,6 +125,7 @@ def test_two_sources_rejected_when_gate_in_between():
 
 def test_multi_source_vacuum_equiv_single_nmode():
     """L5.5: vacuum×2 + displace×2 ≡ vacuum nmode=2 (direct product)."""
+
     def scene(multi: bool) -> dict:
         nodes = [{"id": "s0", "op": "vacuum", "params": {"nmode": 1 if multi else 2}}]
         if multi:
@@ -137,7 +138,8 @@ def test_multi_source_vacuum_equiv_single_nmode():
                 {"id": "d1", "op": "displace", "params": {"alpha": 1.0}, "mode": 1},
             ],
         }
-    r1 = run_circuit(load_circuit(scene(True)))   # two vacuum sources
+
+    r1 = run_circuit(load_circuit(scene(True)))  # two vacuum sources
     r2 = run_circuit(load_circuit(scene(False)))  # single vacuum nmode=2
     assert r1.nmode == 2 and r2.nmode == 2
     assert np.allclose(r1.rbar, r2.rbar)
@@ -161,7 +163,7 @@ def test_multi_source_tmsv_append_third_mode():
     assert abs(res.V[1, 2]) > 0  # x1·x2
     assert abs(res.V[4, 5]) > 0  # p1·p2
     # vacuum mode 0 uncorrelated with the pair: x0/p0 rows empty off-diagonal
-    assert np.abs(res.V[0, 1:]).max() < 1e-12                      # x0 row
+    assert np.abs(res.V[0, 1:]).max() < 1e-12  # x0 row
     assert np.abs(np.concatenate([res.V[3, :3], res.V[3, 4:]])).max() < 1e-12  # p0 row
 
 

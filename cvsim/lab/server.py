@@ -77,9 +77,7 @@ def run(body: dict[str, Any]) -> dict[str, Any]:
         if circuit.backend == "fock":
             # deterministic per circuit (seed field, default 0): same JSON
             # → same run (incl. measured outcomes) — reproducible meters
-            return run_fock_circuit(
-                circuit, np.random.default_rng(circuit.seed)
-            )
+            return run_fock_circuit(circuit, np.random.default_rng(circuit.seed))
         if circuit.backend == "bosonic":
             return run_bosonic_circuit(
                 circuit,
@@ -100,16 +98,12 @@ def sample(body: dict[str, Any]) -> dict[str, Any]:
     try:
         circuit = load_circuit(body)
         if circuit.backend == "fock":
-            payload = run_fock_circuit(
-                circuit, np.random.default_rng(circuit.seed)
-            )
+            payload = run_fock_circuit(circuit, np.random.default_rng(circuit.seed))
             payload["seed"] = circuit.seed
             payload["sampled"] = True
             return payload
         if circuit.backend == "bosonic":
-            payload = run_bosonic_circuit(
-                circuit, np.random.default_rng(circuit.seed)
-            )
+            payload = run_bosonic_circuit(circuit, np.random.default_rng(circuit.seed))
             payload["seed"] = circuit.seed
             payload["sampled"] = True
             return payload
@@ -131,18 +125,13 @@ def batch(body: dict[str, Any]) -> dict[str, Any]:
         shots = body.pop("shots", 1000)
         circuit = load_circuit(body)
         if circuit.backend != "fock":
-            raise CircuitV0Error(
-                "batch requires backend='fock' (v0 has no Gaussian batch)"
-            )
-        if (
-            not isinstance(shots, int)
-            or isinstance(shots, bool)
-            or not 1 <= shots <= 100_000
-        ):
+            raise CircuitV0Error("batch requires backend='fock' (v0 has no Gaussian batch)")
+        if not isinstance(shots, int) or isinstance(shots, bool) or not 1 <= shots <= 100_000:
             raise CircuitV0Error("shots must be an int in [1, 100000]")
         return batch_fock_circuit(circuit, shots, circuit.seed)
     except (CircuitV0Error, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
 
 @app.post("/scan")
 def scan(body: dict[str, Any]) -> dict[str, Any]:
@@ -157,14 +146,13 @@ def scan(body: dict[str, Any]) -> dict[str, Any]:
         sweep = body.pop("sweep", None)
         circuit = load_circuit(body)
         if circuit.backend == "fock":
-            raise CircuitV0Error(
-                "scan is not available for the fock backend (v0)"
-            )
+            raise CircuitV0Error("scan is not available for the fock backend (v0)")
         if not isinstance(sweep, dict):
             raise CircuitV0Error("sweep must be an object")
         return scan_circuit(circuit, sweep)
     except (CircuitV0Error, ValueError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
+
 
 @app.post("/fidelity")
 def fidelity(body: dict[str, Any]) -> dict[str, Any]:
@@ -180,9 +168,7 @@ def fidelity(body: dict[str, Any]) -> dict[str, Any]:
         rounds = body.pop("rounds", 1)
         circuit = load_circuit(body)
         if circuit.backend != "bosonic":
-            raise CircuitV0Error(
-                "fidelity sweep requires backend='bosonic'"
-            )
+            raise CircuitV0Error("fidelity sweep requires backend='bosonic'")
         if not isinstance(sweep, dict):
             raise CircuitV0Error("sweep must be an object")
         return fidelity_sweep(circuit, sweep, seed=circuit.seed, rounds=rounds)

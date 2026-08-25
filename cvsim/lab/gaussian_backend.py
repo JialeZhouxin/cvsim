@@ -7,6 +7,7 @@ this module owns only state→RunResult assembly. Imports shared types from
 ``cvsim.lab.ir`` (no circular import: ir.py does not module-import this file;
 _execute uses a function-local import to call _build_result).
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -47,9 +48,8 @@ def _meters(state: GaussianState, singular: bool) -> dict[str, Any]:
     meters["singular"] = singular
     return meters
 
-def _build_result(
-    state: GaussianState, view: View, measured: list[dict[str, Any]]
-) -> RunResult:
+
+def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any]]) -> RunResult:
     """Assemble RunResult: Wigner view + meters. A singular conditional state
     (homodyne-conditioned mode, det(2V)=0) has no finite Wigner: report
     wigner=None + meters.singular instead of fabricating data. All modes
@@ -60,9 +60,13 @@ def _build_result(
             rbar=np.zeros(0),
             V=np.zeros((0, 0)),
             wigner=None,
-            meters={"purity": None, "mean_photon": 0.0,
-                    "mean_photon_per_mode": [], "log_negativity": None,
-                    "singular": False},
+            meters={
+                "purity": None,
+                "mean_photon": 0.0,
+                "mean_photon_per_mode": [],
+                "log_negativity": None,
+                "singular": False,
+            },
             measured=measured,
         )
     if view.wigner_mode >= state.nmode:

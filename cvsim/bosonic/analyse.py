@@ -48,9 +48,7 @@ def purity(state: BosonicState, *, validate: bool = False) -> float:
     for c in state.components:
         sign, logdet = np.linalg.slogdet(c.V)
         if sign <= 0:
-            raise ValueError(
-                f"purity: det(V_k) ≤ 0 (slogdet sign={sign}): non-physical/singular"
-            )
+            raise ValueError(f"purity: det(V_k) ≤ 0 (slogdet sign={sign}): non-physical/singular")
         mu_k = float(np.exp(-0.5 * logdet) / (2**m))
         acc += abs(c.w) ** 2 * mu_k
     return float(acc)
@@ -86,8 +84,6 @@ def pure_fidelity(state_a: BosonicState, state_b: BosonicState) -> float:
     T = np.zeros((len(comps_a), len(comps_b)), dtype=float)
     for i, ca2 in enumerate(comps_a):
         for j, cb2 in enumerate(comps_b):
-            T[i, j] = _gauss_overlap_two_V(
-                ca2.V, cb2.V, ca2.rbar.real, cb2.rbar.real
-            )
+            T[i, j] = _gauss_overlap_two_V(ca2.V, cb2.V, ca2.rbar.real, cb2.rbar.real)
     inner = c_a.conj() @ T @ c_b
     return float(abs(inner) ** 2)

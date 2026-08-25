@@ -93,10 +93,7 @@ def _u3() -> tuple[bool, str]:
 
     r = 0.5
     st = beamsplitter(squeeze(GaussianState.vacuum(2), r=r, mode=0), 0, 1, np.pi / 4)
-    bs_ok = (
-        abs(mean_photon(st) - np.sinh(r) ** 2) < 1e-12
-        and abs(det_cov(st) - 0.25**2) < 1e-10
-    )
+    bs_ok = abs(mean_photon(st) - np.sinh(r) ** 2) < 1e-12 and abs(det_cov(st) - 0.25**2) < 1e-10
 
     r2, th = 0.7, 0.35
     st_p = phase(squeeze(GaussianState.vacuum(1), r2), th)
@@ -144,17 +141,17 @@ def _u5() -> tuple[bool, str]:
 def _u7() -> tuple[bool, str]:
     """Extended smoke: G loss/condition, F BS, B gkp0/loss."""
     alpha, T = 0.7 + 0.2j, 0.4
-    g_ok = abs(
-        mean_photon(g_loss(displace(GaussianState.vacuum(1), alpha), T)) - T * abs(alpha) ** 2
-    ) < 1e-12
+    g_ok = (
+        abs(mean_photon(g_loss(displace(GaussianState.vacuum(1), alpha), T)) - T * abs(alpha) ** 2)
+        < 1e-12
+    )
 
     st_c = homodyne_condition(GaussianState.vacuum(1), 0, 0.0, 0.25)
     c_ok = abs(st_c.V[0, 0]) < 1e-12 and abs(st_c.rbar[0] - 0.25) < 1e-12
 
     st_f = f_bs(FockState.fock2(1, 0, 12), np.pi / 4)
     f_ok = (
-        abs(abs(st_f.amps[1, 0]) ** 2 - 0.5) < 1e-6
-        and abs(abs(st_f.amps[0, 1]) ** 2 - 0.5) < 1e-6
+        abs(abs(st_f.amps[1, 0]) ** 2 - 0.5) < 1e-6 and abs(abs(st_f.amps[0, 1]) ** 2 - 0.5) < 1e-6
     )
 
     st_g = gkp0(0.1, grid_size=3)
@@ -214,9 +211,7 @@ def _u9() -> tuple[bool, str]:
     rho2 = f_displace(rho, 0.3)
     dens_ok = abs(f_trace(rho2) - 1.0) < 1e-10
 
-    o, st = homodyne_sample_and_condition(
-        GaussianState.vacuum(1), rng=np.random.default_rng(1)
-    )
+    o, st = homodyne_sample_and_condition(GaussianState.vacuum(1), rng=np.random.default_rng(1))
     sc_ok = abs(st.V[0, 0]) < 1e-12 and abs(st.rbar[0] - o) < 1e-12
 
     ok = w_ok and dens_ok and sc_ok

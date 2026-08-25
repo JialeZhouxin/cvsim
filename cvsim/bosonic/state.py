@@ -150,6 +150,4 @@ def coherent(alpha: complex, nmode: int = 1, mode: int = 0) -> BosonicState:
     a = complex(alpha)
     rbar[mode] = np.sqrt(2.0) * a.real
     rbar[nmode + mode] = np.sqrt(2.0) * a.imag
-    return BosonicState(
-        components=[Component(V=vacuum_cov(nmode), rbar=rbar, w=1.0 + 0.0j)]
-    )
+    return BosonicState(components=[Component(V=vacuum_cov(nmode), rbar=rbar, w=1.0 + 0.0j)])

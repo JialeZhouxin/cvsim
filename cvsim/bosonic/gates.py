@@ -65,9 +65,7 @@ def beamsplitter(
     return apply_symplectic(state, S_beamsplitter(m, mode1, mode2, theta, phi))
 
 
-def two_mode_squeeze(
-    state: BosonicState, r: float, mode1: int, mode2: int
-) -> BosonicState:
+def two_mode_squeeze(state: BosonicState, r: float, mode1: int, mode2: int) -> BosonicState:
     m = _nmode(state)
     return apply_symplectic(state, S_two_mode_squeeze(m, r, mode1, mode2))
 
@@ -89,25 +87,19 @@ def mach_zehnder(
     return apply_symplectic(state, S_mach_zehnder(m, mode1, mode2, theta, phi))
 
 
-def cz(
-    state: BosonicState, weight: float, mode1: int, mode2: int
-) -> BosonicState:
+def cz(state: BosonicState, weight: float, mode1: int, mode2: int) -> BosonicState:
     """Controlled-Z: CZ = exp(i·weight·x̂₁·x̂₂)."""
     m = _nmode(state)
     return apply_symplectic(state, S_CZ(m, weight, mode1, mode2))
 
 
-def cx(
-    state: BosonicState, weight: float, mode1: int, mode2: int
-) -> BosonicState:
+def cx(state: BosonicState, weight: float, mode1: int, mode2: int) -> BosonicState:
     """Controlled-X: CX = exp(-i·weight·x̂₁·p̂₂)."""
     m = _nmode(state)
     return apply_symplectic(state, S_CX(m, weight, mode1, mode2))
 
 
-def interferometer(
-    state: BosonicState, U: np.ndarray, *, validate_u: bool = True
-) -> BosonicState:
+def interferometer(state: BosonicState, U: np.ndarray, *, validate_u: bool = True) -> BosonicState:
     """Apply passive linear optics U (m×m unitary) to every component.
 
     ``validate_u=True`` (default) rejects non-unitary U. Setting

@@ -47,21 +47,34 @@ from cvsim.fock.state import FockState
 #: Ops that break a compile segment (channels + measurements; ADR-0002 d2).
 _BREAK_OPS = frozenset(
     {
-        'loss', 'amplifier', 'phase_noise', 'apply_kraus',
-        'measure_pnr', 'measure_homodyne', 'measure_heterodyne',
+        "loss",
+        "amplifier",
+        "phase_noise",
+        "apply_kraus",
+        "measure_pnr",
+        "measure_homodyne",
+        "measure_heterodyne",
     }
 )
 #: Fock measurements collapse the measured mode into the posterior —
 #: the mode leaves the physical mapping (same shift semantics as Gaussian
 #: homodyne). PNR conditioning differs from Gaussian remove-mode only in
 #: what the *surviving* modes are (conditioned, not discarded).
-_REMOVE_MODE_OPS = frozenset({'measure_pnr', 'measure_homodyne', 'measure_heterodyne'})
+_REMOVE_MODE_OPS = frozenset({"measure_pnr", "measure_homodyne", "measure_heterodyne"})
 #: Unitary ops merged into a segment (Kronecker per-op application).
 _MERGEABLE_OPS = frozenset(
     {
-        'squeeze', 'displace', 'phase', 'kerr', 'beamsplitter',
-        'two_mode_squeeze', 'cz', 'cx', 'mach_zehnder',
-        'interferometer', 'apply_unitary',
+        "squeeze",
+        "displace",
+        "phase",
+        "kerr",
+        "beamsplitter",
+        "two_mode_squeeze",
+        "cz",
+        "cx",
+        "mach_zehnder",
+        "interferometer",
+        "apply_unitary",
     }
 )
 
@@ -126,29 +139,29 @@ def _mz_U(N: int, theta: float, phi: float) -> np.ndarray:
 
 def _factor1(op_name: str, N: int, fixed: dict) -> np.ndarray:
     """Single-mode (N,N) unitary factor for a merged op."""
-    if op_name == 'squeeze':
-        return _squeeze_U(N, float(fixed['r']))
-    if op_name == 'displace':
-        return _displace_U(N, complex(fixed['alpha']))
-    if op_name == 'phase':
-        return _phase_diag(N, float(fixed.get('theta', 0.0)))
-    if op_name == 'kerr':
-        return _kerr_diag(N, float(fixed.get('chi', 0.0)))
+    if op_name == "squeeze":
+        return _squeeze_U(N, float(fixed["r"]))
+    if op_name == "displace":
+        return _displace_U(N, complex(fixed["alpha"]))
+    if op_name == "phase":
+        return _phase_diag(N, float(fixed.get("theta", 0.0)))
+    if op_name == "kerr":
+        return _kerr_diag(N, float(fixed.get("chi", 0.0)))
     raise ValueError(f"_factor1: op {op_name} is not single-mode")
 
 
 def _factor2(op_name: str, N: int, fixed: dict) -> np.ndarray:
     """Two-mode (N²,N²) unitary factor for a merged op (equal cutoffs)."""
-    if op_name == 'beamsplitter':
-        return _bs_U(N, float(fixed.get('theta', np.pi / 4)), float(fixed.get('phi', 0.0)))
-    if op_name == 'two_mode_squeeze':
-        return _tms_U(N, float(fixed['r']))
-    if op_name == 'cz':
-        return _cz_U(N, float(fixed['weight']))
-    if op_name == 'cx':
-        return _cx_U(N, float(fixed['weight']))
-    if op_name == 'mach_zehnder':
-        return _mz_U(N, float(fixed.get('theta', np.pi / 4)), float(fixed.get('phi', 0.0)))
+    if op_name == "beamsplitter":
+        return _bs_U(N, float(fixed.get("theta", np.pi / 4)), float(fixed.get("phi", 0.0)))
+    if op_name == "two_mode_squeeze":
+        return _tms_U(N, float(fixed["r"]))
+    if op_name == "cz":
+        return _cz_U(N, float(fixed["weight"]))
+    if op_name == "cx":
+        return _cx_U(N, float(fixed["weight"]))
+    if op_name == "mach_zehnder":
+        return _mz_U(N, float(fixed.get("theta", np.pi / 4)), float(fixed.get("phi", 0.0)))
     raise ValueError(f"_factor2: op {op_name} is not two-mode")
 
 
@@ -188,7 +201,7 @@ def _kron_apply2(
     """Apply two-mode U ((N1·N2)²) on axes (m1,m2) of an m-mode amp tensor."""
     U4 = U2.reshape(N1, N2, N1, N2)  # [out1, out2, in1, in2]
     a = np.moveaxis(amps, (m1, m2), (-2, -1))
-    out = np.einsum('ijkl,...kl->...ij', U4, a)
+    out = np.einsum("ijkl,...kl->...ij", U4, a)
     return np.moveaxis(out, (-2, -1), (m1, m2))
 
 
@@ -243,29 +256,17 @@ class FockCircuit:
         self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
 
     @staticmethod
-    def _validate_initial(
-        initial: list[int] | None, cutoffs: list[int]
-    ) -> list[int] | None:
+    def _validate_initial(initial: list[int] | None, cutoffs: list[int]) -> list[int] | None:
         """Per-mode Fock number-state occupation list; None = vacuum."""
         if initial is None:
             return None
         if not isinstance(initial, (list, tuple)):
-            raise ValueError(
-                f"initial must be a list of ints, got {initial!r}"
-            )
+            raise ValueError(f"initial must be a list of ints, got {initial!r}")
         if len(initial) != len(cutoffs):
-            raise ValueError(
-                f"initial len {len(initial)} != nmode {len(cutoffs)}"
-            )
+            raise ValueError(f"initial len {len(initial)} != nmode {len(cutoffs)}")
         for i, (n, c) in enumerate(zip(initial, cutoffs, strict=True)):
-            if (
-                not isinstance(n, int)
-                or isinstance(n, bool)
-                or not 0 <= n < c
-            ):
-                raise ValueError(
-                    f"initial[{i}]={n!r} must be an int in [0, {c})"
-                )
+            if not isinstance(n, int) or isinstance(n, bool) or not 0 <= n < c:
+                raise ValueError(f"initial[{i}]={n!r} must be an int in [0, {c})")
         return list(initial)
 
     # -- composition ------------------------------------------------------
@@ -289,21 +290,19 @@ class FockCircuit:
     # -- builder: single-mode gates ---------------------------------------
 
     def squeeze(self, mode: int, r: float | str = 0.0) -> FockCircuit:
-        self._ops.append(self._partition('squeeze', [mode], r=r))
+        self._ops.append(self._partition("squeeze", [mode], r=r))
         return self
 
-    def displace(
-        self, mode: int, alpha: complex | str | ParamRef = 0.0
-    ) -> FockCircuit:
-        self._ops.append(self._partition('displace', [mode], alpha=alpha))
+    def displace(self, mode: int, alpha: complex | str | ParamRef = 0.0) -> FockCircuit:
+        self._ops.append(self._partition("displace", [mode], alpha=alpha))
         return self
 
     def phase(self, mode: int, theta: float | str = 0.0) -> FockCircuit:
-        self._ops.append(self._partition('phase', [mode], theta=theta))
+        self._ops.append(self._partition("phase", [mode], theta=theta))
         return self
 
     def kerr(self, mode: int, chi: float | str = 0.0) -> FockCircuit:
-        self._ops.append(self._partition('kerr', [mode], chi=chi))
+        self._ops.append(self._partition("kerr", [mode], chi=chi))
         return self
 
     # -- builder: two-mode gates ------------------------------------------
@@ -315,23 +314,19 @@ class FockCircuit:
         theta: float | str = np.pi / 4,
         phi: float | str = 0.0,
     ) -> FockCircuit:
-        self._ops.append(
-            self._partition('beamsplitter', [mode1, mode2], theta=theta, phi=phi)
-        )
+        self._ops.append(self._partition("beamsplitter", [mode1, mode2], theta=theta, phi=phi))
         return self
 
-    def two_mode_squeeze(
-        self, mode1: int, mode2: int, r: float | str = 0.0
-    ) -> FockCircuit:
-        self._ops.append(self._partition('two_mode_squeeze', [mode1, mode2], r=r))
+    def two_mode_squeeze(self, mode1: int, mode2: int, r: float | str = 0.0) -> FockCircuit:
+        self._ops.append(self._partition("two_mode_squeeze", [mode1, mode2], r=r))
         return self
 
     def cz(self, mode1: int, mode2: int, weight: float | str = 1.0) -> FockCircuit:
-        self._ops.append(self._partition('cz', [mode1, mode2], weight=weight))
+        self._ops.append(self._partition("cz", [mode1, mode2], weight=weight))
         return self
 
     def cx(self, mode1: int, mode2: int, weight: float | str = 1.0) -> FockCircuit:
-        self._ops.append(self._partition('cx', [mode1, mode2], weight=weight))
+        self._ops.append(self._partition("cx", [mode1, mode2], weight=weight))
         return self
 
     def mach_zehnder(
@@ -341,57 +336,41 @@ class FockCircuit:
         theta: float | str = np.pi / 4,
         phi: float | str = 0.0,
     ) -> FockCircuit:
-        self._ops.append(
-            self._partition('mach_zehnder', [mode1, mode2], theta=theta, phi=phi)
-        )
+        self._ops.append(self._partition("mach_zehnder", [mode1, mode2], theta=theta, phi=phi))
         return self
 
     def interferometer(self, U: np.ndarray) -> FockCircuit:
         """Passive interferometer: full nmode×nmode unitary U."""
         U = np.asarray(U, dtype=complex).copy()
         if U.shape != (self.nmode, self.nmode):
-            raise ValueError(
-                f"U shape {U.shape} incompatible with nmode={self.nmode}"
-            )
-        self._ops.append(
-            ('interferometer', tuple(range(self.nmode)), {'U': U}, {}, {})
-        )
+            raise ValueError(f"U shape {U.shape} incompatible with nmode={self.nmode}")
+        self._ops.append(("interferometer", tuple(range(self.nmode)), {"U": U}, {}, {}))
         return self
 
-    def apply_unitary(
-        self, U: np.ndarray, modes: list[int] | None = None
-    ) -> FockCircuit:
+    def apply_unitary(self, U: np.ndarray, modes: list[int] | None = None) -> FockCircuit:
         """Generic truncated unitary on ``modes`` (all modes if None)."""
         U = np.asarray(U, dtype=complex).copy()
         if modes is None:
             modes = list(range(self.nmode))
-        self._ops.append(
-            ('apply_unitary', tuple(modes), {'U': U}, {}, {})
-        )
+        self._ops.append(("apply_unitary", tuple(modes), {"U": U}, {}, {}))
         return self
 
     # -- builder: channels -------------------------------------------------
 
     def loss(self, mode: int, eta: float | str) -> FockCircuit:
-        self._ops.append(self._partition('loss', [mode], eta=eta))
+        self._ops.append(self._partition("loss", [mode], eta=eta))
         return self
 
-    def amplifier(
-        self, mode: int, G: float | str, nbar: float | str = 0.0
-    ) -> FockCircuit:
-        self._ops.append(self._partition('amplifier', [mode], G=G, nbar=nbar))
+    def amplifier(self, mode: int, G: float | str, nbar: float | str = 0.0) -> FockCircuit:
+        self._ops.append(self._partition("amplifier", [mode], G=G, nbar=nbar))
         return self
 
     def phase_noise(self, mode: int, sigma: float | str) -> FockCircuit:
-        self._ops.append(self._partition('phase_noise', [mode], sigma=sigma))
+        self._ops.append(self._partition("phase_noise", [mode], sigma=sigma))
         return self
 
-    def apply_kraus(
-        self, mode: int, kraus_ops: list[np.ndarray]
-    ) -> FockCircuit:
-        self._ops.append(
-            ('apply_kraus', [mode], {'kraus_ops': kraus_ops}, {}, {})
-        )
+    def apply_kraus(self, mode: int, kraus_ops: list[np.ndarray]) -> FockCircuit:
+        self._ops.append(("apply_kraus", [mode], {"kraus_ops": kraus_ops}, {}, {}))
         return self
 
     # -- builder: measurements ---------------------------------------------
@@ -399,9 +378,7 @@ class FockCircuit:
     def measure_pnr(self, mode: int, name: str) -> FockCircuit:
         """PNR measurement: sample n, condition the posterior (mode kept)."""
         self._ops.append(
-            self._partition(
-                'measure_pnr', [mode], _fixed_str_keys={'name'}, name=name
-            )
+            self._partition("measure_pnr", [mode], _fixed_str_keys={"name"}, name=name)
         )
         return self
 
@@ -412,8 +389,11 @@ class FockCircuit:
         """
         self._ops.append(
             self._partition(
-                'measure_homodyne', [mode], _fixed_str_keys={'name'},
-                phi=phi, name=name,
+                "measure_homodyne",
+                [mode],
+                _fixed_str_keys={"name"},
+                phi=phi,
+                name=name,
             )
         )
         return self
@@ -422,7 +402,9 @@ class FockCircuit:
         """Heterodyne measurement: sample β (coherent POVM), condition."""
         self._ops.append(
             self._partition(
-                'measure_heterodyne', [mode], _fixed_str_keys={'name'},
+                "measure_heterodyne",
+                [mode],
+                _fixed_str_keys={"name"},
                 name=name,
             )
         )
@@ -446,12 +428,12 @@ class FockCircuit:
     def compile(self) -> CompiledFock:
         """Structure-compile: segment ops (ADR-0002), resolve mode mapping."""
         segments, params = compile_segments(
-            self._ops, self.nmode,
-            break_ops=_BREAK_OPS, remove_mode_ops=_REMOVE_MODE_OPS,
+            self._ops,
+            self.nmode,
+            break_ops=_BREAK_OPS,
+            remove_mode_ops=_REMOVE_MODE_OPS,
         )
-        return CompiledFock(
-            self.nmode, self.cutoffs, segments, params, initial=self.initial
-        )
+        return CompiledFock(self.nmode, self.cutoffs, segments, params, initial=self.initial)
 
     def run(self, *, rng=None, **params: float) -> Any:
         """Execute with parameter values (single path: compile then run).
@@ -529,12 +511,12 @@ class CompiledFock(CompiledCircuit):
                 if v not in values:
                     raise ValueError(f"Missing parameter '{v}' for {op_name}")
                 fixed[k] = values[v]
-            if op_name in ('interferometer',):
+            if op_name in ("interferometer",):
                 amps = _full_apply(
-                    _interferometer_U(tuple(self.cutoffs), fixed['U']), amps
+                    _interferometer_U(tuple(self.cutoffs), fixed["U"]), amps
                 ).reshape(amps.shape)
-            elif op_name == 'apply_unitary':
-                U = fixed['U']
+            elif op_name == "apply_unitary":
+                U = fixed["U"]
                 msel = len(modes)
                 if msel == 1:
                     if self.cutoffs[modes[0]] != U.shape[0]:
@@ -564,8 +546,12 @@ class CompiledFock(CompiledCircuit):
                             f"{self.cutoffs[modes[0]]} vs {self.cutoffs[modes[1]]}"
                         )
                     amps = _kron_apply2(
-                        _factor2(op_name, N, fixed), amps,
-                        modes[0], modes[1], N, N,
+                        _factor2(op_name, N, fixed),
+                        amps,
+                        modes[0],
+                        modes[1],
+                        N,
+                        N,
                     )
         return FockState(amps=amps)
 
@@ -580,12 +566,12 @@ class CompiledFock(CompiledCircuit):
                 if v not in values:
                     raise ValueError(f"Missing parameter '{v}' for {op_name}")
                 fixed[k] = values[v]
-            if op_name == 'interferometer':
-                U = _interferometer_U(Ns, fixed['U'])
+            if op_name == "interferometer":
+                U = _interferometer_U(Ns, fixed["U"])
                 rho = U @ rho @ U.conj().T
                 continue
-            if op_name == 'apply_unitary':
-                U = fixed['U']
+            if op_name == "apply_unitary":
+                U = fixed["U"]
                 if len(modes) == 1:
                     rho = _kron_apply2_density(U, rho, m, modes[0], modes[0], Ns)
                 else:
@@ -600,8 +586,7 @@ class CompiledFock(CompiledCircuit):
                 N = self.cutoffs[modes[0]]
                 if self.cutoffs[modes[1]] != N:
                     raise ValueError(
-                        f"{op_name} requires equal cutoffs: "
-                        f"{N} vs {self.cutoffs[modes[1]]}"
+                        f"{op_name} requires equal cutoffs: {N} vs {self.cutoffs[modes[1]]}"
                     )
                 U = _factor2(op_name, N, fixed)
                 rho = _kron_apply2_density(U, rho, m, modes[0], modes[1], Ns)
@@ -614,54 +599,54 @@ class CompiledFock(CompiledCircuit):
             if v not in values:
                 raise ValueError(f"Missing parameter '{v}' for {op_name}")
             kwargs[k] = values[v]
-        if op_name == 'measure_pnr':
+        if op_name == "measure_pnr":
             val, st = pnr_sample_and_condition(st, modes[0], rng=rng)
-            results[kwargs['name']] = val
-        elif op_name == 'measure_homodyne':
-            val, st = homodyne_sample_and_condition(
-                st, modes[0], kwargs['phi'], rng=rng
-            )
-            results[kwargs['name']] = val
-        elif op_name == 'measure_heterodyne':
+            results[kwargs["name"]] = val
+        elif op_name == "measure_homodyne":
+            val, st = homodyne_sample_and_condition(st, modes[0], kwargs["phi"], rng=rng)
+            results[kwargs["name"]] = val
+        elif op_name == "measure_heterodyne":
             val, st = heterodyne_sample_and_condition(st, modes[0], rng=rng)
-            results[kwargs['name']] = val
-        elif op_name in ('loss', 'amplifier', 'phase_noise', 'apply_kraus'):
+            results[kwargs["name"]] = val
+        elif op_name in ("loss", "amplifier", "phase_noise", "apply_kraus"):
             for k, v in refs.items():
                 if v.source not in results:
                     raise ValueError(
-                        f"ParamRef '{k}' references '{v.source}' "
-                        f"which has not been measured yet"
+                        f"ParamRef '{k}' references '{v.source}' which has not been measured yet"
                     )
                 kwargs[k] = complex(results[v.source] * v.gain)
-            if op_name == 'loss':
-                st = _ch_loss(st, float(kwargs['eta']), modes[0])
-            elif op_name == 'amplifier':
+            if op_name == "loss":
+                st = _ch_loss(st, float(kwargs["eta"]), modes[0])
+            elif op_name == "amplifier":
                 st = _ch_amplifier(
-                    st, float(kwargs['G']), modes[0],
-                    float(kwargs.get('nbar', 0.0)),
+                    st,
+                    float(kwargs["G"]),
+                    modes[0],
+                    float(kwargs.get("nbar", 0.0)),
                 )
-            elif op_name == 'phase_noise':
-                st = _ch_phase_noise(st, float(kwargs['sigma']), modes[0])
+            elif op_name == "phase_noise":
+                st = _ch_phase_noise(st, float(kwargs["sigma"]), modes[0])
             else:
-                st = _ch_apply_kraus(st, kwargs['kraus_ops'], modes[0])
+                st = _ch_apply_kraus(st, kwargs["kraus_ops"], modes[0])
         else:
             # break op with ParamRef: a unitary gate with feedforward params
             for k, v in refs.items():
                 if v.source not in results:
                     raise ValueError(
-                        f"ParamRef '{k}' references '{v.source}' "
-                        f"which has not been measured yet"
+                        f"ParamRef '{k}' references '{v.source}' which has not been measured yet"
                     )
                 kwargs[k] = complex(results[v.source] * v.gain)
-            st = self._apply_merged(
-                [(op_name, modes, kwargs, {}, {})], self.nmode, {}, st
-            )
+            st = self._apply_merged([(op_name, modes, kwargs, {}, {})], self.nmode, {}, st)
         return st, results
 
 
 def _kron_apply2_density(
-    U: np.ndarray, rho: np.ndarray, nmode: int,
-    m1: int, m2: int, Ns: tuple[int, ...],
+    U: np.ndarray,
+    rho: np.ndarray,
+    nmode: int,
+    m1: int,
+    m2: int,
+    Ns: tuple[int, ...],
 ) -> np.ndarray:
     """ρ' = (U ⊗ I_rest) ρ (U† ⊗ I_rest) on modes (m1, m2).
 
@@ -683,7 +668,7 @@ def _kron_apply2_density(
     R = int(np.prod([Ns[a] for a in rest]))
     t3 = t2.reshape(N**k, R, N**k, R)
     # ρ'[o; i] = Σ_ab U[o,a] ρ[a;b] conj(U[i,b]) — a,b summed, o=out sel, i=in sel
-    out3 = np.einsum('oa,arbs,ib->oris', U, t3, U.conj())
+    out3 = np.einsum("oa,arbs,ib->oris", U, t3, U.conj())
     # split the raveled sel/in indices back (keep the R singletons for the
     # C-order relayout), then expand the rest block
     x = out3.reshape((N,) * k + (R,) + (N,) * k + (R,))

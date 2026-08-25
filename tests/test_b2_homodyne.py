@@ -32,9 +32,7 @@ def test_displace_mean():
     alpha = 0.4 + 0.25j
     st = displace(GaussianState.vacuum(1), alpha)
     for phi in (0.0, 0.5, np.pi / 2):
-        expect = np.sqrt(2) * (
-            alpha.real * np.cos(phi) + alpha.imag * np.sin(phi)
-        )
+        expect = np.sqrt(2) * (alpha.real * np.cos(phi) + alpha.imag * np.sin(phi))
         assert abs(homodyne_mean(st, 0, phi) - expect) < 1e-12
         # variance still vacuum
         assert abs(homodyne_var(st, 0, phi) - 0.5) < 1e-12

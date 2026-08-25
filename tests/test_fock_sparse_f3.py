@@ -43,9 +43,7 @@ def test_permute_reorders_modes() -> None:
 def test_identical_physics_vs_dense() -> None:
     """Sparse chain == dense chain on the shared (diagonal + permute) ops."""
     s = (
-        FockSparse.from_components(
-            {(0, 0): 0.6, (1, 0): 0.8}, cutoffs=[3, 3]
-        )
+        FockSparse.from_components({(0, 0): 0.6, (1, 0): 0.8}, cutoffs=[3, 3])
         .phase(0, 0.4)
         .kerr(1, 0.2)
         .permute([1, 0])
@@ -64,9 +62,7 @@ def test_identical_physics_vs_dense() -> None:
 
 
 def test_pnrd_probs_no_dense_materialization() -> None:
-    c = FockSparse.from_components(
-        {(0, 0): 1 / np.sqrt(2), (2, 1): 1 / np.sqrt(2)}, cutoffs=[4, 3]
-    )
+    c = FockSparse.from_components({(0, 0): 1 / np.sqrt(2), (2, 1): 1 / np.sqrt(2)}, cutoffs=[4, 3])
     p0 = c.pnrd_probs(0)
     assert p0.shape == (4,)
     np.testing.assert_allclose(p0, [0.5, 0.0, 0.5, 0.0], atol=1e-12)

@@ -24,6 +24,7 @@ from cvsim.gaussian import (
 # 1. Amplifier — physical consistency
 # =============================================================================
 
+
 def test_amplifier_G1_on_vacuum():
     """G=1.0 on vacuum → still vacuum (V and rbar unchanged)."""
     c = GaussianCircuit(1)
@@ -137,16 +138,15 @@ def test_amplifier_on_squeezed_after_measure():
     """Measure one mode, amplify remaining squeezed mode using mode=None."""
     c = GaussianCircuit(2)
     c.squeeze(0, r=0.5)
-    c.measure_homodyne(1, phi=0, name='m')  # remove mode 1 (unrelated)
+    c.measure_homodyne(1, phi=0, name="m")  # remove mode 1 (unrelated)
     c.amplifier(mode=None, G=2.0)  # all remaining: just mode 0
     st, _ = c.run(rng=np.random.default_rng(42))
     assert st.nmode == 1
     assert is_physical(st)
     # Mode 0 is amplified squeezed vacuum: V_diag ≈ [2*0.184+0.5, 2*1.359+0.5]
-    np.testing.assert_allclose(np.diag(st.V)[:2],
-                               [2 * np.exp(-1.0) / 2 + 0.5,
-                                2 * np.exp(1.0) / 2 + 0.5],
-                               atol=1e-10)
+    np.testing.assert_allclose(
+        np.diag(st.V)[:2], [2 * np.exp(-1.0) / 2 + 0.5, 2 * np.exp(1.0) / 2 + 0.5], atol=1e-10
+    )
     assert mean_photon(st) > 1.0
 
 
@@ -162,6 +162,7 @@ def test_amplifier_no_measurement_returns_state():
 # =============================================================================
 # 2. Phase noise — physical consistency
 # =============================================================================
+
 
 def test_phase_noise_sigma0_identity():
     """sigma=0 → identity."""
@@ -181,7 +182,7 @@ def test_phase_noise_attenuates_rbar():
     c.phase_noise(0, sigma=1.0)
     st = c.run()
     initial_rbar = np.array([np.sqrt(2) * 0.5, np.sqrt(2) * 0.3])
-    damp = np.exp(-1.0 ** 2 / 2.0)
+    damp = np.exp(-(1.0**2) / 2.0)
     expected_rbar = damp * initial_rbar
     np.testing.assert_allclose(st.rbar, expected_rbar, atol=1e-12)
 
@@ -235,7 +236,7 @@ def test_phase_noise_on_squeezed_after_measure():
     """
     c = GaussianCircuit(2)
     c.squeeze(0, r=0.8)
-    c.measure_homodyne(1, phi=0, name='m')
+    c.measure_homodyne(1, phi=0, name="m")
     c.phase_noise(mode=None, sigma=0.5)
     st, _ = c.run(rng=np.random.default_rng(42))
     assert st.nmode == 1
@@ -259,6 +260,7 @@ def test_phase_noise_no_measurement_returns_state():
 # =============================================================================
 # 3. Gaussian channel — CP validation
 # =============================================================================
+
 
 def test_gaussian_channel_noncp_raises():
     X = 0.1 * np.eye(2)
@@ -350,6 +352,7 @@ def test_gaussian_channel_d_with_XY():
 # 4. Gaussian channel — composition behavior
 # =============================================================================
 
+
 def test_loss_then_amp_not_identity():
     """loss(T=0.5) + amp(G=2.0) ≠ identity (added quantum noise)."""
     T, G = 0.5, 2.0
@@ -396,9 +399,10 @@ def test_chain_noise_monotonic():
 # 5. Mode mapping after measurement
 # =============================================================================
 
+
 def test_amplifier_on_measured_mode_raises():
     c = GaussianCircuit(2)
-    c.measure_homodyne(0, phi=0, name='m')
+    c.measure_homodyne(0, phi=0, name="m")
     c.amplifier(0, G=2.0)  # logical mode 0 has been removed
     with pytest.raises(ValueError, match="measured/removed"):
         c.run()
@@ -406,7 +410,7 @@ def test_amplifier_on_measured_mode_raises():
 
 def test_phase_noise_on_measured_mode_raises():
     c = GaussianCircuit(2)
-    c.measure_homodyne(0, phi=0, name='m')
+    c.measure_homodyne(0, phi=0, name="m")
     c.phase_noise(0, sigma=0.5)
     with pytest.raises(ValueError, match="measured/removed"):
         c.run()
@@ -416,7 +420,7 @@ def test_amp_mode_index_shift_correctly():
     """After removing mode 1, operating on 'mode 0' still works on original mode 0."""
     c = GaussianCircuit(2)
     c.squeeze(0, r=0.3)  # mode 0 squeezed
-    c.measure_homodyne(1, phi=0, name='m')  # remove mode 1
+    c.measure_homodyne(1, phi=0, name="m")  # remove mode 1
     c.amplifier(0, G=2.0)  # operate on original mode 0
     st, _ = c.run(rng=np.random.default_rng(42))
     assert st.nmode == 1
@@ -428,9 +432,10 @@ def test_amp_mode_index_shift_correctly():
 # 6. ParamRef interaction with channels
 # =============================================================================
 
+
 def test_amplifier_param_G():
     c = GaussianCircuit(1)
-    c.amplifier(0, G='g')
+    c.amplifier(0, G="g")
     st1 = c.run(g=1.5)
     st2 = c.run(g=3.0)
     assert mean_photon(st2) > mean_photon(st1)
@@ -440,7 +445,7 @@ def test_phase_noise_param_sigma():
     """Larger sigma makes V more isotropic (diagonal entries converge)."""
     c = GaussianCircuit(1)
     c.squeeze(0, r=0.5)
-    c.phase_noise(0, sigma='s')
+    c.phase_noise(0, sigma="s")
     st0 = c.run(s=0.0)  # no PN: anisotropic squeezed vacuum
     st1 = c.run(s=3.0)  # large PN: nearly isotropic
     # Diagonal ratio converges toward 1 (isotropic)
@@ -451,7 +456,7 @@ def test_phase_noise_param_sigma():
 
 def test_amplifier_missing_param_raises():
     c = GaussianCircuit(1)
-    c.amplifier(0, G='g')
+    c.amplifier(0, G="g")
     with pytest.raises(ValueError, match="g"):
         c.run()
 
@@ -459,6 +464,7 @@ def test_amplifier_missing_param_raises():
 # =============================================================================
 # 7. Builder contracts
 # =============================================================================
+
 
 def test_amp_phase_amp_channel_builder_returns_self():
     c = GaussianCircuit(1)
@@ -483,9 +489,9 @@ def test_repr_shows_channel_ops():
     c.phase_noise(0, sigma=0.1)
     c.gaussian_channel(np.eye(2), np.zeros((2, 2)), validate=False)
     s = repr(c)
-    assert 'amplifier' in s
-    assert 'phase_noise' in s
-    assert 'gaussian_channel' in s
+    assert "amplifier" in s
+    assert "phase_noise" in s
+    assert "gaussian_channel" in s
 
 
 def test_all_modes_large_circuit():
@@ -507,11 +513,11 @@ def test_gaussian_channel_after_measure_on_remaining_modes():
     Y = 0.25 * np.eye(2)
     c = GaussianCircuit(2)
     c.squeeze(0, r=0.4)
-    c.measure_homodyne(1, phi=0.0, name='m')
+    c.measure_homodyne(1, phi=0.0, name="m")
     c.gaussian_channel(X, Y, validate=False)
     st, res = c.run(rng=np.random.default_rng(1))
     assert st.nmode == 1
-    assert 'm' in res
+    assert "m" in res
     assert is_physical(st)
 
 
@@ -520,7 +526,7 @@ def test_full_size_channel_after_measure_fails():
     Y = np.zeros((4, 4))
     c = GaussianCircuit(2)
     c.squeeze(0, r=0.3)
-    c.measure_homodyne(1, phi=0.0, name='m')
+    c.measure_homodyne(1, phi=0.0, name="m")
     c.gaussian_channel(X, Y, validate=False)
     with pytest.raises(ValueError, match="does not match"):
         c.run(rng=np.random.default_rng(0))

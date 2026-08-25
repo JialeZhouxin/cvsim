@@ -35,7 +35,7 @@ def test_roundtrip_full_circuit() -> None:
     assert c2.nmode == 2
     assert list(c2.cutoffs) == [6, 6]
     assert len(c2._ops) == len(c._ops)
-    for (a, b) in zip(c._ops, c2._ops, strict=False):
+    for a, b in zip(c._ops, c2._ops, strict=False):
         assert a[0] == b[0] and a[1] == b[1]
         assert a[3] == b[3]  # symbolic params
         assert a[4] == b[4]  # refs
@@ -143,9 +143,23 @@ def test_gaussian_side_ignores_cutoff() -> None:
 def test_op_meta_covers_all_circuit_ops() -> None:
     c = FockCircuit(2, cutoff=6)
     for name in (
-        "squeeze", "displace", "phase", "kerr", "beamsplitter",
-        "two_mode_squeeze", "cz", "cx", "mach_zehnder", "interferometer",
-        "apply_unitary", "loss", "amplifier", "phase_noise", "apply_kraus",
-        "measure_pnr", "measure_homodyne", "measure_heterodyne",
+        "squeeze",
+        "displace",
+        "phase",
+        "kerr",
+        "beamsplitter",
+        "two_mode_squeeze",
+        "cz",
+        "cx",
+        "mach_zehnder",
+        "interferometer",
+        "apply_unitary",
+        "loss",
+        "amplifier",
+        "phase_noise",
+        "apply_kraus",
+        "measure_pnr",
+        "measure_homodyne",
+        "measure_heterodyne",
     ):
         assert name in OP_META, name

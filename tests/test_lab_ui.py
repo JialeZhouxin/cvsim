@@ -90,6 +90,7 @@ def test_l4_amp_mz_in_palette_contract():
     ir = (STATIC_DIR / ".." / "ir.py").read_text(encoding="utf-8")
     assert '"amplifier"' in ir and '"mz"' in ir
 
+
 def test_offline_guard_no_external_urls():
     """Local workbench hard constraint: zero external network references.
     Case-insensitive schemes (no protocol-relative / URL() forms allowed).

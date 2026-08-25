@@ -27,9 +27,7 @@ def _g_2mode() -> GaussianState:
     gs = GaussianState.squeezed(0.4, nmode=2, mode=1)
     from cvsim.symplectic import d_displace
 
-    return GaussianState(
-        V=gs.V, rbar=gs.rbar + d_displace(2, 0.3 + 0.2j, 0)
-    )
+    return GaussianState(V=gs.V, rbar=gs.rbar + d_displace(2, 0.3 + 0.2j, 0))
 
 
 def _check_matches(b_out: BosonicState, g_out: GaussianState) -> None:
@@ -84,18 +82,14 @@ def test_amplifier_G1_identity():
     st = BosonicState.vacuum(1)
     st2 = amplifier(st, 1.0, nbar=0.0)
     np.testing.assert_allclose(st2.components[0].V, st.components[0].V, atol=1e-12)
-    np.testing.assert_allclose(
-        st2.components[0].rbar, st.components[0].rbar, atol=1e-12
-    )
+    np.testing.assert_allclose(st2.components[0].rbar, st.components[0].rbar, atol=1e-12)
 
 
 def test_phase_noise_sigma0_identity():
     st = BosonicState.vacuum(1)
     st2 = phase_noise(st, 0.0)
     np.testing.assert_allclose(st2.components[0].V, st.components[0].V, atol=1e-12)
-    np.testing.assert_allclose(
-        st2.components[0].rbar, st.components[0].rbar, atol=1e-12
-    )
+    np.testing.assert_allclose(st2.components[0].rbar, st.components[0].rbar, atol=1e-12)
 
 
 def test_amplifier_mean_photon_closed_form():
@@ -126,6 +120,4 @@ def test_phase_noise_damps_rbar():
     sigma = 0.5
     out = phase_noise(coh, sigma)
     damp = np.exp(-sigma * sigma / 2.0)  # X = e^{−σ²/2}
-    np.testing.assert_allclose(
-        out.components[0].rbar, damp * coh.components[0].rbar, atol=1e-12
-    )
+    np.testing.assert_allclose(out.components[0].rbar, damp * coh.components[0].rbar, atol=1e-12)

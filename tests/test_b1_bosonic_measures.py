@@ -56,8 +56,8 @@ def test_threshold_p_click_internal_sum_is_real():
         V1 = np.array([[V[i, i], V[i, 1]], [V[1, i], V[1, 1]]])
         r1 = np.array([c.rbar[i], c.rbar[1]])
         A = V1 + 0.5 * np.eye(2)
-        total += c.w * np.exp(-0.5 * complex(r1 @ np.linalg.solve(A, r1))) / np.sqrt(
-            np.linalg.det(A)
+        total += (
+            c.w * np.exp(-0.5 * complex(r1 @ np.linalg.solve(A, r1))) / np.sqrt(np.linalg.det(A))
         )
     assert abs(total.imag) < 1e-8
     assert abs(total.real - 1.0 / np.cosh(0.8**2)) < 1e-10
@@ -130,9 +130,7 @@ def test_heterodyne_condition_outcome_forms():
     xp = np.array([np.sqrt(2) * 0.6, -np.sqrt(2) * 0.2])
     r2 = heterodyne_condition(bs, 1, xp)
     np.testing.assert_allclose(r1.components[0].V, r2.components[0].V, atol=1e-12)
-    np.testing.assert_allclose(
-        r1.components[0].rbar, r2.components[0].rbar, atol=1e-12
-    )
+    np.testing.assert_allclose(r1.components[0].rbar, r2.components[0].rbar, atol=1e-12)
 
 
 # ---------------------------------------------------------------------------

@@ -41,9 +41,7 @@ PHI = 0.2
 def test_d_displace_known_values() -> None:
     d = d_displace(2, 0.5 + 1.5j, mode=1)
     assert d.shape == (4,)
-    np.testing.assert_allclose(
-        d, [0.0, np.sqrt(2.0) * 0.5, 0.0, np.sqrt(2.0) * 1.5], atol=1e-12
-    )
+    np.testing.assert_allclose(d, [0.0, np.sqrt(2.0) * 0.5, 0.0, np.sqrt(2.0) * 1.5], atol=1e-12)
 
 
 def test_d_displace_backend(backend: str) -> None:

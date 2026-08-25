@@ -61,8 +61,7 @@ def test_weighted_moment_formula() -> None:
     u[0] = 1.0  # x quadrature, mode 0, phi=0
     mu_manual = sum(c.w * (u @ c.rbar) for c in cat.components).real
     x2_manual = sum(
-        c.w * (float(u.real @ c.V @ u.real) + abs(u @ c.rbar) ** 2)
-        for c in cat.components
+        c.w * (float(u.real @ c.V @ u.real) + abs(u @ c.rbar) ** 2) for c in cat.components
     ).real
     assert abs(homodyne_mean(cat, 0, 0.0) - mu_manual) < 1e-12
     assert abs(homodyne_var(cat, 0, 0.0) - (x2_manual - mu_manual**2)) < 1e-12
@@ -89,9 +88,7 @@ def test_loss_weights_unchanged() -> None:
         assert abs(wb - wa) < 1e-12
     # per-component transformation X V Xᵀ + Y with X=√T·I, Y=(1−T)·½I
     for c_b, c_a in zip(cat.components, after.components, strict=True):
-        np.testing.assert_allclose(
-            c_a.V, T * c_b.V + (1.0 - T) * 0.5 * np.eye(2), atol=1e-12
-        )
+        np.testing.assert_allclose(c_a.V, T * c_b.V + (1.0 - T) * 0.5 * np.eye(2), atol=1e-12)
         np.testing.assert_allclose(c_a.rbar, np.sqrt(T) * c_b.rbar, atol=1e-12)
 
 
@@ -109,12 +106,8 @@ def test_single_component_equals_gaussian() -> None:
     b = BosonicState.from_gaussian(g)
     assert b.n_components == 1
     for phi in (0.0, np.pi / 4, np.pi / 2):
-        np.testing.assert_allclose(
-            homodyne_mean(b, 1, phi), g_hmean(g, 1, phi), atol=1e-12
-        )
-        np.testing.assert_allclose(
-            homodyne_var(b, 1, phi), g_hvar(g, 1, phi), atol=1e-12
-        )
+        np.testing.assert_allclose(homodyne_mean(b, 1, phi), g_hmean(g, 1, phi), atol=1e-12)
+        np.testing.assert_allclose(homodyne_var(b, 1, phi), g_hvar(g, 1, phi), atol=1e-12)
 
 
 # ---------------------------------------------------------------------------
@@ -166,8 +159,9 @@ def test_cat_mean_and_var_three_way(even: bool) -> None:
     mu_f = float((amps.conj() @ X @ amps).real)
     var_f = float((amps.conj() @ X2 @ amps).real - mu_f**2)
     for tag, got in (("mu", mu_b), ("var", var_b)):
-        np.testing.assert_allclose(got, mu_a if tag == "mu" else var_a,
-                                   atol=1e-8, err_msg=f"bosonic vs analytic {tag}")
+        np.testing.assert_allclose(
+            got, mu_a if tag == "mu" else var_a, atol=1e-8, err_msg=f"bosonic vs analytic {tag}"
+        )
     np.testing.assert_allclose(mu_b, mu_f, atol=1e-8, err_msg="mean vs Fock")
     np.testing.assert_allclose(var_b, var_f, atol=1e-8, err_msg="var vs Fock")
 
@@ -191,10 +185,6 @@ def test_gkp0_mean_symmetric_zero() -> None:
 def test_gkp1_mean_half_period_anchor() -> None:
     # |1⟩_GKP = |0⟩_GKP shifted by δ/2 = √(2π)/2 in x
     st = gkp1()
-    np.testing.assert_allclose(
-        homodyne_mean(st, 0, 0.0), np.sqrt(2.0 * np.pi) / 2.0, atol=1e-6
-    )
+    np.testing.assert_allclose(homodyne_mean(st, 0, 0.0), np.sqrt(2.0 * np.pi) / 2.0, atol=1e-6)
     # variance identical to gkp0 (pure shift)
-    np.testing.assert_allclose(
-        homodyne_var(st, 0, 0.0), homodyne_var(gkp0(), 0, 0.0), atol=1e-12
-    )
+    np.testing.assert_allclose(homodyne_var(st, 0, 0.0), homodyne_var(gkp0(), 0, 0.0), atol=1e-12)

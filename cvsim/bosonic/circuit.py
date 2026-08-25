@@ -100,75 +100,80 @@ class BosonicCircuit:
     # -- builder methods (gates, 1:1 with GaussianCircuit) ----------------
 
     def squeeze(self, mode: int, r: float | str = 0.0, phi: float | str = 0.0) -> BosonicCircuit:
-        self._ops.append(self._partition('squeeze', [mode], r=r, phi=phi))
+        self._ops.append(self._partition("squeeze", [mode], r=r, phi=phi))
         return self
 
     def displace(
-        self, mode: int,
+        self,
+        mode: int,
         alpha: complex | str | ParamRef = 0.0,
     ) -> BosonicCircuit:
-        self._ops.append(self._partition('displace', [mode], alpha=alpha))
+        self._ops.append(self._partition("displace", [mode], alpha=alpha))
         return self
 
     def phase(self, mode: int, theta: float | str = 0.0) -> BosonicCircuit:
-        self._ops.append(self._partition('phase', [mode], theta=theta))
+        self._ops.append(self._partition("phase", [mode], theta=theta))
         return self
 
     def fourier(self, mode: int = 0) -> BosonicCircuit:
-        self._ops.append(self._partition('fourier', [mode]))
+        self._ops.append(self._partition("fourier", [mode]))
         return self
 
     def beamsplitter(
-        self, mode1: int, mode2: int,
+        self,
+        mode1: int,
+        mode2: int,
         theta: float | str = np.pi / 4,
         phi: float | str = 0.0,
     ) -> BosonicCircuit:
-        self._ops.append(self._partition('beamsplitter', [mode1, mode2], theta=theta, phi=phi))
+        self._ops.append(self._partition("beamsplitter", [mode1, mode2], theta=theta, phi=phi))
         return self
 
     def two_mode_squeeze(self, mode1: int, mode2: int, r: float | str = 0.0) -> BosonicCircuit:
-        self._ops.append(self._partition('two_mode_squeeze', [mode1, mode2], r=r))
+        self._ops.append(self._partition("two_mode_squeeze", [mode1, mode2], r=r))
         return self
 
     def cz(self, mode1: int, mode2: int, weight: float | str = 0.0) -> BosonicCircuit:
-        self._ops.append(self._partition('cz', [mode1, mode2], weight=weight))
+        self._ops.append(self._partition("cz", [mode1, mode2], weight=weight))
         return self
 
     def cx(self, mode1: int, mode2: int, weight: float | str = 0.0) -> BosonicCircuit:
-        self._ops.append(self._partition('cx', [mode1, mode2], weight=weight))
+        self._ops.append(self._partition("cx", [mode1, mode2], weight=weight))
         return self
 
     def mach_zehnder(
-        self, mode1: int, mode2: int,
+        self,
+        mode1: int,
+        mode2: int,
         theta: float | str = np.pi / 4,
         phi: float | str = 0.0,
     ) -> BosonicCircuit:
-        self._ops.append(self._partition('mach_zehnder', [mode1, mode2], theta=theta, phi=phi))
+        self._ops.append(self._partition("mach_zehnder", [mode1, mode2], theta=theta, phi=phi))
         return self
 
     def interferometer(self, U: np.ndarray) -> BosonicCircuit:
         U = np.asarray(U, dtype=complex).copy()
         if U.shape != (self.nmode, self.nmode):
             raise ValueError(f"U shape {U.shape} incompatible with nmode={self.nmode}")
-        self._ops.append(('interferometer', tuple(range(self.nmode)), {'U': U}, {}, {}))
+        self._ops.append(("interferometer", tuple(range(self.nmode)), {"U": U}, {}, {}))
         return self
 
     # -- channels ---------------------------------------------------------
 
     def loss(self, mode: int, T: float | str = 1.0, nbar: float = 0.0) -> BosonicCircuit:
-        self._ops.append(self._partition('loss', [mode], T=T, nbar=nbar))
+        self._ops.append(self._partition("loss", [mode], T=T, nbar=nbar))
         return self
 
     def amplifier(
         self, mode: int | None = None, G: float | str = 1.0, nbar: float = 0.0
     ) -> BosonicCircuit:
         modes = [] if mode is None else [mode]
-        self._ops.append(self._partition('amplifier', modes, G=G, nbar=nbar))
+        self._ops.append(self._partition("amplifier", modes, G=G, nbar=nbar))
         return self
 
     def phase_noise(self, mode: int | None = None, sigma: float | str = 0.0) -> BosonicCircuit:
         modes = [] if mode is None else [mode]
-        self._ops.append(self._partition('phase_noise', modes, sigma=sigma))
+        self._ops.append(self._partition("phase_noise", modes, sigma=sigma))
         return self
 
     def gaussian_channel(
@@ -186,7 +191,7 @@ class BosonicCircuit:
             if d.shape != (2 * m_xy,):
                 raise ValueError(f"d must be ({2 * m_xy},); got {d.shape}")
         self._ops.append(
-            ('gaussian_channel', (), {'X': X, 'Y': Y, 'd': d, 'validate': validate}, {}, {})
+            ("gaussian_channel", (), {"X": X, "Y": Y, "d": d, "validate": validate}, {}, {})
         )
         return self
 
@@ -200,7 +205,7 @@ class BosonicCircuit:
         """
         self._ops.append(
             self._partition(
-                'measure_homodyne', [mode], _fixed_str_keys={'name'}, phi=phi, name=name
+                "measure_homodyne", [mode], _fixed_str_keys={"name"}, phi=phi, name=name
             )
         )
         return self
@@ -212,14 +217,14 @@ class BosonicCircuit:
         removed (already dropped by ``heterodyne_condition``).
         """
         self._ops.append(
-            self._partition('measure_heterodyne', [mode], _fixed_str_keys={'name'}, name=name)
+            self._partition("measure_heterodyne", [mode], _fixed_str_keys={"name"}, name=name)
         )
         return self
 
     def measure_threshold(self, mode: int, name: str) -> BosonicCircuit:
         """Threshold (on/off) — outcome-only, no state update, no mode removal."""
         self._ops.append(
-            self._partition('measure_threshold', [mode], _fixed_str_keys={'name'}, name=name)
+            self._partition("measure_threshold", [mode], _fixed_str_keys={"name"}, name=name)
         )
         return self
 
@@ -227,6 +232,7 @@ class BosonicCircuit:
 
     def compile(self) -> CompiledBosonic:
         from cvsim.bosonic.compile import CompiledBosonic, _compile_segments
+
         segments, params = _compile_segments(self._ops, self.nmode)
         return CompiledBosonic(self.nmode, segments, params, initial=self._initial)
 
@@ -240,11 +246,13 @@ class BosonicCircuit:
 
     def to_ir(self) -> dict:
         from cvsim.bosonic.ir import to_ir
+
         return to_ir(self)
 
     @classmethod
     def from_ir(cls, data: dict) -> BosonicCircuit:
         from cvsim.bosonic.ir import from_ir
+
         return from_ir(data)
 
     # -- inspection -------------------------------------------------------

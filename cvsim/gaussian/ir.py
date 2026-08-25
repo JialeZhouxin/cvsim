@@ -43,36 +43,22 @@ class OpMeta:
 
 
 OP_META: dict[str, OpMeta] = {
-    "squeeze": OpMeta(
-        "one", {"r": "num", "phi": "num"}, {"r": 0.0, "phi": 0.0}
-    ),
+    "squeeze": OpMeta("one", {"r": "num", "phi": "num"}, {"r": 0.0, "phi": 0.0}),
     "displace": OpMeta("one", {"alpha": "complex"}, {"alpha": 0.0}),
     "phase": OpMeta("one", {"theta": "num"}, {"theta": 0.0}),
     "fourier": OpMeta("one", {}, {}),
-    "beamsplitter": OpMeta(
-        "two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}
-    ),
+    "beamsplitter": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
     "two_mode_squeeze": OpMeta("two", {"r": "num"}, {"r": 0.0}),
     "cz": OpMeta("two", {"weight": "num"}, {"weight": 0.0}),
     "cx": OpMeta("two", {"weight": "num"}, {"weight": 0.0}),
-    "mach_zehnder": OpMeta(
-        "two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}
-    ),
-    "mz": OpMeta(
-        "two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}
-    ),
+    "mach_zehnder": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
+    "mz": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
     "interferometer": OpMeta("all", {"U": "matrix"}, {}),
     "loss": OpMeta("one", {"T": "num", "nbar": "num"}, {"T": 1.0, "nbar": 0.0}),
-    "amplifier": OpMeta(
-        "any", {"G": "num", "nbar": "num"}, {"G": 1.0, "nbar": 0.0}
-    ),
+    "amplifier": OpMeta("any", {"G": "num", "nbar": "num"}, {"G": 1.0, "nbar": 0.0}),
     "phase_noise": OpMeta("any", {"sigma": "num"}, {"sigma": 0.0}),
-    "gaussian_channel": OpMeta(
-        "none", {"X": "matrix", "Y": "matrix", "d": "matrix"}, {}
-    ),
-    "measure_homodyne": OpMeta(
-        "one", {"phi": "num", "name": "str"}, {"phi": 0.0}
-    ),
+    "gaussian_channel": OpMeta("none", {"X": "matrix", "Y": "matrix", "d": "matrix"}, {}),
+    "measure_homodyne": OpMeta("one", {"phi": "num", "name": "str"}, {"phi": 0.0}),
     "measure_heterodyne": OpMeta("one", {"name": "str"}, {}),
     "measure_threshold": OpMeta("one", {"name": "str"}, {}),
 }
@@ -99,20 +85,14 @@ class CircuitV1:
 
 # -- structural value checks ------------------------------------------------
 
+
 def _is_num(v: Any) -> bool:
-    return isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(
-        v, bool
-    )
+    return isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool)
 
 
 def _is_leaf_pair(v: Any) -> bool:
     """``[re, im]`` complex leaf inside a matrix."""
-    return (
-        isinstance(v, list)
-        and len(v) == 2
-        and _is_num(v[0])
-        and _is_num(v[1])
-    )
+    return isinstance(v, list) and len(v) == 2 and _is_num(v[0]) and _is_num(v[1])
 
 
 def _check_matrix(v: Any, where: str) -> None:
@@ -128,23 +108,17 @@ def _check_matrix(v: Any, where: str) -> None:
         if ncols is None:
             ncols = len(row)
         elif len(row) != ncols:
-            raise ValueError(
-                f"{where}: ragged array (row length {len(row)} != {ncols})"
-            )
+            raise ValueError(f"{where}: ragged array (row length {len(row)} != {ncols})")
         if all(_is_num(x) for x in row):
             row_style = "real"
         elif all(_is_leaf_pair(x) for x in row):
             row_style = "complex"
         else:
-            raise ValueError(
-                f"{where}: entries must be numbers or [re, im] pairs, got {row!r}"
-            )
+            raise ValueError(f"{where}: entries must be numbers or [re, im] pairs, got {row!r}")
         if style is None:
             style = row_style
         elif style != row_style:
-            raise ValueError(
-                f"{where}: mixed real/complex entries ({style} vs {row_style})"
-            )
+            raise ValueError(f"{where}: mixed real/complex entries ({style} vs {row_style})")
 
 
 def _check_value(v: Any, kind: str, where: str) -> None:
@@ -153,27 +127,19 @@ def _check_value(v: Any, kind: str, where: str) -> None:
             if kind not in ("num", "complex"):
                 raise ValueError(f"{where}: $param not allowed for {kind} param")
             if set(v) != {"$param"}:
-                raise ValueError(
-                    f"{where}: $param must be the only key, got {sorted(v)}"
-                )
+                raise ValueError(f"{where}: $param must be the only key, got {sorted(v)}")
             name = v["$param"]
             if not isinstance(name, str) or not name:
-                raise ValueError(
-                    f"{where}: $param must be a non-empty string, got {name!r}"
-                )
+                raise ValueError(f"{where}: $param must be a non-empty string, got {name!r}")
             return
         if "$ref" in v:
             if kind not in ("num", "complex"):
                 raise ValueError(f"{where}: $ref not allowed for {kind} param")
             if not set(v) <= {"$ref", "gain"}:
-                raise ValueError(
-                    f"{where}: $ref allows only 'gain', got {sorted(v)}"
-                )
+                raise ValueError(f"{where}: $ref allows only 'gain', got {sorted(v)}")
             src = v["$ref"]
             if not isinstance(src, str) or not src:
-                raise ValueError(
-                    f"{where}: $ref source must be a non-empty string, got {src!r}"
-                )
+                raise ValueError(f"{where}: $ref source must be a non-empty string, got {src!r}")
             gain = v.get("gain", 1.0)
             if not _is_num(gain):
                 raise ValueError(f"{where}: $ref gain must be a number, got {gain!r}")
@@ -218,25 +184,17 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
             continue
         raise ValueError(f"unknown top-level field {key!r}")
     if "view" in data and not isinstance(data["view"], dict):
-        raise ValueError(
-            f"view must be an object, got {type(data['view']).__name__}"
-        )
+        raise ValueError(f"view must be an object, got {type(data['view']).__name__}")
     if "seed" in data and (
-        not isinstance(data["seed"], int)
-        or isinstance(data["seed"], bool)
-        or data["seed"] < 0
+        not isinstance(data["seed"], int) or isinstance(data["seed"], bool) or data["seed"] < 0
     ):
-        raise ValueError(
-            f"seed must be a non-negative int, got {data['seed']!r}"
-        )
+        raise ValueError(f"seed must be a non-negative int, got {data['seed']!r}")
     if "ui" in data and not isinstance(data["ui"], dict):
         raise ValueError(f"ui must be an object, got {type(data['ui']).__name__}")
 
     raw_ops = data.get("ops")
     if not isinstance(raw_ops, list):
-        raise ValueError(
-            f"ops must be a list, got {type(raw_ops).__name__}"
-        )
+        raise ValueError(f"ops must be a list, got {type(raw_ops).__name__}")
     ops: list[IRNode] = []
     seen_ids: set[str] = set()
     for i, rn in enumerate(raw_ops):
@@ -256,17 +214,11 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
             seen_ids.add(nid)
         modes = rn.get("modes")
         if not isinstance(modes, list):
-            raise ValueError(
-                f"{where}: modes must be a list, got {type(modes).__name__}"
-            )
+            raise ValueError(f"{where}: modes must be a list, got {type(modes).__name__}")
         if meta.arity == "one" and len(modes) != 1:
-            raise ValueError(
-                f"{where}: op {op!r} requires exactly 1 mode, got {len(modes)}"
-            )
+            raise ValueError(f"{where}: op {op!r} requires exactly 1 mode, got {len(modes)}")
         if meta.arity == "two" and len(modes) != 2:
-            raise ValueError(
-                f"{where}: op {op!r} requires exactly 2 modes, got {len(modes)}"
-            )
+            raise ValueError(f"{where}: op {op!r} requires exactly 2 modes, got {len(modes)}")
         if meta.arity == "all" and modes != list(range(nmode)):
             raise ValueError(
                 f"{where}: op {op!r} requires modes == list(range(nmode)), got {modes!r}"
@@ -279,32 +231,25 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
             raise ValueError(f"{where}: op {op!r} takes no modes, got {modes!r}")
         for m in modes:
             if not isinstance(m, int) or isinstance(m, bool) or m < 0:
-                raise ValueError(
-                    f"{where}: mode index must be a non-negative int, got {m!r}"
-                )
+                raise ValueError(f"{where}: mode index must be a non-negative int, got {m!r}")
             if m >= nmode:
-                raise ValueError(
-                    f"{where}: mode {m} out of range (nmode={nmode})"
-                )
+                raise ValueError(f"{where}: mode {m} out of range (nmode={nmode})")
         params = rn.get("params")
         if not isinstance(params, dict):
-            raise ValueError(
-                f"{where}: params must be an object, got {type(params).__name__}"
-            )
+            raise ValueError(f"{where}: params must be an object, got {type(params).__name__}")
         for k, v in params.items():
             if k not in meta.value_kind:
                 raise ValueError(f"{where}: unknown param {k!r} for op {op!r}")
             _check_value(v, meta.value_kind[k], f"{where}.params.{k}")
         for k in meta.value_kind:
             if k not in meta.defaults and k not in params:
-                raise ValueError(
-                    f"{where}: op {op!r} requires param {k!r} (no default)"
-                )
+                raise ValueError(f"{where}: op {op!r} requires param {k!r} (no default)")
         ops.append(IRNode(id=nid, op=op, params=dict(params), modes=tuple(modes)))
     return CircuitV1(schema=SCHEMA, nmode=nmode, ops=tuple(ops))
 
 
 # -- value encoding ---------------------------------------------------------
+
 
 def _encode(v: Any) -> Any:
     """Python value (from ``GaussianCircuit._ops`` fixed kwargs) → JSON-native.
@@ -319,9 +264,7 @@ def _encode(v: Any) -> Any:
     if isinstance(v, np.ndarray):
         if v.dtype.kind == "c":
             if v.ndim != 2:  # pragma: no cover — builders only store 2-D U
-                raise ValueError(
-                    f"complex array encoding requires 2-D, got shape {v.shape}"
-                )
+                raise ValueError(f"complex array encoding requires 2-D, got shape {v.shape}")
             return [[[z.real, z.imag] for z in row] for row in v]
         return v.tolist()
     if isinstance(v, np.generic):
@@ -344,9 +287,7 @@ def _decode(v: Any, kind: str) -> Any:
         # 2x2 real matrix — no current param uses one (d real, X/Y/U 2-D),
         # add a shape check here if a complex vector param ever appears.
         if v and isinstance(v[0], list) and v[0] and isinstance(v[0][0], list):
-            return np.array(
-                [[complex(x[0], x[1]) for x in row] for row in v], dtype=complex
-            )
+            return np.array([[complex(x[0], x[1]) for x in row] for row in v], dtype=complex)
         return np.asarray(v, dtype=float)
     if kind == "complex":
         return complex(v)
@@ -378,6 +319,7 @@ def to_ir(circuit: GaussianCircuit) -> dict[str, Any]:
 
 
 # -- deserialization --------------------------------------------------------
+
 
 def _expand_mz(circuit: GaussianCircuit, modes: tuple[int, ...], kw: dict) -> None:
     """Lab composite MZ: BS(θ) → phase(φ, m0) → BS(θ) (design §1, lossless)."""

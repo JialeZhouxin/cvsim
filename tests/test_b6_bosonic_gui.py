@@ -30,6 +30,7 @@ pytestmark = pytest.mark.phaseB6
 # IR initial (R1)
 # ===========================================================================
 
+
 class TestInitial:
     def test_vacuum_default_unchanged(self):
         """No initial field → vacuum start (B5 behavior, old JSON safe)."""
@@ -93,6 +94,7 @@ class TestInitial:
 # Two-V fidelity (R3)
 # ===========================================================================
 
+
 class TestTwoVFidelity:
     def test_two_v_reduces_to_equal_v(self):
         """_gauss_overlap_two_V(V,V) == _gauss_overlap (B4 kernel)."""
@@ -143,6 +145,7 @@ class TestTwoVFidelity:
 # GKP QEC main script (R2)
 # ===========================================================================
 
+
 class TestGKPQEC:
     def _qec(self, T, gain=1.0, phi=np.pi / 2, seed=0):
         c = BosonicCircuit(2, initial=["gkp0", "gkp1"])
@@ -191,6 +194,7 @@ class TestGKPQEC:
 # Lab golden (exit 2) + steps + fidelity sweep (exit 1 backend)
 # ===========================================================================
 
+
 class TestLabGolden:
     @pytest.fixture()
     def qec_body(self):
@@ -203,8 +207,11 @@ class TestLabGolden:
             "ops": [
                 {"op": "cz", "modes": [0, 1], "params": {"weight": 1.0}},
                 {"op": "loss", "modes": [0], "params": {"T": 0.9, "nbar": 0.0}},
-                {"op": "measure_homodyne", "modes": [1],
-                 "params": {"phi": np.pi / 2, "name": "m_p"}},
+                {
+                    "op": "measure_homodyne",
+                    "modes": [1],
+                    "params": {"phi": np.pi / 2, "name": "m_p"},
+                },
                 {"op": "displace", "modes": [0], "params": {"alpha": {"$ref": "m_p", "gain": 1.0}}},
             ],
         }
@@ -225,9 +232,7 @@ class TestLabGolden:
         out = c.run(rng=np.random.default_rng(42))
         st, results = out
         assert payload["nmode"] == st.nmode
-        assert payload["meters"]["mean_photon"] == pytest.approx(
-            float(bmp(st)), abs=1e-6
-        )
+        assert payload["meters"]["mean_photon"] == pytest.approx(float(bmp(st)), abs=1e-6)
         assert payload["measured"][0]["outcome"] == pytest.approx(results["m_p"], abs=1e-6)
 
     def test_run_deterministic_same_json(self, qec_body):
@@ -267,12 +272,13 @@ class TestLabGolden:
         from cvsim.lab.server import app
 
         body = dict(qec_body)
-        body["ops"] = [
-            {**o, **({} if o["op"] != "loss" else {"id": "chan"})} for o in body["ops"]
-        ]
+        body["ops"] = [{**o, **({} if o["op"] != "loss" else {"id": "chan"})} for o in body["ops"]]
         body["sweep"] = {
-            "node_id": "chan", "param": "T",
-            "min": 0.5, "max": 1.0, "n": 5,
+            "node_id": "chan",
+            "param": "T",
+            "min": 0.5,
+            "max": 1.0,
+            "n": 5,
             "target": {"state": "gkp0", "mode": 0},
         }
         body["rounds"] = 3
@@ -292,9 +298,14 @@ class TestLabGolden:
         from cvsim.lab.server import app
 
         tc = TestClient(app)
-        body = {"schema": "circuit_v1", "nmode": 1, "backend": "gaussian", "ops": [],
-                "sweep": {"node_id": "x", "param": "r", "min": 0, "max": 1, "n": 3},
-                "target": {"state": "gkp0", "mode": 0}}
+        body = {
+            "schema": "circuit_v1",
+            "nmode": 1,
+            "backend": "gaussian",
+            "ops": [],
+            "sweep": {"node_id": "x", "param": "r", "min": 0, "max": 1, "n": 3},
+            "target": {"state": "gkp0", "mode": 0},
+        }
         r = tc.post("/fidelity", json=body)
         assert r.status_code == 422
 
@@ -302,8 +313,12 @@ class TestLabGolden:
         """Bosonic whitelist: kerr is a valid bosonic-op neighbour but not whitelisted."""
         from cvsim.lab.ir import CircuitV0Error, load_circuit
 
-        data = {"schema": "circuit_v1", "nmode": 1, "backend": "bosonic",
-                "ops": [{"op": "kerr", "modes": [0], "params": {"chi": 0.1}}]}
+        data = {
+            "schema": "circuit_v1",
+            "nmode": 1,
+            "backend": "bosonic",
+            "ops": [{"op": "kerr", "modes": [0], "params": {"chi": 0.1}}],
+        }
         with pytest.raises(CircuitV0Error, match="whitelist"):
             load_circuit(data)
 
@@ -311,6 +326,7 @@ class TestLabGolden:
 # ===========================================================================
 # Old JSON unchanged (exit 3)
 # ===========================================================================
+
 
 class TestOldJSONUnchanged:
     def test_gaussian_json_still_runs(self):
@@ -321,7 +337,8 @@ class TestOldJSONUnchanged:
 
         tc = TestClient(app)
         body = {
-            "schema": "circuit_v1", "nmode": 1,
+            "schema": "circuit_v1",
+            "nmode": 1,
             "ops": [{"op": "squeeze", "modes": [0], "params": {"r": 0.5, "phi": 0.0}}],
         }
         r = tc.post("/run", json=body)

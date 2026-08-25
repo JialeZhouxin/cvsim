@@ -38,6 +38,7 @@ B: cat|gkp0 → 门 → [loss] → 加权矩
 
 ```python
 from cvsim.wigner import wigner_grid, wigner_gaussian, wigner_bosonic, wigner_fock
+
 X, P, W = wigner_grid(GaussianState.vacuum(1), lim=4, n=81)  # W(0,0)≈1/π
 # Fock: wigner_fock(FockState.fock(1, N), 0, 0) < 0
 # even/odd cat：odd 中心 W<0（干涉）

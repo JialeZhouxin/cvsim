@@ -75,9 +75,7 @@ def test_tmsv_tutorial_physics_self_check():
 @pytest.mark.parametrize("r", [0.3, 0.6, 1.0])
 def test_tmsv_logneg_curve_freeze(r):
     st = GaussianState.tmsv(r, nmode=2)
-    assert log_negativity(st, 0) == pytest.approx(
-        -np.log2(np.exp(-2 * r)), abs=1e-9
-    )
+    assert log_negativity(st, 0) == pytest.approx(-np.log2(np.exp(-2 * r)), abs=1e-9)
 
 
 def test_tmsv_r0_reduced_entropy_closed_no_nan():

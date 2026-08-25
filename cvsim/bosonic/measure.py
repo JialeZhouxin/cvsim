@@ -63,9 +63,7 @@ def _beta_to_xp(beta: complex) -> np.ndarray:
     return np.array([np.sqrt(2.0) * b.real, np.sqrt(2.0) * b.imag], dtype=float)
 
 
-def _real_diag_pool(
-    state: BosonicState, imag_tol: float
-) -> tuple[list[Component], list[float]]:
+def _real_diag_pool(state: BosonicState, imag_tol: float) -> tuple[list[Component], list[float]]:
     """Teaching-cut pool: real-mean, real-weight components (Re(w) > 0, |Im(w)| ≤ tol).
 
     Complex-weight guard (OCR 2026-08-14): a complex-weight real-mean component
@@ -102,9 +100,7 @@ def heterodyne_sample(
     m = _check_mode(state, mode)
     pool, weights = _real_diag_pool(state, imag_tol)
     if not pool:
-        raise ValueError(
-            "heterodyne_sample: no real-mean positive-weight components"
-        )
+        raise ValueError("heterodyne_sample: no real-mean positive-weight components")
 
     if len(pool) == 1:
         idx = 0
@@ -119,9 +115,7 @@ def heterodyne_sample(
     Sigma = 0.5 * (Sigma + Sigma.T)
     w = np.linalg.eigvalsh(Sigma)
     if np.min(w) <= _SIG_EPS:
-        raise ValueError(
-            f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}"
-        )
+        raise ValueError(f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}")
     z = rng.multivariate_normal(mu, Sigma)
     return complex((z[0] + 1j * z[1]) / np.sqrt(2.0))
 
@@ -150,9 +144,7 @@ def heterodyne_condition(
     m = _check_mode(state, mode)
     beta = _as_beta(outcome)
     if abs(beta) > 30.0:
-        raise ValueError(
-            f"heterodyne outcome |β|={abs(beta):.3g} out of range (|β| ≤ 30)"
-        )
+        raise ValueError(f"heterodyne outcome |β|={abs(beta):.3g} out of range (|β| ≤ 30)")
     z = _beta_to_xp(beta)
 
     idx_A = _xp_indices(m, mode)
@@ -164,9 +156,7 @@ def heterodyne_condition(
 
     pool, _ = _real_diag_pool(state, imag_tol)
     if not pool:
-        raise ValueError(
-            "heterodyne_condition: no real-mean positive-weight components"
-        )
+        raise ValueError("heterodyne_condition: no real-mean positive-weight components")
 
     kept: list[Component] = []
     raw_w: list[complex] = []
@@ -219,9 +209,7 @@ def heterodyne_sample_and_condition(
 # ---------------------------------------------------------------------------
 
 
-def _vacuum_probability_complex(
-    V: np.ndarray, rbar: np.ndarray, mode: int
-) -> complex:
+def _vacuum_probability_complex(V: np.ndarray, rbar: np.ndarray, mode: int) -> complex:
     """⟨0|ρ|0⟩ of one Gaussian component, complex r̄ allowed.
 
     Same quadratic form as ``cvsim.bridge.vacuum_probability`` (ħ=1, xxpp):

@@ -145,9 +145,7 @@ def heterodyne_cov_xp(state: GaussianState, mode: int = 0) -> np.ndarray:
     return Vblk + 0.5 * np.eye(2)
 
 
-def _heterodyne_params(
-    state: GaussianState, mode: int = 0
-) -> tuple[np.ndarray, np.ndarray]:
+def _heterodyne_params(state: GaussianState, mode: int = 0) -> tuple[np.ndarray, np.ndarray]:
     """(mu, Sigma) of the heterodyne outcome edge N(r̄_xp, V_xp + I/2).
     Shared by single-shot and batch samplers (no formula drift)."""
     m = _check_mode(state, mode)
@@ -158,9 +156,7 @@ def _heterodyne_params(
     Sigma = 0.5 * (Sigma + Sigma.T)
     w = np.linalg.eigvalsh(Sigma)
     if np.min(w) <= _EPS:
-        raise ValueError(
-            f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}"
-        )
+        raise ValueError(f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}")
     return mu, Sigma
 
 
@@ -204,9 +200,7 @@ def heterodyne_condition(
     beta = _as_beta(outcome)
     z = _beta_to_xp(beta)
 
-    V = 0.5 * (
-        np.asarray(state.V, dtype=float) + np.asarray(state.V, dtype=float).T
-    )
+    V = 0.5 * (np.asarray(state.V, dtype=float) + np.asarray(state.V, dtype=float).T)
     r = np.asarray(state.rbar, dtype=float).copy()
     idx_A = _xp_indices(m, mode)
     idx_B = [i for i in range(2 * m) if i not in idx_A]
@@ -292,6 +286,7 @@ def mean_photon(state: GaussianState, mode: int | None = None) -> float:
 
 # ── F-SAMPLE batch (vision §4.2): vectorized size=10³ standard ──────────────
 
+
 def _vacuum_probability(V: np.ndarray, rbar: np.ndarray, mode: int) -> float:
     """P(0) of a Gaussian state on one mode — same formula as
     ``cvsim.bridge.vacuum_probability`` (kept in lock by
@@ -320,15 +315,12 @@ def p_click(state: GaussianState, mode: int = 0) -> float:
     conditioning is a ponytail (needs the Gaussian→Fock state bridge).
     """
     if not isinstance(state, GaussianState):
-        raise TypeError(
-            f"p_click requires GaussianState, got {type(state).__name__}"
-        )
+        raise TypeError(f"p_click requires GaussianState, got {type(state).__name__}")
     _check_mode(state, mode)
     p0 = _vacuum_probability(state.V, state.rbar, mode)
     if not np.isfinite(p0) or not 0.0 <= p0 <= 1.0:
         raise ValueError(
-            f"vacuum probability {p0:.3g} outside [0, 1] — state V/rbar "
-            "non-physical or non-finite?"
+            f"vacuum probability {p0:.3g} outside [0, 1] — state V/rbar non-physical or non-finite?"
         )
     return 1.0 - p0
 

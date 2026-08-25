@@ -36,6 +36,7 @@ pytestmark = pytest.mark.phaseB4
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def _fock_pdf(state: FockState, phi: float, xs: np.ndarray) -> np.ndarray:
     """Fock homodyne P(x_φ) on the given grid (HO wavefunctions, ħ=1)."""
     from cvsim.fock.observables import _amps_for_phi, _ho_basis_x
@@ -57,6 +58,7 @@ def _fock_pdf(state: FockState, phi: float, xs: np.ndarray) -> np.ndarray:
 # ===========================================================================
 # Layer 1 — degenerate reconciliation (atol 1e-7+)
 # ===========================================================================
+
 
 class TestL1Degenerate:
     """L1a–L1e: degenerate cases vs analytic / Fock closed forms."""
@@ -80,12 +82,16 @@ class TestL1Degenerate:
         a1, a2 = 2.0, -2.0
         st = BosonicState(
             components=[
-                coherent(a1).components[0].__class__(
+                coherent(a1)
+                .components[0]
+                .__class__(
                     V=coherent(a1).components[0].V,
                     rbar=coherent(a1).components[0].rbar,
                     w=0.5,
                 ),
-                coherent(a2).components[0].__class__(
+                coherent(a2)
+                .components[0]
+                .__class__(
                     V=coherent(a2).components[0].V,
                     rbar=coherent(a2).components[0].rbar,
                     w=0.5,
@@ -130,6 +136,7 @@ class TestL1Degenerate:
 # ===========================================================================
 # Layer 2 — GKP internal identities (no analytic benchmark)
 # ===========================================================================
+
 
 class TestL2GkpIdentities:
     """L2a–L2e: GKP internal numeric identities."""

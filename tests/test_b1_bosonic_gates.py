@@ -1,4 +1,4 @@
-﻿"""B1 Bosonic component-wise gates."""
+"""B1 Bosonic component-wise gates."""
 
 from __future__ import annotations
 
@@ -155,9 +155,7 @@ def test_interferometer_validate_u_false_escape_hatch():
     bs = BosonicState.from_gaussian(_g_2mode())
     U = np.eye(2)
     out = interferometer(bs, U, validate_u=False)
-    np.testing.assert_allclose(
-        out.components[0].V, bs.components[0].V, atol=1e-12
-    )
+    np.testing.assert_allclose(out.components[0].V, bs.components[0].V, atol=1e-12)
 
 
 @pytest.mark.phaseB1

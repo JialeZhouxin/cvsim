@@ -49,10 +49,7 @@ def validate_channel(
 ) -> None:
     """Raise ValueError if (X, Y) is not a CP Gaussian channel."""
     if not is_cp_channel(X, Y, atol=atol):
-        raise ValueError(
-            "non-CP Gaussian channel: Y + iΩ/2 − i XΩXᵀ/2 is not PSD "
-            "(ħ=1, xxpp)"
-        )
+        raise ValueError("non-CP Gaussian channel: Y + iΩ/2 − i XΩXᵀ/2 is not PSD (ħ=1, xxpp)")
 
 
 def apply_gaussian_channel(
@@ -79,16 +76,14 @@ def apply_gaussian_channel(
     Y = np.asarray(Y, dtype=float)
     m = state.nmode
     if X.shape != (2 * m, 2 * m) or Y.shape != (2 * m, 2 * m):
-        raise ValueError(
-            f"X/Y must be ({2*m},{2*m}); got {X.shape}, {Y.shape}"
-        )
+        raise ValueError(f"X/Y must be ({2 * m},{2 * m}); got {X.shape}, {Y.shape}")
     if validate:
         validate_channel(X, Y)
     if d is None:
         d = np.zeros(2 * m)
     d = np.asarray(d, dtype=float)
     if d.shape != (2 * m,):
-        raise ValueError(f"d must be ({2*m},); got {d.shape}")
+        raise ValueError(f"d must be ({2 * m},); got {d.shape}")
 
     V = X @ state.V @ X.T + Y
     rbar = X @ state.rbar + d

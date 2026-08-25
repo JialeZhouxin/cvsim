@@ -43,10 +43,23 @@ from cvsim.gaussian.ir import SCHEMA, CircuitV1, validate_ir
 #: backend (no historical v0 UI restriction to honor).
 BOSONIC_WHITELIST = frozenset(
     {
-        "squeeze", "displace", "phase", "fourier", "beamsplitter",
-        "two_mode_squeeze", "mach_zehnder", "cz", "cx", "interferometer",
-        "loss", "amplifier", "phase_noise", "gaussian_channel",
-        "measure_homodyne", "measure_heterodyne", "measure_threshold",
+        "squeeze",
+        "displace",
+        "phase",
+        "fourier",
+        "beamsplitter",
+        "two_mode_squeeze",
+        "mach_zehnder",
+        "cz",
+        "cx",
+        "interferometer",
+        "loss",
+        "amplifier",
+        "phase_noise",
+        "gaussian_channel",
+        "measure_homodyne",
+        "measure_heterodyne",
+        "measure_threshold",
     }
 )
 SCHEMA_V0 = "circuit_v0"
@@ -57,9 +70,17 @@ SCHEMA_V0 = "circuit_v0"
 #: Lab loader rejects them (whitelist is a UI concept, ADR-0003 #3).
 LAB_WHITELIST = frozenset(
     {
-        "displace", "phase", "squeeze", "fourier", "loss", "amplifier",
-        "beamsplitter", "two_mode_squeeze", "mz",
-        "measure_homodyne", "measure_heterodyne",
+        "displace",
+        "phase",
+        "squeeze",
+        "fourier",
+        "loss",
+        "amplifier",
+        "beamsplitter",
+        "two_mode_squeeze",
+        "mz",
+        "measure_homodyne",
+        "measure_heterodyne",
     }
 )
 #: Fock backend op whitelist (vision-gaussian-lab-ui §4.7, F7). Core Fock IR
@@ -67,10 +88,21 @@ LAB_WHITELIST = frozenset(
 #: unlocked in the Fock Lab UI (matrix editor deferred, anti-whitelist creed).
 FOCK_WHITELIST = frozenset(
     {
-        "displace", "phase", "squeeze", "kerr", "beamsplitter",
-        "two_mode_squeeze", "mach_zehnder", "cz", "cx",
-        "loss", "amplifier", "phase_noise",
-        "measure_pnr", "measure_homodyne", "measure_heterodyne",
+        "displace",
+        "phase",
+        "squeeze",
+        "kerr",
+        "beamsplitter",
+        "two_mode_squeeze",
+        "mach_zehnder",
+        "cz",
+        "cx",
+        "loss",
+        "amplifier",
+        "phase_noise",
+        "measure_pnr",
+        "measure_homodyne",
+        "measure_heterodyne",
     }
 )
 #: v0-only source ops — translated away by :func:`translate_v0` (no source
@@ -83,8 +115,7 @@ V0_TO_V1_OP = {"homodyne": "measure_homodyne", "heterodyne": "measure_heterodyne
 #: core builder/IR speak ``theta``).
 V0_TO_V1_PARAM = {"phase": {"phi": "theta"}}
 SINGLE_MODE_V0 = frozenset(
-    {"displace", "phase", "squeeze", "fourier", "loss", "amplifier",
-     "homodyne", "heterodyne"}
+    {"displace", "phase", "squeeze", "fourier", "loss", "amplifier", "homodyne", "heterodyne"}
 )
 TWO_MODE_V0 = frozenset({"beamsplitter", "two_mode_squeeze", "mz"})
 MEASUREMENT_OPS = frozenset({"measure_homodyne", "measure_heterodyne"})
@@ -177,6 +208,7 @@ def _as_complex(v: Any, where: str) -> complex:
 
 # -- circuit_v0 → circuit_v1 translation ------------------------------------
 
+
 def translate_v0(data: dict[str, Any]) -> dict[str, Any]:
     """Pure ``circuit_v0`` JSON → ``circuit_v1`` dict.
 
@@ -208,15 +240,11 @@ def translate_v0(data: dict[str, Any]) -> dict[str, Any]:
             raise CircuitV0Error(f"{where}: params must be an object")
         if op in SOURCE_V0:
             if seen_gate:
-                raise CircuitV0Error(
-                    f"{where}: source op must be first (state already exists)"
-                )
+                raise CircuitV0Error(f"{where}: source op must be first (state already exists)")
             if op == "vacuum":
                 nm = params.get("nmode", 1)
                 if not isinstance(nm, int) or isinstance(nm, bool) or nm < 1:
-                    raise CircuitV0Error(
-                        f"nodes[{i}]: vacuum nmode must be an int >= 1"
-                    )
+                    raise CircuitV0Error(f"nodes[{i}]: vacuum nmode must be an int >= 1")
                 nmode += nm
             else:
                 src_node: dict[str, Any] = {}
@@ -224,13 +252,19 @@ def translate_v0(data: dict[str, Any]) -> dict[str, Any]:
                     src_node["id"] = rn["id"]  # scan/UI reference the source node
                 if op == "coherent":
                     alpha = _as_complex(params.get("alpha"), where)
-                    src_node.update({"op": "displace", "modes": [nmode],
-                                     "params": {"alpha": [alpha.real, alpha.imag]}})
+                    src_node.update(
+                        {
+                            "op": "displace",
+                            "modes": [nmode],
+                            "params": {"alpha": [alpha.real, alpha.imag]},
+                        }
+                    )
                     nmode += 1
                 else:  # tmsv
                     r = _num(params.get("r"), where, "r")
-                    src_node.update({"op": "two_mode_squeeze", "modes": [nmode, nmode + 1],
-                                     "params": {"r": r}})
+                    src_node.update(
+                        {"op": "two_mode_squeeze", "modes": [nmode, nmode + 1], "params": {"r": r}}
+                    )
                     nmode += 2
                 ops.append(src_node)
         else:
@@ -241,17 +275,18 @@ def translate_v0(data: dict[str, Any]) -> dict[str, Any]:
                 modes = [_as_pos_int(rn["mode"], f"{where}.mode")]
             elif op in TWO_MODE_V0:
                 if not isinstance(rn.get("modes"), list) or len(rn["modes"]) != 2:
-                    raise CircuitV0Error(
-                        f"{where}: op {op!r} requires 'modes' of length 2"
-                    )
+                    raise CircuitV0Error(f"{where}: op {op!r} requires 'modes' of length 2")
                 modes = [_as_pos_int(m, f"{where}.modes") for m in rn["modes"]]
             else:
                 raise CircuitV0Error(
                     f"{where}: unknown op {op!r}; whitelist: "
                     f"{sorted(SOURCE_V0 | SINGLE_MODE_V0 | TWO_MODE_V0)}"
                 )
-            node: dict[str, Any] = {"op": V0_TO_V1_OP.get(op, op), "modes": modes,
-                                    "params": dict(params)}
+            node: dict[str, Any] = {
+                "op": V0_TO_V1_OP.get(op, op),
+                "modes": modes,
+                "params": dict(params),
+            }
             pnames = V0_TO_V1_PARAM.get(node["op"], {})
             if pnames:
                 node["params"] = {pnames.get(k, k): v for k, v in params.items()}
@@ -287,11 +322,11 @@ def _parse_view(raw: Any) -> View:
         or jm[0] == jm[1]
         or not all(isinstance(m, int) and not isinstance(m, bool) and m >= 0 for m in jm)
     ):
-        raise CircuitV0Error(
-            "view.joint_modes must be a list of two distinct non-negative ints"
-        )
+        raise CircuitV0Error("view.joint_modes must be a list of two distinct non-negative ints")
     return View(
-        wigner_mode=wigner_mode, lim=float(lim), n=n,
+        wigner_mode=wigner_mode,
+        lim=float(lim),
+        n=n,
         joint_modes=None if jm is None else list(jm),
     )
 
@@ -309,14 +344,11 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
         data = translate_v0(data)
     elif data.get("schema") != SCHEMA:
         raise CircuitV0Error(
-            f"unsupported schema {data.get('schema')!r}; expected {SCHEMA!r} or "
-            f"{SCHEMA_V0!r}"
+            f"unsupported schema {data.get('schema')!r}; expected {SCHEMA!r} or {SCHEMA_V0!r}"
         )
     backend = data.get("backend", "gaussian")
     if backend not in ("gaussian", "fock", "bosonic"):
-        raise CircuitV0Error(
-            f"backend must be 'gaussian', 'fock' or 'bosonic', got {backend!r}"
-        )
+        raise CircuitV0Error(f"backend must be 'gaussian', 'fock' or 'bosonic', got {backend!r}")
     view = _parse_view(data.get("view", {}))
     seed = data.get("seed", 0)
     if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
@@ -342,9 +374,8 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
             )
     return LabCircuit(core=core, seed=seed, view=view, ui=ui, raw=data)
 
-def _load_fock(
-    data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]
-) -> LabCircuit:
+
+def _load_fock(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]) -> LabCircuit:
     """Fock backend load: FOCK_WHITELIST first, then fock IR validation.
 
     Whitelist is a UI concept (ADR-0003 #3): ops outside it are rejected
@@ -358,8 +389,7 @@ def _load_fock(
         if op not in FOCK_WHITELIST:
             nid = node.get("id") if isinstance(node, dict) else "?"
             raise CircuitV0Error(
-                f"ops[{nid or '?'}]: op {op!r} not in Fock Lab "
-                f"whitelist: {sorted(FOCK_WHITELIST)}"
+                f"ops[{nid or '?'}]: op {op!r} not in Fock Lab whitelist: {sorted(FOCK_WHITELIST)}"
             )
     try:
         validate_fock_ir(data)
@@ -368,21 +398,21 @@ def _load_fock(
     initial = data.get("initial")
     if initial is not None and (
         not isinstance(initial, list)
-        or not all(
-            isinstance(n, int) and not isinstance(n, bool) and n >= 0
-            for n in initial
-        )
+        or not all(isinstance(n, int) and not isinstance(n, bool) and n >= 0 for n in initial)
     ):
         raise CircuitV0Error("initial must be a list of non-negative ints")
     return LabCircuit(
-        core=None, backend="fock", seed=seed, view=view, ui=ui,
-        raw=data, initial=initial,
+        core=None,
+        backend="fock",
+        seed=seed,
+        view=view,
+        ui=ui,
+        raw=data,
+        initial=initial,
     )
 
 
-def _load_bosonic(
-    data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]
-) -> LabCircuit:
+def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]) -> LabCircuit:
     """Bosonic backend load: BOSONIC_WHITELIST first, then bosonic IR validation.
 
     Mirrors the Fock path: whitelist is a UI concept (ADR-0003 #3); ops
@@ -407,20 +437,21 @@ def _load_bosonic(
         if not isinstance(initial, list) or not all(
             item is None or item in ("gkp0", "gkp1") for item in initial
         ):
-            raise CircuitV0Error(
-                "initial must be a list of null/'gkp0'/'gkp1' per mode"
-            )
+            raise CircuitV0Error("initial must be a list of null/'gkp0'/'gkp1' per mode")
         if len(initial) != data.get("nmode"):
-            raise CircuitV0Error(
-                f"initial list length {len(initial)} != nmode {data.get('nmode')}"
-            )
+            raise CircuitV0Error(f"initial list length {len(initial)} != nmode {data.get('nmode')}")
     return LabCircuit(
-        core=None, backend="bosonic", seed=seed, view=view, ui=ui,
+        core=None,
+        backend="bosonic",
+        seed=seed,
+        view=view,
+        ui=ui,
         raw=data,
     )
 
 
 # -- execution --------------------------------------------------------------
+
 
 def _apply_measure(
     op_name: str,
@@ -446,11 +477,11 @@ def _apply_measure(
             outcome = homodyne_mean(state, phys_modes[0], phi)
             st = homodyne_condition(state, phys_modes[0], phi, outcome)
         else:
-            outcome, st = homodyne_sample_and_condition(
-                state, phys_modes[0], phi, rng=rng
-            )
+            outcome, st = homodyne_sample_and_condition(state, phys_modes[0], phi, rng=rng)
         return st.remove_mode(phys_modes[0]), {
-            "op": "measure_homodyne", "mode": logical_mode, "phi": phi,
+            "op": "measure_homodyne",
+            "mode": logical_mode,
+            "phi": phi,
             "outcome": outcome,
         }
     if op_name == "measure_heterodyne":
@@ -458,18 +489,16 @@ def _apply_measure(
             outcome = heterodyne_mean(state, phys_modes[0])
             st = heterodyne_condition(state, phys_modes[0], outcome)
         else:
-            outcome, st = heterodyne_sample_and_condition(
-                state, phys_modes[0], rng=rng
-            )
+            outcome, st = heterodyne_sample_and_condition(state, phys_modes[0], rng=rng)
         return st, {
-            "op": "measure_heterodyne", "mode": logical_mode,
+            "op": "measure_heterodyne",
+            "mode": logical_mode,
             "outcome": [outcome.real, outcome.imag],
         }
     raise CircuitV0Error(f"{where}: unsupported measurement op {op_name!r} in Lab")
 
-def _execute(
-    circuit: LabCircuit, *, rng: np.random.Generator | None = None
-) -> RunResult:
+
+def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> RunResult:
     """Shared execution core: ordered ops → final GaussianState + result.
 
     Non-measurement ops are delegated to ``GaussianCircuit.from_ir().compile()``
@@ -498,7 +527,7 @@ def _execute(
     ir_idx = 0
     run_results: dict[str, float] = {}  # ParamRef sources for feedforward ops
     for seg in compiled._segments:
-        if seg[0] == 'merged':
+        if seg[0] == "merged":
             _, nmode, ops = seg
             state = compiled._apply_merged(ops, nmode, {}, state)
             ir_idx += len(ops)
@@ -509,8 +538,13 @@ def _execute(
         if op_name in MEASUREMENT_OPS:
             # Measurements: Lab owns the path (mean/sample split + entry).
             state, entry = _apply_measure(
-                op_name, state, phys_modes, node.modes[0],
-                fixed, f"ops[{node.id or '?'}]", rng=rng,
+                op_name,
+                state,
+                phys_modes,
+                node.modes[0],
+                fixed,
+                f"ops[{node.id or '?'}]",
+                rng=rng,
             )
             # feedforward: record outcome under the measurement's name for
             # later ParamRef resolution by _run_op.
@@ -536,13 +570,16 @@ def _execute(
             if op_name in _LAB_REQUIRED_PARAMS:
                 for pname in _LAB_REQUIRED_PARAMS[op_name]:
                     if pname not in node.params:
-                        raise CircuitV0Error(
-                            f"ops[{node.id or '?'}]: {pname} must be a number"
-                        )
+                        raise CircuitV0Error(f"ops[{node.id or '?'}]: {pname} must be a number")
             state, run_results = compiled._run_op(
-                seg[1], state, run_results, {}, rng=rng,
+                seg[1],
+                state,
+                run_results,
+                {},
+                rng=rng,
             )
     from cvsim.lab.gaussian_backend import _build_result  # D1-A: local import
+
     return _build_result(state, circuit.view, measured)
 
 
@@ -555,4 +592,3 @@ def sample_circuit(circuit: LabCircuit, rng: np.random.Generator) -> RunResult:
     """Compile + run with true sampling of every measurement node, in node
     order; each measurement conditions the state for the next one."""
     return _execute(circuit, rng=rng)
-

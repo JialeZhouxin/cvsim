@@ -97,9 +97,7 @@ def test_validate_true_rejects_non_cp():
 def test_validate_false_escape_hatch():
     st = GaussianState.vacuum(1)
     # would fail validate=True; escape hatch lets it through
-    out = apply_gaussian_channel(
-        st, 2.0 * np.eye(2), np.zeros((2, 2)), validate=False
-    )
+    out = apply_gaussian_channel(st, 2.0 * np.eye(2), np.zeros((2, 2)), validate=False)
     assert out.nmode == 1
 
 

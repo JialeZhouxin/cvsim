@@ -30,6 +30,7 @@ pytestmark = pytest.mark.phaseB3
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def _fock_pdf(state: FockState, phi: float, xs: np.ndarray) -> np.ndarray:
     """Fock homodyne P(x_φ) on the given grid (HO wavefunctions, ħ=1)."""
     from cvsim.fock.observables import _amps_for_phi, _ho_basis_x
@@ -48,9 +49,11 @@ def _fock_pdf(state: FockState, phi: float, xs: np.ndarray) -> np.ndarray:
     # return density per-unit-x (multiply by count/range to match continuous)
     return pdf
 
+
 # ---------------------------------------------------------------------------
 # criterion 4: K=1 Gaussian reduces to single Gaussian density
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("alpha", [0.0, 0.5, 1.0 + 0.5j])
 def test_pdf_k1_gaussian_matches_analytic(alpha):
@@ -62,9 +65,11 @@ def test_pdf_k1_gaussian_matches_analytic(alpha):
     analytic = np.exp(-0.5 * (xs - mu) ** 2 / var) / np.sqrt(2.0 * np.pi * var)
     np.testing.assert_allclose(P, analytic, atol=1e-12)
 
+
 # ---------------------------------------------------------------------------
 # criterion 1: cat vs Fock high-cutoff cross-check
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize("alpha", [0.8, 1.2])
 @pytest.mark.parametrize("even", [True, False])
@@ -88,6 +93,7 @@ def test_pdf_cat_matches_fock_high_cutoff(alpha, even):
 
     # Bosonic P is already per-unit-x (continuous density on grid)
     np.testing.assert_allclose(P_b, pf_density, atol=1e-7)
+
 
 def test_pdf_gkp_peak_positions_align_with_fock():
     """GKP homodyne_pdf peak positions qualitatively match Fock high cutoff.
@@ -123,14 +129,14 @@ def test_pdf_gkp_peak_positions_align_with_fock():
         pytest.skip("Fock GKP produced no detectable peaks")
 
     # each bosonic peak should have a fock peak within ~0.5
-    matched = sum(
-        1 for p in pb if np.min(np.abs(pf_peaks - p)) < 0.5
-    )
+    matched = sum(1 for p in pb if np.min(np.abs(pf_peaks - p)) < 0.5)
     assert matched >= max(1, len(pb) - 1)
+
 
 # ---------------------------------------------------------------------------
 # criterion 2: Born consistency (analytic, deterministic)
 # ---------------------------------------------------------------------------
+
 
 def _born_check(state, mode, phi, xs, P, dx, p_thr=1e-14):
     """Born consistency for Gaussian-approx condition (vision B3 criterion 2).
@@ -202,9 +208,11 @@ def test_born_consistency_coherent():
     assert chk["mean_recon_err"] < 1e-7
     assert chk["likeweight_err"] < 1e-7
 
+
 # ---------------------------------------------------------------------------
 # criterion 3: sample histogram vs exact density
 # ---------------------------------------------------------------------------
+
 
 def test_sample_histogram_matches_density_cat():
     """10⁴ shots histogram vs homodyne_pdf density, bin relative error <5%."""
@@ -214,9 +222,7 @@ def test_sample_histogram_matches_density_cat():
     lim = 6.0 * alpha * np.sqrt(2.0) + 2.0
     n_grid = 801
     shots = 10_000
-    samples = homodyne_sample(
-        st, mode=0, phi=0.0, rng=rng, n_grid=n_grid, lim=lim, shots=shots
-    )
+    samples = homodyne_sample(st, mode=0, phi=0.0, rng=rng, n_grid=n_grid, lim=lim, shots=shots)
     assert samples.shape == (shots,)
 
     xs, P = homodyne_pdf(st, mode=0, phi=0.0, n_grid=n_grid, lim=lim)
@@ -231,9 +237,11 @@ def test_sample_histogram_matches_density_cat():
     rel_err = np.abs(hist[mask] - P_at[mask]) / P_at[mask]
     assert np.max(rel_err) < 0.12
 
+
 # ---------------------------------------------------------------------------
 # regression: API shape
 # ---------------------------------------------------------------------------
+
 
 def test_sample_returns_array_shape():
     st = coherent(0.3)
@@ -242,18 +250,15 @@ def test_sample_returns_array_shape():
     assert isinstance(out, np.ndarray)
     assert out.shape == (5,)
 
+
 def test_sample_and_condition_uses_exact_path():
     from cvsim.bosonic import homodyne_sample_and_condition
 
     st = even_cat(0.8)
     rng = np.random.default_rng(1)
-    outcomes, post = homodyne_sample_and_condition(
-        st, rng=rng, n_grid=401, lim=6.0, shots=3
-    )
+    outcomes, post = homodyne_sample_and_condition(st, rng=rng, n_grid=401, lim=6.0, shots=3)
     assert outcomes.shape == (3,)
     assert isinstance(post, BosonicState)
     # posterior conditioned on outcomes[0]
     expected = homodyne_condition(st, 0, 0.0, float(outcomes[0]))
-    np.testing.assert_allclose(
-        post.components[0].rbar, expected.components[0].rbar, atol=1e-12
-    )
+    np.testing.assert_allclose(post.components[0].rbar, expected.components[0].rbar, atol=1e-12)

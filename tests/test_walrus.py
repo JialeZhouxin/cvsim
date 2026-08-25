@@ -88,7 +88,9 @@ def test_no_aliasing():
     np.testing.assert_allclose(st.V[0, 0], 0.5 * np.exp(-1.0), atol=1e-15)
     np.testing.assert_allclose(st.rbar[0], 0.0, atol=1e-15)
 
+
 # --- thin GBS wrappers: format layer (no thewalrus needed) ---
+
 
 def test_wrap_type_errors():
     with pytest.raises(TypeError):
@@ -99,6 +101,7 @@ def test_wrap_type_errors():
         gbs_sample(np.eye(2), 10)  # type: ignore[arg-type]
     with pytest.raises(TypeError):
         threshold_sample(np.zeros(4), 10)  # type: ignore[arg-type]
+
 
 def test_wrap_positive_int_errors():
     st = GaussianState.vacuum(1)
@@ -117,6 +120,7 @@ def test_wrap_positive_int_errors():
     with pytest.raises(ValueError):
         threshold_sample(st, 10, fanout=0)
 
+
 def test_wrap_missing_extra(monkeypatch):
     """No thewalrus installed → RuntimeError with install hint (PRD AC2)."""
     import sys
@@ -129,7 +133,6 @@ def test_wrap_missing_extra(monkeypatch):
         gbs_sample(st, 10)
     with pytest.raises(RuntimeError, match=r"cvsim\[gbs\]"):
         threshold_sample(st, 10)
-
 
 
 # --- comparison layer (needs thewalrus, cvsim[gbs]) ---
@@ -192,7 +195,9 @@ def test_walrus_tmsv_ordering_xxpp():
         got = np.real(dm[n, n, n, n])
         assert abs(got - expected) < 1e-9, f"P({n},{n}) = {got}, expected {expected}"
 
+
 # --- thin GBS wrappers: comparison layer (needs thewalrus, cvsim[gbs]) ---
+
 
 def test_pnr_probs_matches_density_matrix_diag():
     thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
@@ -207,6 +212,7 @@ def test_pnr_probs_matches_density_matrix_diag():
     dm = density_matrix(mu, sigma, cutoff=5, hbar=2)
     np.testing.assert_allclose(P, np.real(np.einsum("iijj->ij", dm)), atol=1e-9)
 
+
 def test_pnr_probs_squeezed_analytic():
     thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
 
@@ -217,6 +223,7 @@ def test_pnr_probs_squeezed_analytic():
         assert abs(P[2 * n] - _squeezed_vac_p(n, r)) < 1e-9
     for n in (1, 3, 5):  # odd diagonals vanish
         assert abs(P[n]) < 1e-9
+
 
 def test_pnr_probs_thermal_product_axes():
     """Mixed-state enumeration path + mode-axis order (asymmetric nbar)."""
@@ -231,6 +238,7 @@ def test_pnr_probs_thermal_product_axes():
             p0 = nbar0**n0 / (1.0 + nbar0) ** (n0 + 1)
             p1 = nbar1**n1 / (1.0 + nbar1) ** (n1 + 1)
             assert abs(P[n0, n1] - p0 * p1) < 1e-9
+
 
 def test_gbs_sample_frequencies():
     thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)
@@ -248,6 +256,7 @@ def test_gbs_sample_frequencies():
         freq[int(n0), int(n1)] += 1.0
     freq /= samples.shape[0]
     np.testing.assert_allclose(freq, Ps, atol=0.02)
+
 
 def test_threshold_sample_frequencies():
     thewalrus = pytest.importorskip("thewalrus", exc_type=ImportError)

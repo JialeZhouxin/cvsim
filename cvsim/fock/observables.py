@@ -311,9 +311,7 @@ def homodyne_sample_and_condition(
 # -- PNR measurement (vision §4 F2) ----------------------------------------
 
 
-def pnr_sample(
-    state: FockLike, mode: int = 0, *, rng: np.random.Generator | None = None
-) -> int:
+def pnr_sample(state: FockLike, mode: int = 0, *, rng: np.random.Generator | None = None) -> int:
     """Sample a photon-number outcome from p_n = ⟨n|ρ|n⟩ (marginal on `mode`)."""
     p = pnrd_probs(state, mode)
     if rng is None:
@@ -497,8 +495,11 @@ def heterodyne_condition(
         if mode not in (0, 1):
             raise IndexError(f"mode {mode} out of range for nmode=2")
         v = _coherent_overlap_matrix(N, (beta,))[:, 0]
-        A = np.kron(np.outer(v, v.conj()), np.eye(N)) if mode == 0 else \
-            np.kron(np.eye(N), np.outer(v, v.conj()))
+        A = (
+            np.kron(np.outer(v, v.conj()), np.eye(N))
+            if mode == 0
+            else np.kron(np.eye(N), np.outer(v, v.conj()))
+        )
         rho2 = A @ state.rho @ A.conj().T
         p = np.real(np.trace(rho2))
         if p <= _EPS:

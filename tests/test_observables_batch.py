@@ -93,8 +93,16 @@ def test_seed_reproducibility_golden():
     h = homodyne_sample_batch(st, phi=0.0, size=8, rng=np.random.default_rng(1234))
     np.testing.assert_allclose(
         h,
-        [-0.62239843, 0.02487515, 0.28751652, 0.05922669,
-         0.33519174, 1.13048184, -0.57388466, 0.36690821],
+        [
+            -0.62239843,
+            0.02487515,
+            0.28751652,
+            0.05922669,
+            0.33519174,
+            1.13048184,
+            -0.57388466,
+            0.36690821,
+        ],
         atol=1e-8,
     )
 

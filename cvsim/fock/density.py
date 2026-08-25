@@ -29,7 +29,7 @@ class FockDensity:
             raise ValueError("nmode must be 1..4 (dense m≤4; sparse F3)")
         d = self.rho.shape[0]
         n = int(round(d ** (1.0 / self.nmode)))
-        if n ** self.nmode != d:
+        if n**self.nmode != d:
             raise ValueError(f"rho dim {d} is not cutoff**{self.nmode}")
 
     @property

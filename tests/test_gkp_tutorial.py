@@ -11,15 +11,16 @@ import numpy as np
 from cvsim.gaussian import GaussianCircuit, ParamRef
 
 
-def gkp_detect_correct(eps: float, r: float, gain: float = -1.0 / np.sqrt(2),
-                       seed: int = 0) -> tuple[float, float]:
+def gkp_detect_correct(
+    eps: float, r: float, gain: float = -1.0 / np.sqrt(2), seed: int = 0
+) -> tuple[float, float]:
     c = GaussianCircuit(2)
-    c.squeeze(0, r=r)                              # data: x-squeezed GKP|0> approx
+    c.squeeze(0, r=r)  # data: x-squeezed GKP|0> approx
     c.fourier(1)
     c.squeeze(1, r=r)
     c.fourier(1)  # ancilla: p-squeezed
-    c.displace(0, alpha=eps / np.sqrt(2))          # inject x error eps
-    c.cz(0, 1, weight=1.0)                         # propagate x1 -> p2
+    c.displace(0, alpha=eps / np.sqrt(2))  # inject x error eps
+    c.cz(0, 1, weight=1.0)  # propagate x1 -> p2
     c.measure_homodyne(1, phi=np.pi / 2, name="m_p")
     c.displace(0, alpha=ParamRef("m_p", gain=gain))  # feedforward correction
     st, res = c.compile().run(rng=np.random.default_rng(seed))
@@ -29,8 +30,7 @@ def gkp_detect_correct(eps: float, r: float, gain: float = -1.0 / np.sqrt(2),
 def test_readout_mean_tracks_error() -> None:
     # calibration: mean readout ≈ injected ε (200 seeds, r=2)
     eps, r = 0.2, 2.0
-    readouts = [gkp_detect_correct(eps, r, gain=0.0, seed=s)[0]
-                for s in range(200)]
+    readouts = [gkp_detect_correct(eps, r, gain=0.0, seed=s)[0] for s in range(200)]
     assert abs(np.mean(readouts) - eps) < 0.05
     # readout std ≈ e^{-r} (data squeeze noise + ancilla noise, independent)
     assert abs(np.std(readouts) - np.exp(-r)) < 0.3 * np.exp(-r)
@@ -69,10 +69,10 @@ def test_notebook_build_is_stable() -> None:
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    subprocess.run([sys.executable, "tutorials/_build_06.py"],
-                   cwd=root, check=True, capture_output=True)
-    nb = json.loads((root / "tutorials/06_gkp_feedforward.ipynb").read_text(
-        encoding="utf-8"))
+    subprocess.run(
+        [sys.executable, "tutorials/_build_06.py"], cwd=root, check=True, capture_output=True
+    )
+    nb = json.loads((root / "tutorials/06_gkp_feedforward.ipynb").read_text(encoding="utf-8"))
     assert nb["nbformat"] == 4
     code_cells = [c for c in nb["cells"] if c["cell_type"] == "code"]
     assert len(code_cells) == 4  # 1 helper def + 3 assert blocks

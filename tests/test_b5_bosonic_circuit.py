@@ -30,6 +30,7 @@ pytestmark = pytest.mark.phaseB5
 # Exit 1 — compiled vs naive (gate sequence)
 # ===========================================================================
 
+
 class TestCompiledVsNaive:
     def test_single_mode_squeeze_displace(self):
         """squeeze + displace: circuit vs direct gate calls (atol 1e-12)."""
@@ -40,9 +41,7 @@ class TestCompiledVsNaive:
         c.squeeze(0, 0.5)
         c.displace(0, 0.3 + 0.4j)
         st_circ = c.run()
-        np.testing.assert_allclose(
-            st_circ.components[0].V, st_naive.components[0].V, atol=1e-12
-        )
+        np.testing.assert_allclose(st_circ.components[0].V, st_naive.components[0].V, atol=1e-12)
         np.testing.assert_allclose(
             st_circ.components[0].rbar, st_naive.components[0].rbar, atol=1e-12
         )
@@ -58,9 +57,7 @@ class TestCompiledVsNaive:
         c.beamsplitter(0, 1, np.pi / 4)
         c.cz(0, 1, 1.0)
         st_circ = c.run()
-        np.testing.assert_allclose(
-            st_circ.components[0].V, st_naive.components[0].V, atol=1e-12
-        )
+        np.testing.assert_allclose(st_circ.components[0].V, st_naive.components[0].V, atol=1e-12)
         np.testing.assert_allclose(
             st_circ.components[0].rbar, st_naive.components[0].rbar, atol=1e-12
         )
@@ -79,6 +76,7 @@ class TestCompiledVsNaive:
 # ===========================================================================
 # Exit 2 — IR roundtrip lossless
 # ===========================================================================
+
 
 class TestIRRoundtrip:
     def test_roundtrip_gate_circuit(self):
@@ -133,6 +131,7 @@ class TestIRRoundtrip:
 # Exit 3 — Lab backend="bosonic"
 # ===========================================================================
 
+
 class TestLabBackendBosonic:
     """Exit 3: Bosonic IR uses circuit_v1 schema (schema-compatible).
 
@@ -175,6 +174,7 @@ class TestLabBackendBosonic:
 # ===========================================================================
 # Exit 4 — measurement + feedforward + mode removal
 # ===========================================================================
+
 
 class TestMeasurementFeedforward:
     def test_homodyne_measure_removes_mode(self):
@@ -225,6 +225,7 @@ class TestMeasurementFeedforward:
 # ===========================================================================
 # Exit 5 — channels component-wise
 # ===========================================================================
+
 
 class TestChannels:
     def test_loss_channel(self):

@@ -34,9 +34,7 @@ def _state_with(r: float = 0.0, alpha: complex = 0.0) -> GaussianState:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "r,alpha", [(0.0, 0.0), (0.0, 0.6), (0.4, 0.0), (0.4, 0.3 + 0.1j)]
-)
+@pytest.mark.parametrize("r,alpha", [(0.0, 0.0), (0.0, 0.6), (0.4, 0.0), (0.4, 0.3 + 0.1j)])
 def test_p_click_matches_fock_truncated(r: float, alpha: complex) -> None:
     from cvsim.fock import FockState, displace, squeeze
 

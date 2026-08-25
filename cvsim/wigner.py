@@ -16,9 +16,7 @@ from cvsim.fock.state import FockState
 from cvsim.gaussian.state import GaussianState
 
 
-def wigner_point_gaussian(
-    V: np.ndarray, rbar: np.ndarray, x: float, p: float
-) -> complex:
+def wigner_point_gaussian(V: np.ndarray, rbar: np.ndarray, x: float, p: float) -> complex:
     """Single-mode Gaussian Wigner at (x,p). rbar may be complex."""
     V = np.asarray(V, dtype=float)
     rbar = np.asarray(rbar, dtype=complex).reshape(-1)
@@ -73,11 +71,7 @@ def _wigner_kernel_nm(n: int, m: int, x: float, p: float) -> complex:
         )
     lag = eval_genlaguerre(m, n - m, 4.0 * r2)
     return (
-        pref
-        * ((-1.0) ** m)
-        * np.sqrt(factorial(m) / factorial(n))
-        * (2.0 * alpha) ** (n - m)
-        * lag
+        pref * ((-1.0) ** m) * np.sqrt(factorial(m) / factorial(n)) * (2.0 * alpha) ** (n - m) * lag
     )
 
 
@@ -104,9 +98,7 @@ def wigner_fock(state: FockState | FockDensity, x: float, p: float) -> float:
     return float(total.real)
 
 
-def _wigner_grid_fock(
-    rho: np.ndarray, X: np.ndarray, P: np.ndarray
-) -> np.ndarray:
+def _wigner_grid_fock(rho: np.ndarray, X: np.ndarray, P: np.ndarray) -> np.ndarray:
     """Vectorized Wigner grid for Fock states (same kernel as
     :func:`wigner_fock`, evaluated over the full grid per (n, m) pair).
 
@@ -158,24 +150,22 @@ def wigner_grid(
     ps = np.linspace(-lim, lim, n)
     X, P = np.meshgrid(xs, ps, indexing="xy")
     if isinstance(state, GaussianState):
+
         def fn(x, p):
             return wigner_gaussian(state, x, p)
     elif isinstance(state, BosonicState):
+
         def fn(x, p):
             return wigner_bosonic(state, x, p)
     elif isinstance(state, (FockState, FockDensity)):
         if state.nmode != 1:
             raise ValueError("wigner_grid: single-mode only")
         rho = (
-            state.rho
-            if isinstance(state, FockDensity)
-            else np.outer(state.amps, state.amps.conj())
+            state.rho if isinstance(state, FockDensity) else np.outer(state.amps, state.amps.conj())
         )
         return X, P, _wigner_grid_fock(rho, X, P)
     else:
-        raise TypeError(
-            "state must be GaussianState, BosonicState, FockState, or FockDensity"
-        )
+        raise TypeError("state must be GaussianState, BosonicState, FockState, or FockDensity")
     W = np.empty_like(X, dtype=float)
     for i in range(n):
         for j in range(n):

@@ -123,7 +123,7 @@ def test_vacuum_probability_coherent() -> None:
     for alpha in (0.3, 0.5 + 0.2j, 1.0):
         st_d = GaussianState(V=np.eye(2) * 0.5, rbar=_displace_vec(alpha))
         got = bridge.vacuum_probability(st_d.V, st_d.rbar, 0)
-        np.testing.assert_allclose(got, math.exp(-abs(alpha) ** 2), atol=1e-12)
+        np.testing.assert_allclose(got, math.exp(-(abs(alpha) ** 2)), atol=1e-12)
         # Fock cross-check at high cutoff
         psi = displace(FockState.vacuum(20), alpha)
         np.testing.assert_allclose(got, _fock_p0(psi), atol=1e-10)

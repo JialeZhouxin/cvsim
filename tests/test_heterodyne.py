@@ -122,11 +122,7 @@ def test_heterodyne_bad_mode():
 
 def test_circuit_measure_heterodyne():
     rng = np.random.default_rng(0)
-    circ = (
-        GaussianCircuit(2)
-        .displace(0, 0.5 + 0.0j)
-        .measure_heterodyne(0, "h0")
-    )
+    circ = GaussianCircuit(2).displace(0, 0.5 + 0.0j).measure_heterodyne(0, "h0")
     st, results = circ.run(rng=rng)
     assert "h0" in results
     assert isinstance(results["h0"], complex)

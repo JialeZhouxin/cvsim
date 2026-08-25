@@ -52,13 +52,13 @@ def test_twomode_merged_matches_direct() -> None:
 
 def test_symbolic_params_and_feedforward() -> None:
     c = FockCircuit(2, cutoff=12)
-    c.squeeze(1, r='r_s')
-    c.measure_pnr(1, name='m_n')
-    c.displace(0, alpha=ParamRef('m_n', gain=0.2))
+    c.squeeze(1, r="r_s")
+    c.measure_pnr(1, name="m_n")
+    c.displace(0, alpha=ParamRef("m_n", gain=0.2))
     rng = np.random.default_rng(9)
     st, results = c.run(r_s=0.6, rng=rng)
-    assert 'm_n' in results and isinstance(results['m_n'], int)
-    assert 0 <= results['m_n'] < 12
+    assert "m_n" in results and isinstance(results["m_n"], int)
+    assert 0 <= results["m_n"] < 12
     # deterministic with same rng
     rng2 = np.random.default_rng(9)
     st2, res2 = c.run(r_s=0.6, rng=rng2)
@@ -70,8 +70,8 @@ def test_compile_run_parity() -> None:
     c = FockCircuit(2, cutoff=8)
     c.beamsplitter(0, 1)
     c.phase(0, theta=0.4)
-    c.measure_pnr(0, name='n0')
-    c.displace(1, alpha=ParamRef('n0', gain=0.1))
+    c.measure_pnr(0, name="n0")
+    c.displace(1, alpha=ParamRef("n0", gain=0.1))
     rng = np.random.default_rng(3)
     st1, r1 = c.run(rng=rng)
     rng2 = np.random.default_rng(3)
@@ -83,9 +83,9 @@ def test_compile_run_parity() -> None:
 def test_measure_pnr_conditioning() -> None:
     c = FockCircuit(2, cutoff=10)
     c.squeeze(0, r=0.5)
-    c.measure_pnr(1, name='n1')  # vacuum mode → n=0 almost surely
+    c.measure_pnr(1, name="n1")  # vacuum mode → n=0 almost surely
     st, results = c.run(rng=np.random.default_rng(1))
-    assert results['n1'] == 0
+    assert results["n1"] == 0
     ref = pnr_condition(squeeze(FockState.vacuum(10, nmode=2), 0.5), 1, 0)
     np.testing.assert_allclose(st.amps, ref.amps, atol=1e-12)
 

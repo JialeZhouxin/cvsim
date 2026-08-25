@@ -220,9 +220,7 @@ def gkp0(
     lattice="2d": square grid; V=(ε/2)I; cross none|full (not nn).
     Weights Gram-normalized Z=c†Sc. Not Clifford.
     """
-    return _dispatch(
-        epsilon, grid_size, cross=cross, lattice=lattice, x_of_k=lambda k, d: k * d
-    )
+    return _dispatch(epsilon, grid_size, cross=cross, lattice=lattice, x_of_k=lambda k, d: k * d)
 
 
 def gkp1(

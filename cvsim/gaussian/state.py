@@ -105,11 +105,7 @@ class GaussianState:
         st = cls.vacuum(nmode)
         S_r = S_squeeze(nmode, r, mode)
         # S(r,φ) = R(φ) S(r) R(-φ); φ=0 degenerates to bare squeeze
-        S = (
-            S_r
-            if phi == 0.0
-            else S_phase(nmode, phi, mode) @ S_r @ S_phase(nmode, -phi, mode)
-        )
+        S = S_r if phi == 0.0 else S_phase(nmode, phi, mode) @ S_r @ S_phase(nmode, -phi, mode)
         return apply_symplectic(st, S, validate=False)
 
     @classmethod

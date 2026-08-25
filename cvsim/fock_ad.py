@@ -43,11 +43,14 @@ def _expm(xp, G: np.ndarray) -> np.ndarray:
     if xp is np:
         return _expm_np(G)
     import jax.scipy.linalg as jsl  # lazy: jax touched only on the jax path
+
     return jsl.expm(G)
+
 
 def _annihilation(xp, N: int) -> np.ndarray:
     """Truncated a with a|n⟩ = √n |n−1⟩ — mirror of ``gates.annihilation``."""
     return xp.diag(xp.sqrt(xp.arange(1.0, N)), 1).astype(complex)
+
 
 def squeeze_u(backend: str, N: int, r: float) -> np.ndarray:
     """Single-mode squeeze unitary S(r) = exp(½r(a² − a†²)), shape (N, N).
@@ -60,6 +63,7 @@ def squeeze_u(backend: str, N: int, r: float) -> np.ndarray:
         return _squeeze_U(N, r)
     a = _annihilation(xp, N)
     return _expm(xp, 0.5 * r * (a @ a - a.conj().T @ a.conj().T))
+
 
 def bs_u(backend: str, N: int, theta: float, phi: float = 0.0) -> np.ndarray:
     """Two-mode BS(θ, φ) = exp[θ(e^{iφ} a0† a1 − h.c.)], shape (N², N²).
@@ -78,6 +82,7 @@ def bs_u(backend: str, N: int, theta: float, phi: float = 0.0) -> np.ndarray:
     G = theta * (eip * a0.conj().T @ a1 - xp.conj(eip) * a1.conj().T @ a0)
     return _expm(xp, G)
 
+
 def kerr_diag(backend: str, N: int, chi: float) -> np.ndarray:
     """Kerr phases diag(e^{iχ n²}) — |n⟩ ↦ e^{iχ n²}|n⟩ (mirror of gates.kerr).
 
@@ -86,6 +91,7 @@ def kerr_diag(backend: str, N: int, chi: float) -> np.ndarray:
     xp = _get_xp(backend)
     n = xp.arange(N)
     return xp.diag(xp.exp(1j * chi * n * n))
+
 
 def _cat_amps(xp, N: int, alpha: complex) -> np.ndarray:
     """Even cat (|α⟩ + |−α⟩)/√(2(1+e^{−2|α|²})) amplitudes, normalized.
@@ -96,12 +102,13 @@ def _cat_amps(xp, N: int, alpha: complex) -> np.ndarray:
     n = xp.arange(N)
     fact = xp.concatenate([xp.ones(1), xp.cumprod(xp.arange(1.0, N))])
     return (
-        xp.exp(-abs(alpha) ** 2 / 2.0)
+        xp.exp(-(abs(alpha) ** 2) / 2.0)
         / xp.sqrt(2.0 * (1.0 + xp.exp(-2.0 * abs(alpha) ** 2)))
         * (1.0 + (-1.0) ** n)
         * alpha**n
         / xp.sqrt(fact)
     )
+
 
 def _loss_superop(xp, rho: np.ndarray, T: float) -> np.ndarray:
     """ρ' = Σ_k E_k ρ E_k† (1-mode loss, transmissivity T).
@@ -114,8 +121,14 @@ def _loss_superop(xp, rho: np.ndarray, T: float) -> np.ndarray:
     K = np.stack(channels._kraus_ops(N, T))
     return xp.einsum("kam,mn,kbn->ab", K, rho, xp.conj(K))
 
+
 def cat_fidelity(
-    backend: str, r: float, chi: float, *, alpha: complex, T: float = 1.0,
+    backend: str,
+    r: float,
+    chi: float,
+    *,
+    alpha: complex,
+    T: float = 1.0,
     cutoff: int = 12,
 ) -> float:
     """Fidelity of squeeze(r) → Kerr(χ) → loss(T) state vs even cat |α⟩+|−α⟩.
@@ -138,6 +151,7 @@ def cat_fidelity(
         rho = _loss_superop(xp, rho, T)
     cat = _cat_amps(xp, cutoff, alpha)
     return xp.real(xp.conj(cat) @ rho @ cat)
+
 
 def bs_overlap(backend: str, theta: float, *, cutoff: int = 8) -> float:
     """|⟨0,1| BS(θ) |1,0⟩|² = sin²θ — BS gradient test chain.

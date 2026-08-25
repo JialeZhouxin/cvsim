@@ -433,11 +433,9 @@ def test_fidelity_coherent_overlap():
     b = 0.5 + 0.5j
     s1 = GaussianState.coherent(a, nmode=1)
     s2 = GaussianState.coherent(b, nmode=1)
-    expected = float(np.exp(-abs(a - b) ** 2))
+    expected = float(np.exp(-(abs(a - b) ** 2)))
     assert fidelity(s1, s2) == pytest.approx(expected, abs=1e-10)
-    assert fidelity(s1, GaussianState.vacuum(1)) == pytest.approx(
-        np.exp(-abs(a) ** 2), abs=1e-10
-    )
+    assert fidelity(s1, GaussianState.vacuum(1)) == pytest.approx(np.exp(-(abs(a) ** 2)), abs=1e-10)
 
 
 @pytest.mark.parametrize(

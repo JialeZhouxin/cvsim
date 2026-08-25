@@ -56,13 +56,13 @@ def test_rep_packages_isolated(path: Path, pkg: str) -> None:
     for other in REP_PACKAGES:
         if other == pkg:
             continue
-        assert not any(
-            i == other or i.startswith(other + ".") for i in imports
-        ), f"{path} imports {other} (cross-rep forbidden)"
+        assert not any(i == other or i.startswith(other + ".") for i in imports), (
+            f"{path} imports {other} (cross-rep forbidden)"
+        )
     for bad in FORBIDDEN_IMPORTS:
-        assert not any(
-            i == bad or i.startswith(bad + ".") for i in imports
-        ), f"{path} imports {bad} (forbidden)"
+        assert not any(i == bad or i.startswith(bad + ".") for i in imports), (
+            f"{path} imports {bad} (forbidden)"
+        )
     for i in imports:
         if (i == "cvsim" or i.startswith("cvsim.")) and not i.startswith(pkg + "."):
             assert i in ALLOWED_ROOT_IMPORTS, f"{path} imports {i} outside allowlist"

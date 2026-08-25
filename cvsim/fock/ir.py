@@ -38,15 +38,11 @@ OP_META: dict[str, OpMeta] = {
     "displace": OpMeta("one", {"alpha": "complex"}, {"alpha": 0.0}),
     "phase": OpMeta("one", {"theta": "num"}, {"theta": 0.0}),
     "kerr": OpMeta("one", {"chi": "num"}, {"chi": 0.0}),
-    "beamsplitter": OpMeta(
-        "two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}
-    ),
+    "beamsplitter": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
     "two_mode_squeeze": OpMeta("two", {"r": "num"}, {"r": 0.0}),
     "cz": OpMeta("two", {"weight": "num"}, {"weight": 1.0}),
     "cx": OpMeta("two", {"weight": "num"}, {"weight": 1.0}),
-    "mach_zehnder": OpMeta(
-        "two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}
-    ),
+    "mach_zehnder": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
     "interferometer": OpMeta("all", {"U": "matrix"}, {}),
     "apply_unitary": OpMeta("any", {"U": "matrix"}, {}),
     "loss": OpMeta("one", {"eta": "num"}, {"eta": 1.0}),
@@ -85,14 +81,9 @@ def _decode(v: Any, kind: str) -> Any:
         if kind == "complex":
             return complex(v[0], v[1])
         if kind == "kraus":
-            return [
-                np.array([[complex(x[0], x[1]) for x in row] for row in k])
-                for k in v
-            ]
+            return [np.array([[complex(x[0], x[1]) for x in row] for row in k]) for k in v]
         if v and isinstance(v[0], list) and v[0] and isinstance(v[0][0], list):
-            return np.array(
-                [[complex(x[0], x[1]) for x in row] for row in v], dtype=complex
-            )
+            return np.array([[complex(x[0], x[1]) for x in row] for row in v], dtype=complex)
         return np.asarray(v, dtype=float)
     if kind == "complex":
         return complex(v)
@@ -123,9 +114,7 @@ def validate_ir(data: dict[str, Any]) -> None:
         ):
             pass
         else:
-            raise ValueError(
-                f"cutoff must be an int >= 1 or a list of nmode ints, got {cutoff!r}"
-            )
+            raise ValueError(f"cutoff must be an int >= 1 or a list of nmode ints, got {cutoff!r}")
     cutoffs = (
         [cutoff] * nmode
         if isinstance(cutoff, int)
@@ -138,9 +127,7 @@ def validate_ir(data: dict[str, Any]) -> None:
             or len(initial) != nmode
             or not all(isinstance(n, int) and not isinstance(n, bool) for n in initial)
         ):
-            raise ValueError(
-                f"initial must be a list of nmode={nmode} ints, got {initial!r}"
-            )
+            raise ValueError(f"initial must be a list of nmode={nmode} ints, got {initial!r}")
         for i, (n, c) in enumerate(zip(initial, cutoffs, strict=True)):
             if not 0 <= n < c:
                 raise ValueError(f"initial[{i}]={n} must be in [0, {c})")
@@ -237,9 +224,7 @@ def from_ir(data: dict[str, Any]) -> FockCircuit:
     """Rebuild a FockCircuit from a circuit_v1 dict (with cutoff/initial)."""
     validate_ir(data)
     cutoff = data.get("cutoff", 10)
-    circuit = FockCircuit(
-        data["nmode"], cutoff=cutoff, initial=data.get("initial")
-    )
+    circuit = FockCircuit(data["nmode"], cutoff=cutoff, initial=data.get("initial"))
     for node in data["ops"]:
         meta = OP_META[node["op"]]
         kw = dict(meta.defaults)

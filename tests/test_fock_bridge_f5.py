@@ -66,9 +66,7 @@ def test_pnr_probs_coherent(alpha: complex) -> None:
     _check_tail(psi.tail)
     p = pnrd_probs(psi)
     for n in range(12):
-        np.testing.assert_allclose(
-            p[n], abs(bridge.coherent_element(n, alpha)) ** 2, atol=1e-7
-        )
+        np.testing.assert_allclose(p[n], abs(bridge.coherent_element(n, alpha)) ** 2, atol=1e-7)
 
 
 @pytest.mark.parametrize("r", [0.2, 0.3, 0.4])
@@ -78,9 +76,7 @@ def test_pnr_probs_squeezed(r: float) -> None:
     _check_tail(psi.tail)
     p = pnrd_probs(psi)
     for n in range(12):
-        np.testing.assert_allclose(
-            p[n], abs(bridge.squeezed_element(n, r)) ** 2, atol=1e-7
-        )
+        np.testing.assert_allclose(p[n], abs(bridge.squeezed_element(n, r)) ** 2, atol=1e-7)
     # odd photons vanish for squeezed vacuum (φ=0 convention)
     np.testing.assert_allclose(p[1::2][:6], 0.0, atol=1e-12)
 
@@ -137,7 +133,7 @@ def test_mean_photon_thermal(nbar: float, cutoff: int) -> None:
 def test_threshold_coherent(alpha: complex) -> None:
     st = GaussianState.coherent(alpha)
     got = gauss_p_click(st)
-    np.testing.assert_allclose(got, 1.0 - math.exp(-abs(alpha) ** 2), atol=1e-12)
+    np.testing.assert_allclose(got, 1.0 - math.exp(-(abs(alpha) ** 2)), atol=1e-12)
     psi = FockState.coherent(40, alpha)
     _check_tail(psi.tail)
     np.testing.assert_allclose(got, 1.0 - pnrd_probs(psi)[0], atol=1e-7)
@@ -182,9 +178,7 @@ def test_lossy_coherent_eta_sweep(eta: float) -> None:
     _check_tail(psi_in.tail)
 
     rho = loss(psi_in, eta)  # Fock loss Kraus
-    np.testing.assert_allclose(
-        fock_mean(rho), eta * abs(alpha) ** 2, atol=1e-7
-    )
+    np.testing.assert_allclose(fock_mean(rho), eta * abs(alpha) ** 2, atol=1e-7)
     np.testing.assert_allclose(
         1.0 - pnrd_probs(rho)[0], 1.0 - math.exp(-eta * abs(alpha) ** 2), atol=1e-7
     )

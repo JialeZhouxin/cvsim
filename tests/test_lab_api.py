@@ -114,10 +114,14 @@ def test_run_heterodyne_removes_mode_and_remaps_view():
 
 
 def test_sample_endpoint_reproduces_same_seed():
-    body = dict(MAIN_SCENE, nodes=[
-        {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-        {"id": "h", "op": "heterodyne", "params": {}, "mode": 0},
-    ], seed=7)
+    body = dict(
+        MAIN_SCENE,
+        nodes=[
+            {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
+            {"id": "h", "op": "heterodyne", "params": {}, "mode": 0},
+        ],
+        seed=7,
+    )
     r1 = client.post("/sample", json=body)
     r2 = client.post("/sample", json=body)
     assert r1.status_code == 200 and r2.status_code == 200
@@ -131,10 +135,15 @@ def test_sample_endpoint_reproduces_same_seed():
 def test_sample_endpoint_homodyne_removes_mode_wigner_ok():
     """v1 semantics: homodyne removes the measured mode — remaining mode is
     regular, Wigner viewable (no singular state remains)."""
-    body = dict(MAIN_SCENE, nodes=[
-        {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-        {"id": "h", "op": "homodyne", "params": {}, "mode": 0},
-    ], seed=3, view={"wigner_mode": 0, "lim": 4.0, "n": 32})
+    body = dict(
+        MAIN_SCENE,
+        nodes=[
+            {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
+            {"id": "h", "op": "homodyne", "params": {}, "mode": 0},
+        ],
+        seed=3,
+        view={"wigner_mode": 0, "lim": 4.0, "n": 32},
+    )
     r = client.post("/sample", json=body)
     assert r.status_code == 200
     j = r.json()
@@ -170,7 +179,9 @@ def test_a8_no_private_or_other_rep_imports():
         "bosonic._",
     ]
     for rel in [
-        "cvsim/lab/ir.py", "cvsim/lab/server.py", "cvsim/lab/__init__.py",
+        "cvsim/lab/ir.py",
+        "cvsim/lab/server.py",
+        "cvsim/lab/__init__.py",
         "cvsim/lab/gaussian_backend.py",
     ]:
         src = (root / rel).read_text(encoding="utf-8")

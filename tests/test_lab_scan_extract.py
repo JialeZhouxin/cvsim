@@ -14,6 +14,7 @@ Guards:
 6. lab.scan_circuit is lab.scan.scan_circuit (__init__.py forwards from new source).
 7. import order smoke: scan then ir both importable (no cycle).
 """
+
 from __future__ import annotations
 
 import ast
@@ -36,6 +37,7 @@ def test_scan_module_exists():
 def test_ir_no_longer_defines_scan():
     """R2: scan symbols migrated out of ir.py."""
     import cvsim.lab.ir as ir
+
     moved = {"scan_circuit", "_safe_logneg", "_inject_symbolic_param", "SWEEPABLE_PARAMS"}
     leaked = moved & set(ir.__dict__)
     assert not leaked, f"ir.py still defines scan symbols: {leaked}"
@@ -70,12 +72,13 @@ def test_ir_no_module_import_of_scan():
 def test_scan_imports_ir_types():
     """D1: scan.py module-level imports cvsim.lab.ir (single-direction)."""
     import cvsim.lab.scan as scan
+
     assert "cvsim.lab.ir" in dir(scan) or any(
-        "cvsim.lab.ir" in str(getattr(scan, n))
-        for n in dir(scan)
+        "cvsim.lab.ir" in str(getattr(scan, n)) for n in dir(scan)
     ), "scan.py must import cvsim.lab.ir"
     # direct: scan imports the shared helpers it needs from ir
     from cvsim.lab.ir import MEASUREMENT_OPS, _num, _require
+
     assert scan._require is _require, "scan._require must be ir._require"
     assert scan._num is _num, "scan._num must be ir._num"
     assert scan.MEASUREMENT_OPS is MEASUREMENT_OPS, (
@@ -87,6 +90,7 @@ def test_init_scan_import_source():
     """R3: lab.scan_circuit is lab.scan.scan_circuit (__init__ forwards from scan)."""
     import cvsim.lab as lab
     import cvsim.lab.scan as scan
+
     assert lab.scan_circuit is scan.scan_circuit, (
         "lab.scan_circuit must come from cvsim.lab.scan (got different object)"
     )

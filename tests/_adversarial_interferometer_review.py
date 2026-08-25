@@ -2,6 +2,7 @@
 
 Run: py -3 tests/_adversarial_interferometer_review.py
 """
+
 from __future__ import annotations
 
 import traceback
@@ -205,7 +206,7 @@ def main() -> None:
         record(
             "B2 extreme BS theta=pi/2 roundtrip",
             norm(U2 - U) < 1e-9,
-            f"err={norm(U2-U):.3e}, nops={len(ops)}",
+            f"err={norm(U2 - U):.3e}, nops={len(ops)}",
         )
     except Exception as e:
         record("B2 extreme BS", False, str(e))
@@ -231,8 +232,7 @@ def main() -> None:
                 a = interferometer(st0, U)
                 b = apply_mesh(st0, ops)
                 if not (
-                    np.allclose(a.V, b.V, atol=1e-8)
-                    and np.allclose(a.rbar, b.rbar, atol=1e-8)
+                    np.allclose(a.V, b.V, atol=1e-8) and np.allclose(a.rbar, b.rbar, atol=1e-8)
                 ):
                     ok = False
                     worst = (m, trial, "mesh mismatch", float(norm(a.V - b.V)))
@@ -292,7 +292,7 @@ def main() -> None:
         record(
             "B6 m=1 phase-only decomposition",
             norm(U2 - U) < 1e-12,
-            f"ops={ops}, err={norm(U2-U):.3e}",
+            f"ops={ops}, err={norm(U2 - U):.3e}",
         )
     except Exception as e:
         record("B6 m=1", False, str(e))
@@ -303,9 +303,7 @@ def main() -> None:
     try:
         rng = np.random.default_rng(3)
         U = haar(4, rng)
-        U_noisy = U + 1e-12 * rng.normal(size=U.shape) + 1e-12j * rng.normal(
-            size=U.shape
-        )
+        U_noisy = U + 1e-12 * rng.normal(size=U.shape) + 1e-12j * rng.normal(size=U.shape)
         try:
             S = S_from_unitary(U_noisy)
             ok_pass = is_symplectic(S)
@@ -374,9 +372,7 @@ def main() -> None:
     # C5: real orthogonal U
     try:
         th = 0.3
-        U = np.array(
-            [[np.cos(th), np.sin(th)], [-np.sin(th), np.cos(th)]], dtype=float
-        )
+        U = np.array([[np.cos(th), np.sin(th)], [-np.sin(th), np.cos(th)]], dtype=float)
         S = S_from_unitary(U)
         ok = is_symplectic(S)
         st = interferometer(GaussianState.squeezed(0.4, nmode=2), U)
@@ -422,8 +418,7 @@ def main() -> None:
         record(
             "D1 MZ matches documented BS(θ)·R(φ)·BS(π/4)",
             match_doc,
-            f"match_textbook_50_50={match_textbook50}; "
-            "vision text says phase·BS·phase·BS vs code",
+            f"match_textbook_50_50={match_textbook50}; vision text says phase·BS·phase·BS vs code",
         )
     except Exception as e:
         record("D1 MZ semantics", False, str(e))
@@ -447,9 +442,7 @@ def main() -> None:
         st = displace(st, 0 + 1j, 1)
         st = displace(st, 0.5 + 0.5j, 2)
         st2 = fourier(st, mode=1)
-        ok = np.allclose(st2.rbar[0], st.rbar[0]) and np.allclose(
-            st2.rbar[2], st.rbar[2]
-        )
+        ok = np.allclose(st2.rbar[0], st.rbar[0]) and np.allclose(st2.rbar[2], st.rbar[2])
         x1, p1 = st.rbar[1], st.rbar[1 + 3]
         ok = ok and np.allclose(st2.rbar[1], -p1) and np.allclose(st2.rbar[1 + 3], x1)
         record("D3 fourier acts only on target mode", ok, f"rbar={st2.rbar}")
@@ -634,9 +627,7 @@ def main() -> None:
         st = squeeze(displace(GaussianState.vacuum(3), 0.4 + 0.2j, 1), 0.3, 0)
         a = interferometer(st, U)
         b = interferometer(st, U2)
-        same = np.allclose(a.V, b.V, atol=1e-10) and np.allclose(
-            a.rbar, b.rbar, atol=1e-10
-        )
+        same = np.allclose(a.V, b.V, atol=1e-10) and np.allclose(a.rbar, b.rbar, atol=1e-10)
         record(
             "G6 global phase e^{iφ}U vs U on Gaussian",
             True,
@@ -679,10 +670,7 @@ def main() -> None:
         st = displace(GaussianState.vacuum(1), 0.5)
         via_mesh = apply_mesh(st, ops)
         via_phase = phase(phase(st, th1), th2)
-        ok = (
-            norm(U - U_exp) < 1e-12
-            and np.allclose(via_mesh.rbar, via_phase.rbar)
-        )
+        ok = norm(U - U_exp) < 1e-12 and np.allclose(via_mesh.rbar, via_phase.rbar)
         record("G9 compose/apply order consistency", ok, f"U={U}")
     except Exception as e:
         record("G9", False, str(e))

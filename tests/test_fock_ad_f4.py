@@ -31,11 +31,13 @@ JAX = pytest.mark.skipif(not be.HAS_JAX, reason="jax not installed")
 # Exit 2: numpy/jax path identity (conftest `backend` fixture parametrizes)
 # ---------------------------------------------------------------------------
 
+
 def test_squeeze_u_identity(backend: str):
     """jax path == numpy path; numpy path reuses the gates source of truth."""
     U = np.asarray(squeeze_u(backend, 6, 0.4))
     np.testing.assert_allclose(U, squeeze_u("numpy", 6, 0.4), atol=1e-12)
     np.testing.assert_allclose(U, fock.gates._squeeze_U(6, 0.4), atol=1e-12)
+
 
 def test_bs_u_identity(backend: str):
     """jax path == numpy path; numpy path matches gates.beamsplitter on |1,0⟩."""
@@ -47,6 +49,7 @@ def test_bs_u_identity(backend: str):
     ref = fock.beamsplitter(fock.FockState.fock2(1, 0, N), 0.3, 0.2).amps.reshape(N * N)
     np.testing.assert_allclose(U @ vec10, ref, atol=1e-12)
 
+
 def test_kerr_diag_identity(backend: str):
     """jax path == numpy path; numpy path matches gates.kerr on a coherent state."""
     N = 6
@@ -55,6 +58,7 @@ def test_kerr_diag_identity(backend: str):
     np.testing.assert_allclose(D, kerr_diag("numpy", N, chi), atol=1e-12)
     st = fock.FockState.coherent(N, 0.8 + 0.3j)
     np.testing.assert_allclose(D @ st.amps, fock.kerr(st, chi).amps, atol=1e-12)
+
 
 @pytest.mark.parametrize("r,chi", [(0.3, 0.2), (0.7, 0.4), (1.1, 0.8)])
 def test_cat_fidelity_identity(backend: str, r: float, chi: float):
@@ -65,11 +69,13 @@ def test_cat_fidelity_identity(backend: str, r: float, chi: float):
         assert abs(f_np - f_jx) < 1e-10
         assert 0.0 <= f_np <= 1.0
 
+
 def test_cat_fidelity_loss_reduces(backend: str):
     """Loss can only reduce fidelity to the (lossless) cat target."""
     f0 = float(cat_fidelity(backend, 0.7, 0.4, alpha=1.1, T=1.0, cutoff=12))
     f1 = float(cat_fidelity(backend, 0.7, 0.4, alpha=1.1, T=0.7, cutoff=12))
     assert f1 < f0
+
 
 @pytest.mark.parametrize("theta", [0.1, 0.4, 0.9])
 def test_bs_overlap_identity(backend: str, theta: float):
@@ -78,11 +84,13 @@ def test_bs_overlap_identity(backend: str, theta: float):
     np.testing.assert_allclose(o, np.sin(theta) ** 2, atol=1e-12)
     np.testing.assert_allclose(o, bs_overlap("numpy", theta, cutoff=8), atol=1e-12)
 
+
 def test_cat_amps_match_factory():
     """Inlined cat amplitudes == FockState.cat (atol covers the factory's
     truncation renormalisation 1/√(1−tail))."""
     c = np.asarray(_cat_amps(np, 12, 1.1))
     np.testing.assert_allclose(c, fock.FockState.cat(12, 1.1, even=True).amps, atol=1e-6)
+
 
 def test_loss_superop_matches_channel():
     """einsum loss superoperator == channels._apply_kraus_1mode (numpy)."""
@@ -96,6 +104,7 @@ def test_loss_superop_matches_channel():
         atol=1e-12,
     )
 
+
 # ---------------------------------------------------------------------------
 # Exit 1: gradients vs central finite difference (jax required)
 # ---------------------------------------------------------------------------
@@ -103,8 +112,10 @@ def test_loss_superop_matches_channel():
 H = 1e-6
 ATOL = 1e-6
 
+
 def _fd(f, x0: float) -> float:
     return (float(f(x0 + H)) - float(f(x0 - H))) / (2 * H)
+
 
 @JAX
 def test_grad_squeeze_vs_fd():
@@ -120,6 +131,7 @@ def test_grad_squeeze_vs_fd():
     g = float(jax.grad(f)(r0))
     assert abs(g - _fd(f, r0)) < ATOL
 
+
 @JAX
 def test_grad_bs_vs_fd():
     """d|⟨0,1|BS(θ)|1,0⟩|²/dθ == 2 sinθ cosθ == central fd."""
@@ -133,6 +145,7 @@ def test_grad_bs_vs_fd():
     g = float(jax.grad(f)(th))
     assert abs(g - 2.0 * np.sin(th) * np.cos(th)) < ATOL
     assert abs(g - _fd(f, th)) < ATOL
+
 
 @JAX
 def test_grad_kerr_vs_fd():

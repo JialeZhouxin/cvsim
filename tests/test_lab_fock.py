@@ -25,8 +25,7 @@ def _hom_v1(**over):
         "initial": [1, 1],
         "seed": 0,
         "ops": [
-            {"id": "bs", "op": "beamsplitter",
-             "modes": [0, 1], "params": {"theta": np.pi / 4}},
+            {"id": "bs", "op": "beamsplitter", "modes": [0, 1], "params": {"theta": np.pi / 4}},
         ],
         "view": {"wigner_mode": 0, "lim": 5.0, "n": 64, "joint_modes": [0, 1]},
         "ui": {},
@@ -43,6 +42,7 @@ def _script_hom():
 
 
 # --- golden equivalence (A1) -------------------------------------------------
+
 
 def test_hom_run_matches_script_and_bunching():
     r = client.post("/run", json=_hom_v1())
@@ -86,9 +86,11 @@ def test_leakage_analytic_for_displaced_coherent():
     from scipy.special import gammainc
 
     data = {
-        "schema": "circuit_v1", "backend": "fock", "nmode": 1, "cutoff": 10,
-        "ops": [{"id": "d", "op": "displace", "modes": [0],
-                 "params": {"alpha": [1.0, 0.0]}}],
+        "schema": "circuit_v1",
+        "backend": "fock",
+        "nmode": 1,
+        "cutoff": 10,
+        "ops": [{"id": "d", "op": "displace", "modes": [0], "params": {"alpha": [1.0, 0.0]}}],
         "view": {"wigner_mode": 0},
     }
     body = client.post("/run", json=data).json()
@@ -108,9 +110,11 @@ def test_leakage_analytic_for_displaced_coherent():
 def test_leakage_null_for_density_states():
     """Channels → density: leakage honestly null (never fabricated)."""
     data = {
-        "schema": "circuit_v1", "backend": "fock", "nmode": 1, "cutoff": 10,
-        "ops": [{"id": "l", "op": "loss", "modes": [0],
-                 "params": {"eta": 0.8}}],
+        "schema": "circuit_v1",
+        "backend": "fock",
+        "nmode": 1,
+        "cutoff": 10,
+        "ops": [{"id": "l", "op": "loss", "modes": [0], "params": {"eta": 0.8}}],
         "view": {"wigner_mode": 0},
     }
     body = client.post("/run", json=data).json()
@@ -120,12 +124,13 @@ def test_leakage_null_for_density_states():
 def test_kerr_cat_scene_runs():
     """A2: displace(√2) + kerr(π/2) → bimodal cat; Wigner computed."""
     data = {
-        "schema": "circuit_v1", "backend": "fock", "nmode": 1, "cutoff": 12,
+        "schema": "circuit_v1",
+        "backend": "fock",
+        "nmode": 1,
+        "cutoff": 12,
         "ops": [
-            {"id": "d", "op": "displace", "modes": [0],
-             "params": {"alpha": [np.sqrt(2.0), 0.0]}},
-            {"id": "k", "op": "kerr", "modes": [0],
-             "params": {"chi": np.pi / 2}},
+            {"id": "d", "op": "displace", "modes": [0], "params": {"alpha": [np.sqrt(2.0), 0.0]}},
+            {"id": "k", "op": "kerr", "modes": [0], "params": {"chi": np.pi / 2}},
         ],
         "view": {"wigner_mode": 0, "lim": 5.0, "n": 32},
     }
@@ -144,11 +149,11 @@ def test_kerr_cat_scene_runs():
 
 # --- sampling (A3, R4) -------------------------------------------------------
 
+
 def test_sample_seed_reproduction():
     data = _hom_v1(
         ops=[
-            {"id": "m", "op": "measure_pnr", "modes": [0],
-             "params": {"name": "n0"}},
+            {"id": "m", "op": "measure_pnr", "modes": [0], "params": {"name": "n0"}},
         ],
         seed=42,
     )
@@ -166,8 +171,7 @@ def test_sample_seed_reproduction():
 def test_run_deterministic_for_same_payload():
     data = _hom_v1(
         ops=[
-            {"id": "m", "op": "measure_pnr", "modes": [0],
-             "params": {"name": "n0"}},
+            {"id": "m", "op": "measure_pnr", "modes": [0], "params": {"name": "n0"}},
         ],
     )
     b1 = client.post("/run", json=data).json()
@@ -176,6 +180,7 @@ def test_run_deterministic_for_same_payload():
 
 
 # --- batch (R4) --------------------------------------------------------------
+
 
 def test_batch_counts_match_theory_statistically():
     body = client.post("/batch", json={**_hom_v1(), "shots": 1000})
@@ -206,8 +211,7 @@ def test_batch_single_mode_when_no_joint_modes():
 def test_batch_with_measurement_chain():
     data = _hom_v1(
         ops=[
-            {"id": "m", "op": "measure_pnr", "modes": [0],
-             "params": {"name": "n0"}},
+            {"id": "m", "op": "measure_pnr", "modes": [0], "params": {"name": "n0"}},
         ],
     )
     b = client.post("/batch", json={**data, "shots": 50})
@@ -220,12 +224,13 @@ def test_batch_with_measurement_chain():
 
 # --- 422 guards --------------------------------------------------------------
 
+
 def test_422_bad_initial():
     cases = [
-        {**_hom_v1(), "initial": [1, 10]},   # n >= cutoff
-        {**_hom_v1(), "initial": [1]},       # wrong length
-        {**_hom_v1(), "initial": [1, -1]},   # negative
-        {**_hom_v1(), "initial": "11"},      # not a list
+        {**_hom_v1(), "initial": [1, 10]},  # n >= cutoff
+        {**_hom_v1(), "initial": [1]},  # wrong length
+        {**_hom_v1(), "initial": [1, -1]},  # negative
+        {**_hom_v1(), "initial": "11"},  # not a list
         {**_hom_v1(), "initial": [1.5, 0]},  # non-int
     ]
     for data in cases:
@@ -242,7 +247,9 @@ def test_422_op_outside_fock_whitelist():
         ("fourier", {}, [0]),
     ]:
         data = {
-            "schema": "circuit_v1", "backend": "fock", "nmode": 2,
+            "schema": "circuit_v1",
+            "backend": "fock",
+            "nmode": 2,
             "ops": [{"id": "x", "op": op, "modes": modes, "params": params}],
         }
         r = client.post("/run", json=data)
@@ -260,18 +267,28 @@ def test_422_bad_cutoff_and_batch_shots():
 
 
 def test_422_scan_on_fock():
-    r = client.post("/scan", json={**_hom_v1(), "sweep": {
-        "node_id": "bs", "param": "theta", "min": 0, "max": 1, "n": 5,
-    }})
+    r = client.post(
+        "/scan",
+        json={
+            **_hom_v1(),
+            "sweep": {
+                "node_id": "bs",
+                "param": "theta",
+                "min": 0,
+                "max": 1,
+                "n": 5,
+            },
+        },
+    )
     assert r.status_code == 422
     assert "fock" in r.json()["detail"]
 
 
 def test_422_batch_on_gaussian():
     data = {
-        "schema": "circuit_v1", "nmode": 2,
-        "ops": [{"id": "s", "op": "squeeze", "modes": [0],
-                 "params": {"r": 0.4, "phi": 0.0}}],
+        "schema": "circuit_v1",
+        "nmode": 2,
+        "ops": [{"id": "s", "op": "squeeze", "modes": [0], "params": {"r": 0.4, "phi": 0.0}}],
     }
     r = client.post("/batch", json=data)
     assert r.status_code == 422
@@ -280,17 +297,22 @@ def test_422_batch_on_gaussian():
 
 # --- gaussian default regression (A4) ----------------------------------------
 
+
 def test_backend_default_gaussian_regression():
     """Old gaussian JSON (no backend field) behaves exactly as before."""
     data = {
-        "schema": "circuit_v1", "nmode": 2, "seed": 0,
+        "schema": "circuit_v1",
+        "nmode": 2,
+        "seed": 0,
         "ops": [
-            {"id": "s", "op": "two_mode_squeeze", "modes": [0, 1],
-             "params": {"r": 0.6}},
-            {"id": "l", "op": "loss", "modes": [0],
-             "params": {"T": 0.8, "nbar": 0.0}},
-            {"id": "bs", "op": "beamsplitter", "modes": [0, 1],
-             "params": {"theta": np.pi / 4, "phi": 0.0}},
+            {"id": "s", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+            {"id": "l", "op": "loss", "modes": [0], "params": {"T": 0.8, "nbar": 0.0}},
+            {
+                "id": "bs",
+                "op": "beamsplitter",
+                "modes": [0, 1],
+                "params": {"theta": np.pi / 4, "phi": 0.0},
+            },
         ],
         "view": {"wigner_mode": 0, "lim": 5.0, "n": 64},
     }
@@ -305,10 +327,11 @@ def test_backend_default_gaussian_regression():
 
 def test_backend_gaussian_ignores_initial_field():
     data = {
-        "schema": "circuit_v1", "backend": "gaussian", "initial": [1, 1],
+        "schema": "circuit_v1",
+        "backend": "gaussian",
+        "initial": [1, 1],
         "nmode": 2,
-        "ops": [{"id": "s", "op": "squeeze", "modes": [0],
-                 "params": {"r": 0.1, "phi": 0.0}}],
+        "ops": [{"id": "s", "op": "squeeze", "modes": [0], "params": {"r": 0.1, "phi": 0.0}}],
         "view": {"wigner_mode": 0},
     }
     assert client.post("/run", json=data).status_code == 200
@@ -316,9 +339,9 @@ def test_backend_gaussian_ignores_initial_field():
 
 def test_gaussian_backend_rejects_measure_pnr():
     data = {
-        "schema": "circuit_v1", "nmode": 1,
-        "ops": [{"id": "m", "op": "measure_pnr", "modes": [0],
-                 "params": {"name": "n"}}],
+        "schema": "circuit_v1",
+        "nmode": 1,
+        "ops": [{"id": "m", "op": "measure_pnr", "modes": [0], "params": {"name": "n"}}],
     }
     assert client.post("/run", json=data).status_code == 422
 
@@ -326,13 +349,14 @@ def test_gaussian_backend_rejects_measure_pnr():
 def test_measure_heterodyne_fock_conditions_and_keeps_state():
     """Fock heterodyne: outcome vector in payload, conditioned state honest."""
     data = {
-        "schema": "circuit_v1", "backend": "fock", "nmode": 1, "cutoff": 10,
+        "schema": "circuit_v1",
+        "backend": "fock",
+        "nmode": 1,
+        "cutoff": 10,
         "seed": 7,
         "ops": [
-            {"id": "d", "op": "displace", "modes": [0],
-             "params": {"alpha": [1.0, 0.0]}},
-            {"id": "m", "op": "measure_heterodyne", "modes": [0],
-             "params": {"name": "b"}},
+            {"id": "d", "op": "displace", "modes": [0], "params": {"alpha": [1.0, 0.0]}},
+            {"id": "m", "op": "measure_heterodyne", "modes": [0], "params": {"name": "b"}},
         ],
         "view": {"wigner_mode": 0},
     }
@@ -343,11 +367,15 @@ def test_measure_heterodyne_fock_conditions_and_keeps_state():
     assert isinstance(body["measured"][0]["outcome"], list)
     assert len(body["measured"][0]["outcome"]) == 2
 
+
 def test_fock_loss_and_squeeze_run():
     """UI-shaped fock path: loss speaks eta, squeeze has only r (ops.js maps
     T→eta and drops nbar/phi before sending — guard the backend contract)."""
     data = {
-        "schema": "circuit_v1", "backend": "fock", "nmode": 2, "cutoff": 10,
+        "schema": "circuit_v1",
+        "backend": "fock",
+        "nmode": 2,
+        "cutoff": 10,
         "initial": [1, 0],
         "ops": [
             {"id": "l", "op": "loss", "modes": [0], "params": {"eta": 0.8}},
@@ -361,15 +389,19 @@ def test_fock_loss_and_squeeze_run():
     assert body["meters"]["leakage"] is None  # channels → density: honest null
     assert body["joint"] is not None
 
+
 def test_422_malformed_ops_list_not_500():
     """Non-dict op entries → 422 whitelist message, never a 500 traceback."""
     data = {
-        "schema": "circuit_v1", "backend": "fock", "nmode": 2,
+        "schema": "circuit_v1",
+        "backend": "fock",
+        "nmode": 2,
         "ops": ["garbage"],
     }
     r = client.post("/run", json=data)
     assert r.status_code == 422
     assert "whitelist" in r.json()["detail"]
+
 
 def test_batch_non_dict_body_422_not_500():
     # FastAPI rejects a non-object body at the framework layer (dict_type 422);

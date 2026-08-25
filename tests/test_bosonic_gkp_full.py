@@ -22,11 +22,7 @@ def test_full_contains_nn_midpoints():
     delta = np.sqrt(2.0 * np.pi)
     full = gkp0(eps, grid_size=N, cross="full")
     nn_mids = {0.5 * (k + k + 1) * delta for k in range(-N, N)}
-    cross_xs = {
-        float(c.rbar[0].real)
-        for c in full.components
-        if abs(c.rbar[1].imag) > 1e-14
-    }
+    cross_xs = {float(c.rbar[0].real) for c in full.components if abs(c.rbar[1].imag) > 1e-14}
     for m in nn_mids:
         assert any(abs(x - m) < 1e-12 for x in cross_xs)
 

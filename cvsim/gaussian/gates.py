@@ -51,9 +51,7 @@ def apply_symplectic(
     return GaussianState(V=V, rbar=rbar)
 
 
-def squeeze(
-    state: GaussianState, r: float, mode: int = 0, phi: float = 0.0
-) -> GaussianState:
+def squeeze(state: GaussianState, r: float, mode: int = 0, phi: float = 0.0) -> GaussianState:
     """Single-mode squeeze S(r, φ)=R(φ)S(r)R(-φ) in xxpp.
 
     ``phi`` is the squeezing angle (same convention as ``GaussianState.squeezed``).
@@ -76,9 +74,7 @@ def displace(state: GaussianState, alpha: complex, mode: int = 0) -> GaussianSta
 
 def phase(state: GaussianState, theta: float, mode: int = 0) -> GaussianState:
     """Single-mode phase rotation R(θ)."""
-    return apply_symplectic(
-        state, S_phase(state.nmode, theta, mode), validate=False
-    )
+    return apply_symplectic(state, S_phase(state.nmode, theta, mode), validate=False)
 
 
 def beamsplitter(
@@ -96,9 +92,7 @@ def beamsplitter(
     )
 
 
-def two_mode_squeeze(
-    state: GaussianState, r: float, mode1: int, mode2: int
-) -> GaussianState:
+def two_mode_squeeze(state: GaussianState, r: float, mode1: int, mode2: int) -> GaussianState:
     """Two-mode squeeze S₂(r) (real r)."""
     return apply_symplectic(
         state,
@@ -107,28 +101,20 @@ def two_mode_squeeze(
     )
 
 
-def cz(
-    state: GaussianState, weight: float, mode1: int, mode2: int
-) -> GaussianState:
+def cz(state: GaussianState, weight: float, mode1: int, mode2: int) -> GaussianState:
     """Controlled-Z: CZ = exp(i·weight·x̂₁·x̂₂).
 
     p₁ → p₁ + weight·x₂, p₂ → p₂ + weight·x₁.
     """
-    return apply_symplectic(
-        state, S_CZ(state.nmode, weight, mode1, mode2), validate=False
-    )
+    return apply_symplectic(state, S_CZ(state.nmode, weight, mode1, mode2), validate=False)
 
 
-def cx(
-    state: GaussianState, weight: float, mode1: int, mode2: int
-) -> GaussianState:
+def cx(state: GaussianState, weight: float, mode1: int, mode2: int) -> GaussianState:
     """Controlled-X: CX = exp(-i·weight·x̂₁·p̂₂).
 
     x₂ → x₂ + weight·x₁, p₁ → p₁ - weight·p₂.
     """
-    return apply_symplectic(
-        state, S_CX(state.nmode, weight, mode1, mode2), validate=False
-    )
+    return apply_symplectic(state, S_CX(state.nmode, weight, mode1, mode2), validate=False)
 
 
 def fourier(state: GaussianState, mode: int = 0) -> GaussianState:
@@ -169,9 +155,7 @@ def interferometer(
     """
     U = np.asarray(U, dtype=complex)
     if U.shape != (state.nmode, state.nmode):
-        raise ValueError(
-            f"U shape {U.shape} incompatible with nmode={state.nmode}"
-        )
+        raise ValueError(f"U shape {U.shape} incompatible with nmode={state.nmode}")
     S = S_from_unitary(U, validate=validate_u)
     return apply_symplectic(state, S, validate=False)
 

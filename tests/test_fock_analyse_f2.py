@@ -148,7 +148,7 @@ def test_fidelity_coherent_closed_form() -> None:
     st_a = FockState.coherent(25, alpha)
     st_b = FockState.coherent(25, beta)
     f = fidelity(st_a, st_b)
-    expected = np.exp(-abs(alpha - beta) ** 2)
+    expected = np.exp(-(abs(alpha - beta) ** 2))
     assert f == pytest.approx(expected, abs=1e-3)
 
 

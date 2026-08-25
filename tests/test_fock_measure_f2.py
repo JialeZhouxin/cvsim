@@ -137,7 +137,7 @@ def test_heterodyne_condition_probability() -> None:
     from cvsim.fock.observables import _q_function
 
     q = _q_function(st, 1, np.array([beta]))[0]
-    expected = np.exp(-abs(beta) ** 2) * abs(beta) ** 4 / 2.0
+    expected = np.exp(-(abs(beta) ** 2)) * abs(beta) ** 4 / 2.0
     np.testing.assert_allclose(q, expected, atol=1e-12)
 
 
@@ -150,11 +150,12 @@ def test_heterodyne_matches_tms_marginal() -> None:
 
     betas = np.array([0.3, 0.8 + 0.2j, 1.1j])
     q = _q_function(st, 0, betas)
-    expected = np.exp(-np.abs(betas) ** 2 / (nbar + 1.0)) / (nbar + 1.0)
+    expected = np.exp(-(np.abs(betas) ** 2) / (nbar + 1.0)) / (nbar + 1.0)
     np.testing.assert_allclose(q, expected, atol=1e-6)
 
 
 # -- F3: PNR batch -----------------------------------------------------------
+
 
 def test_pnr_sample_batch_shapes_and_range() -> None:
     from cvsim.fock import pnr_sample_batch

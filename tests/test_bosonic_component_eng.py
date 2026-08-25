@@ -139,9 +139,7 @@ def test_merge_combines_matching_geometry_and_preserves_first_representative():
 
 def test_merge_uses_only_geometry_not_weights_and_keeps_input_unchanged():
     state = BosonicState([_component(w=2.0), _component(w=-0.5)])
-    original = [
-        (c.V.copy(), c.rbar.copy(), c.w) for c in state.components
-    ]
+    original = [(c.V.copy(), c.rbar.copy(), c.w) for c in state.components]
 
     merged, _ = merge(state)
 

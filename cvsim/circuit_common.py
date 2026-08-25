@@ -23,6 +23,7 @@ class ParamRef:
         c.measure_homodyne(1, phi=0, name='m_x')
         c.displace(0, alpha=ParamRef('m_x', gain=0.5))
     """
+
     source: str
     gain: float = 1.0
 
@@ -80,7 +81,7 @@ def compile_segments(
     def flush() -> None:
         nonlocal merged
         if merged:
-            segments.append(('merged', merged_nmode, merged))
+            segments.append(("merged", merged_nmode, merged))
             merged = []
 
     for op in ops:
@@ -91,14 +92,10 @@ def compile_segments(
             if modes:
                 phys = [mapping[m] for m in modes]
                 if any(p < 0 for p in phys):
-                    raise ValueError(
-                        f"{op_name} references a mode already measured/removed"
-                    )
+                    raise ValueError(f"{op_name} references a mode already measured/removed")
             else:
                 phys = []
-            segments.append(
-                ('op', (op_name, tuple(phys), fixed, pnames, refs))
-            )
+            segments.append(("op", (op_name, tuple(phys), fixed, pnames, refs)))
             if op_name in remove_mode_ops:
                 phys_mode = mapping[modes[0]]
                 nmode -= 1
@@ -113,9 +110,7 @@ def compile_segments(
         if modes:
             phys = [mapping[m] for m in modes]
             if any(p < 0 for p in phys):
-                raise ValueError(
-                    f"{op_name} references a mode already measured/removed"
-                )
+                raise ValueError(f"{op_name} references a mode already measured/removed")
         else:
             phys = []
         merged.append((op_name, tuple(phys), fixed, pnames, refs))
@@ -141,7 +136,7 @@ class CompiledCircuit:
         st = self._init_state()
         results: dict = {}
         for seg in self._segments:
-            if seg[0] == 'merged':
+            if seg[0] == "merged":
                 _, nmode, ops = seg
                 st = self._apply_merged(ops, nmode, values, st)
                 continue
@@ -164,7 +159,7 @@ class CompiledCircuit:
     def __repr__(self) -> str:
         lines = [f"{type(self).__name__}({self.nmode})"]
         for seg in self._segments:
-            if seg[0] == 'merged':
+            if seg[0] == "merged":
                 lines.append(f"  merged({len(seg[2])} ops)")
             else:
                 op_name, modes, fixed, pnames, refs = seg[1]

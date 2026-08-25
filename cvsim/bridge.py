@@ -33,10 +33,8 @@ def coherent_element(n: int, alpha: complex) -> complex:
     if n < 0:
         raise ValueError(f"n must be >= 0, got {n}")
     if n == 0:
-        return complex(np.exp(-abs(alpha) ** 2 / 2.0))
-    return complex(
-        np.exp(-abs(alpha) ** 2 / 2.0) * alpha**n / math.sqrt(math.factorial(n))
-    )
+        return complex(np.exp(-(abs(alpha) ** 2) / 2.0))
+    return complex(np.exp(-(abs(alpha) ** 2) / 2.0) * alpha**n / math.sqrt(math.factorial(n)))
 
 
 def squeezed_element(n: int, r: float, phi: float = 0.0) -> complex:
@@ -51,9 +49,7 @@ def squeezed_element(n: int, r: float, phi: float = 0.0) -> complex:
         return 0.0j
     z = math.tanh(r) * np.exp(1j * phi)  # complex squeezing parameter
     m = n // 2
-    pref = math.sqrt(math.factorial(2 * m)) / (
-        2**m * math.factorial(m) * math.sqrt(math.cosh(r))
-    )
+    pref = math.sqrt(math.factorial(2 * m)) / (2**m * math.factorial(m) * math.sqrt(math.cosh(r)))
     return complex(((-1) ** m) * pref * z**m)
 
 

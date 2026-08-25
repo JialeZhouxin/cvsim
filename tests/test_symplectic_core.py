@@ -40,8 +40,11 @@ def _random_symplectic(m: int, rng: np.random.Generator) -> np.ndarray:
             i, j = rng.choice(m, size=2, replace=False)
             S = (
                 S_beamsplitter(
-                    m, int(i), int(j),
-                    float(rng.uniform(0, np.pi / 2)), float(rng.uniform(0, 2 * np.pi)),
+                    m,
+                    int(i),
+                    int(j),
+                    float(rng.uniform(0, np.pi / 2)),
+                    float(rng.uniform(0, 2 * np.pi)),
                 )
                 @ S
             )
@@ -110,9 +113,7 @@ def test_apply_matches_squeeze_and_displace():
     via_gate = squeeze(st, r)
     np.testing.assert_allclose(via_S.V, via_gate.V, atol=1e-12)
 
-    via_d = apply_symplectic(
-        st, np.eye(2), d_displace(1, alpha, 0), validate=True
-    )
+    via_d = apply_symplectic(st, np.eye(2), d_displace(1, alpha, 0), validate=True)
     via_disp = displace(st, alpha)
     np.testing.assert_allclose(via_d.rbar, via_disp.rbar, atol=1e-12)
 

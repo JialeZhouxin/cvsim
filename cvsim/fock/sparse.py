@@ -33,17 +33,13 @@ class FockSparse:
 
     def __init__(self, data: coo_array, cutoffs: tuple[int, ...] | list[int]) -> None:
         if data.ndim != len(cutoffs):
-            raise ValueError(
-                f"data ndim {data.ndim} != len(cutoffs) {len(cutoffs)}"
-            )
+            raise ValueError(f"data ndim {data.ndim} != len(cutoffs) {len(cutoffs)}")
         for d, c in zip(data.shape, cutoffs, strict=False):
             if d != c:
                 raise ValueError(f"shape {data.shape} != cutoffs {cutoffs}")
         norm = float(np.sum(np.abs(data.data) ** 2))
         if not np.isclose(norm, 1.0, atol=1e-10):
-            raise ValueError(
-                f"amplitude must be normalized (Σ|ψ|² = 1), got {norm}"
-            )
+            raise ValueError(f"amplitude must be normalized (Σ|ψ|² = 1), got {norm}")
         object.__setattr__(self, "data", data.tocoo())
         object.__setattr__(self, "cutoffs", tuple(cutoffs))
 
@@ -119,9 +115,7 @@ class FockSparse:
         coo = self.data.tocoo()
         # coords: tuple of per-axis index arrays → reorder axes by `perm`
         coords = tuple(coo.coords[i] for i in perm)
-        return FockSparse(
-            coo_array((coo.data, coords), shape=coo.shape), self.cutoffs
-        )
+        return FockSparse(coo_array((coo.data, coords), shape=coo.shape), self.cutoffs)
 
     # -- measurement ----------------------------------------------------------
 

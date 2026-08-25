@@ -28,6 +28,7 @@ TOL_LOOSE = 1e-8
 # Random state seeding — deterministic across runs
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def rng() -> np.random.Generator:
     """Deterministic RNG for reproducible random tests."""
@@ -37,6 +38,7 @@ def rng() -> np.random.Generator:
 # ---------------------------------------------------------------------------
 # Common states
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def vacuum_1() -> GaussianState:
@@ -105,6 +107,7 @@ def backend(request: pytest.FixtureRequest) -> str:
 # Reusable helper functions
 # ---------------------------------------------------------------------------
 
+
 def assert_allclose_weak(actual, desired, msg: str = "") -> None:
     """Assert with relaxed tolerance — for stochastic/approximate tests."""
     np.testing.assert_allclose(actual, desired, atol=TOL_LOOSE, err_msg=msg)
@@ -117,14 +120,13 @@ def assert_allclose(actual, desired, msg: str = "") -> None:
 
 def assert_physical(state: GaussianState, msg: str = "") -> None:
     """Assert a GaussianState satisfies the uncertainty relation."""
-    assert state.is_physical(), (
-        f"State is not physical: {msg}" if msg else "State is not physical"
-    )
+    assert state.is_physical(), f"State is not physical: {msg}" if msg else "State is not physical"
+
 
 def assert_pure(state: GaussianState, msg: str = "") -> None:
     """Assert a GaussianState is pure (det(V) = (1/4)^m)."""
     from cvsim.gaussian import det_cov
 
-    expected = 0.25 ** state.nmode
+    expected = 0.25**state.nmode
     actual = det_cov(state)
     np.testing.assert_allclose(actual, expected, atol=TOL, err_msg=msg)

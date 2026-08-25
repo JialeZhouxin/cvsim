@@ -113,10 +113,12 @@ def test_s_from_unitary_jit_compatible() -> None:
         return S_from_unitary(u, backend="jax")
 
     S = np.asarray(build(U))
-    expected = np.block([
-        [np.asarray(U).real, -np.asarray(U).imag],
-        [np.asarray(U).imag, np.asarray(U).real],
-    ])
+    expected = np.block(
+        [
+            [np.asarray(U).real, -np.asarray(U).imag],
+            [np.asarray(U).imag, np.asarray(U).real],
+        ]
+    )
     np.testing.assert_allclose(S, expected, atol=1e-12)
 
 

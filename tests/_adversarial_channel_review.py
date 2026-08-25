@@ -2,6 +2,7 @@
 
 Run: PYTHONPATH=. py -3 tests/_adversarial_channel_review.py
 """
+
 from __future__ import annotations
 
 import sys
@@ -43,7 +44,7 @@ def assert_allclose(name: str, a, b, atol: float = 1e-10) -> None:
     a = np.asarray(a)
     b = np.asarray(b)
     ok = np.allclose(a, b, atol=atol)
-    record(name, ok, f"max|diff|={norm(a-b):.3e}" if not ok else "")
+    record(name, ok, f"max|diff|={norm(a - b):.3e}" if not ok else "")
 
 
 def norm(a) -> float:
@@ -78,8 +79,11 @@ def main() -> None:
             w = np.linalg.eigvalsh(0.5 * (H + H.conj().T))
             if not np.any(w < -1e-6):
                 bad_Ts.append(T)
-        record("A2 bare-Omega formula rejects valid pure loss", len(bad_Ts) == 0,
-               f"failed at T={bad_Ts}" if bad_Ts else "")
+        record(
+            "A2 bare-Omega formula rejects valid pure loss",
+            len(bad_Ts) == 0,
+            f"failed at T={bad_Ts}" if bad_Ts else "",
+        )
     except Exception as e:
         record("A2 bare-Omega formula rejects valid pure loss", False, traceback.format_exc()[:80])
 
@@ -208,9 +212,8 @@ def main() -> None:
     try:
         st = displace(GaussianState.vacuum(1), 0.5 + 0.2j)
         out = phase_noise(st, 5.0)
-        ok = (
-            np.allclose(out.V, 0.5 * np.eye(2), atol=1e-6)
-            and np.allclose(out.rbar, 0.0, atol=1e-5)
+        ok = np.allclose(out.V, 0.5 * np.eye(2), atol=1e-6) and np.allclose(
+            out.rbar, 0.0, atol=1e-5
         )
         record("B8 phase_noise large sigma -> vacuum", ok)
     except Exception as e:
@@ -222,7 +225,7 @@ def main() -> None:
         sigma = 0.7
         st = displace(GaussianState.vacuum(1), alpha)
         out = phase_noise(st, sigma)
-        damp = np.exp(-sigma ** 2 / 2.0)
+        damp = np.exp(-(sigma**2) / 2.0)
         ok = np.allclose(out.rbar, damp * st.rbar, atol=1e-12)
         record("B9 phase_noise rbar damping factor", ok)
     except Exception as e:
@@ -267,10 +270,7 @@ def main() -> None:
         T, G, nbar_loss, nbar_amp = 0.4, 2.5, 0.3, 0.1
         seq = amplifier(loss(st, T, nbar=nbar_loss), G, nbar=nbar_amp)
         X = np.sqrt(G * T) * np.eye(2)
-        Y = (
-            G * (1 - T) * (nbar_loss + 0.5)
-            + (G - 1) * (nbar_amp + 0.5)
-        ) * np.eye(2)
+        Y = (G * (1 - T) * (nbar_loss + 0.5) + (G - 1) * (nbar_amp + 0.5)) * np.eye(2)
         one = apply_gaussian_channel(st, X, Y, validate=False)
         assert_allclose("C3 thermal loss+amplifier compose V", seq.V, one.V)
         assert_allclose("C3 thermal loss+amplifier compose rbar", seq.rbar, one.rbar)
@@ -351,9 +351,7 @@ def main() -> None:
         ok = (
             np.allclose(out.rbar[1], st.rbar[1], atol=1e-12)
             and np.allclose(out.rbar[3], st.rbar[3], atol=1e-12)
-            and np.allclose(
-                out.V[np.ix_([1, 3], [1, 3])], st.V[np.ix_([1, 3], [1, 3])], atol=1e-12
-            )
+            and np.allclose(out.V[np.ix_([1, 3], [1, 3])], st.V[np.ix_([1, 3], [1, 3])], atol=1e-12)
         )
         record("E2 single-mode channel leaves other block", ok)
     except Exception as e:
@@ -383,6 +381,7 @@ def main() -> None:
     # F1: apply_gaussian_channel docstring uses bare Omega formula (incorrect)
     try:
         import cvsim.gaussian.channels as ch
+
         ok = (
             "Y + iΩ/2" in ch.apply_gaussian_channel.__doc__
             or "Y + i\\Omega/2" in ch.apply_gaussian_channel.__doc__

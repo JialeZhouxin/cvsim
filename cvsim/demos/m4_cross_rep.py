@@ -44,9 +44,7 @@ def t1_coherent_loss(
     n_f = f_n(f_loss(f_displace(FockState.vacuum(fock_cutoff), alpha), T))
     n_b = b_n(b_loss(BosonicState.from_gaussian(g_coh), T))
     print(f"T1 coherent+loss  alpha={alpha}  T={T}  cutoff={fock_cutoff}")
-    print(
-        f"  analytic={n_ex:.10f}  G={n_g:.10f}  F={n_f:.10f}  B={n_b:.10f}"
-    )
+    print(f"  analytic={n_ex:.10f}  G={n_g:.10f}  F={n_f:.10f}  B={n_b:.10f}")
     assert abs(n_g - n_ex) < 1e-12, f"G <n>={n_g} != {n_ex}"
     assert abs(n_b - n_g) < 1e-12, f"B <n>={n_b} != G {n_g}"
     assert abs(n_f - n_ex) < 0.05, f"F <n>={n_f} vs analytic {n_ex}"
@@ -59,10 +57,7 @@ def t5_s2_n(r: float = 0.3, fock_cutoff: int = 24) -> None:
     n_g0, n_g1 = g_n(st_g, 0), g_n(st_g, 1)
     n_f0, n_f1 = f_n(st_f, 0), f_n(st_f, 1)
     print(f"T5 S2 <n>  r={r}  cutoff={fock_cutoff}")
-    print(
-        f"  analytic={n_ex:.10f}  "
-        f"G=({n_g0:.10f},{n_g1:.10f})  F=({n_f0:.10f},{n_f1:.10f})"
-    )
+    print(f"  analytic={n_ex:.10f}  G=({n_g0:.10f},{n_g1:.10f})  F=({n_f0:.10f},{n_f1:.10f})")
     assert abs(n_g0 - n_ex) < 1e-12 and abs(n_g1 - n_ex) < 1e-12
     assert abs(n_f0 - n_ex) < 5e-3 and abs(n_f1 - n_ex) < 5e-3
     assert abs(n_f0 - n_g0) < 1e-2 and abs(n_f1 - n_g1) < 1e-2

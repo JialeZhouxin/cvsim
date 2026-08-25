@@ -93,7 +93,7 @@ def test_phase_noise_decoheres_coherence() -> None:
     d = phase_noise(st, sigma)
     off = abs(d.rho[0, 1])
     c0c1 = abs(st.amps[0] * st.amps[1])
-    np.testing.assert_allclose(off, c0c1 * np.exp(-sigma**2 / 2.0), atol=1e-12)
+    np.testing.assert_allclose(off, c0c1 * np.exp(-(sigma**2) / 2.0), atol=1e-12)
 
 
 def test_phase_noise_closed_form() -> None:
@@ -101,7 +101,7 @@ def test_phase_noise_closed_form() -> None:
     sigma = 0.4
     d = phase_noise(st, sigma)
     n = np.arange(8)
-    cm = np.exp(-sigma**2 / 2.0 * (n[:, None] - n[None, :]) ** 2)
+    cm = np.exp(-(sigma**2) / 2.0 * (n[:, None] - n[None, :]) ** 2)
     # ρ'_{nm} = c_n c_m* e^{−σ²(n−m)²/2}
     c = st.amps
     expected = np.outer(c, c.conj()) * cm

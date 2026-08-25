@@ -98,9 +98,7 @@ def test_jitted_gradient_matches_eager() -> None:
 
     eager = jax.grad(objective)(0.6, 0.3)
     compiled = jax.jit(jax.grad(objective))(0.6, 0.3)
-    np.testing.assert_allclose(
-        np.asarray(compiled), np.asarray(eager), atol=1e-8, rtol=1e-8
-    )
+    np.testing.assert_allclose(np.asarray(compiled), np.asarray(eager), atol=1e-8, rtol=1e-8)
 
 
 @pytest.mark.skipif(not be.HAS_JAX, reason="jax not installed")

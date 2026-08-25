@@ -50,9 +50,7 @@ def test_bosonic_s2_matches_gaussian_and_weights():
     r = 0.4
     vac_g = two_mode_squeeze(GaussianState.vacuum(2), r, 0, 1)
     vac_b = BosonicState(
-        components=[
-            Component(V=vacuum_cov(2), rbar=np.zeros(4, dtype=complex), w=1.0)
-        ]
+        components=[Component(V=vacuum_cov(2), rbar=np.zeros(4, dtype=complex), w=1.0)]
     )
     st_b = b_tms(vac_b, r, 0, 1)
     assert abs(weight_sum(st_b) - 1.0) < 1e-12

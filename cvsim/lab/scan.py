@@ -8,6 +8,7 @@ target/reduce helpers) moved here from ``bosonic_backend.py``. Imports shared
 types/helpers from ``cvsim.lab.ir`` (no circular import: ir.py does not
 module-import this file; mirrors gaussian_backend.py pattern).
 """
+
 from __future__ import annotations
 
 import copy
@@ -48,9 +49,7 @@ def _safe_logneg(state: GaussianState, modes_A: list[int]) -> float | None:
         return None
 
 
-def _inject_symbolic_param(
-    raw: dict[str, Any], node_id: str, param: str
-) -> dict[str, Any]:
+def _inject_symbolic_param(raw: dict[str, Any], node_id: str, param: str) -> dict[str, Any]:
     """Return a deep copy of ``raw`` with ``node_id``'s ``param`` replaced by
     a symbolic ``{"$param": "sweep_x"}`` reference (ADR-0002 value binding).
 
@@ -92,14 +91,11 @@ def scan_circuit(circuit: LabCircuit, sweep: dict[str, Any]) -> dict[str, Any]:
     if node is None:
         raise CircuitV0Error(f"sweep: unknown node_id {node_id!r}")
     if param not in SWEEPABLE_PARAMS.get(node.op, frozenset()):
-        raise CircuitV0Error(
-            f"sweep: param {param!r} is not sweepable for op {node.op!r}"
-        )
+        raise CircuitV0Error(f"sweep: param {param!r} is not sweepable for op {node.op!r}")
     for nd in core.ops:
         if nd.op in MEASUREMENT_OPS:
             raise CircuitV0Error(
-                f"sweep: measurement node {nd.id!r} ({nd.op}) — E_N undefined on "
-                "conditional states"
+                f"sweep: measurement node {nd.id!r} ({nd.op}) — E_N undefined on conditional states"
             )
 
     # Compile once with the swept param as a symbolic $param; bind per point.
@@ -135,16 +131,20 @@ def scan_circuit(circuit: LabCircuit, sweep: dict[str, Any]) -> dict[str, Any]:
         "ys": ys,
     }
 
+
 def _fidelity_target(target: dict[str, Any], mode: int) -> BosonicState:
     """Resolve the fidelity target state name (B6 R2: GKP QEC vs gkp0)."""
     name = _require(target, "state", str, "target")
     if name == "gkp0":
         from cvsim.bosonic import gkp0
+
         return gkp0()
     if name == "gkp1":
         from cvsim.bosonic import gkp1
+
         return gkp1()
     raise CircuitV0Error(f"target.state: unknown state source {name!r} (gkp0|gkp1)")
+
 
 def _bosonic_reduce_to_mode(state: BosonicState, mode: int) -> BosonicState:
     """Reduce ``state`` to a single mode via remove_mode (B6 target mode)."""
@@ -155,6 +155,7 @@ def _bosonic_reduce_to_mode(state: BosonicState, mode: int) -> BosonicState:
         if i != mode:
             s = s.remove_mode(i)
     return s
+
 
 def fidelity_sweep(
     circuit: LabCircuit, sweep: dict[str, Any], seed: int = 0, rounds: int = 1

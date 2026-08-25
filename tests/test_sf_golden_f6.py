@@ -48,9 +48,7 @@ def test_squeezed_r05():
 
 def test_displaced():
     """D(0.4,0.3)|0> = |0.4 e^{0.3i}> dm — SF cutoff 12 (2026-08-12)."""
-    rho = FockDensity.from_pure(
-        displace(FockState.vacuum(12), 0.4 * np.exp(1j * 0.3))
-    ).rho
+    rho = FockDensity.from_pure(displace(FockState.vacuum(12), 0.4 * np.exp(1j * 0.3))).rho
     _check(rho, "displaced")
 
 
@@ -68,9 +66,7 @@ def test_kerr():
 
 def test_bs_11():
     """BS(pi/4,0.2)|1,1> dm — cvsim beamsplitter(-pi/4,-0.2) (BS sign mapping)."""
-    rho = FockDensity.from_pure(
-        beamsplitter(FockState.fock2(1, 1, 10), -np.pi / 4, -0.2)
-    ).rho
+    rho = FockDensity.from_pure(beamsplitter(FockState.fock2(1, 1, 10), -np.pi / 4, -0.2)).rho
     _check(rho, "bs_11")
 
 

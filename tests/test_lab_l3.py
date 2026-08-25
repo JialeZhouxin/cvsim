@@ -23,6 +23,7 @@ def _circuit(nodes, *, seed=7, wigner_mode=0):
 
 # --- S1a: homodyne phi ------------------------------------------------------
 
+
 def test_load_homodyne_phi_default_zero():
     data = _circuit([TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}])
     res = run_circuit(load_circuit(data))
@@ -32,12 +33,15 @@ def test_load_homodyne_phi_default_zero():
     assert entry["phi"] == 0.0
     assert isinstance(entry["outcome"], float)
 
+
 def test_load_homodyne_phi_kept():
     data = _circuit([TMSV, {"id": "h", "op": "homodyne", "params": {"phi": 1.5}, "mode": 0}])
     res = run_circuit(load_circuit(data))
     assert res.measured[0]["phi"] == 1.5
 
+
 # --- S1b: sample_circuit core ------------------------------------------------
+
 
 def test_sample_heterodyne_removes_mode():
     data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
@@ -58,6 +62,7 @@ def test_sample_homodyne_removes_mode():
     assert entry["op"] == "measure_homodyne"
     assert isinstance(entry["outcome"], float)
 
+
 def test_sample_same_seed_reproducible():
     data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
     c = load_circuit(data)
@@ -67,20 +72,24 @@ def test_sample_same_seed_reproducible():
     np.testing.assert_allclose(r1.rbar, r2.rbar, atol=0.0)
     np.testing.assert_allclose(r1.V, r2.V, atol=0.0)
 
+
 def test_sample_multi_measurement_chain():
     """homodyne(mode0) → heterodyne(mode1): ordered conditioning chain; each
     measurement removes its mode (v1 semantics) → all modes gone."""
-    data = _circuit([
-        TMSV,
-        {"id": "a", "op": "homodyne", "params": {}, "mode": 0},
-        {"id": "b", "op": "heterodyne", "params": {}, "mode": 1},
-    ])
+    data = _circuit(
+        [
+            TMSV,
+            {"id": "a", "op": "homodyne", "params": {}, "mode": 0},
+            {"id": "b", "op": "heterodyne", "params": {}, "mode": 1},
+        ]
+    )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert [m["op"] for m in res.measured] == ["measure_homodyne", "measure_heterodyne"]
     assert isinstance(res.measured[0]["outcome"], float)
     assert isinstance(res.measured[1]["outcome"], list)
     assert res.nmode == 0  # both measured modes removed
     assert res.wigner is None  # no mode left to view — honest empty result
+
 
 def test_run_no_rng_deterministic():
     """/run stays pure: no RNG anywhere; /sample does not perturb it."""
@@ -94,7 +103,9 @@ def test_run_no_rng_deterministic():
     c2 = run_circuit(c)
     np.testing.assert_allclose(c2.V, b.V, atol=0.0)
 
+
 # --- S1d: singular conditional-state view -----------------------------------
+
 
 def test_sample_homodyne_removed_mode_not_viewable():
     """v1: homodyne removes the measured mode — no singular state remains.
@@ -122,12 +133,14 @@ def test_sample_homodyne_other_mode_wigner_ok():
     assert res.wigner[2].shape == (32, 32)
     assert res.meters["singular"] is False
 
+
 def test_sample_heterodyne_view_mode_valid():
     data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert res.nmode == 1
     assert res.wigner is not None
     assert res.wigner[2].shape == (32, 32)
+
 
 def test_sample_heterodyne_conditioned_removes_mode_and_keeps_meters():
     """After heterodyne the conditioned state is regular: purity/meters fine."""
@@ -152,11 +165,15 @@ def test_sample_homodyne_phi_controls_variance():
     assert vp_analytic > vx_analytic
 
     def shots(phi, n=4000):
-        circuit = load_circuit(_circuit([
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "sq", "op": "squeeze", "params": {"r": r, "phi": 0.0}, "mode": 0},
-            {"id": "h", "op": "homodyne", "params": {"phi": phi}, "mode": 0},
-        ]))
+        circuit = load_circuit(
+            _circuit(
+                [
+                    {"id": "s", "op": "vacuum", "params": {}},
+                    {"id": "sq", "op": "squeeze", "params": {"r": r, "phi": 0.0}, "mode": 0},
+                    {"id": "h", "op": "homodyne", "params": {"phi": phi}, "mode": 0},
+                ]
+            )
+        )
         out = []
         for k in range(n):
             res = sample_circuit(circuit, np.random.default_rng(k))

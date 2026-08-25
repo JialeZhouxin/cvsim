@@ -68,9 +68,7 @@ def test_cz_against_gaussian() -> None:
     gst = GaussianState.squeezed(r, nmode=2, mode=0)
     gst = g_cz(gst, g, 0, 1)
     for m in (0, 1):
-        np.testing.assert_allclose(
-            f_mean(fst, m), _gauss_mean_photon(gst, m), rtol=1e-4, atol=1e-5
-        )
+        np.testing.assert_allclose(f_mean(fst, m), _gauss_mean_photon(gst, m), rtol=1e-4, atol=1e-5)
 
 
 # -- cx --------------------------------------------------------------------
@@ -99,9 +97,7 @@ def test_cx_against_gaussian() -> None:
     gst = GaussianState.squeezed(r, nmode=2, mode=0)
     gst = g_cx(gst, g, 0, 1)
     for m in (0, 1):
-        np.testing.assert_allclose(
-            f_mean(fst, m), _gauss_mean_photon(gst, m), rtol=1e-4, atol=1e-5
-        )
+        np.testing.assert_allclose(f_mean(fst, m), _gauss_mean_photon(gst, m), rtol=1e-4, atol=1e-5)
 
 
 # -- mach_zehnder -----------------------------------------------------------
@@ -203,9 +199,7 @@ def test_interferometer_preserves_norm() -> None:
         ]
     )
     out = interferometer(st, U)
-    np.testing.assert_allclose(
-        np.sum(abs(out.amps) ** 2), np.sum(abs(st.amps) ** 2), atol=1e-12
-    )
+    np.testing.assert_allclose(np.sum(abs(out.amps) ** 2), np.sum(abs(st.amps) ** 2), atol=1e-12)
 
 
 def test_apply_unitary_density_full_space() -> None:

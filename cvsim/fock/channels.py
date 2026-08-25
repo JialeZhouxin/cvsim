@@ -122,9 +122,7 @@ def _apply_phase_diffusion(rho: FockDensity, sigma: float) -> FockDensity:
     return FockDensity(rho=rho.rho * damp, nmode=1)
 
 
-def amplifier(
-    state: FockLike, G: float, mode: int = 0, nbar: float = 0.0
-) -> FockDensity:
+def amplifier(state: FockLike, G: float, mode: int = 0, nbar: float = 0.0) -> FockDensity:
     """Quantum-limited phase-insensitive amplifier (nbar=0).
 
     Kraus (vacuum environment TMS): A_k|n⟩ = √C(n+k,k)·(√(G−1))^k·G^{−(n+k+1)/2}|n+k⟩.
@@ -174,9 +172,7 @@ def _amplify_kraus(N: int, G: float) -> list[np.ndarray]:
     return ks
 
 
-def apply_kraus(
-    state: FockLike, kraus: list[np.ndarray], mode: int | None = None
-) -> FockDensity:
+def apply_kraus(state: FockLike, kraus: list[np.ndarray], mode: int | None = None) -> FockDensity:
     """Apply a Kraus decomposition ρ' = Σ_k A_k ρ A_k†.
 
     - 1-mode state: each A_k is (N, N); ``mode`` must be None/0.

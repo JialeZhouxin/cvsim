@@ -55,9 +55,7 @@ def is_physical(
 def validate_state(state: GaussianState, *, atol: float = 1e-10) -> None:
     """Raise ValueError if ``state`` is not a physical Gaussian covariance."""
     if not is_physical(state, atol=atol):
-        raise ValueError(
-            "non-physical Gaussian covariance: V + iΩ/2 is not PSD (ħ=1, xxpp)"
-        )
+        raise ValueError("non-physical Gaussian covariance: V + iΩ/2 is not PSD (ħ=1, xxpp)")
 
 
 def symplectic_eigenvalues(
@@ -99,9 +97,7 @@ def symplectic_eigenvalues(
     V = _as_cov(state)
     V = 0.5 * (V + V.T)
     if validate and not is_physical(V, atol=atol):
-        raise ValueError(
-            "non-physical Gaussian covariance: V + iΩ/2 is not PSD (ħ=1, xxpp)"
-        )
+        raise ValueError("non-physical Gaussian covariance: V + iΩ/2 is not PSD (ħ=1, xxpp)")
     m = V.shape[0] // 2
 
     try:
@@ -153,15 +149,11 @@ def purity(
     V = _as_cov(state)
     V = 0.5 * (V + V.T)
     if validate and not is_physical(V):
-        raise ValueError(
-            "non-physical Gaussian covariance: V + iΩ/2 is not PSD (ħ=1, xxpp)"
-        )
+        raise ValueError("non-physical Gaussian covariance: V + iΩ/2 is not PSD (ħ=1, xxpp)")
     m = V.shape[0] // 2
     sign, logdet = np.linalg.slogdet(V)
     if sign <= 0:
-        raise ValueError(
-            f"det(V) ≤ 0 (slogdet sign={sign}): non-physical or singular covariance"
-        )
+        raise ValueError(f"det(V) ≤ 0 (slogdet sign={sign}): non-physical or singular covariance")
     return float(np.exp(-0.5 * logdet) / (2**m))
 
 
@@ -244,9 +236,7 @@ def partial_trace(
         If any index is outside ``0 .. nmode-1``.
     """
     if not isinstance(state, GaussianState):
-        raise TypeError(
-            f"partial_trace requires GaussianState, got {type(state).__name__}"
-        )
+        raise TypeError(f"partial_trace requires GaussianState, got {type(state).__name__}")
     m = state.nmode
     keep_list = [int(keep)] if isinstance(keep, (int, np.integer)) else [int(k) for k in keep]
     # unique, sorted — stable subsystem order
@@ -330,9 +320,7 @@ def log_negativity(
         E_N ≥ 0 in bits.
     """
     if not isinstance(state, GaussianState):
-        raise TypeError(
-            f"log_negativity requires GaussianState, got {type(state).__name__}"
-        )
+        raise TypeError(f"log_negativity requires GaussianState, got {type(state).__name__}")
     m = state.nmode
     if isinstance(modes_A, (int, np.integer)):
         A = [int(modes_A)]
@@ -398,26 +386,16 @@ def fidelity(
         If the two states have different ``nmode``.
     """
     if not isinstance(state1, GaussianState):
-        raise TypeError(
-            f"fidelity requires GaussianState, got state1={type(state1).__name__}"
-        )
+        raise TypeError(f"fidelity requires GaussianState, got state1={type(state1).__name__}")
     if not isinstance(state2, GaussianState):
-        raise TypeError(
-            f"fidelity requires GaussianState, got state2={type(state2).__name__}"
-        )
+        raise TypeError(f"fidelity requires GaussianState, got state2={type(state2).__name__}")
     if state1.nmode != state2.nmode:
-        raise ValueError(
-            f"fidelity nmode mismatch: {state1.nmode} vs {state2.nmode}"
-        )
+        raise ValueError(f"fidelity nmode mismatch: {state1.nmode} vs {state2.nmode}")
 
     mu1 = np.asarray(state1.rbar, dtype=float).ravel()
     mu2 = np.asarray(state2.rbar, dtype=float).ravel()
-    cov1 = 0.5 * (
-        np.asarray(state1.V, dtype=float) + np.asarray(state1.V, dtype=float).T
-    )
-    cov2 = 0.5 * (
-        np.asarray(state2.V, dtype=float) + np.asarray(state2.V, dtype=float).T
-    )
+    cov1 = 0.5 * (np.asarray(state1.V, dtype=float) + np.asarray(state1.V, dtype=float).T)
+    cov2 = 0.5 * (np.asarray(state2.V, dtype=float) + np.asarray(state2.V, dtype=float).T)
 
     if np.allclose(mu1, mu2, rtol=rtol, atol=atol) and np.allclose(
         cov1, cov2, rtol=rtol, atol=atol

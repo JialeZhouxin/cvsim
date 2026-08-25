@@ -47,10 +47,7 @@ def normalize(state: BosonicState, *, atol: float = 1e-12) -> BosonicState:
     if abs(total) <= atol:
         raise ValueError("weight sum is zero")
     return BosonicState(
-        [
-            _copy_component(component, w=component.w / total)
-            for component in state.components
-        ]
+        [_copy_component(component, w=component.w / total) for component in state.components]
     )
 
 

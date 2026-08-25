@@ -98,6 +98,7 @@ def _xphi_params(c: Component, mode: int, nmode: int, phi: float) -> tuple[compl
     var_k = float(u @ c.V @ u)
     return mu_k, var_k
 
+
 def _auto_grid(state: BosonicState, mode: int, phi: float) -> tuple[np.ndarray, float]:
     """Auto grid: δx ≤ σ_min/5, range = centroid ± 6σ_max.
 
@@ -127,6 +128,7 @@ def _auto_grid(state: BosonicState, mode: int, phi: float) -> tuple[np.ndarray, 
     xs = np.linspace(lo, hi, n_grid)
     return xs, dx
 
+
 def _edge_density(state: BosonicState, mode: int, phi: float, xs: np.ndarray) -> np.ndarray:
     """S(x) = Σ_k w_k p_k(x) on grid; complex dtype (interference kept)."""
     m = _check_mode(state, mode)
@@ -138,6 +140,7 @@ def _edge_density(state: BosonicState, mode: int, phi: float, xs: np.ndarray) ->
         coeff = c.w / np.sqrt(2.0 * np.pi * var_k)
         S += coeff * np.exp(-0.5 * (xs - mu_k) ** 2 / var_k)
     return S
+
 
 def homodyne_pdf(
     state: BosonicState,
@@ -190,6 +193,7 @@ def homodyne_pdf(
         )
         P[neg] = 0.0
     return xs, P
+
 
 def homodyne_sample(
     state: BosonicState,
@@ -262,9 +266,7 @@ def homodyne_condition(
         if sigma <= _SIG_EPS:
             raise ValueError(f"homodyne variance too small: σ={sigma}")
         mu = complex(u @ c.rbar)
-        L = (2.0 * np.pi * sigma) ** (-0.5) * np.exp(
-            -0.5 * (outcome - mu) ** 2 / sigma
-        )
+        L = (2.0 * np.pi * sigma) ** (-0.5) * np.exp(-0.5 * (outcome - mu) ** 2 / sigma)
         Vn = c.V - np.outer(v, v) / sigma
         Vn = 0.5 * (Vn + Vn.T)
         rn = c.rbar + v * ((outcome - mu) / sigma)
@@ -293,8 +295,6 @@ def homodyne_sample_and_condition(
     ``(outcomes, posterior)`` where ``outcomes`` has shape ``(shots,)`` and
     ``posterior`` is conditioned on ``outcomes[0]``.
     """
-    outcomes = homodyne_sample(
-        state, mode, phi, rng=rng, n_grid=n_grid, lim=lim, shots=shots
-    )
+    outcomes = homodyne_sample(state, mode, phi, rng=rng, n_grid=n_grid, lim=lim, shots=shots)
     posterior = homodyne_condition(state, mode, phi, float(outcomes[0]))
     return outcomes, posterior
