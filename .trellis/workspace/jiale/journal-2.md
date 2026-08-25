@@ -197,3 +197,119 @@ Gaussian Lab 不再重复 `gaussian/circuit.py` 的 op dispatch；新后端加�
 ### Next Steps
 
 - None - task complete
+
+
+## Session 62: Lab 后端拆分——Fock/Bosonic 抽到独立模块（候选②）
+
+**Date**: 2026-08-24
+**Task**: Lab 后端拆分——Fock/Bosonic 抽到独立模块（候选②）
+**Branch**: `master`
+
+### Summary
+
+Session summary was not supplied.
+
+### Main Changes
+
+## 改动
+候选②：lab/ir.py 能力分层——Fock/Bosonic 后端执行拆到独立模块。
+
+### 新文件
+- `cvsim/lab/fock_backend.py`（280 行）：`run_fock_circuit` + `batch_fock_circuit` + 8 个 `_fock_*` helpers（mode_probs/mean_photon/purity/leakage/wigner/joint/measured）+ `_LEAKAGE_DIM_CAP`
+- `cvsim/lab/bosonic_backend.py`（259 行）：`run_bosonic_circuit` + `fidelity_sweep` + 7 个 `_bosonic_*` helpers + `_fidelity_target`；复用 `fock_backend._fock_measured`（measured entry 格式共享）
+
+### ir.py 变化
+1216→759 行（-446），回 ADR-0001 §5 安全区（<800 行触发器）。保留 Gaussian 执行 + schema + translate_v0 + load_circuit。末尾 backward-compat re-export shim（外部 `from cvsim.lab.ir import run_fock_circuit` 不破）。
+
+## 设计
+- 三后端无相互依赖；共享类型（CircuitV0Error/View/LabCircuit/SCHEMA + _require/_num）经 `from cvsim.lab.ir import` 获取，ir.py 不 import 子模块 → 无循环
+- bosonic_backend 复用 fock_backend 的 `_fock_measured`（measured entry 格式两后端相同，避免重复）
+- 用 AST 精确定位函数边界抽取（非按行号估算），避免残块
+
+## 验证
+- 全量 pytest：**1147 passed / 4 skipped / 3 warnings**（223.75s，零回归）
+- ruff：clean（22 错全 --fix，import 排序 + unused 删除）
+- mypy：lab/ir.py 0 错；fock_backend/bosonic_backend 仅 4 错（全是既有类别：SCHEMA attr-defined + list/dict generic，从 ir.py 转移的技术债）
+
+## 架构收益
+ir.py 回到单一职责（Gaussian 执行 + schema）；Fock/Bosonic 各自独立文件，导航改善；加新后端 = 新文件，不动 ir.py 核心。
+
+## 残留
+- mypy 272 错总数含 cvsim 全包既有技术债（非本次引入）；fock/bosonic_backend 仅 4 错。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6657c92` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 63: Lab 后端拆分——Fock/Bosonic 抽到独立模块（候选②）
+
+**Date**: 2026-08-25
+**Task**: Lab 后端拆分——Fock/Bosonic 抽到独立模块（候选②）
+**Branch**: `master`
+
+### Summary
+
+Session summary was not supplied.
+
+### Main Changes
+
+## 改动
+候选②：lab/ir.py 能力分层——Fock/Bosonic 后端执行拆到独立模块。
+
+### 新文件
+- `cvsim/lab/fock_backend.py`（280 行）：`run_fock_circuit` + `batch_fock_circuit` + 8 个 `_fock_*` helpers（mode_probs/mean_photon/purity/leakage/wigner/joint/measured）+ `_LEAKAGE_DIM_CAP`
+- `cvsim/lab/bosonic_backend.py`（259 行）：`run_bosonic_circuit` + `fidelity_sweep` + 7 个 `_bosonic_*` helpers + `_fidelity_target`；复用 `fock_backend._fock_measured`（measured entry 格式共享）
+
+### ir.py 变化
+1216→759 行（-446），回 ADR-0001 §5 安全区（<800 行触发器）。保留 Gaussian 执行 + schema + translate_v0 + load_circuit。末尾 backward-compat re-export shim（外部 `from cvsim.lab.ir import run_fock_circuit` 不破）。
+
+## 设计
+- 三后端无相互依赖；共享类型（CircuitV0Error/View/LabCircuit/SCHEMA + _require/_num）经 `from cvsim.lab.ir import` 获取，ir.py 不 import 子模块 → 无循环
+- bosonic_backend 复用 fock_backend 的 `_fock_measured`（measured entry 格式两后端相同，避免重复）
+- 用 AST 精确定位函数边界抽取（非按行号估算），避免残块
+
+## 验证
+- 全量 pytest：**1147 passed / 4 skipped / 3 warnings**（223.75s，零回归）
+- ruff：clean（22 错全 --fix，import 排序 + unused 删除）
+- mypy：lab/ir.py 0 错；fock_backend/bosonic_backend 仅 4 错（全是既有类别：SCHEMA attr-defined + list/dict generic，从 ir.py 转移的技术债）
+
+## 架构收益
+ir.py 回到单一职责（Gaussian 执行 + schema）；Fock/Bosonic 各自独立文件，导航改善；加新后端 = 新文件，不动 ir.py 核心。
+
+## 残留
+- mypy 272 错总数含 cvsim 全包既有技术债（非本次引入）；fock/bosonic_backend 仅 4 错。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9fa6480` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

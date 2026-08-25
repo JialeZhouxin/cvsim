@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 61
-- **Last Active**: 2026-08-24
+- **Total Sessions**: 63
+- **Last Active**: 2026-08-25
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~199 | Active |
+| `journal-2.md` | ~315 | Active |
 | `journal-1.md` | ~1988 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 63 | 2026-08-25 | Lab 后端拆分——Fock/Bosonic 抽到独立模块（候选②） | `9fa6480` | `master` |
+| 62 | 2026-08-24 | Lab 后端拆分——Fock/Bosonic 抽到独立模块（候选②） | `6657c92` | `master` |
 | 61 | 2026-08-24 | Lab Gaussian 执行路径统一——删 _apply 13 分支 dispatch | `bafc534` | `master` |
 | 60 | 2026-08-24 | Bosonic B6 GUI 任务清账 + 基线复验 1147 绿 | `17d9073` | `master` |
 | 59 | 2026-08-19 | Bosonic B5 BosonicCircuit 电路 DSL——circuit_v1 第三消费者 | `125aae4` | `master` |
