@@ -248,10 +248,7 @@ def partial_trace(
             f"partial_trace requires GaussianState, got {type(state).__name__}"
         )
     m = state.nmode
-    if isinstance(keep, (int, np.integer)):
-        keep_list = [int(keep)]
-    else:
-        keep_list = [int(k) for k in keep]
+    keep_list = [int(keep)] if isinstance(keep, (int, np.integer)) else [int(k) for k in keep]
     # unique, sorted — stable subsystem order
     keep_u = sorted(set(keep_list))
     if not keep_u:

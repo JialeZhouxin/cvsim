@@ -61,7 +61,9 @@ def test_pnr_condition_2mode_density() -> None:
     st = FockState.fock2(1, 0, 6)
     d = FockDensity.from_pure(st)
     out = pnr_condition(d, 0, 1)
-    np.testing.assert_allclose(out.rho, FockDensity.from_pure(FockState.fock2(1, 0, 6)).rho, atol=1e-14)
+    np.testing.assert_allclose(
+        out.rho, FockDensity.from_pure(FockState.fock2(1, 0, 6)).rho, atol=1e-14
+    )
 
 
 def test_pnr_sample_and_condition_roundtrip() -> None:

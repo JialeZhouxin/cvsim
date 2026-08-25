@@ -120,9 +120,9 @@ def beamsplitter(state: FockState, theta: float, phi: float = 0.0) -> FockState:
         raise ValueError("beamsplitter requires two-mode state")
     N = state.cutoff
     a = annihilation(N)
-    I = np.eye(N, dtype=complex)
-    a0 = np.kron(a, I)
-    a1 = np.kron(I, a)
+    eye = np.eye(N, dtype=complex)
+    a0 = np.kron(a, eye)
+    a1 = np.kron(eye, a)
     ad0 = a0.conj().T
     ad1 = a1.conj().T
     eip = np.exp(1j * phi)
@@ -146,9 +146,9 @@ def two_mode_squeeze(
         raise ValueError("two_mode_squeeze: modes must be 0 and 1")
     N = state.cutoff
     a = annihilation(N)
-    I = np.eye(N, dtype=complex)
-    a0 = np.kron(a, I)
-    a1 = np.kron(I, a)
+    eye = np.eye(N, dtype=complex)
+    a0 = np.kron(a, eye)
+    a1 = np.kron(eye, a)
     ad0 = a0.conj().T
     ad1 = a1.conj().T
     G = r * (ad0 @ ad1 - a0 @ a1)
@@ -215,17 +215,17 @@ def mach_zehnder(
     if state.nmode != 2:
         raise ValueError("mach_zehnder requires two-mode state")
     N = state.cutoff
-    I = np.eye(N, dtype=complex)
+    eye = np.eye(N, dtype=complex)
     a = annihilation(N)
-    a0 = np.kron(a, I)
-    a1 = np.kron(I, a)
+    a0 = np.kron(a, eye)
+    a1 = np.kron(eye, a)
     def G_bs(th: float, ph: float) -> np.ndarray:
         eip = np.exp(1j * ph)
         return th * (eip * a0.conj().T @ a1 - np.conj(eip) * a1.conj().T @ a0)
 
     n = np.arange(N)
     P = np.diag(np.exp(1j * phi * n))
-    U = expm(G_bs(np.pi / 4.0, 0.0)) @ np.kron(I, P) @ expm(G_bs(theta, phi))
+    U = expm(G_bs(np.pi / 4.0, 0.0)) @ np.kron(eye, P) @ expm(G_bs(theta, phi))
     vec = state.amps.reshape(N * N)
     return FockState(amps=(U @ vec).reshape(N, N))
 
@@ -244,10 +244,10 @@ def interferometer(state: FockState, U: np.ndarray) -> FockState:
     if not np.allclose(U @ U.conj().T, np.eye(2), atol=1e-10):
         raise ValueError("U must be unitary")
     N = state.cutoff
-    I = np.eye(N, dtype=complex)
+    eye = np.eye(N, dtype=complex)
     a = annihilation(N)
-    a0 = np.kron(a, I)
-    a1 = np.kron(I, a)
+    a0 = np.kron(a, eye)
+    a1 = np.kron(eye, a)
     logU = logm(U)
     H = logU[0, 0] * (a0.conj().T @ a0) + logU[0, 1] * (a0.conj().T @ a1) + \
         logU[1, 0] * (a1.conj().T @ a0) + logU[1, 1] * (a1.conj().T @ a1)

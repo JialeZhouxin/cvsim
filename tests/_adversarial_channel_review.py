@@ -20,11 +20,9 @@ from cvsim.gaussian import (
     loss,
     mean_photon,
     phase_noise,
-    squeeze,
     validate_channel,
 )
-from cvsim.gaussian.analyse import is_physical
-from cvsim.symplectic import S_phase, S_squeeze
+from cvsim.symplectic import S_phase
 
 results: list[tuple[str, bool, str]] = []
 
@@ -71,12 +69,12 @@ def main() -> None:
 
     # A2: bare-Omega CP condition rejects valid pure loss (documentation drift)
     try:
-        O = omega(1)
+        omega_mat = omega(1)
         bad_Ts = []
         for T in [0.0, 0.25, 0.5, 0.75]:
             X = np.sqrt(T) * np.eye(2)
             Y = (1 - T) * 0.5 * np.eye(2)
-            H = Y + 1j * O - 1j * (X @ O @ X.T)
+            H = Y + 1j * omega_mat - 1j * (X @ omega_mat @ X.T)
             w = np.linalg.eigvalsh(0.5 * (H + H.conj().T))
             if not np.any(w < -1e-6):
                 bad_Ts.append(T)
@@ -385,8 +383,12 @@ def main() -> None:
     # F1: apply_gaussian_channel docstring uses bare Omega formula (incorrect)
     try:
         import cvsim.gaussian.channels as ch
-        ok = "Y + iΩ/2" in ch.apply_gaussian_channel.__doc__ or "Y + i\\Omega/2" in ch.apply_gaussian_channel.__doc__
-        # A correct docstring would contain Omega/2; current docstring is known to contain bare Omega.
+        ok = (
+            "Y + iΩ/2" in ch.apply_gaussian_channel.__doc__
+            or "Y + i\\Omega/2" in ch.apply_gaussian_channel.__doc__
+        )
+        # A correct docstring would contain Omega/2;
+        # current docstring is known to contain bare Omega.
         record("F1 docstring states correct Omega/2 CP formula", ok)
     except Exception as e:
         record("F1 docstring states correct Omega/2 CP formula", False, traceback.format_exc()[:80])

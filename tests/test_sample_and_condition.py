@@ -6,9 +6,8 @@ import numpy as np
 
 from cvsim.bosonic import BosonicState
 from cvsim.bosonic import homodyne_sample_and_condition as b_sc
-from cvsim.gaussian import GaussianState
+from cvsim.gaussian import GaussianState, homodyne_var, squeeze
 from cvsim.gaussian import homodyne_sample_and_condition as g_sc
-from cvsim.gaussian import homodyne_var, squeeze
 
 
 def test_g_vac_sample_condition():

@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from cvsim.conventions import omega
 from cvsim.gaussian import (
     GaussianState,
     amplifier,
@@ -19,8 +18,7 @@ from cvsim.gaussian import (
     squeeze,
     validate_channel,
 )
-from cvsim.symplectic import S_phase, S_squeeze
-
+from cvsim.symplectic import S_phase
 
 # --- core channel ----------------------------------------------------------
 

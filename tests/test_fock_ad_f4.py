@@ -15,7 +15,15 @@ import pytest
 
 import cvsim.backend as be
 import cvsim.fock as fock
-from cvsim.fock_ad import _cat_amps, _loss_superop, bs_overlap, bs_u, cat_fidelity, kerr_diag, squeeze_u
+from cvsim.fock_ad import (
+    _cat_amps,
+    _loss_superop,
+    bs_overlap,
+    bs_u,
+    cat_fidelity,
+    kerr_diag,
+    squeeze_u,
+)
 
 JAX = pytest.mark.skipif(not be.HAS_JAX, reason="jax not installed")
 

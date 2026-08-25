@@ -6,9 +6,9 @@ import numpy as np
 
 from cvsim.gaussian.state import GaussianState
 from cvsim.symplectic import (
-    S_beamsplitter,
     S_CX,
     S_CZ,
+    S_beamsplitter,
     S_from_unitary,
     S_mach_zehnder,
     S_phase,
@@ -60,10 +60,7 @@ def squeeze(
     """
     n = state.nmode
     S_r = S_squeeze(n, r, mode)
-    if phi == 0.0:
-        S = S_r
-    else:
-        S = S_phase(n, phi, mode) @ S_r @ S_phase(n, -phi, mode)
+    S = S_r if phi == 0.0 else S_phase(n, phi, mode) @ S_r @ S_phase(n, -phi, mode)
     return apply_symplectic(state, S, validate=False)
 
 
@@ -185,7 +182,7 @@ apply_interferometer = interferometer
 
 def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState:
     """Apply Reck/Clements mesh ops (from ``clements_decomposition``) in order."""
-    from cvsim.symplectic import S_from_unitary, U_beamsplitter, embed_U_2mode
+    from cvsim.symplectic import S_from_unitary, embed_U_2mode
 
     st = state
     m = st.nmode

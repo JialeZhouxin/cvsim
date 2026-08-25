@@ -1,4 +1,5 @@
-"""B6 — Bosonic GUI 三件套 tests (IR initial / two-V fidelity / Lab golden / steps / fidelity sweep).
+"""B6 — Bosonic GUI 三件套 tests
+(IR initial / two-V fidelity / Lab golden / steps / fidelity sweep).
 
 Exit criteria (vision §4 B6):
 1. GKP QEC main script (gkp0 → CZ → loss γ → homodyne → feedforward → fidelity
@@ -126,7 +127,6 @@ class TestTwoVFidelity:
 
     def test_true_displaced_equal_v(self):
         """Equal-V displaced Gaussians: fidelity matches analytic overlap."""
-        import scipy.linalg
 
         V = 0.5 * np.diag([0.2, 5.0])
         r0 = np.array([0.0, 0.0])
@@ -166,7 +166,7 @@ class TestGKPQEC:
         st1, res1 = self._qec(T=0.9, seed=7)
         st2, res2 = self._qec(T=0.9, seed=7)
         assert res1["m_p"] == res2["m_p"]
-        for c1, c2 in zip(st1.components, st2.components):
+        for c1, c2 in zip(st1.components, st2.components, strict=False):
             np.testing.assert_array_equal(c1.V, c2.V)
             np.testing.assert_array_equal(c1.rbar, c2.rbar)
 
@@ -203,7 +203,8 @@ class TestLabGolden:
             "ops": [
                 {"op": "cz", "modes": [0, 1], "params": {"weight": 1.0}},
                 {"op": "loss", "modes": [0], "params": {"T": 0.9, "nbar": 0.0}},
-                {"op": "measure_homodyne", "modes": [1], "params": {"phi": np.pi / 2, "name": "m_p"}},
+                {"op": "measure_homodyne", "modes": [1],
+                 "params": {"phi": np.pi / 2, "name": "m_p"}},
                 {"op": "displace", "modes": [0], "params": {"alpha": {"$ref": "m_p", "gain": 1.0}}},
             ],
         }
@@ -211,6 +212,7 @@ class TestLabGolden:
     def test_run_matches_equivalent_script(self, qec_body):
         """Bosonic JSON → /run matches equivalent BosonicCircuit script."""
         from fastapi.testclient import TestClient
+
         from cvsim.bosonic import mean_photon as bmp
         from cvsim.lab.server import app
 
@@ -230,6 +232,7 @@ class TestLabGolden:
 
     def test_run_deterministic_same_json(self, qec_body):
         from fastapi.testclient import TestClient
+
         from cvsim.lab.server import app
 
         tc = TestClient(app)
@@ -241,6 +244,7 @@ class TestLabGolden:
     def test_steps_structure(self, qec_body):
         """detail=steps returns per-break-point snapshots with nmode cascade."""
         from fastapi.testclient import TestClient
+
         from cvsim.lab.server import app
 
         body = {**qec_body, "detail": "steps"}
@@ -259,6 +263,7 @@ class TestLabGolden:
     def test_fidelity_sweep_returns_curve(self, qec_body):
         """/fidelity sweeps loss T → fidelity curve (rounds-avg)."""
         from fastapi.testclient import TestClient
+
         from cvsim.lab.server import app
 
         body = dict(qec_body)
@@ -283,6 +288,7 @@ class TestLabGolden:
     def test_fidelity_requires_bosonic(self):
         """Gaussian /fidelity → 422."""
         from fastapi.testclient import TestClient
+
         from cvsim.lab.server import app
 
         tc = TestClient(app)
@@ -294,8 +300,7 @@ class TestLabGolden:
 
     def test_whitelist_rejects_non_whitelist(self):
         """Bosonic whitelist: kerr is a valid bosonic-op neighbour but not whitelisted."""
-        from cvsim.lab.ir import CircuitV0Error
-        from cvsim.lab.ir import load_circuit
+        from cvsim.lab.ir import CircuitV0Error, load_circuit
 
         data = {"schema": "circuit_v1", "nmode": 1, "backend": "bosonic",
                 "ops": [{"op": "kerr", "modes": [0], "params": {"chi": 0.1}}]}
@@ -311,6 +316,7 @@ class TestOldJSONUnchanged:
     def test_gaussian_json_still_runs(self):
         """Classic Gaussian circuit (no backend) unaffected by B6."""
         from fastapi.testclient import TestClient
+
         from cvsim.lab.server import app
 
         tc = TestClient(app)

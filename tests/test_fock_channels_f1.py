@@ -163,8 +163,8 @@ def test_apply_kraus_mode_selection() -> None:
 
 def test_apply_kraus_full_space() -> None:
     st = FockState.fock2(1, 0, 4)
-    I = np.eye(4)
-    U = np.kron(np.diag(np.exp(1j * np.arange(4))), I)
+    eye = np.eye(4)
+    U = np.kron(np.diag(np.exp(1j * np.arange(4))), eye)
     d = apply_kraus(st, [U])
     np.testing.assert_allclose(d.rho[4, 4], 1.0, atol=1e-12)  # |1,0⟩ index = 1*4+0
 

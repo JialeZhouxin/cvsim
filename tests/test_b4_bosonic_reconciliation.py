@@ -17,14 +17,13 @@ from cvsim.bosonic import (
     gkp0,
     gkp1,
     gkp_logical_overlap,
+    homodyne_pdf,
+    homodyne_var,
     loss,
     mean_photon,
     pure_fidelity,
     purity,
-    homodyne_pdf,
-    homodyne_var,
 )
-from cvsim.bosonic.observables import _mean_photon_component
 from cvsim.fock.state import FockState
 from cvsim.gaussian import GaussianState, squeeze
 from cvsim.gaussian import homodyne_var as g_homodyne_var

@@ -53,7 +53,7 @@ def test_gkp1_2d_half_shift_x():
     for key in by_p0:
         xs0 = sorted(by_p0[key])
         xs1 = sorted(by_p1[key])
-        for a, b in zip(xs0, xs1):
+        for a, b in zip(xs0, xs1, strict=False):
             assert abs((b - a) - 0.5 * delta) < 1e-12
 
 

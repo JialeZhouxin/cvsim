@@ -14,7 +14,6 @@ from cvsim.gaussian import (
     homodyne_mean,
     homodyne_sample,
     homodyne_sample_batch,
-    homodyne_var,
 )
 
 

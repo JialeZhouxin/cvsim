@@ -274,7 +274,7 @@ def homodyne_condition(
     s = sum(raw_w)
     if abs(s) < _SIG_EPS:
         raise ValueError("homodyne_condition: weight sum ~ 0 after likelihood")
-    for comp, w in zip(kept, raw_w):
+    for comp, w in zip(kept, raw_w, strict=False):
         comp.w = w / s
     return BosonicState(components=kept)
 

@@ -36,7 +36,7 @@ class FockSparse:
             raise ValueError(
                 f"data ndim {data.ndim} != len(cutoffs) {len(cutoffs)}"
             )
-        for d, c in zip(data.shape, cutoffs):
+        for d, c in zip(data.shape, cutoffs, strict=False):
             if d != c:
                 raise ValueError(f"shape {data.shape} != cutoffs {cutoffs}")
         norm = float(np.sum(np.abs(data.data) ** 2))

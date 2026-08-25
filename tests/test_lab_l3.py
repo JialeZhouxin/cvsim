@@ -4,9 +4,8 @@ singular conditional-state handling (A5/A6)."""
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
-from cvsim.lab import CircuitV0Error, load_circuit, run_circuit, sample_circuit
+from cvsim.lab import load_circuit, run_circuit, sample_circuit
 
 TMSV = {"id": "s", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]}
 

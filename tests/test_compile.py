@@ -13,8 +13,8 @@ from cvsim.gaussian.compile import (
 from cvsim.gaussian.gates import (
     apply_symplectic,
     beamsplitter,
-    cz,
     cx,
+    cz,
     displace,
     fourier,
     mach_zehnder,
@@ -27,7 +27,6 @@ from cvsim.gaussian.observables import (
     homodyne_sample_and_condition,
 )
 from cvsim.gaussian.state import GaussianState
-
 
 # -- naive reference executor (independent of the compile path) -----------
 

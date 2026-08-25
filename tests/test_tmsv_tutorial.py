@@ -55,10 +55,7 @@ def test_tmsv_tutorial_physics_self_check():
     red = partial_trace(st, [0])
     assert abs(purity(red) - 1.0 / (2 * nbar + 1)) < ATOL
     # nbar=0 → S=0 by continuity (avoid 0*log0 NaN)
-    if nbar > 0.0:
-        S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
-    else:
-        S_closed = 0.0
+    S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar) if nbar > 0.0 else 0.0
     assert abs(entropy_vn(red) - S_closed) < ATOL
     assert abs(entropy_vn(partial_trace(st, [1])) - entropy_vn(red)) < ATOL
 
@@ -90,9 +87,6 @@ def test_tmsv_r0_reduced_entropy_closed_no_nan():
     nbar = float(np.sinh(r) ** 2)
     assert nbar == 0.0
     red = partial_trace(st, [0])
-    if nbar > 0.0:
-        S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar)
-    else:
-        S_closed = 0.0
+    S_closed = (nbar + 1) * np.log(nbar + 1) - nbar * np.log(nbar) if nbar > 0.0 else 0.0
     assert np.isfinite(S_closed)
     assert abs(entropy_vn(red) - S_closed) < ATOL

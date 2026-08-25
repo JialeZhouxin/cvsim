@@ -13,7 +13,6 @@ import pytest
 
 from cvsim.gaussian import GaussianState
 
-
 # ---------------------------------------------------------------------------
 # Numerical tolerances — single source of truth
 # ---------------------------------------------------------------------------

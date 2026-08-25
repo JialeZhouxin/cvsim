@@ -105,8 +105,8 @@ def test_channel_breaks_segment_and_density_path() -> None:
 
 
 def test_density_2mode_channel_path() -> None:
-    from cvsim.fock.circuit import _bs_U
     from cvsim.fock.channels import loss as ch_loss
+    from cvsim.fock.circuit import _bs_U
 
     c = FockCircuit(2, cutoff=6)
     c.two_mode_squeeze(0, 1, r=0.3)
@@ -169,7 +169,8 @@ def test_add_and_repr() -> None:
     c3 = c1 + c2
     assert len(c3) == 2
     out = c3.run()
-    np.testing.assert_allclose(out.amps, phase(squeeze(FockState.vacuum(8, nmode=2), 0.3), 0.2, mode=1).amps, atol=1e-12)
+    expected = phase(squeeze(FockState.vacuum(8, nmode=2), 0.3), 0.2, mode=1)
+    np.testing.assert_allclose(out.amps, expected.amps, atol=1e-12)
     assert "FockCircuit(2, cutoff=[8, 8])" in repr(c3)
     with pytest.raises(ValueError):
         c1 += FockCircuit(2, cutoff=10)

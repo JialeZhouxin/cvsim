@@ -16,17 +16,11 @@ import pytest
 from cvsim.bosonic import (
     BosonicCircuit,
     BosonicState,
-    coherent,
-    homodyne_mean,
-    homodyne_var,
-    from_ir,
-    mean_photon,
-    to_ir,
 )
 from cvsim.bosonic.gates import beamsplitter as g_bs
+from cvsim.bosonic.gates import cz as g_cz
 from cvsim.bosonic.gates import displace as g_displace
 from cvsim.bosonic.gates import squeeze as g_squeeze
-from cvsim.bosonic.gates import cz as g_cz
 from cvsim.circuit_common import ParamRef
 
 pytestmark = pytest.mark.phaseB5
@@ -46,8 +40,12 @@ class TestCompiledVsNaive:
         c.squeeze(0, 0.5)
         c.displace(0, 0.3 + 0.4j)
         st_circ = c.run()
-        np.testing.assert_allclose(st_circ.components[0].V, st_naive.components[0].V, atol=1e-12)
-        np.testing.assert_allclose(st_circ.components[0].rbar, st_naive.components[0].rbar, atol=1e-12)
+        np.testing.assert_allclose(
+            st_circ.components[0].V, st_naive.components[0].V, atol=1e-12
+        )
+        np.testing.assert_allclose(
+            st_circ.components[0].rbar, st_naive.components[0].rbar, atol=1e-12
+        )
 
     def test_two_mode_bs_cz_merged(self):
         """squeeze + BS + CZ: merged symplectic vs naive (atol 1e-12)."""
@@ -60,8 +58,12 @@ class TestCompiledVsNaive:
         c.beamsplitter(0, 1, np.pi / 4)
         c.cz(0, 1, 1.0)
         st_circ = c.run()
-        np.testing.assert_allclose(st_circ.components[0].V, st_naive.components[0].V, atol=1e-12)
-        np.testing.assert_allclose(st_circ.components[0].rbar, st_naive.components[0].rbar, atol=1e-12)
+        np.testing.assert_allclose(
+            st_circ.components[0].V, st_naive.components[0].V, atol=1e-12
+        )
+        np.testing.assert_allclose(
+            st_circ.components[0].rbar, st_naive.components[0].rbar, atol=1e-12
+        )
 
     def test_symbolic_param_binding(self):
         """Symbolic r bound at run() matches fixed r (atol 1e-12)."""

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsim.bosonic import BosonicState, even_cat, odd_cat
+from cvsim.bosonic import BosonicState, odd_cat
 from cvsim.gaussian import GaussianState, squeeze
 from cvsim.wigner import wigner_bosonic, wigner_gaussian, wigner_grid
 

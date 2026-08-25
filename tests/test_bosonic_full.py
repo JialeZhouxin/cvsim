@@ -17,10 +17,20 @@ from cvsim.bosonic import (
 )
 from cvsim.gaussian import (
     GaussianState,
+)
+from cvsim.gaussian import (
     displace as g_disp,
+)
+from cvsim.gaussian import (
     homodyne_mean as g_mean,
+)
+from cvsim.gaussian import (
     homodyne_var as g_var,
+)
+from cvsim.gaussian import (
     mean_photon as g_n,
+)
+from cvsim.gaussian import (
     squeeze as g_sq,
 )
 
@@ -68,4 +78,4 @@ def test_gate_keeps_weights():
     w0 = [c.w for c in st.components]
     st2 = squeeze(st, 0.2)
     st3 = displace(st2, 0.1)
-    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st3.components]))
+    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st3.components], strict=False))

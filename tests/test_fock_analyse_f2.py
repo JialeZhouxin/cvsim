@@ -47,9 +47,13 @@ def test_entropy_vn_maximally_mixed() -> None:
 def test_partial_trace_pure_product() -> None:
     st = FockState.fock2(1, 2, 10)
     out = partial_trace(st, 0)
-    np.testing.assert_allclose(out.rho, FockDensity.from_pure(FockState.fock(1, 10)).rho, atol=1e-12)
+    np.testing.assert_allclose(
+        out.rho, FockDensity.from_pure(FockState.fock(1, 10)).rho, atol=1e-12
+    )
     out1 = partial_trace(st, 1)
-    np.testing.assert_allclose(out1.rho, FockDensity.from_pure(FockState.fock(2, 10)).rho, atol=1e-12)
+    np.testing.assert_allclose(
+        out1.rho, FockDensity.from_pure(FockState.fock(2, 10)).rho, atol=1e-12
+    )
 
 
 def test_partial_trace_density_product() -> None:

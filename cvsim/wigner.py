@@ -158,9 +158,11 @@ def wigner_grid(
     ps = np.linspace(-lim, lim, n)
     X, P = np.meshgrid(xs, ps, indexing="xy")
     if isinstance(state, GaussianState):
-        fn = lambda x, p: wigner_gaussian(state, x, p)
+        def fn(x, p):
+            return wigner_gaussian(state, x, p)
     elif isinstance(state, BosonicState):
-        fn = lambda x, p: wigner_bosonic(state, x, p)
+        def fn(x, p):
+            return wigner_bosonic(state, x, p)
     elif isinstance(state, (FockState, FockDensity)):
         if state.nmode != 1:
             raise ValueError("wigner_grid: single-mode only")

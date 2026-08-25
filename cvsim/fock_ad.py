@@ -37,6 +37,7 @@ from cvsim.backend import _get_xp, _set
 from cvsim.fock import channels
 from cvsim.fock.gates import _squeeze_U
 
+
 def _expm(xp, G: np.ndarray) -> np.ndarray:
     """Matrix exponential: scipy for numpy; jax.scipy.linalg for jax (lazy)."""
     if xp is np:
@@ -70,9 +71,9 @@ def bs_u(backend: str, N: int, theta: float, phi: float = 0.0) -> np.ndarray:
     """
     xp = _get_xp(backend)
     a = _annihilation(xp, N)
-    I = xp.eye(N, dtype=complex)
-    a0 = xp.kron(a, I)
-    a1 = xp.kron(I, a)
+    eye = xp.eye(N, dtype=complex)
+    a0 = xp.kron(a, eye)
+    a1 = xp.kron(eye, a)
     eip = xp.exp(1j * phi)
     G = theta * (eip * a0.conj().T @ a1 - xp.conj(eip) * a1.conj().T @ a0)
     return _expm(xp, G)

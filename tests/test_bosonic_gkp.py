@@ -17,7 +17,7 @@ def test_gkp0_spacing():
     st = gkp0(0.1, grid_size=2)
     xs = sorted(float(c.rbar[0].real) for c in st.components)
     delta = np.sqrt(2.0 * np.pi)
-    for a, b in zip(xs, xs[1:]):
+    for a, b in zip(xs, xs[1:], strict=False):
         assert abs((b - a) - delta) < 1e-12
 
 
@@ -31,7 +31,7 @@ def test_gkp0_gates_keep_weights():
     st = gkp0(0.15, grid_size=2)
     w0 = [c.w for c in st.components]
     st2 = squeeze(phase(st, 0.3), 0.2)
-    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st2.components]))
+    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st2.components], strict=False))
 
 
 def test_gkp0_bad_args():

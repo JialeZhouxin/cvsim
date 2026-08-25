@@ -18,7 +18,6 @@ from cvsim.gaussian import (
 )
 from cvsim.gaussian.analyse import _as_cov, _bosonic_g
 
-
 ATOL = 1e-10
 
 

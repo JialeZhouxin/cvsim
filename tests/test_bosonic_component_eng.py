@@ -52,10 +52,10 @@ def test_normalize_uses_complex_weight_sum_without_mutating_input():
     assert normalized is not state
     assert weight_sum(normalized) == pytest.approx(1.0)
     assert [component.w for component in state.components] == original_weights
-    for component, v, rbar in zip(state.components, original_v, original_rbar):
+    for component, v, rbar in zip(state.components, original_v, original_rbar, strict=False):
         np.testing.assert_array_equal(component.V, v)
         np.testing.assert_array_equal(component.rbar, rbar)
-    for component, source in zip(normalized.components, state.components):
+    for component, source in zip(normalized.components, state.components, strict=False):
         assert component is not source
         np.testing.assert_array_equal(component.V, source.V)
         np.testing.assert_array_equal(component.rbar, source.rbar)
@@ -139,13 +139,15 @@ def test_merge_combines_matching_geometry_and_preserves_first_representative():
 
 def test_merge_uses_only_geometry_not_weights_and_keeps_input_unchanged():
     state = BosonicState([_component(w=2.0), _component(w=-0.5)])
-    original = [(component.V.copy(), component.rbar.copy(), component.w) for component in state.components]
+    original = [
+        (c.V.copy(), c.rbar.copy(), c.w) for c in state.components
+    ]
 
     merged, _ = merge(state)
 
     assert merged.n_components == 1
     assert merged.components[0].w == pytest.approx(1.5)
-    for component, (v, rbar, w) in zip(state.components, original):
+    for component, (v, rbar, w) in zip(state.components, original, strict=False):
         np.testing.assert_array_equal(component.V, v)
         np.testing.assert_array_equal(component.rbar, rbar)
         assert component.w == w

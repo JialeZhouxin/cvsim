@@ -4,7 +4,7 @@ spectrum, not symplectic (dense m≤2; partial_trace general m)."""
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 from scipy.linalg import sqrtm
@@ -45,10 +45,7 @@ def partial_trace(
     Always returns a FockDensity (entangled pure input → mixed marginal).
     m≤2 supported (dense).
     """
-    if isinstance(keep, int):
-        keep_list = [keep]
-    else:
-        keep_list = list(keep)
+    keep_list = [keep] if isinstance(keep, int) else list(keep)
     nmode = state.nmode
     if nmode == 1:
         if keep_list == [0]:
@@ -82,10 +79,7 @@ def log_negativity(
     Fock: explicit partial transpose on the (N²×N²) density, 2-mode only
     (dense anchor; sparse F3 for larger m).
     """
-    if isinstance(modes_A, int):
-        modes_A = [modes_A]
-    else:
-        modes_A = list(modes_A)
+    modes_A = [modes_A] if isinstance(modes_A, int) else list(modes_A)
     rho = _to_density(state)
     if rho.nmode != 2:
         raise NotImplementedError("log_negativity: 2-mode only (dense anchor)")

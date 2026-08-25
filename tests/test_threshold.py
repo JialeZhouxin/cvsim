@@ -173,7 +173,7 @@ def test_circuit_threshold_ir_roundtrip() -> None:
 
 def test_p_click_rejects_nonphysical() -> None:
     # V=0.1I below Heisenberg bound → p0 = 1/√0.6 > 1 → must raise
-    with pytest.raises(ValueError, match="outside \[0, 1\]"):
+    with pytest.raises(ValueError, match=r"outside \[0, 1\]"):
         p_click(GaussianState(V=0.1 * np.eye(2), rbar=np.zeros(2)), 0)
 
 

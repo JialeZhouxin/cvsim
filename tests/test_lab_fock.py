@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from cvsim.fock import FockCircuit, FockState, pnrd_probs
+from cvsim.fock import FockCircuit
 from cvsim.lab.server import app
 
 client = TestClient(app)

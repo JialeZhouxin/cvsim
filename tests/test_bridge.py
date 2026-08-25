@@ -17,7 +17,6 @@ from cvsim.fock import FockState, displace, squeeze
 from cvsim.gaussian import GaussianState
 from cvsim.symplectic import S_squeeze, d_displace
 
-
 # ---------------------------------------------------------------------------
 # coherent_element vs Fock numerical
 # ---------------------------------------------------------------------------

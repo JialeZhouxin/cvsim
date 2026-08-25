@@ -127,7 +127,7 @@ def _build_gram_state(
     s = sum(raw_w)
     if s <= 0:
         raise ValueError("weight sum non-positive")
-    for comp, w in zip(comps, raw_w):
+    for comp, w in zip(comps, raw_w, strict=False):
         comp.w = complex(w / s)
     return BosonicState(components=comps)
 

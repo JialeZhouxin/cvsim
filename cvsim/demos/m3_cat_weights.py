@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
-
 from cvsim.bosonic import even_cat, odd_cat, weight_sum
 
 ATOL = 1e-12
@@ -17,7 +15,7 @@ def check_cat(name: str, even: bool) -> None:
 
     ws = [c.w for c in st.components]
     rs = [c.rbar for c in st.components]
-    for i, (w, r) in enumerate(zip(ws, rs)):
+    for i, (w, r) in enumerate(zip(ws, rs, strict=False)):
         print(f"  [{i}] w={w:.6g}  rbar={r}")
 
     # diagonal: real positive centres on ±x; cross: imag on p

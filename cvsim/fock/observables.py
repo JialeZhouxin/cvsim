@@ -369,10 +369,7 @@ def _pnr_condition_pure(state: FockState, mode: int, n: int) -> FockState:
         return FockState(amps=amps)
     if mode not in (0, 1):
         raise IndexError(f"mode {mode} out of range for nmode=2")
-    if mode == 0:
-        vec = state.amps[n, :].copy()
-    else:
-        vec = state.amps[:, n].copy()
+    vec = state.amps[n, :].copy() if mode == 0 else state.amps[:, n].copy()
     p = np.sum(abs(vec) ** 2)
     if p <= _EPS:
         raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
@@ -396,8 +393,8 @@ def _pnr_condition_density(state: FockDensity, mode: int, n: int) -> FockDensity
         raise IndexError(f"mode {mode} out of range for nmode=2")
     P = np.zeros((N, N), dtype=complex)
     P[n, n] = 1.0
-    I = np.eye(N, dtype=complex)
-    A = np.kron(P, I) if mode == 0 else np.kron(I, P)
+    eye = np.eye(N, dtype=complex)
+    A = np.kron(P, eye) if mode == 0 else np.kron(eye, P)
     rho2 = A @ state.rho @ A.conj().T
     p = np.real(np.trace(rho2))
     if p <= _EPS:

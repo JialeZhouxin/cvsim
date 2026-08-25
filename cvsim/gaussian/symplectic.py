@@ -5,9 +5,9 @@ This shim mirrors the full public surface of `cvsim.symplectic` so that
 """
 
 from cvsim.symplectic import (  # noqa: F401
-    S_beamsplitter,
     S_CX,
     S_CZ,
+    S_beamsplitter,
     S_from_unitary,
     S_mach_zehnder,
     S_phase,

@@ -22,9 +22,17 @@ from cvsim.bosonic.state import BosonicState, Component
 from cvsim.conventions import vacuum_cov
 from cvsim.gaussian.gates import (
     cx as g_cx,
+)
+from cvsim.gaussian.gates import (
     cz as g_cz,
+)
+from cvsim.gaussian.gates import (
     fourier as g_fourier,
+)
+from cvsim.gaussian.gates import (
     interferometer as g_interferometer,
+)
+from cvsim.gaussian.gates import (
     mach_zehnder as g_mz,
 )
 from cvsim.symplectic import S_CX, S_CZ, d_displace, is_symplectic

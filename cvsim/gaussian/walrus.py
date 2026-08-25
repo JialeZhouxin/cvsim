@@ -9,8 +9,9 @@ hard dependency on it.
 
 from __future__ import annotations
 
-import numpy as np
 from types import ModuleType
+
+import numpy as np
 
 from cvsim.gaussian.state import GaussianState
 

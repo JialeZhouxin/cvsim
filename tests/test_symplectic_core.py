@@ -40,7 +40,8 @@ def _random_symplectic(m: int, rng: np.random.Generator) -> np.ndarray:
             i, j = rng.choice(m, size=2, replace=False)
             S = (
                 S_beamsplitter(
-                    m, int(i), int(j), float(rng.uniform(0, np.pi / 2)), float(rng.uniform(0, 2 * np.pi))
+                    m, int(i), int(j),
+                    float(rng.uniform(0, np.pi / 2)), float(rng.uniform(0, 2 * np.pi)),
                 )
                 @ S
             )

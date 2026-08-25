@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsim.bosonic.channels import _apply_affine, amplifier as _amp, loss as _loss, phase_noise as _pn
+from cvsim.bosonic.channels import amplifier as _amp
+from cvsim.bosonic.channels import loss as _loss
+from cvsim.bosonic.channels import phase_noise as _pn
 from cvsim.bosonic.gates import apply_symplectic
 from cvsim.bosonic.measure import (
     heterodyne_sample_and_condition,
@@ -102,7 +104,9 @@ def _instantiate(ops: list[tuple], nmode: int, values: dict) -> tuple[np.ndarray
     return S, d
 
 
-def _apply_channel_affine(st: BosonicState, X: np.ndarray, Y: np.ndarray, d: np.ndarray | None) -> BosonicState:
+def _apply_channel_affine(
+    st: BosonicState, X: np.ndarray, Y: np.ndarray, d: np.ndarray | None
+) -> BosonicState:
     """Per-component V ← X V Xᵀ + Y, r̄ ← X r̄ + d (if given), w unchanged.
 
     Extends ``channels._apply_affine`` with the displacement ``d`` (needed by
@@ -216,7 +220,9 @@ class CompiledBosonic(CompiledCircuit):
             return self._initial
         return BosonicState.vacuum(self.nmode)
 
-    def _apply_merged(self, ops: list[tuple], nmode: int, values: dict, st: BosonicState) -> BosonicState:
+    def _apply_merged(
+        self, ops: list[tuple], nmode: int, values: dict, st: BosonicState
+    ) -> BosonicState:
         return _apply_merged(ops, nmode, values, st)
 
     def _run_op(self, op, st, results, values, *, rng=None):

@@ -138,7 +138,9 @@ def _check_value(v: Any, kind: str, where: str) -> None:
             if not _is_num(gain):
                 raise ValueError(f"{where}: $ref gain must be a number, got {gain!r}")
             return
-        raise ValueError(f"{where}: unknown value form (expected $param/$ref or bare JSON), got {v!r}")
+        raise ValueError(
+            f"{where}: unknown value form (expected $param/$ref or bare JSON), got {v!r}"
+        )
     if kind == "num":
         if not _is_num(v):
             raise ValueError(f"{where}: must be a number, got {v!r}")
@@ -173,7 +175,9 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
         raise ValueError(f"unknown top-level field {key!r}")
     if "view" in data and not isinstance(data["view"], dict):
         raise ValueError(f"view must be an object, got {type(data['view']).__name__}")
-    if "seed" in data and (not isinstance(data["seed"], int) or isinstance(data["seed"], bool) or data["seed"] < 0):
+    if "seed" in data and (
+        not isinstance(data["seed"], int) or isinstance(data["seed"], bool) or data["seed"] < 0
+    ):
         raise ValueError(f"seed must be a non-negative int, got {data['seed']!r}")
     if "ui" in data and not isinstance(data["ui"], dict):
         raise ValueError(f"ui must be an object, got {type(data['ui']).__name__}")
@@ -205,9 +209,13 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
         if meta.arity == "two" and len(modes) != 2:
             raise ValueError(f"{where}: op {op!r} requires exactly 2 modes, got {len(modes)}")
         if meta.arity == "all" and modes != list(range(nmode)):
-            raise ValueError(f"{where}: op {op!r} requires modes == list(range(nmode)), got {modes!r}")
+            raise ValueError(
+                f"{where}: op {op!r} requires modes == list(range(nmode)), got {modes!r}"
+            )
         if meta.arity == "any" and len(modes) > 1:
-            raise ValueError(f"{where}: op {op!r} takes at most 1 mode ([] = all), got {len(modes)}")
+            raise ValueError(
+                f"{where}: op {op!r} takes at most 1 mode ([] = all), got {len(modes)}"
+            )
         if meta.arity == "none" and modes:
             raise ValueError(f"{where}: op {op!r} takes no modes, got {modes!r}")
         for m in modes:

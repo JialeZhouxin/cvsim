@@ -50,7 +50,7 @@ def test_gkp1_full_count_and_shift():
     d0 = sorted(float(c.rbar[0].real) for c in z0.components if abs(c.rbar[1].imag) < 1e-14)
     d1 = sorted(float(c.rbar[0].real) for c in z1.components if abs(c.rbar[1].imag) < 1e-14)
     delta = np.sqrt(2.0 * np.pi)
-    for a, b in zip(d0, d1):
+    for a, b in zip(d0, d1, strict=False):
         assert abs((b - a) - 0.5 * delta) < 1e-12
 
 

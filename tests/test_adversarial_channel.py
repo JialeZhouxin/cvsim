@@ -12,18 +12,12 @@ import pytest
 from cvsim.gaussian import (
     GaussianCircuit,
     GaussianState,
-    ParamRef,
-    amplifier,
-    apply_gaussian_channel,
     det_cov,
     displace,
     is_cp_channel,
     is_physical,
-    loss,
     mean_photon,
-    phase_noise,
     squeeze,
-    validate_channel,
 )
 
 # =============================================================================

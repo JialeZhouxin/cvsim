@@ -7,8 +7,10 @@ import numpy as np
 from cvsim.bosonic import (
     BosonicState,
     even_cat,
-    homodyne_condition as b_cond,
     weight_sum,
+)
+from cvsim.bosonic import (
+    homodyne_condition as b_cond,
 )
 from cvsim.bosonic.state import Component
 from cvsim.conventions import vacuum_cov

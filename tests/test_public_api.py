@@ -6,6 +6,7 @@ See docs/api-stability.md. Removing/renaming an entry is a MAJOR bump.
 from __future__ import annotations
 
 import cvsim.bosonic as bosonic
+import cvsim.fock as fock
 import cvsim.gaussian as g
 from cvsim.conventions import HBAR, QUAD_ORDER, omega, vacuum_cov, vacuum_mean
 
@@ -120,8 +121,6 @@ def test_examples_phase1_imports_public_only():
 
 
 # -- FOCK (F2 exit: freeze the export surface, mirror of GAUSSIAN_PUBLIC) ----
-
-import cvsim.fock as fock
 
 FOCK_PUBLIC = {
     # states + factories

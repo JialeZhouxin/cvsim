@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from cvsim.conventions import omega
-from cvsim.symplectic import (S_CX, S_CZ, S_beamsplitter, S_phase, S_squeeze)
+from cvsim.symplectic import S_CX, S_CZ, S_beamsplitter, S_phase, S_squeeze
 
 
 def _check_symplectic(S: np.ndarray, nmode: int) -> None:

@@ -26,7 +26,6 @@ from cvsim.symplectic import (
     is_symplectic,
     is_unitary,
     reck_decomposition,
-    validate_unitary,
 )
 
 

@@ -75,10 +75,12 @@ def test_scan_imports_ir_types():
         for n in dir(scan)
     ), "scan.py must import cvsim.lab.ir"
     # direct: scan imports the shared helpers it needs from ir
-    from cvsim.lab.ir import _require, _num, MEASUREMENT_OPS
+    from cvsim.lab.ir import MEASUREMENT_OPS, _num, _require
     assert scan._require is _require, "scan._require must be ir._require"
     assert scan._num is _num, "scan._num must be ir._num"
-    assert scan.MEASUREMENT_OPS is MEASUREMENT_OPS, "scan.MEASUREMENT_OPS must be ir.MEASUREMENT_OPS"
+    assert scan.MEASUREMENT_OPS is MEASUREMENT_OPS, (
+        "scan.MEASUREMENT_OPS must be ir.MEASUREMENT_OPS"
+    )
 
 
 def test_init_scan_import_source():

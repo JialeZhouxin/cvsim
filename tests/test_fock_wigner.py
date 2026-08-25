@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from cvsim.fock import FockDensity, FockState, squeeze as f_squeeze
-from cvsim.gaussian import GaussianState, squeeze as g_squeeze
+from cvsim.fock import FockDensity, FockState
+from cvsim.fock import squeeze as f_squeeze
+from cvsim.gaussian import GaussianState
+from cvsim.gaussian import squeeze as g_squeeze
 from cvsim.wigner import wigner_fock, wigner_gaussian, wigner_grid
 
 

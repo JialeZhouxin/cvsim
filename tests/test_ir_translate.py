@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from cvsim.gaussian.ir import validate_ir
 from cvsim.lab import (
     CircuitV0Error,
     load_circuit,
@@ -17,7 +18,6 @@ from cvsim.lab import (
     sample_circuit,
     translate_v0,
 )
-from cvsim.gaussian.ir import validate_ir
 
 
 def _v0(nodes, **extra):

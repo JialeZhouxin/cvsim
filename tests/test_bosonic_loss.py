@@ -6,7 +6,6 @@ import numpy as np
 
 from cvsim.bosonic import (
     BosonicState,
-    displace,
     even_cat,
     homodyne_var,
     loss,
@@ -15,8 +14,14 @@ from cvsim.bosonic import (
 )
 from cvsim.gaussian import (
     GaussianState,
+)
+from cvsim.gaussian import (
     displace as g_disp,
+)
+from cvsim.gaussian import (
     loss as g_loss,
+)
+from cvsim.gaussian import (
     mean_photon as g_n,
 )
 
@@ -24,7 +29,7 @@ from cvsim.gaussian import (
 def test_t1_identity():
     st = even_cat(0.6)
     st2 = loss(st, 1.0)
-    for a, b in zip(st.components, st2.components):
+    for a, b in zip(st.components, st2.components, strict=False):
         assert np.allclose(a.V, b.V)
         assert np.allclose(a.rbar, b.rbar)
         assert abs(a.w - b.w) < 1e-15
@@ -50,4 +55,4 @@ def test_weights_unchanged():
     st = even_cat(0.7)
     w0 = [c.w for c in st.components]
     st2 = loss(st, 0.4)
-    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st2.components]))
+    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st2.components], strict=False))

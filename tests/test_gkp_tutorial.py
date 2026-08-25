@@ -15,7 +15,9 @@ def gkp_detect_correct(eps: float, r: float, gain: float = -1.0 / np.sqrt(2),
                        seed: int = 0) -> tuple[float, float]:
     c = GaussianCircuit(2)
     c.squeeze(0, r=r)                              # data: x-squeezed GKP|0> approx
-    c.fourier(1); c.squeeze(1, r=r); c.fourier(1)  # ancilla: p-squeezed
+    c.fourier(1)
+    c.squeeze(1, r=r)
+    c.fourier(1)  # ancilla: p-squeezed
     c.displace(0, alpha=eps / np.sqrt(2))          # inject x error eps
     c.cz(0, 1, weight=1.0)                         # propagate x1 -> p2
     c.measure_homodyne(1, phi=np.pi / 2, name="m_p")
@@ -52,7 +54,8 @@ def test_residual_std_tracks_e_minus_r() -> None:
 
 
 def test_uncorrected_residual_stays_at_eps() -> None:
-    # without correction the injected error survives: x_after ≈ ε (r=2, no readout noise in data? data x-noise σ=e^{-r}/√2=0.096, so allow 3σ)
+    # without correction the injected error survives:
+    # x_after ≈ ε (r=2, no readout noise in data? data x-noise σ=e^{-r}/√2=0.096, allow 3σ)
     eps, r = 0.2, 2.0
     xs = [gkp_detect_correct(eps, r, gain=0.0, seed=s)[1] for s in range(50)]
     assert abs(np.mean(xs) - eps) < 3 * np.exp(-r) / np.sqrt(2)

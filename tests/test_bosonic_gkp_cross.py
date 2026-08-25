@@ -44,7 +44,7 @@ def test_nn_gates_keep_weights():
     st = gkp0(0.25, grid_size=1, cross="nn")
     w0 = [c.w for c in st.components]
     st2 = squeeze(phase(st, 0.2), 0.15)
-    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st2.components]))
+    assert all(abs(a - b) < 1e-15 for a, b in zip(w0, [c.w for c in st2.components], strict=False))
 
 
 def test_cross_bad_arg():

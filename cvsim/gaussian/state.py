@@ -104,11 +104,12 @@ class GaussianState:
 
         st = cls.vacuum(nmode)
         S_r = S_squeeze(nmode, r, mode)
-        if phi == 0.0:
-            S = S_r
-        else:
-            # S(r,φ) = R(φ) S(r) R(-φ)
-            S = S_phase(nmode, phi, mode) @ S_r @ S_phase(nmode, -phi, mode)
+        # S(r,φ) = R(φ) S(r) R(-φ); φ=0 degenerates to bare squeeze
+        S = (
+            S_r
+            if phi == 0.0
+            else S_phase(nmode, phi, mode) @ S_r @ S_phase(nmode, -phi, mode)
+        )
         return apply_symplectic(st, S, validate=False)
 
     @classmethod
@@ -163,7 +164,7 @@ class GaussianState:
         rbar = np.zeros(2 * M, dtype=float)
 
         offset = 0
-        for st, m in zip(states, ms):
+        for st, m in zip(states, ms, strict=False):
             # local (x0..xm-1, p0..pm-1) → global (x_{off..}, p_{off..})
             local_to_global = list(range(offset, offset + m)) + list(
                 range(M + offset, M + offset + m)

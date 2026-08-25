@@ -26,11 +26,18 @@ import numpy as np
 import pytest
 
 from cvsim import bridge
-from cvsim.fock import FockDensity, FockState, loss, mean_photon as fock_mean, pnrd_probs
+from cvsim.fock import FockDensity, FockState, loss, pnrd_probs
+from cvsim.fock import mean_photon as fock_mean
 from cvsim.gaussian import (
     GaussianState,
+)
+from cvsim.gaussian import (
     loss as gauss_loss,
+)
+from cvsim.gaussian import (
     mean_photon as gauss_mean,
+)
+from cvsim.gaussian import (
     p_click as gauss_p_click,
 )
 

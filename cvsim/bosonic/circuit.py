@@ -7,10 +7,15 @@ Physics is component-wise (K=1 vacuum start, gates do not add components).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from cvsim.bosonic.state import BosonicState
 from cvsim.circuit_common import ParamRef, partition
+
+if TYPE_CHECKING:
+    from cvsim.bosonic.compile import CompiledBosonic
 
 
 class BosonicCircuit:
@@ -31,7 +36,7 @@ class BosonicCircuit:
         state, results = c.run()
     """
 
-    def __init__(self, nmode: int, initial: "BosonicState | list[str | None] | None" = None) -> None:
+    def __init__(self, nmode: int, initial: BosonicState | list[str | None] | None = None) -> None:
         if nmode < 1:
             raise ValueError("nmode must be >= 1")
         self.nmode = nmode
@@ -50,7 +55,8 @@ class BosonicCircuit:
                 self._initial = self._resolve_initial(initial)
             else:
                 raise TypeError(
-                    f"initial must be a BosonicState or a list of state names, got {type(initial).__name__}"
+                    f"initial must be a BosonicState or a list of state names, "
+                    f"got {type(initial).__name__}"
                 )
         # _ops entries: (name, orig_modes, fixed, params, refs)
         self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
@@ -179,7 +185,9 @@ class BosonicCircuit:
             d = np.asarray(d, dtype=float).copy()
             if d.shape != (2 * m_xy,):
                 raise ValueError(f"d must be ({2 * m_xy},); got {d.shape}")
-        self._ops.append(('gaussian_channel', (), {'X': X, 'Y': Y, 'd': d, 'validate': validate}, {}, {}))
+        self._ops.append(
+            ('gaussian_channel', (), {'X': X, 'Y': Y, 'd': d, 'validate': validate}, {}, {})
+        )
         return self
 
     # -- measurements ------------------------------------------------------
@@ -191,7 +199,9 @@ class BosonicCircuit:
         removed (mode index shifts for later gates).
         """
         self._ops.append(
-            self._partition('measure_homodyne', [mode], _fixed_str_keys={'name'}, phi=phi, name=name)
+            self._partition(
+                'measure_homodyne', [mode], _fixed_str_keys={'name'}, phi=phi, name=name
+            )
         )
         return self
 
@@ -216,7 +226,7 @@ class BosonicCircuit:
     # -- execution --------------------------------------------------------
 
     def compile(self) -> CompiledBosonic:
-        from cvsim.bosonic.compile import _compile_segments, CompiledBosonic
+        from cvsim.bosonic.compile import CompiledBosonic, _compile_segments
         segments, params = _compile_segments(self._ops, self.nmode)
         return CompiledBosonic(self.nmode, segments, params, initial=self._initial)
 

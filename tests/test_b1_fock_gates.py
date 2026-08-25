@@ -5,7 +5,9 @@ from __future__ import annotations
 import numpy as np
 
 from cvsim.fock import FockState, displace, mean_photon, phase, squeeze
-from cvsim.gaussian import GaussianState, displace as g_disp, mean_photon as g_n
+from cvsim.gaussian import GaussianState
+from cvsim.gaussian import displace as g_disp
+from cvsim.gaussian import mean_photon as g_n
 
 
 def test_displace_mean_photon_cutoff():

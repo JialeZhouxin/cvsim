@@ -63,10 +63,7 @@ def main() -> None:
         dets = []
         for m in [1, 2, 3, 5, 7]:
             for _ in range(10):
-                if m > 1:
-                    U = haar(m, rng)
-                else:
-                    U = np.array([[np.exp(1j * rng.uniform(0, 2 * np.pi))]])
+                U = haar(m, rng) if m > 1 else np.array([[np.exp(1j * rng.uniform(0, 2 * np.pi))]])
                 S = S_from_unitary(U)
                 d = float(det(S))
                 dets.append(d)
@@ -254,7 +251,7 @@ def main() -> None:
         ops2 = reck_decomposition(U)
         same = len(ops1) == len(ops2)
         if same:
-            for a, b in zip(ops1, ops2):
+            for a, b in zip(ops1, ops2, strict=False):
                 if a[0] != b[0]:
                     same = False
                     break

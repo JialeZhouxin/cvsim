@@ -45,13 +45,10 @@ def _apply_kraus_1mode(rho: np.ndarray, T: float) -> np.ndarray:
 
 def _apply_kraus_2mode_side(rho: np.ndarray, N: int, T: float, mode: int) -> np.ndarray:
     d = N * N
-    I = np.eye(N, dtype=complex)
+    eye = np.eye(N, dtype=complex)
     out = np.zeros((d, d), dtype=complex)
     for E in _kraus_ops(N, T):
-        if mode == 0:
-            Ef = np.kron(E, I)
-        else:
-            Ef = np.kron(I, E)
+        Ef = np.kron(E, eye) if mode == 0 else np.kron(eye, E)
         out += Ef @ rho @ Ef.conj().T
     return 0.5 * (out + out.conj().T)
 
@@ -113,10 +110,7 @@ def phase_noise(state: FockLike, sigma: float, mode: int = 0) -> FockDensity:
     # 2-mode: act on mode `mode` — elementwise mask on the (N²×N²) rho
     n0, n1 = np.meshgrid(np.arange(N), np.arange(N), indexing="ij")
     fock_idx = n0.ravel() * N + n1.ravel()  # row-major |n0 n1⟩
-    if mode == 0:
-        nn = fock_idx // N
-    else:
-        nn = fock_idx % N
+    nn = fock_idx // N if mode == 0 else fock_idx % N
     damp = np.exp(-sigma * sigma / 2.0 * (nn[:, None] - nn[None, :]) ** 2)
     rho2 = rho.rho * damp
     return FockDensity(rho=rho2, nmode=2)
@@ -152,9 +146,9 @@ def amplifier(
     if mode not in (0, 1):
         raise IndexError(f"mode {mode} out of range for nmode=2")
     N = rho.cutoff
-    I = np.eye(N, dtype=complex)
+    eye = np.eye(N, dtype=complex)
     ks = _amplify_kraus(N, G)
-    full = [np.kron(a, I) if mode == 0 else np.kron(I, a) for a in ks]
+    full = [np.kron(a, eye) if mode == 0 else np.kron(eye, a) for a in ks]
     return _kraus_sum(rho, full)
 
 
@@ -212,11 +206,11 @@ def apply_kraus(
         return _kraus_sum(rho, ks)
     if mode not in (0, 1):
         raise IndexError(f"mode {mode} out of range for nmode=2")
-    I = np.eye(N, dtype=complex)
+    eye = np.eye(N, dtype=complex)
     for a in ks:
         if a.shape != (N, N):
             raise ValueError(f"Kraus must be ({N},{N}) for mode application, got {a.shape}")
-    full = [np.kron(a, I) if mode == 0 else np.kron(I, a) for a in ks]
+    full = [np.kron(a, eye) if mode == 0 else np.kron(eye, a) for a in ks]
     return _kraus_sum(rho, full)
 
 

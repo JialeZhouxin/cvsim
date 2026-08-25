@@ -30,10 +30,7 @@ def apply_symplectic(
     """V_k ← S V_k Sᵀ, r̄_k ← S r̄_k + d, w_k unchanged."""
     S = np.asarray(S, dtype=float)
     m2 = S.shape[0]
-    if d is None:
-        d = np.zeros(m2, dtype=float)
-    else:
-        d = np.asarray(d, dtype=float)
+    d = np.zeros(m2, dtype=float) if d is None else np.asarray(d, dtype=float)
     out: list[Component] = []
     for c in state.components:
         V = S @ c.V @ S.T

@@ -25,7 +25,9 @@ def test_coherent_coefficients_ratio() -> None:
     alpha = 1.2 + 0.3j
     st = FockState.coherent(12, alpha)
     n = np.arange(12)
-    expected_ratio = (alpha ** n / np.sqrt(np.array([math.factorial(k) for k in n]))).astype(complex)
+    expected_ratio = (
+        (alpha ** n / np.sqrt(np.array([math.factorial(k) for k in n]))).astype(complex)
+    )
     # c_n = c_0 * α^n/√(n!);  ratio c_n/c_0 must match
     ratios = st.amps / st.amps[0]
     np.testing.assert_allclose(ratios, expected_ratio / expected_ratio[0], atol=1e-12)

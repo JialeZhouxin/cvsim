@@ -11,15 +11,29 @@ from cvsim.bosonic import (
     BosonicState,
     even_cat,
     gkp0,
-    homodyne_condition as b_cond,
-    homodyne_sample as b_sample,
-    loss as b_loss,
-    mean_photon as b_n,
-    phase as b_phase,
     weight_sum,
 )
-from cvsim.fock import FockState, beamsplitter as f_bs, loss as f_loss, mean_photon as f_n, norm, squeeze as f_squeeze, trace as f_trace
-from cvsim.fock.density import FockDensity
+from cvsim.bosonic import (
+    homodyne_condition as b_cond,
+)
+from cvsim.bosonic import (
+    homodyne_sample as b_sample,
+)
+from cvsim.bosonic import (
+    loss as b_loss,
+)
+from cvsim.bosonic import (
+    mean_photon as b_n,
+)
+from cvsim.bosonic import (
+    phase as b_phase,
+)
+from cvsim.fock import FockState, norm
+from cvsim.fock import beamsplitter as f_bs
+from cvsim.fock import loss as f_loss
+from cvsim.fock import mean_photon as f_n
+from cvsim.fock import squeeze as f_squeeze
+from cvsim.fock import trace as f_trace
 from cvsim.fock.gates import displace as f_displace
 from cvsim.fock.gates import squeeze as f_squeeze_gate
 from cvsim.gaussian import (
@@ -29,13 +43,17 @@ from cvsim.gaussian import (
     displace,
     homodyne_condition,
     homodyne_mean,
-    homodyne_sample as g_sample,
     homodyne_sample_and_condition,
     homodyne_var,
-    loss as g_loss,
     mean_photon,
     phase,
     squeeze,
+)
+from cvsim.gaussian import (
+    homodyne_sample as g_sample,
+)
+from cvsim.gaussian import (
+    loss as g_loss,
 )
 from cvsim.wigner import wigner_fock
 
@@ -126,13 +144,18 @@ def _u5() -> tuple[bool, str]:
 def _u7() -> tuple[bool, str]:
     """Extended smoke: G loss/condition, F BS, B gkp0/loss."""
     alpha, T = 0.7 + 0.2j, 0.4
-    g_ok = abs(mean_photon(g_loss(displace(GaussianState.vacuum(1), alpha), T)) - T * abs(alpha) ** 2) < 1e-12
+    g_ok = abs(
+        mean_photon(g_loss(displace(GaussianState.vacuum(1), alpha), T)) - T * abs(alpha) ** 2
+    ) < 1e-12
 
     st_c = homodyne_condition(GaussianState.vacuum(1), 0, 0.0, 0.25)
     c_ok = abs(st_c.V[0, 0]) < 1e-12 and abs(st_c.rbar[0] - 0.25) < 1e-12
 
     st_f = f_bs(FockState.fock2(1, 0, 12), np.pi / 4)
-    f_ok = abs(abs(st_f.amps[1, 0]) ** 2 - 0.5) < 1e-6 and abs(abs(st_f.amps[0, 1]) ** 2 - 0.5) < 1e-6
+    f_ok = (
+        abs(abs(st_f.amps[1, 0]) ** 2 - 0.5) < 1e-6
+        and abs(abs(st_f.amps[0, 1]) ** 2 - 0.5) < 1e-6
+    )
 
     st_g = gkp0(0.1, grid_size=3)
     xs = sorted(float(c.rbar[0].real) for c in st_g.components)

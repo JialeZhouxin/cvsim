@@ -1,8 +1,8 @@
+from cvsim.bosonic.analyse import pure_fidelity, purity
 from cvsim.bosonic.cat import even_cat, odd_cat
-from cvsim.bosonic.circuit import BosonicCircuit
-from cvsim.circuit_common import ParamRef
-from cvsim.bosonic.component_eng import LeakReport, is_hermitian, merge, normalize, truncate
 from cvsim.bosonic.channels import amplifier, loss, phase_noise
+from cvsim.bosonic.circuit import BosonicCircuit
+from cvsim.bosonic.component_eng import LeakReport, is_hermitian, merge, normalize, truncate
 from cvsim.bosonic.gates import (
     beamsplitter,
     cx,
@@ -16,6 +16,7 @@ from cvsim.bosonic.gates import (
     two_mode_squeeze,
 )
 from cvsim.bosonic.gkp import gkp0, gkp1, gkp_logical_overlap
+from cvsim.bosonic.ir import from_ir, to_ir
 from cvsim.bosonic.measure import (
     heterodyne_condition,
     heterodyne_sample,
@@ -30,9 +31,8 @@ from cvsim.bosonic.measure import (
     sample_threshold,
 )
 from cvsim.bosonic.observables import mean_photon
-from cvsim.bosonic.analyse import purity, pure_fidelity
-from cvsim.bosonic.ir import from_ir, to_ir
 from cvsim.bosonic.state import BosonicState, Component, coherent, weight_sum
+from cvsim.circuit_common import ParamRef
 
 # B1 exit freeze (A11): BOSONIC_PUBLIC — see tests/test_public_api.py.
 # Additions go through docs/api-stability.md; removals are a MAJOR bump.

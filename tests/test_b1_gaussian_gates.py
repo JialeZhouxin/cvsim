@@ -80,6 +80,7 @@ def test_cz_cx_validation():
 
 def test_cz_cx_export():
     """cz and cx importable from cvsim.gaussian."""
-    from cvsim.gaussian import cx as cx2, cz as cz2
+    from cvsim.gaussian import cx as cx2
+    from cvsim.gaussian import cz as cz2
     assert callable(cz2)
     assert callable(cx2)
