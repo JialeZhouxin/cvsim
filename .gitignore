@@ -28,7 +28,6 @@ build/
 # internal notes / personal context (not part of the simulator)
 CONTEXT.md
 user-model.md
-AGENTS.md
 00-CV核心原理.md
 00-CV核心原理.html
 01-Fock表示原理.md
