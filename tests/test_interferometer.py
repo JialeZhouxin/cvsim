@@ -21,7 +21,6 @@ from cvsim.symplectic import (
     S_mach_zehnder,
     S_phase,
     U_beamsplitter,
-    clements_decomposition,
     compose_unitary_mesh,
     is_symplectic,
     is_unitary,
@@ -84,18 +83,6 @@ def test_reck_roundtrip():
         U2 = compose_unitary_mesh(m, ops)
         assert np.linalg.norm(U2 - U) < 1e-8
 
-
-def test_clements_alias_is_reck_with_warning():
-    """clements_decomposition is Reck-only alias (review R1)."""
-    rng = np.random.default_rng(2)
-    U = _haar_unitary(4, rng)
-    ops_r = reck_decomposition(U)
-    with pytest.warns(FutureWarning, match="alias for reck"):
-        ops_c = clements_decomposition(U)
-    # same round-trip quality; structure length match
-    assert len(ops_c) == len(ops_r)
-    U3 = compose_unitary_mesh(4, ops_c)
-    assert np.linalg.norm(U3 - U) < 1e-8
 
 
 def test_apply_mesh_matches_interferometer():

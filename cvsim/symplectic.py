@@ -422,27 +422,6 @@ def compose_unitary_mesh(m: int, ops: list[tuple], *, backend: str = "numpy") ->
     return U
 
 
-def clements_decomposition(
-    U: np.ndarray, *, atol: float = 1e-10, backend: str = "numpy"
-) -> list[tuple]:
-    """ALIAS FOR RECK — not rectangular Clements hardware layout.
-
-    Phase-1 name kept for vision sketch compatibility. Prefer
-    ``reck_decomposition``. A true Clements rectangular mesh will be a
-    **separate** API later; this function must not silently change semantics.
-    """
-    import warnings
-
-    warnings.warn(
-        "clements_decomposition is a Phase-1 alias for reck_decomposition "
-        "(triangular Reck mesh), not rectangular Clements. "
-        "Prefer reck_decomposition().",
-        FutureWarning,
-        stacklevel=2,
-    )
-    return reck_decomposition(U, atol=atol, backend=backend)
-
-
 def S_mach_zehnder(
     nmode: int,
     mode1: int,

@@ -165,7 +165,7 @@ apply_interferometer = interferometer
 
 
 def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState:
-    """Apply Reck/Clements mesh ops (from ``clements_decomposition``) in order."""
+    """Apply Reck mesh ops (from ``reck_decomposition``) in order."""
     from cvsim.symplectic import S_from_unitary, embed_U_2mode
 
     st = state

@@ -31,7 +31,6 @@ from cvsim.symplectic import (
     S_mach_zehnder,
     S_phase,
     U_beamsplitter,
-    clements_decomposition,
     compose_unitary_mesh,
     embed_U_2mode,
     is_symplectic,
@@ -243,35 +242,6 @@ def main() -> None:
         )
     except Exception as e:
         record("B3 many Haar", False, traceback.format_exc(limit=3))
-
-    # B4: clements alias of reck, documented
-    try:
-        U = haar(4, np.random.default_rng(0))
-        ops1 = clements_decomposition(U)
-        ops2 = reck_decomposition(U)
-        same = len(ops1) == len(ops2)
-        if same:
-            for a, b in zip(ops1, ops2, strict=False):
-                if a[0] != b[0]:
-                    same = False
-                    break
-                if a[0] == "u2":
-                    if a[1] != b[1] or a[2] != b[2] or not np.allclose(a[3], b[3]):
-                        same = False
-                        break
-                else:
-                    if a[1:] != b[1:]:
-                        same = False
-                        break
-        doc = clements_decomposition.__doc__ or ""
-        documents_alias = "Reck" in doc
-        record(
-            "B4 clements==reck alias (documented)",
-            same and documents_alias,
-            f"same={same}, doc_mentions_Reck={documents_alias}",
-        )
-    except Exception as e:
-        record("B4 clements alias", False, str(e))
 
     # B5: non-unitary rejected
     try:
@@ -535,7 +505,6 @@ def main() -> None:
             "is_unitary",
             "validate_unitary",
             "reck_decomposition",
-            "clements_decomposition",
             "compose_unitary_mesh",
             "S_mach_zehnder",
             "U_beamsplitter",

@@ -377,7 +377,7 @@ $$
 - **Output:** list of mesh ops **or** direct $S_U$.  
 - Phase-1 **minimum:** `S_from_unitary(U)` + `apply_interferometer(state, U)`.  
 - Phase-1 **shipped decomposition:** **Reck** triangular mesh via `reck_decomposition(U) -> list[ops]`.  
-- **`clements_decomposition`** is a **documented alias of Reck only** (not rectangular Clements hardware layout). True Clements = **separate future API**; must not silently replace Reck semantics.  
+- The Phase-1 `clements_decomposition` alias was **removed** (2026-08-28). True Clements = **separate future API**; must not silently replace Reck semantics.  
 - Mesh ops include `("u2", i, j, U2)` and `("phase", i, theta)` (and `bs`); further split of `u2` → named BS+phase is optional later (R4).
 
 **API sketch**
@@ -387,7 +387,6 @@ def S_from_unitary(U: np.ndarray) -> np.ndarray: ...
 def apply_interferometer(state: GaussianState, U: np.ndarray) -> GaussianState: ...
 
 def reck_decomposition(U: np.ndarray) -> list[tuple]: ...
-def clements_decomposition(U: np.ndarray) -> list[tuple]: ...  # ALIAS → reck (Phase-1)
 def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState: ...
 ```
 
@@ -403,7 +402,7 @@ def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState: ...
 - Haar-random $U$ (via QR) for $m=2,4,8$ (+ larger smoke).  
 - Homomorphism $S(U_2U_1)=S(U_2)S(U_1)$; passive $S^\top S=I$; $\det S=+1$.  
 - TMSV + balanced BS; total photon conservation under passive $U$.  
-- Decomposition round-trip; alias `clements_decomposition` ≡ Reck behavior.
+- Decomposition round-trip via `reck_decomposition` (alias removed 2026-08-28).
 
 **Performance note:** applying $S_U$ as one matrix multiply is $O(m^3)$; preferred path under F-COMPILE when many passive layers exist.
 
@@ -552,7 +551,7 @@ $$
 - Math identical to numpy path.
 - Backend protocol: `cvsim/backend.py` — `_get_xp` / `require_jax` / `_set` / `_block` / `_allclose`; lazy jax import + x64 forced at first use; **sole jax-aware point**.
 - `cvsim/symplectic.py` 19 functions backend-agnostic via keyword `*, backend="numpy"` (方案 B); numpy path byte-identical to pre-Phase-4 (592 regression green).
-- Decompose trio (`reck` / `clements` / `compose_unitary_mesh`) **numpy-only**: `backend="jax"` → `NotImplementedError` (ponytail; no mesh AD).
+- Decompose pair (`reck` / `compose_unitary_mesh`) **numpy-only**: `backend="jax"` → `NotImplementedError` (ponytail; no mesh AD).
 - Differentiable objective chain: `cvsim/ad.py` (top-level, ADR-0001 keeps `cvsim.gaussian` import allowlist) — `apply_gaussian` + `log_neg_loss` (jnp mirror of `analyse.log_negativity`: PT → raw symplectic spectrum → per-term PPT log-neg).
 - Optimization notebook: `tutorials/05_ad_designer.ipynb` — TMSV → loss η → max [E_N − λ·2sinh²r] (energy-penalized; loss-only E_N saturates, no interior optimum) → gradient ascent → design curve r*(λ). Physics note in `tests/test_ad_objective.py`.
 - JAX first candidate; Torch second. No AD in core import path: `[jax]` optional extra.
