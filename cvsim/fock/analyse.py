@@ -30,7 +30,8 @@ def entropy_vn(state: FockLike, *, validate: bool = False) -> float:
     rho = _to_density(state)
     ev = np.linalg.eigvalsh(rho.rho)
     ev = np.clip(ev, 0.0, None)
-    s = -float(np.sum(ev * np.log(ev, where=ev > 0)))
+    pos = ev[ev > 0]
+    s = -float(np.sum(pos * np.log(pos)))
     if validate and not np.isfinite(s):
         raise ValueError(f"entropy_vn: non-finite entropy {s}")
     return s
