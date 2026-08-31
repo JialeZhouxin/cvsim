@@ -683,4 +683,5 @@ def _kron_apply2_density(
     rest_sizes = tuple(Ns[a] for a in rest)
     shape = (N,) * k + rest_sizes + (N,) * k + rest_sizes
     t4 = np.transpose(x.reshape(shape), np.argsort(order))
-    return t4.reshape(d, d)
+    # numpy 2.5 stubs 给带轴列表的 transpose 返回 Any，asarray 收口为 ndarray
+    return np.asarray(t4.reshape(d, d))
