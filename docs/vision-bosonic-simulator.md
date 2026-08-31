@@ -59,7 +59,7 @@ Gaussian's "production" claim rests on scale + precision (m→100, fast compile)
 ### 2.3 Measurement semantics
 
 - **Homodyne:** per-component affine + likelihood reweighting (teaching closed form, notes §5.2). B3 upgrades sampling to **exact edge distribution** (cross terms included, no "diagonal-peak pool" approximation — that is the teaching cut, explicitly not production). **Sampling strategy (A5, 2026-08-14): CDF grid inversion** — P(x) = Σ_k w_k p_k(x) 是复权重混合（无正概率权重，拒绝采样不可行）；网格 δx ≤ σ_min/5 自动定，uniform + searchsorted 反演，10³ shots 向量化；条件化 ρ_post = Σ_k [w_k p_k(x)] ρ_k / P(x) 同一核。
-- **Heterodyne / threshold:** follow Gaussian semantics (threshold = outcome-only {0,1}, no state update; heterodyne conditions and deletes the measured mode).
+- **Heterodyne / threshold:** threshold = outcome-only {0,1}, no state update; heterodyne **精确化（ADR-0007）**：2D Q-surface Q(β)=Σ_k w_k Q_k(β)（复中心解析延拓）+ 顺序 CDF 反演（x 边缘 → 条件 p），条件化同一核 w_k ∝ w_k·Q_k(β)，模删除语义不变。
 
 ---
 
@@ -224,7 +224,7 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 | State factories | BosonicState/Component + even/odd cat + gkp0/gkp1 + coherent | —（B1 done） |
 | Gates | 11 门（D/R/S/F/BS/MZ/S₂/CZ/CX/interferometer）K=1 atol 对齐 | —（B1 done） |
 | Channels | loss/amplifier/phase_noise（X,Y 逐分量仿射） | —（B1 done） |
-| Measures | measure.py：homodyne 教学切（mean/var/sample/condition）+ heterodyne 教学切 + threshold outcome-only | exact edge + conditional + 混合态 heterodyne 精确化（B3） |
+| Measures | measure.py：homodyne 精确（CDF 网格反演）+ heterodyne 精确（2D Q-surface + 顺序 CDF 反演，ADR-0007）+ threshold outcome-only | —（B3 done，backlog #1 关闭） |
 | Component engineering | — | merge/truncate/underflow/normalization + leakage + is_hermitian（B2） |
 | Analyse | mean_photon | purity/overlap/pure_fidelity 闭式（B2/B4）；entropy defer |
 | Circuit DSL | — | BosonicCircuit + IR + run_steps（B5） |

@@ -2,15 +2,15 @@
 
 Homodyne implementation lives in ``observables.py`` (CDF grid inversion
 exact edge distribution, B3); this module re-exports it so
-``cvsim.bosonic.homodyne_*`` import paths are unchanged. ``homodyne_pdf``
-is the exact edge density ``P(x_φ) = Σ_k w_k p_k(x)`` on a grid (complex
-weights kept, interference terms included).
+``cvsim.bosonic.homodyne_*`` import paths are unchanged.
 
-Heterodyne (B1) is a **teaching cut**: sample and condition both use the
-real-diagonal-component pool only (components with real r̄ and Re(w) > 0,
-mirroring the pre-B3 homodyne teaching cut). K=1 states match the Gaussian
-package exactly. Exact mixed-state heterodyne (complex centres/weights, CDF
-strategy) is deferred to B3 — do not use on mixed states for production.
+Heterodyne (ADR-0007) is **exact**: the full component sum
+Q(β) = Σ_k w_k Q_k(β) is evaluated on a 2D (x, p) grid, with complex
+centres analytically continued — cross/interference components contribute
+their fringe terms; Hermitian-pair closure guarantees Im ≈ 0. Sampling is
+sequential CDF inversion (marginal x, then conditional p | x). Conditioning
+reweights by the same per-component complex Gaussian kernel and removes the
+measured mode. The old teaching cut (real-diagonal pool) is removed.
 
 Threshold is outcome-only ({0,1}, no state update); the post-click state
 leaves the Gaussian mixture manifold.
@@ -45,11 +45,10 @@ from cvsim.bosonic.observables import (
 )
 from cvsim.bosonic.state import BosonicState, Component
 
-_POOL_IMAG_TOL = 1e-12
-
+_IM_TOL = 1e-8
 
 # ---------------------------------------------------------------------------
-# heterodyne — teaching cut (real-diagonal pool)
+# heterodyne — exact 2D Q-surface (ADR-0007)
 # ---------------------------------------------------------------------------
 
 
@@ -75,83 +74,181 @@ def _beta_to_xp(beta: complex) -> np.ndarray:
     return np.array([np.sqrt(2.0) * b.real, np.sqrt(2.0) * b.imag], dtype=float)
 
 
-def _real_diag_pool(state: BosonicState, imag_tol: float) -> tuple[list[Component], list[float]]:
-    """Teaching-cut pool: real-mean, real-weight components (Re(w) > 0, |Im(w)| ≤ tol).
+def _q_edge_params(state: BosonicState, mode: int) -> list[tuple[np.ndarray, np.ndarray, complex]]:
+    """Per-component (Σ_k, r̄_k, w_k) of the heterodyne Q kernel.
 
-    Complex-weight guard (OCR 2026-08-14): a complex-weight real-mean component
-    would be conditioned without phase rotation → silently wrong state.
+    Σ_k = V_A,k + I/2 (vacuum smearing of the 8-port detector, ħ=1);
+    r̄_k is the (possibly complex) mode-A mean; w_k the complex weight.
     """
-    pool: list[Component] = []
-    weights: list[float] = []
+    m = _check_mode(state, mode)
+    idx = _xp_indices(m, mode)
+    out: list[tuple[np.ndarray, np.ndarray, complex]] = []
     for c in state.components:
-        if np.max(np.abs(c.rbar.imag)) > imag_tol:
-            continue
-        rw = float(c.w.real)
-        if rw <= 0.0 or abs(c.w.imag) > imag_tol:
-            continue
-        pool.append(c)
-        weights.append(rw)
-    return pool, weights
+        VA = c.V[np.ix_(idx, idx)]
+        Sigma = VA + 0.5 * np.eye(2)
+        Sigma = 0.5 * (Sigma + Sigma.T)
+        out.append((Sigma, c.rbar[idx].copy(), c.w))
+    return out
+
+
+def _auto_grid_2d(
+    params: list[tuple[np.ndarray, np.ndarray, complex]],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Auto grid: δ ≤ σ_min/5 per axis, centroid ± 6σ_max.
+
+    σ per axis from the Q-edge marginal std sqrt(Σ_ii); centroid from the
+    real-part weighted mean (Hermitian closure cancels imaginary parts).
+
+    ponytail: uniform grid, no 2D adaptivity — if small-ε GKP blows up the
+    point count, upgrade to per-axis adaptive subdivision.
+    """
+    sig_x = [float(np.sqrt(S[0, 0])) for (S, _, _) in params]
+    sig_p = [float(np.sqrt(S[1, 1])) for (S, _, _) in params]
+    ws = np.array([w for (_, _, w) in params], dtype=complex)
+    wsum = ws.sum()
+    if abs(wsum) < _SIG_EPS:
+        raise ValueError("heterodyne: weight sum ~ 0")
+    rx = np.array([r[0].real for (_, r, _) in params])
+    rp = np.array([r[1].real for (_, r, _) in params])
+    cx = float(np.real(ws @ rx) / wsum.real)
+    cp = float(np.real(ws @ rp) / wsum.real)
+    dx = min(sig_x) / 5.0
+    dp = min(sig_p) / 5.0
+    nx = int(np.ceil(12.0 * max(sig_x) / dx)) + 1
+    npp = int(np.ceil(12.0 * max(sig_p) / dp)) + 1
+    xs = np.linspace(cx - 6.0 * max(sig_x), cx + 6.0 * max(sig_x), nx)
+    ps = np.linspace(cp - 6.0 * max(sig_p), cp + 6.0 * max(sig_p), npp)
+    return xs, ps
+
+
+def heterodyne_pdf(
+    state: BosonicState,
+    mode: int = 0,
+    *,
+    n_grid: int | None = None,
+    lim: float | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Exact Husimi Q(β) on a 2D grid: ``(xs, ps, Q)`` with ``Q[i, j] = Q(x_i, p_j)``.
+
+    S(x,p) = Σ_k w_k Q_k(x,p), Q_k = N(z; r̄_k, Σ_k) with complex r̄_k
+    (analytic continuation: cross components carry the fringe phase).
+    Hermitian-pair closure ensures Im(S) ≈ 0 (checked, tol 1e-8).
+    Q = max(Re S, 0); negative leaks warned with mass estimate.
+
+    Grid auto (default): δ ≤ σ_min/5 per axis, centroid ± 6σ_max.
+    Override ``n_grid``/``lim`` to force ``np.linspace(-lim, lim, n_grid)``
+    on both axes (mirror of ``homodyne_pdf``).
+    """
+    import warnings
+
+    if n_grid is not None and lim is not None:
+        if n_grid < 3:
+            raise ValueError("n_grid must be >= 3")
+        xs = np.linspace(-lim, lim, int(n_grid))
+        ps = np.linspace(-lim, lim, int(n_grid))
+    elif n_grid is not None or lim is not None:
+        raise ValueError("heterodyne_pdf: n_grid and lim must be both set or both None")
+    else:
+        params = _q_edge_params(state, mode)
+        xs, ps = _auto_grid_2d(params)
+
+    params = _q_edge_params(state, mode)
+    S = np.zeros((xs.size, ps.size), dtype=complex)
+    for Sigma, r, w in params:
+        invS = np.linalg.inv(Sigma)
+        ZX = xs[:, None] - r[0]  # (nx, 1) complex broadcast
+        ZP = ps[None, :] - r[1]  # (1, np)
+        expo = -0.5 * (invS[0, 0] * ZX * ZX + 2.0 * invS[0, 1] * ZX * ZP + invS[1, 1] * ZP * ZP)
+        Qk = 2.0 * np.exp(expo) / (2.0 * np.pi * np.sqrt(np.linalg.det(Sigma)))
+        S += w * Qk
+    imag_max = float(np.max(np.abs(S.imag))) if S.size else 0.0
+    if imag_max > _IM_TOL:
+        raise ValueError(
+            f"heterodyne_pdf: large imaginary part in Q surface (max |Im|={imag_max:.3e}); "
+            "state is not Hermitian-closed"
+        )
+    Q = S.real.copy()
+    neg = Q < 0.0
+    if np.any(neg):
+        n_neg = int(np.sum(neg))
+        dxa = xs[1] - xs[0] if xs.size > 1 else 0.0
+        dpa = ps[1] - ps[0] if ps.size > 1 else 0.0
+        leak = float(-np.sum(Q[neg]) * dxa * dpa / 2.0)
+        warnings.warn(
+            f"heterodyne_pdf: {n_neg} grid points have Re(S)<0 "
+            f"(leak mass ~{leak:.3e}); clipped to 0",
+            stacklevel=2,
+        )
+        Q[neg] = 0.0
+    return xs, ps, Q
 
 
 def heterodyne_sample(
     state: BosonicState,
     mode: int = 0,
-    *,
+    *args: object,
     rng: np.random.Generator | None = None,
-    imag_tol: float = _POOL_IMAG_TOL,
 ) -> complex:
-    """Sample heterodyne outcome β without conditioning (teaching cut).
+    """Sample one heterodyne outcome β (exact, sequential CDF inversion).
 
-    Pool components with real r̄ and Re(w)>0; pick k ∝ Re(w_k), then
-    (x, p) ~ N(r̄_xp, V_xp + I/2) of that component; returns β = (x + i p)/√2.
-    K=1: identical distribution to the Gaussian heterodyne_sample.
+    Marginal P(x) = Σ_j Q[i, j] then conditional P(p | x_i) = Q[i, :] / Σ_j;
+    both inverted via uniform + searchsorted on the normalised CDF, then
+    jittered uniformly within the cell (samples the piecewise-constant
+    density — error O(δ²) instead of lattice spikes on grid points).
+
+    Backward compat: legacy ``imag_tol`` positional/keyword is accepted and
+    ignored (the teaching-cut pool no longer exists).
     """
+    if args:
+        # legacy imag_tol positional — ignore
+        pass
     if rng is None:
         rng = np.random.default_rng()
-    m = _check_mode(state, mode)
-    pool, weights = _real_diag_pool(state, imag_tol)
-    if not pool:
-        raise ValueError("heterodyne_sample: no real-mean positive-weight components")
-
-    if len(pool) == 1:
-        idx = 0
-    else:
-        p = np.asarray(weights, dtype=float)
-        p = p / p.sum()
-        idx = int(rng.choice(len(pool), p=p))
-    c = pool[idx]
-    ixp = _xp_indices(m, mode)
-    mu = c.rbar[ixp].real
-    Sigma = c.V[np.ix_(ixp, ixp)] + 0.5 * np.eye(2)
-    Sigma = 0.5 * (Sigma + Sigma.T)
-    w = np.linalg.eigvalsh(Sigma)
-    if np.min(w) <= _SIG_EPS:
-        raise ValueError(f"heterodyne outcome covariance not PD: min eig={float(np.min(w))}")
-    z = rng.multivariate_normal(mu, Sigma)
-    return complex((z[0] + 1j * z[1]) / np.sqrt(2.0))
+    xs, ps, Q = heterodyne_pdf(state, mode)
+    # marginal x
+    Px = Q.sum(axis=1)
+    total = Px.sum()
+    if total <= _SIG_EPS:
+        raise ValueError("heterodyne_sample: Q surface integrates to ~0")
+    cdf_x = np.cumsum(Px) / total
+    u1 = rng.uniform(0.0, 1.0)
+    ix = int(np.clip(np.searchsorted(cdf_x, u1, side="right"), 0, xs.size - 1))
+    # conditional p | x
+    row = Q[ix, :]
+    row_sum = row.sum()
+    if row_sum <= _SIG_EPS:
+        raise ValueError("heterodyne_sample: conditional P(p|x) ~ 0")
+    cdf_p = np.cumsum(row) / row_sum
+    u2 = rng.uniform(0.0, 1.0)
+    ip = int(np.clip(np.searchsorted(cdf_p, u2, side="right"), 0, ps.size - 1))
+    # within-cell jitter: piecewise-constant density sampling
+    x = xs[ix] + (rng.uniform(0.0, 1.0) - 0.5) * (xs[1] - xs[0])
+    p = ps[ip] + (rng.uniform(0.0, 1.0) - 0.5) * (ps[1] - ps[0])
+    return complex((x + 1j * p) / np.sqrt(2.0))
 
 
 def heterodyne_condition(
     state: BosonicState,
     mode: int,
     outcome: complex | float | np.ndarray,
-    *,
-    imag_tol: float = _POOL_IMAG_TOL,
 ) -> BosonicState:
     """Condition on heterodyne outcome β and **remove** the measured mode.
 
-    Teaching cut: only pool components (real r̄, Re(w) > 0) are conditioned.
+    Exact (ADR-0007): every component is conditioned with complex r̄
+    (analytic continuation of the Gaussian formula), reweighted by the same
+    per-component Q kernel value Q_k(β) — complex likelihood; weights
+    renormalized to Σw = 1. Hermitian closure makes Σ_k w_k Q_k(β) real ≥ 0.
+
     Per component (Gaussian ``heterodyne_condition`` formula, mode removal +
     xxpp repack):
 
         Σ_A = V_A + I/2,  C = cov(B, A)
         V_B' = V_B − C Σ_A⁻¹ Cᵀ,   r̄_B' = r̄_B + C Σ_A⁻¹ (z − r̄_A)
 
-    Weights reweighted by the real Gaussian edge density
-    w_k ∝ w_k · N(z; r̄_A,k, Σ_A,k) then renormalized to Σw = 1.
-    K=1 matches the Gaussian heterodyne_condition exactly; a single-mode
-    K=1 condition leaves a 0-mode state (``nmode == 0``).
+    with r̄_A, r̄_B complex (the posterior stays in the manifold: V real
+    symmetric, r̄ complex, w complex). K=1 matches the Gaussian
+    ``heterodyne_condition`` exactly; a single-mode K=1 condition leaves a
+    0-mode state (``nmode == 0``).
     """
     m = _check_mode(state, mode)
     beta = _as_beta(outcome)
@@ -166,31 +263,27 @@ def heterodyne_condition(
     pos = {ax: j for j, ax in enumerate(idx_B)}
     perm = [pos[ax] for ax in pack]
 
-    pool, _ = _real_diag_pool(state, imag_tol)
-    if not pool:
-        raise ValueError("heterodyne_condition: no real-mean positive-weight components")
-
     kept: list[Component] = []
     raw_w: list[complex] = []
-    for c in pool:
+    for c in state.components:
         VA = c.V[np.ix_(idx_A, idx_A)]
-        rA = c.rbar[idx_A].real
+        rA = c.rbar[idx_A]  # complex allowed
         Sigma = VA + 0.5 * np.eye(2)
         Sigma = 0.5 * (Sigma + Sigma.T)
         try:
             invS = np.linalg.inv(Sigma)
         except np.linalg.LinAlgError as exc:
             raise ValueError("heterodyne Σ_A = V_A + I/2 is singular") from exc
-        dmu = z - rA
-        wlik = np.exp(-0.5 * float(dmu @ invS @ dmu)) / (
+        dmu = z - rA  # complex residual
+        wlik = np.exp(-0.5 * (dmu @ invS @ dmu)) / (
             2.0 * np.pi * np.sqrt(float(np.linalg.det(Sigma)))
         )
         raw_w.append(c.w * complex(wlik))
         VB = c.V[np.ix_(idx_B, idx_B)]
         C = c.V[np.ix_(idx_B, idx_A)]
-        rB = c.rbar[idx_B].real
+        rB = c.rbar[idx_B]  # complex allowed
         VB_n = VB - C @ invS @ C.T
-        rB_n = rB + C @ invS @ dmu
+        rB_n = rB + C @ invS @ dmu  # complex update
         VB_n = 0.5 * (VB_n + VB_n.T)
         VB_n = VB_n[np.ix_(perm, perm)]
         rB_n = rB_n[perm]
@@ -209,11 +302,10 @@ def heterodyne_sample_and_condition(
     mode: int = 0,
     *,
     rng: np.random.Generator | None = None,
-    imag_tol: float = _POOL_IMAG_TOL,
 ) -> tuple[complex, BosonicState]:
     """Sample heterodyne β then condition (measured mode removed)."""
-    beta = heterodyne_sample(state, mode, rng=rng, imag_tol=imag_tol)
-    return beta, heterodyne_condition(state, mode, beta, imag_tol=imag_tol)
+    beta = heterodyne_sample(state, mode, rng=rng)
+    return beta, heterodyne_condition(state, mode, beta)
 
 
 # ---------------------------------------------------------------------------

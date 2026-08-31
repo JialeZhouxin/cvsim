@@ -19,6 +19,7 @@ from cvsim.bosonic.gkp import gkp0, gkp1, gkp_logical_overlap
 from cvsim.bosonic.ir import from_ir, to_ir
 from cvsim.bosonic.measure import (
     heterodyne_condition,
+    heterodyne_pdf,
     heterodyne_sample,
     heterodyne_sample_and_condition,
     homodyne_condition,
@@ -67,6 +68,7 @@ __all__ = [
     "homodyne_sample",
     "homodyne_sample_and_condition",
     "homodyne_condition",
+    "heterodyne_pdf",
     "heterodyne_sample",
     "heterodyne_condition",
     "heterodyne_sample_and_condition",

@@ -138,16 +138,27 @@ def test_heterodyne_condition_outcome_forms():
 # ---------------------------------------------------------------------------
 
 
-def test_heterodyne_sample_k1_matches_gaussian_stream():
-    """Same-seed K=1 sample: identical (single pool component, same RNG path)."""
+def test_heterodyne_sample_k1_matches_gaussian_statistics():
+    """K=1 exact sampler: outcome distribution matches Gaussian package
+    statistically (same-seed stream identity retired at exactification —
+    same RNG path is no longer the Gaussian multivariate draw; mirrors B3
+    homodyne precedent)."""
     gs = _g_2mode_correlated()
     bs = BosonicState.from_gaussian(gs)
     rng1 = np.random.default_rng(5)
-    rng2 = np.random.default_rng(5)
-    for _ in range(10):
-        o1 = heterodyne_sample(bs, 1, rng=rng1)
-        o2 = g_het_sample(gs, 1, rng=rng2)
-        assert o1 == o2
+    n = 20_000
+    draws = np.array([heterodyne_sample(bs, 1, rng=rng1) for _ in range(n)])
+    draws_g = np.array([g_het_sample(gs, 1, rng=rng1) for _ in range(n)])
+    # outcome moments: ⟨β⟩, Var(Re β), Var(Im β), Cov(Re,Im) agree within 4σ/√N
+    m1, m2 = draws.mean(), draws_g.mean()
+    tol = 4.0 / np.sqrt(n)
+    assert abs(m1 - m2) < tol
+    vr1 = (draws.real**2).mean() - draws.real.mean() ** 2
+    vr2 = (draws_g.real**2).mean() - draws_g.real.mean() ** 2
+    vi1 = (draws.imag**2).mean() - draws.imag.mean() ** 2
+    vi2 = (draws_g.imag**2).mean() - draws_g.imag.mean() ** 2
+    assert abs(vr1 - vr2) < 4.0 * vr2 / np.sqrt(n / 2.0)
+    assert abs(vi1 - vi2) < 4.0 * vi2 / np.sqrt(n / 2.0)
 
 
 def test_heterodyne_sample_coherent_statistics():

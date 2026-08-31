@@ -226,6 +226,7 @@ BOSONIC_PUBLIC = {
     "homodyne_sample_and_condition",
     "homodyne_condition",
     "heterodyne_sample",
+    "heterodyne_pdf",
     "heterodyne_condition",
     "heterodyne_sample_and_condition",
     "p_click",
