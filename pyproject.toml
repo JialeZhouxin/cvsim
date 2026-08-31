@@ -108,7 +108,10 @@ skip-magic-trailing-comma = false
 line-ending          = "lf"
 
 [tool.mypy]
-python_version          = "3.10"
+# 不钉 python_version：随当前解释器检查。lock 按 Python 分流 numpy
+# （3.10→2.2.6 / 3.12+→2.5.1），2.5.1 stubs 用 PEP 695 type 语句，
+# 钉 3.10 会让 3.12 job 按 3.10 语法解析自家 stubs 直接报 syntax 错
+# （CI 33368075232 实证）。
 strict                  = true
 ignore_missing_imports  = true
 disallow_untyped_defs   = false
