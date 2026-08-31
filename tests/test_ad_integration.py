@@ -48,8 +48,16 @@ def _scene_en(backend: str, r: float, th: float):
 # Analytic endpoints of the scene (physical sanity, both backends)
 # ---------------------------------------------------------------------------
 
+# jax 参数在无 jax 环境必须干净跳过（Phase 4 exit #2），不能裸用 be.BACKENDS。
+_BACKENDS = [
+    pytest.param(b, marks=pytest.mark.skipif(not be.HAS_JAX, reason="jax not installed"))
+    if b == "jax"
+    else b
+    for b in be.BACKENDS
+]
 
-@pytest.mark.parametrize("backend", be.BACKENDS)
+
+@pytest.mark.parametrize("backend", _BACKENDS)
 @pytest.mark.parametrize("r", [0.3, 0.6])
 def test_scene_endpoints(backend: str, r: float) -> None:
     # θ=0: TMSV intact → E_N = 2r/ln2

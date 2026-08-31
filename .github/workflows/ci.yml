@@ -11,6 +11,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# 环境一律经 uv sync --frozen 从 uv.lock 装（与本地验证环境逐版本一致，
+# 且不做任何重新解析——裸 pip install 会拉到未测过的最新 numpy/mypy，
+# 2026-08-31 实证：mypy 2.3.1 + numpy 2.5.2 在 strict 下全库报 ndarray
+# type-arg，锁定环境 0 错）。
+
 jobs:
   lint:
     name: Lint (ruff)
@@ -30,11 +35,11 @@ jobs:
         python-version: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ matrix.python-version }}
-      - run: pip install ".[dev]"
-      - run: mypy cvsim/
+          enable-cache: true
+      - run: uv sync --frozen --python ${{ matrix.python-version }} --extra dev
+      - run: uv run --no-sync mypy cvsim/
 
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -45,12 +50,12 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ matrix.python-version }}
-      - run: pip install ".[dev]"
-      - run: python -m pytest tests/ -q --tb=short
-      - run: python -m pytest tests/ --cov=cvsim --cov-report=term-missing
+          enable-cache: true
+      - run: uv sync --frozen --python ${{ matrix.python-version }} --extra dev
+      - run: uv run --no-sync python -m pytest tests/ -q --tb=short
+      - run: uv run --no-sync python -m pytest tests/ --cov=cvsim --cov-report=term-missing
         if: matrix.python-version == '3.12'
 
   # -----------------------------------------------------------------------
@@ -62,11 +67,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-      - run: pip install ".[dev]"
-      - run: python -m pytest tests/test_public_api.py -q -v
+          enable-cache: true
+      - run: uv sync --frozen --python 3.12 --extra dev
+      - run: uv run --no-sync python -m pytest tests/test_public_api.py -q -v
 
   # -----------------------------------------------------------------------
   # Benchmark (vision Phase 3 exit #2/#5): m=100 compile+run must stay
@@ -78,11 +83,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-      - run: pip install ".[dev]"
-      - run: python benchmarks/benchmark_m100.py
+          enable-cache: true
+      - run: uv sync --frozen --python 3.12 --extra dev
+      - run: uv run --no-sync python benchmarks/benchmark_m100.py
 
   # -----------------------------------------------------------------------
   # GBS interop (vision Phase 3 exit #4): core test jobs install only
@@ -96,8 +101,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-      - run: pip install ".[dev,gbs]"
-      - run: python -m pytest tests/ -q --tb=short
+          enable-cache: true
+      - run: uv sync --frozen --python 3.12 --extra dev --extra gbs
+      - run: uv run --no-sync python -m pytest tests/ -q --tb=short
