@@ -24,7 +24,8 @@ Q(β) = Σ_k w_k Q_k(β) 在 (x, p) 网格上求和；Q_k 为复中心解析延�
 2. **Q 面**：S(x,p) = Σ w_k Q_k(x,p)（complex dtype）；|Im| > 1e-8 raise；
    `Q = max(Re S, 0)`，负值 warn 泄漏质量。
 3. **采样**：顺序反演 —— 先抽边缘 P(x)（x 轴求和），再抽条件 P(p|x)
-   （该 x 列归一），uniform + searchsorted，10³ shots 向量化。
+   （该 x 列归一），uniform + searchsorted，10³ shots 向量化；格内
+   均匀 jitter（分段常数密度采样，消除格点尖峰伪影）。
 4. **条件化**：同一核，w_k ∝ w_k · Q_k(β)，复权重重加权 + Σw=1 归一，
    复中心公式与 Gaussian `heterodyne_condition` 同形（解析延拓），
    模删除/xxpp 重排骨架复用现实现。
@@ -45,10 +46,11 @@ Q(β) = Σ_k w_k Q_k(β) 在 (x, p) 网格上求和；Q_k 为复中心解析延�
 ## 验收 oracle（R1 分层）
 
 1. 偶/奇猫闭式 Q（交叉项 cos 条纹闭式）atol 1e-7；
-2. ∫Q d²β = 1（网格积分，1e-9 容差）；
+2. ∫Q d²β = 1（网格积分；实测 ±6σ 网格截断尾部 ~1e-6，容差定 1e-5 —— 残差是物理尾部而非归一化 bug）；
 3. 一致性恒等式 Σ p(o)·ρ_post(o) = ρ（条件化对账）；
 4. 采样直方图 vs Q 网格 bin-level 一致；
-5. K=1 reconciliation 全绿（现有测试不动）。
+5. K=1 reconciliation 全绿（分布统计等价，同种子流断言退役 —— RNG 路径
+   改 uniform+searchsorted，B3 homodyne 先例）。
 
 ## 后果
 
