@@ -83,13 +83,13 @@ class FockSparse:
         cutoffs: int | list[int],
     ) -> FockSparse:
         """``{fock_tuple: amplitude}`` — e.g. {(0, 3): 1/√2, (2, 1): 1j/√2}."""
-        cutoffs = list(cutoffs)
-        nmode = len(cutoffs)
+        cutoffs_l: list[int] = [cutoffs] if isinstance(cutoffs, int) else list(cutoffs)
+        nmode = len(cutoffs_l)
         comps = tuple(components)
         coords = np.asarray(comps, dtype=int).T
         vals = np.asarray([components[c] for c in comps], dtype=complex)
-        data = coo_array((vals, coords), shape=tuple(cutoffs))
-        return cls(data, cutoffs)
+        data = coo_array((vals, coords), shape=tuple(cutoffs_l))
+        return cls(data, cutoffs_l)
 
     # -- sparse-preserving ops ------------------------------------------------
 

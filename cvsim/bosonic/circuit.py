@@ -209,7 +209,7 @@ class BosonicCircuit:
         """
         self._ops.append(
             self._partition(
-                "measure_homodyne", [mode], _fixed_str_keys={"name"}, phi=phi, name=name
+                "measure_homodyne", [mode], _fixed_str_keys=frozenset({"name"}), phi=phi, name=name
             )
         )
         return self
@@ -221,14 +221,18 @@ class BosonicCircuit:
         removed (already dropped by ``heterodyne_condition``).
         """
         self._ops.append(
-            self._partition("measure_heterodyne", [mode], _fixed_str_keys={"name"}, name=name)
+            self._partition(
+                "measure_heterodyne", [mode], _fixed_str_keys=frozenset({"name"}), name=name
+            )
         )
         return self
 
     def measure_threshold(self, mode: int, name: str) -> BosonicCircuit:
         """Threshold (on/off) — outcome-only, no state update, no mode removal."""
         self._ops.append(
-            self._partition("measure_threshold", [mode], _fixed_str_keys={"name"}, name=name)
+            self._partition(
+                "measure_threshold", [mode], _fixed_str_keys=frozenset({"name"}), name=name
+            )
         )
         return self
 

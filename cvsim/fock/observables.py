@@ -41,8 +41,9 @@ def trace(state: FockDensity) -> float:
     return float(np.trace(state.rho).real)
 
 
-def _dens_joint_pn(state: FockDensity) -> np.ndarray:
+def _dens_joint_pn(state: FockLike) -> np.ndarray:
     """Joint P(n0,n1) for 2-mode dens, shape (N,N); 1-mode returns (N,)."""
+    assert isinstance(state, FockDensity)  # callers guard with _is_density
     p = np.asarray(np.real(np.diag(state.rho)), dtype=float)
     if state.nmode == 1:
         return p

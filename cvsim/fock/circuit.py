@@ -373,7 +373,7 @@ class FockCircuit:
         return self
 
     def apply_kraus(self, mode: int, kraus_ops: list[np.ndarray]) -> FockCircuit:
-        self._ops.append(("apply_kraus", [mode], {"kraus_ops": kraus_ops}, {}, {}))
+        self._ops.append(("apply_kraus", (mode,), {"kraus_ops": kraus_ops}, {}, {}))
         return self
 
     # -- builder: measurements ---------------------------------------------
@@ -381,7 +381,7 @@ class FockCircuit:
     def measure_pnr(self, mode: int, name: str) -> FockCircuit:
         """PNR measurement: sample n, condition the posterior (mode kept)."""
         self._ops.append(
-            self._partition("measure_pnr", [mode], _fixed_str_keys={"name"}, name=name)
+            self._partition("measure_pnr", [mode], _fixed_str_keys=frozenset({"name"}), name=name)
         )
         return self
 
@@ -394,7 +394,7 @@ class FockCircuit:
             self._partition(
                 "measure_homodyne",
                 [mode],
-                _fixed_str_keys={"name"},
+                _fixed_str_keys=frozenset({"name"}),
                 phi=phi,
                 name=name,
             )
@@ -407,7 +407,7 @@ class FockCircuit:
             self._partition(
                 "measure_heterodyne",
                 [mode],
-                _fixed_str_keys={"name"},
+                _fixed_str_keys=frozenset({"name"}),
                 name=name,
             )
         )

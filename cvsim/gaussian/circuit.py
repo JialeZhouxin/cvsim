@@ -208,7 +208,7 @@ class GaussianCircuit:
             self._partition(
                 "measure_homodyne",
                 [mode],
-                _fixed_str_keys={"name"},
+                _fixed_str_keys=frozenset({"name"}),
                 phi=phi,
                 name=name,
             )
@@ -225,7 +225,7 @@ class GaussianCircuit:
             self._partition(
                 "measure_heterodyne",
                 [mode],
-                _fixed_str_keys={"name"},
+                _fixed_str_keys=frozenset({"name"}),
                 name=name,
             )
         )
@@ -243,7 +243,7 @@ class GaussianCircuit:
             self._partition(
                 "measure_threshold",
                 [mode],
-                _fixed_str_keys={"name"},
+                _fixed_str_keys=frozenset({"name"}),
                 name=name,
             )
         )
@@ -325,7 +325,7 @@ class GaussianCircuit:
         modes: list[int],
         *,
         _fixed_str_keys: frozenset[str] = frozenset(),
-        **kwargs: float | str | ParamRef,
+        **kwargs: float | complex | str | ParamRef,
     ) -> tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]:
         """Split builder kwargs into a 5-tuple (shared core, ADR-0004)."""
         return partition(op_name, modes, _fixed_str_keys=_fixed_str_keys, **kwargs)

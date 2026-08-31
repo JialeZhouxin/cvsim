@@ -178,8 +178,9 @@ def to_ir(circuit: FockCircuit) -> dict[str, Any]:
 
 
 def _build_op(circuit: FockCircuit, op: str, modes: tuple[int, ...], kw: dict[str, Any]) -> None:
-    m0 = modes[0] if modes else None
-    m1 = modes[1] if len(modes) > 1 else None
+    # OpMeta arity: 'none' ops carry no modes; 'one'/'two' carry 1/2.
+    m0 = modes[0] if modes else 0
+    m1 = modes[1] if len(modes) > 1 else m0
     if op == "squeeze":
         circuit.squeeze(m0, r=kw["r"])
     elif op == "displace":

@@ -71,8 +71,8 @@ def _factor(op: tuple[Any, ...], nmode: int) -> tuple[np.ndarray, np.ndarray]:
     """(S, d) factor for one merged op at physical mode coordinates."""
     op_name, modes, fixed, _pnames, _refs = op
     kw = dict(fixed)
-    m0 = modes[0] if modes else None
-    m1 = modes[1] if len(modes) > 1 else None
+    m0 = modes[0]  # gate ops always carry modes (OpMeta arity, compile_segments)
+    m1 = modes[1] if len(modes) > 1 else modes[0]
     if op_name == "squeeze":
         S = S_squeeze(nmode, kw["r"], m0)
         if kw.get("phi", 0.0) != 0.0:
