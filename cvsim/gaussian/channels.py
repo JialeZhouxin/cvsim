@@ -93,7 +93,7 @@ def apply_gaussian_channel(
 
 def _acted_block(
     state: GaussianState,
-    modes: int | range | list | None,
+    modes: int | range | list[int] | None,
 ) -> tuple[int, list[int]]:
     """Resolve acted modes; return (nmode, list of acted mode indices)."""
     m = state.nmode

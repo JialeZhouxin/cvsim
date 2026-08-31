@@ -7,9 +7,12 @@ L4: ``measure_homodyne`` / ``measure_heterodyne`` + ``ParamRef`` feedforward.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
-from cvsim.circuit_common import ParamRef, partition
+from cvsim.circuit_common import ParamRef as ParamRef
+from cvsim.circuit_common import partition
 from cvsim.gaussian.compile import CompiledGaussian, _compile_segments
 from cvsim.gaussian.state import GaussianState
 
@@ -37,7 +40,9 @@ class GaussianCircuit:
             raise ValueError("nmode must be >= 1")
         self.nmode = nmode
         # _ops entries: (name, orig_modes, fixed, params, refs)
-        self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
+        self._ops: list[
+            tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]
+        ] = []
 
     # -- L3: circuit composition ------------------------------------------
 
@@ -273,7 +278,7 @@ class GaussianCircuit:
 
     # -- serialization (circuit_v1 IR, ADR-0003) --------------------------
 
-    def to_ir(self) -> dict:
+    def to_ir(self) -> dict[str, Any]:
         """Serialize to a circuit_v1 IR dict (``cvsim.gaussian.ir``).
 
         Lossless for all builder ops; the output is JSON-native
@@ -285,7 +290,7 @@ class GaussianCircuit:
         return to_ir(self)
 
     @classmethod
-    def from_ir(cls, data: dict) -> GaussianCircuit:
+    def from_ir(cls, data: dict[str, Any]) -> GaussianCircuit:
         """Rebuild a circuit from a circuit_v1 IR dict."""
         from cvsim.gaussian.ir import from_ir
 
@@ -321,6 +326,6 @@ class GaussianCircuit:
         *,
         _fixed_str_keys: frozenset[str] = frozenset(),
         **kwargs: float | str | ParamRef,
-    ) -> tuple[str, tuple, dict, dict, dict]:
+    ) -> tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]:
         """Split builder kwargs into a 5-tuple (shared core, ADR-0004)."""
         return partition(op_name, modes, _fixed_str_keys=_fixed_str_keys, **kwargs)

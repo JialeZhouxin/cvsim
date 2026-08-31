@@ -137,7 +137,7 @@ def _mz_U(N: int, theta: float, phi: float) -> np.ndarray:
     return bs2 @ np.kron(np.eye(N), ph) @ bs1
 
 
-def _factor1(op_name: str, N: int, fixed: dict) -> np.ndarray:
+def _factor1(op_name: str, N: int, fixed: dict[str, Any]) -> np.ndarray:
     """Single-mode (N,N) unitary factor for a merged op."""
     if op_name == "squeeze":
         return _squeeze_U(N, float(fixed["r"]))
@@ -150,7 +150,7 @@ def _factor1(op_name: str, N: int, fixed: dict) -> np.ndarray:
     raise ValueError(f"_factor1: op {op_name} is not single-mode")
 
 
-def _factor2(op_name: str, N: int, fixed: dict) -> np.ndarray:
+def _factor2(op_name: str, N: int, fixed: dict[str, Any]) -> np.ndarray:
     """Two-mode (N²,N²) unitary factor for a merged op (equal cutoffs)."""
     if op_name == "beamsplitter":
         return _bs_U(N, float(fixed.get("theta", np.pi / 4)), float(fixed.get("phi", 0.0)))
@@ -253,7 +253,10 @@ class FockCircuit:
         self.nmode = nmode
         self.cutoffs = cutoffs
         self.initial = self._validate_initial(initial, cutoffs)
-        self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
+        # _ops entries: (name, orig_modes, fixed, params, refs)
+        self._ops: list[
+            tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]
+        ] = []
 
     @staticmethod
     def _validate_initial(initial: list[int] | None, cutoffs: list[int]) -> list[int] | None:
@@ -412,14 +415,14 @@ class FockCircuit:
 
     # -- execution ---------------------------------------------------------
 
-    def to_ir(self) -> dict:
+    def to_ir(self) -> dict[str, Any]:
         """Serialize to a circuit_v1 dict (ADR-0003; with ``cutoff``)."""
         from cvsim.fock.ir import to_ir
 
         return to_ir(self)
 
     @classmethod
-    def from_ir(cls, data: dict) -> FockCircuit:
+    def from_ir(cls, data: dict[str, Any]) -> FockCircuit:
         """Rebuild from a circuit_v1 dict (ADR-0003)."""
         from cvsim.fock.ir import from_ir
 
@@ -474,7 +477,7 @@ class FockCircuit:
         *,
         _fixed_str_keys: frozenset[str] = frozenset(),
         **kwargs: Any,
-    ) -> tuple[str, tuple, dict, dict, dict]:
+    ) -> tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]:
         return partition(op_name, modes, _fixed_str_keys=_fixed_str_keys, **kwargs)
 
 
@@ -485,7 +488,7 @@ class CompiledFock(CompiledCircuit):
         self,
         nmode: int,
         cutoffs: list[int],
-        segments: list,
+        segments: list[tuple[Any, ...]],
         params: frozenset[str],
         initial: list[int] | None = None,
     ) -> None:

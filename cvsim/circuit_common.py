@@ -9,6 +9,7 @@ runner base class. Physics is injected per representation via registries
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -33,17 +34,17 @@ def partition(
     modes: list[int],
     *,
     _fixed_str_keys: frozenset[str] = frozenset(),
-    **kwargs,
-) -> tuple[str, tuple, dict, dict, dict]:
+    **kwargs: object,
+) -> tuple[str, tuple[int, ...], dict[str, object], dict[str, str], dict[str, ParamRef]]:
     """Split builder kwargs into a 5-tuple (name, modes, fixed, params, refs).
 
     ``ParamRef`` values go to ``refs``; strings (symbolic parameters) to
     ``params`` unless the key is in ``_fixed_str_keys`` (e.g. measurement
     ``name``); everything else to ``fixed``.
     """
-    fixed: dict = {}
-    params: dict = {}
-    refs: dict = {}
+    fixed: dict[str, object] = {}
+    params: dict[str, str] = {}
+    refs: dict[str, ParamRef] = {}
     for k, v in kwargs.items():
         if isinstance(v, ParamRef):
             refs[k] = v
@@ -55,12 +56,12 @@ def partition(
 
 
 def compile_segments(
-    ops: list[tuple],
+    ops: list[tuple[Any, ...]],
     nmode: int,
     *,
     break_ops: frozenset[str],
     remove_mode_ops: frozenset[str],
-) -> tuple[list, frozenset[str]]:
+) -> tuple[list[tuple[Any, ...]], frozenset[str]]:
     """Static segmentation with mode mapping resolved to physical coords.
 
     ``break_ops`` split a compile segment (channels / measurements / any op
@@ -72,9 +73,9 @@ def compile_segments(
     ``('merged', nmode, ops)`` or ``('op', op)``.
     """
     # ops from Circuit._ops: (name, orig_modes, fixed, pnames, refs)
-    mapping = list(range(nmode))
-    segments: list = []
-    merged: list = []
+    mapping: list[int] = list(range(nmode))
+    segments: list[tuple[Any, ...]] = []
+    merged: list[tuple[Any, ...]] = []
     params: set[str] = set()
     merged_nmode = nmode
 
@@ -126,7 +127,7 @@ class CompiledCircuit:
     Public surface: ``nmode``, ``params``, ``run(**values)``.
     """
 
-    def __init__(self, nmode: int, segments: list, params: frozenset[str]) -> None:
+    def __init__(self, nmode: int, segments: list[tuple[Any, ...]], params: frozenset[str]) -> None:
         self.nmode = nmode
         self.params = params
         self._segments = list(segments)
@@ -134,7 +135,7 @@ class CompiledCircuit:
     def run(self, *, rng=None, **values):
         """Execute compiled segments. Semantics per subclass (see Circuit.run)."""
         st = self._init_state()
-        results: dict = {}
+        results: dict[str, Any] = {}
         for seg in self._segments:
             if seg[0] == "merged":
                 _, nmode, ops = seg
@@ -147,13 +148,23 @@ class CompiledCircuit:
 
     # -- representation-specific (subclass) ------------------------------
 
-    def _init_state(self):
+    def _init_state(self) -> Any:
         raise NotImplementedError
 
-    def _apply_merged(self, ops, nmode, values, st):
+    def _apply_merged(
+        self, ops: list[tuple[Any, ...]], nmode: int, values: dict[str, Any], st: Any
+    ) -> Any:
         raise NotImplementedError
 
-    def _run_op(self, op, st, results, values, *, rng=None):
+    def _run_op(
+        self,
+        op: tuple[Any, ...],
+        st: Any,
+        results: dict[str, Any],
+        values: dict[str, Any],
+        *,
+        rng: Any = None,
+    ) -> Any:
         raise NotImplementedError
 
     def __repr__(self) -> str:

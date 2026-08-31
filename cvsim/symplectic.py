@@ -6,6 +6,8 @@ Prefer this module over cvsim.gaussian.symplectic (compat shim).
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from cvsim.backend import BACKENDS, _allclose, _block, _get_xp, _set
@@ -342,7 +344,7 @@ def _nulling_T_for_column(v0: complex, v1: complex, atol: float) -> np.ndarray:
 
 def reck_decomposition(
     U: np.ndarray, *, atol: float = 1e-10, backend: str = "numpy"
-) -> list[tuple]:
+) -> list[tuple[Any, ...]]:
     """Reck triangular factorization into 2-mode unitaries + diagonal phases.
 
     Numpy-only (``backend="jax"`` raises NotImplementedError; see
@@ -368,7 +370,7 @@ def reck_decomposition(
     U = np.asarray(U, dtype=complex).copy()
     validate_unitary(U, atol=max(atol, 1e-8))
     m = U.shape[0]
-    ts: list[tuple] = []
+    ts: list[tuple[Any, ...]] = []
 
     # Peel from the left: U ← T† @ U nulls U[j, i]; then U_old = T @ U_new
     for i in range(m - 1):
@@ -378,7 +380,7 @@ def reck_decomposition(
             U = Tfull.conj().T @ U
             ts.append(("u2", i, j, T.copy()))
 
-    phases: list[tuple] = []
+    phases: list[tuple[Any, ...]] = []
     for k in range(m):
         pk = U[k, k]
         # Match S_phase(theta): â → e^{+i theta} â ⇔ S_from_unitary(diag(e^{iθ}))
@@ -389,7 +391,9 @@ def reck_decomposition(
     return phases + list(reversed(ts))
 
 
-def compose_unitary_mesh(m: int, ops: list[tuple], *, backend: str = "numpy") -> np.ndarray:
+def compose_unitary_mesh(
+    m: int, ops: list[tuple[Any, ...]], *, backend: str = "numpy"
+) -> np.ndarray:
     """Compose mesh ops into m×m unitary.
 
     Numpy-only (``backend="jax"`` raises NotImplementedError; see

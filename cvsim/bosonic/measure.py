@@ -24,12 +24,24 @@ from cvsim.bosonic.observables import (
     _SIG_EPS,
     _as_real,
     _check_mode,
-    homodyne_condition,  # noqa: F401  (re-export: single implementation source)
-    homodyne_mean,  # noqa: F401
-    homodyne_pdf,  # noqa: F401
-    homodyne_sample,  # noqa: F401
-    homodyne_sample_and_condition,  # noqa: F401
-    homodyne_var,  # noqa: F401
+)
+from cvsim.bosonic.observables import (
+    homodyne_condition as homodyne_condition,  # re-export: single implementation source
+)
+from cvsim.bosonic.observables import (
+    homodyne_mean as homodyne_mean,
+)
+from cvsim.bosonic.observables import (
+    homodyne_pdf as homodyne_pdf,
+)
+from cvsim.bosonic.observables import (
+    homodyne_sample as homodyne_sample,
+)
+from cvsim.bosonic.observables import (
+    homodyne_sample_and_condition as homodyne_sample_and_condition,
+)
+from cvsim.bosonic.observables import (
+    homodyne_var as homodyne_var,
 )
 from cvsim.bosonic.state import BosonicState, Component
 

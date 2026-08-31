@@ -109,7 +109,7 @@ def _fock_wigner(
 
 
 def _fock_joint(
-    state: FockState | FockDensity, view: View, measured: list
+    state: FockState | FockDensity, view: View, measured: list[Any]
 ) -> dict[str, Any] | None:
     """2-mode joint photon-number grid (≤30×30, design §2.3). null when no
     joint_modes / <2 modes / measurement collapse ambiguity."""
@@ -131,7 +131,7 @@ def _fock_joint(
         return None
 
 
-def _fock_measured(raw: dict[str, Any], results: dict) -> list[dict[str, Any]]:
+def _fock_measured(raw: dict[str, Any], results: dict[str, Any]) -> list[dict[str, Any]]:
     """Measurement outcomes in node order (name-keyed results dict → list)."""
     out: list[dict[str, Any]] = []
     for node in raw.get("ops", []):

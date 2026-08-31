@@ -177,7 +177,7 @@ def to_ir(circuit: FockCircuit) -> dict[str, Any]:
     return doc
 
 
-def _build_op(circuit: FockCircuit, op: str, modes: tuple[int, ...], kw: dict) -> None:
+def _build_op(circuit: FockCircuit, op: str, modes: tuple[int, ...], kw: dict[str, Any]) -> None:
     m0 = modes[0] if modes else None
     m1 = modes[1] if len(modes) > 1 else None
     if op == "squeeze":

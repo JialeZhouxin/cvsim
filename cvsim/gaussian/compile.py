@@ -11,6 +11,8 @@ removes a deterministic number of modes, so the mapping is RNG-independent).
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from cvsim.circuit_common import CompiledCircuit, compile_segments
@@ -65,7 +67,7 @@ _MERGEABLE_OPS = frozenset(
 )
 
 
-def _factor(op: tuple, nmode: int) -> tuple[np.ndarray, np.ndarray]:
+def _factor(op: tuple[Any, ...], nmode: int) -> tuple[np.ndarray, np.ndarray]:
     """(S, d) factor for one merged op at physical mode coordinates."""
     op_name, modes, fixed, _pnames, _refs = op
     kw = dict(fixed)
@@ -99,7 +101,9 @@ def _factor(op: tuple, nmode: int) -> tuple[np.ndarray, np.ndarray]:
     raise ValueError(f"not a mergeable op: {op_name!r}")
 
 
-def _instantiate(ops: list[tuple], nmode: int, values: dict) -> tuple[np.ndarray, np.ndarray]:
+def _instantiate(
+    ops: list[tuple[Any, ...]], nmode: int, values: dict[str, Any]
+) -> tuple[np.ndarray, np.ndarray]:
     """Merge segment ops into (S, d) with parameter values bound."""
     S = np.eye(2 * nmode)
     d = np.zeros(2 * nmode)
@@ -124,9 +128,9 @@ def _instantiate(ops: list[tuple], nmode: int, values: dict) -> tuple[np.ndarray
 
 
 def _compile_segments(
-    ops: list[tuple],
+    ops: list[tuple[Any, ...]],
     nmode: int,
-) -> tuple[list, frozenset[str]]:
+) -> tuple[list[tuple[Any, ...]], frozenset[str]]:
     """Backward-compatible wrapper (ADR-0004): shared core with Gaussian sets."""
     return compile_segments(
         ops,
@@ -137,10 +141,10 @@ def _compile_segments(
 
 
 def _run_op(
-    op: tuple,
+    op: tuple[Any, ...],
     st: GaussianState,
     results: dict[str, float],
-    values: dict,
+    values: dict[str, Any],
     *,
     rng: np.random.Generator | None = None,
 ) -> tuple[GaussianState, dict[str, float]]:
@@ -204,14 +208,20 @@ class CompiledGaussian(CompiledCircuit):
         return GaussianState.vacuum(self.nmode)
 
     def _apply_merged(
-        self, ops: list[tuple], nmode: int, values: dict, st: GaussianState
+        self, ops: list[tuple[Any, ...]], nmode: int, values: dict[str, Any], st: GaussianState
     ) -> GaussianState:
         S, d = _instantiate(ops, nmode, values)
         return apply_symplectic(st, S, d, validate=False)
 
     def _run_op(
-        self, op: tuple, st: GaussianState, results: dict, values: dict, *, rng=None
-    ) -> tuple[GaussianState, dict]:
+        self,
+        op: tuple[Any, ...],
+        st: GaussianState,
+        results: dict[str, Any],
+        values: dict[str, Any],
+        *,
+        rng: Any = None,
+    ) -> tuple[GaussianState, dict[str, Any]]:
         return _run_op(op, st, results, values, rng=rng)
 
 
@@ -234,7 +244,7 @@ _DISPATCH = {
 }
 
 
-def _apply(op_name: str, st: GaussianState, modes: tuple, **kwargs) -> GaussianState:
+def _apply(op_name: str, st: GaussianState, modes: tuple[int, ...], **kwargs: Any) -> GaussianState:
     """Dispatch one op (channels + dynamic unitary ops)."""
     return _DISPATCH[op_name](st, modes, **kwargs)
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from cvsim.gaussian.state import GaussianState
@@ -164,7 +166,7 @@ def interferometer(
 apply_interferometer = interferometer
 
 
-def apply_mesh(state: GaussianState, ops: list[tuple]) -> GaussianState:
+def apply_mesh(state: GaussianState, ops: list[tuple[Any, ...]]) -> GaussianState:
     """Apply Reck mesh ops (from ``reck_decomposition``) in order."""
     from cvsim.symplectic import S_from_unitary, embed_U_2mode
 

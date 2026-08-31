@@ -8,6 +8,8 @@ over all components (K=1 vacuum start, gates do not add components).
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from cvsim.bosonic.channels import amplifier as _amp
@@ -64,7 +66,7 @@ _MERGEABLE_OPS = frozenset(
 )
 
 
-def _factor(op: tuple, nmode: int) -> tuple[np.ndarray, np.ndarray]:
+def _factor(op: tuple[Any, ...], nmode: int) -> tuple[np.ndarray, np.ndarray]:
     """(S, d) factor for one merged op at physical mode coordinates."""
     op_name, modes, fixed, _pnames, _refs = op
     kw = dict(fixed)
@@ -97,7 +99,9 @@ def _factor(op: tuple, nmode: int) -> tuple[np.ndarray, np.ndarray]:
     raise ValueError(f"not a mergeable op: {op_name!r}")
 
 
-def _instantiate(ops: list[tuple], nmode: int, values: dict) -> tuple[np.ndarray, np.ndarray]:
+def _instantiate(
+    ops: list[tuple[Any, ...]], nmode: int, values: dict[str, Any]
+) -> tuple[np.ndarray, np.ndarray]:
     """Merge segment ops into (S, d) with parameter values bound."""
     S = np.eye(2 * nmode)
     d = np.zeros(2 * nmode)
@@ -140,10 +144,10 @@ def _apply_channel_affine(
 
 
 def _run_op(
-    op: tuple,
+    op: tuple[Any, ...],
     st: BosonicState,
     results: dict[str, float],
-    values: dict,
+    values: dict[str, Any],
     *,
     rng: np.random.Generator | None = None,
 ) -> tuple[BosonicState, dict[str, float]]:
@@ -203,12 +207,16 @@ def _run_op(
     return st, results
 
 
-def _apply_merged(ops: list[tuple], nmode: int, values: dict, st: BosonicState) -> BosonicState:
+def _apply_merged(
+    ops: list[tuple[Any, ...]], nmode: int, values: dict[str, Any], st: BosonicState
+) -> BosonicState:
     S, d = _instantiate(ops, nmode, values)
     return apply_symplectic(st, S, d)
 
 
-def _compile_segments(ops: list[tuple], nmode: int) -> tuple[list, frozenset[str]]:
+def _compile_segments(
+    ops: list[tuple[Any, ...]], nmode: int
+) -> tuple[list[tuple[Any, ...]], frozenset[str]]:
     return compile_segments(ops, nmode, break_ops=_BREAK_OPS, remove_mode_ops=_REMOVE_MODE_OPS)
 
 
@@ -223,7 +231,7 @@ class CompiledBosonic(CompiledCircuit):
     def __init__(
         self,
         nmode: int,
-        segments: list,
+        segments: list[tuple[Any, ...]],
         params: frozenset[str],
         initial: BosonicState | None = None,
     ) -> None:
@@ -240,11 +248,19 @@ class CompiledBosonic(CompiledCircuit):
         return BosonicState.vacuum(self.nmode)
 
     def _apply_merged(
-        self, ops: list[tuple], nmode: int, values: dict, st: BosonicState
+        self, ops: list[tuple[Any, ...]], nmode: int, values: dict[str, Any], st: BosonicState
     ) -> BosonicState:
         return _apply_merged(ops, nmode, values, st)
 
-    def _run_op(self, op, st, results, values, *, rng=None):
+    def _run_op(
+        self,
+        op: tuple[Any, ...],
+        st: Any,
+        results: dict[str, Any],
+        values: dict[str, Any],
+        *,
+        rng: Any = None,
+    ):
         return _run_op(op, st, results, values, rng=rng)
 
     def run_steps(self, *, rng=None, **values):
@@ -256,7 +272,7 @@ class CompiledBosonic(CompiledCircuit):
         inside a gate run).
         """
         st = self._init_state()
-        results: dict = {}
+        results: dict[str, Any] = {}
         steps: list[tuple[str, BosonicState]] = []
         for seg in self._segments:
             if seg[0] == "merged":

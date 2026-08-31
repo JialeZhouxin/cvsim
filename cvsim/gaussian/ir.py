@@ -17,7 +17,8 @@ from typing import Any
 
 import numpy as np
 
-from cvsim.gaussian.circuit import GaussianCircuit, ParamRef
+from cvsim.gaussian.circuit import GaussianCircuit
+from cvsim.gaussian.circuit import ParamRef as ParamRef
 
 SCHEMA = "circuit_v1"
 
@@ -321,7 +322,7 @@ def to_ir(circuit: GaussianCircuit) -> dict[str, Any]:
 # -- deserialization --------------------------------------------------------
 
 
-def _expand_mz(circuit: GaussianCircuit, modes: tuple[int, ...], kw: dict) -> None:
+def _expand_mz(circuit: GaussianCircuit, modes: tuple[int, ...], kw: dict[str, Any]) -> None:
     """Lab composite MZ: BS(θ) → phase(φ, m0) → BS(θ) (design §1, lossless)."""
     theta, phi = kw["theta"], kw["phi"]
     circuit.beamsplitter(modes[0], modes[1], theta=theta, phi=0.0)

@@ -34,7 +34,8 @@ from cvsim.gaussian import (
     homodyne_mean,
     homodyne_sample_and_condition,
 )
-from cvsim.gaussian.ir import SCHEMA, CircuitV1, validate_ir
+from cvsim.gaussian.ir import SCHEMA as SCHEMA
+from cvsim.gaussian.ir import CircuitV1, validate_ir
 
 #: Bosonic backend op whitelist (B6, same-shell third backend). Mirrors the
 #: F7 unlock: the Bosonic builder exposes the full gate/channel/measure set

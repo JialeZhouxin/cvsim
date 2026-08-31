@@ -7,12 +7,13 @@ Physics is component-wise (K=1 vacuum start, gates do not add components).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from cvsim.bosonic.state import BosonicState
-from cvsim.circuit_common import ParamRef, partition
+from cvsim.circuit_common import ParamRef as ParamRef
+from cvsim.circuit_common import partition
 
 if TYPE_CHECKING:
     from cvsim.bosonic.compile import CompiledBosonic
@@ -59,10 +60,13 @@ class BosonicCircuit:
                     f"got {type(initial).__name__}"
                 )
         # _ops entries: (name, orig_modes, fixed, params, refs)
-        self._ops: list[tuple[str, tuple, dict, dict, dict]] = []
+        # _ops entries: (name, orig_modes, fixed, params, refs)
+        self._ops: list[
+            tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]
+        ] = []
 
     @staticmethod
-    def _resolve_initial(initial: list) -> BosonicState:
+    def _resolve_initial(initial: list[str | None]) -> BosonicState:
         """Resolve a per-mode list of state-source names to a BosonicState.
 
         Items: ``None`` = vacuum, ``"gkp0"`` / ``"gkp1"``; tensor-multiplied
@@ -244,13 +248,13 @@ class BosonicCircuit:
 
     # -- serialization (circuit_v1 IR, ADR-0003) --------------------------
 
-    def to_ir(self) -> dict:
+    def to_ir(self) -> dict[str, Any]:
         from cvsim.bosonic.ir import to_ir
 
         return to_ir(self)
 
     @classmethod
-    def from_ir(cls, data: dict) -> BosonicCircuit:
+    def from_ir(cls, data: dict[str, Any]) -> BosonicCircuit:
         from cvsim.bosonic.ir import from_ir
 
         return from_ir(data)
@@ -281,5 +285,5 @@ class BosonicCircuit:
     @staticmethod
     def _partition(
         op_name: str, modes: list[int], *, _fixed_str_keys: frozenset[str] = frozenset(), **kwargs
-    ) -> tuple:
+    ) -> tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]:
         return partition(op_name, modes, _fixed_str_keys=_fixed_str_keys, **kwargs)

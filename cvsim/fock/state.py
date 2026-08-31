@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import warnings
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy.special import factorial, gammainc
@@ -29,7 +30,7 @@ class FockState:
 
     amps: np.ndarray
     tail: float | None = None
-    _source: tuple | None = None  # ('name', args) — rebuild for estimate_leakage
+    _source: tuple[Any, ...] | None = None  # ('name', args) — rebuild for estimate_leakage
 
     def __post_init__(self) -> None:
         self.amps = np.asarray(self.amps, dtype=complex)
