@@ -11,7 +11,7 @@ readme      = "README.md"
 authors     = [
     { name = "cv-photonic-notes contributors" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.15"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -41,7 +41,7 @@ gbs = [
     "thewalrus>=0.22,<0.23",  # 仅 0.22.0 实测确认（xxpp 约定），见 docs/gbs-walrus.md 版本注
 ]
 sf = [
-    "strawberryfields>=0.24",  # 对照脚本 docs/sf-roundtrip.md；非运行时依赖
+    "strawberryfields>=0.23,<0.24",  # 对照脚本 docs/sf-roundtrip.md；非运行时依赖。PyPI 最新 0.23.0（2022-06），0.24 从未发布
 ]
 jax = [
     "jax[cpu]>=0.4",  # 可微后端（Phase 4 F-AD）；Windows CPU 官方支持
@@ -65,6 +65,12 @@ include = ["cvsim*"]
 [tool.ruff]
 target-version = "py310"
 line-length    = 100
+# 教学材料与一次性工具不按库代码 lint 标准（169 处错全在此带，2026-08-31 实证）；
+# 库本体 cvsim/ + 测试 + examples/ + scripts/ 保持全检。
+extend-exclude = [
+    "tutorials",
+    "tools",
+]
 
 [tool.ruff.lint]
 select = [
@@ -106,6 +112,10 @@ python_version          = "3.10"
 strict                  = true
 ignore_missing_imports  = true
 disallow_untyped_defs   = false
+# numpy 2.2（py3.10 唯一可用）stubs 要求 ndarray 带泛型参数，2.4（py3.11+）
+# 不要求——192 处 type-arg 只在 3.10 矩阵爆发（2026-08-31 实证）。裸 ndarray
+# 注解保留，关闭此项对齐两端行为。
+disallow_any_generics   = false
 warn_return_any         = true
 warn_unreachable        = true
 exclude                 = ["tests/"]

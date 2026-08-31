@@ -8,9 +8,8 @@
 import math
 
 import numpy as np
-from thewalrus import hafnian_repeated, rec_torontonian
+from thewalrus import hafnian_repeated
 from thewalrus.quantum import Amat, Qmat, density_matrix
-from thewalrus.samples import hafnian_sample_state
 
 from cvsim.gaussian import GaussianCircuit, export_cov_for_walrus
 
@@ -67,7 +66,7 @@ idx = rng.choice(len(flat), size=20000, p=flat)
 samples = np.array(np.unravel_index(idx, p_theory.shape)).T  # (20000, 2) 光子数
 hist, _, _ = np.histogram2d(samples[:, 0], samples[:, 1], bins=range(CUT + 2))
 freq = hist / len(samples)
-print(f"4. 直接权重采样 20000 次频率 vs 理论:")
+print("4. 直接权重采样 20000 次频率 vs 理论:")
 for n1 in range(3):
     for n2 in range(3):
         print(f"   P({n1},{n2}): 理论 {p_ref[n1,n2]:.4f} | 频率 {freq[n1,n2]:.4f}")
@@ -85,6 +84,7 @@ for S in range(n_pattern):
             want = tuple(bool((S >> i) & 1) for i in range(m))
             if click == want:
                 p_click_pattern[S] += p_theory[n1, n2]
-print(f"5. threshold 探测: {m} 模 -> {n_pattern} 个 click 模式, Sum P = {p_click_pattern.sum():.4f}")
+print(f"5. threshold 探测: {m} 模 -> {n_pattern} 个 click 模式, "
+      f"Sum P = {p_click_pattern.sum():.4f}")
 for S in range(n_pattern):
     print(f"   pattern {S:0{m}b}: P = {p_click_pattern[S]:.4f}")

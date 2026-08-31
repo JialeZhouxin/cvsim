@@ -17,11 +17,11 @@ and raises.
 
 from __future__ import annotations
 
-import numpy as np
-
 # repo-local import: this script is run from the repo root
 import sys
 from pathlib import Path
+
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -30,7 +30,6 @@ from cvsim.gaussian.gates import interferometer
 from cvsim.gaussian.observables import homodyne_var
 from cvsim.gaussian.state import GaussianState
 from cvsim.symplectic import U_beamsplitter, embed_U_2mode
-
 
 # -----------------------------------------------------------------------------
 # Fixed parameters

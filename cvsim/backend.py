@@ -52,7 +52,8 @@ def _load_jax() -> Any:
         raise ImportError(
             "jax not installed; run `pip install -e '.[jax]'` (or `pip install jax[cpu]`)"
         ) from None
-    jax.config.update("jax_enable_x64", True)  # type: ignore[no-untyped-call]
+    # jax 有类型标记的版本触发 no-untyped-call；jax 未安装的环境此 ignore 未用。
+    jax.config.update("jax_enable_x64", True)  # type: ignore[no-untyped-call,unused-ignore]
     return jnp
 
 
