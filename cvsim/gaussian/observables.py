@@ -142,7 +142,7 @@ def heterodyne_cov_xp(state: GaussianState, mode: int = 0) -> np.ndarray:
     idx = _xp_indices(m, mode)
     Vblk = np.asarray(state.V, dtype=float)[np.ix_(idx, idx)]
     Vblk = 0.5 * (Vblk + Vblk.T)
-    return Vblk + 0.5 * np.eye(2)
+    return np.asarray(Vblk + 0.5 * np.eye(2))
 
 
 def _heterodyne_params(state: GaussianState, mode: int = 0) -> tuple[np.ndarray, np.ndarray]:
@@ -277,7 +277,7 @@ def mean_photon(state: GaussianState, mode: int | None = None) -> float:
         # ⟨x²⟩ = V_xx + ⟨x⟩², ⟨p²⟩ = V_pp + ⟨p⟩²
         xx = V[i, i] + r[i] ** 2
         pp = V[m + i, m + i] + r[m + i] ** 2
-        return 0.5 * (xx + pp - 1.0)
+        return float(0.5 * (xx + pp - 1.0))
 
     if mode is not None:
         return one(mode)
@@ -385,4 +385,4 @@ def heterodyne_sample_batch(
     _check_size(size)
     mu, Sigma = _heterodyne_params(state, mode)
     z = rng.multivariate_normal(mu, Sigma, size=size)
-    return (z[:, 0] + 1j * z[:, 1]) / np.sqrt(2.0)
+    return np.asarray((z[:, 0] + 1j * z[:, 1]) / np.sqrt(2.0))

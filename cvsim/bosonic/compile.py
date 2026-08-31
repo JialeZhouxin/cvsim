@@ -146,11 +146,11 @@ def _apply_channel_affine(
 def _run_op(
     op: tuple[Any, ...],
     st: BosonicState,
-    results: dict[str, float],
+    results: dict[str, float | complex],
     values: dict[str, Any],
     *,
     rng: np.random.Generator | None = None,
-) -> tuple[BosonicState, dict[str, float]]:
+) -> tuple[BosonicState, dict[str, float | complex]]:
     """Execute one break-point op (channel / measure / ParamRef op)."""
     op_name, modes, fixed, pnames, refs = op
     kwargs = dict(fixed)
@@ -260,10 +260,10 @@ class CompiledBosonic(CompiledCircuit):
         values: dict[str, Any],
         *,
         rng: Any = None,
-    ):
+    ) -> Any:
         return _run_op(op, st, results, values, rng=rng)
 
-    def run_steps(self, *, rng=None, **values):
+    def run_steps(self, *, rng: Any = None, **values: Any) -> Any:
         """Run compiled segments capturing a per-break-point snapshot (B6).
 
         Returns ``(final_state, results, steps)`` where ``steps`` is a list of

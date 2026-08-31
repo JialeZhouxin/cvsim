@@ -132,7 +132,7 @@ class CompiledCircuit:
         self.params = params
         self._segments = list(segments)
 
-    def run(self, *, rng=None, **values):
+    def run(self, *, rng: Any = None, **values: Any) -> Any:
         """Execute compiled segments. Semantics per subclass (see Circuit.run)."""
         st = self._init_state()
         results: dict[str, Any] = {}

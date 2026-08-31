@@ -49,12 +49,12 @@ class FockSparse:
 
     @property
     def nnz(self) -> int:
-        return self.data.nnz
+        return int(self.data.nnz)
 
     @property
     def amps(self) -> np.ndarray:
         """Dense amplitude tensor (materializes the full volume — use with care)."""
-        return self.data.toarray()
+        return np.asarray(self.data.toarray())
 
     # -- factories -----------------------------------------------------------
 

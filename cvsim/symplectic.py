@@ -6,7 +6,7 @@ Prefer this module over cvsim.gaussian.symplectic (compat shim).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -57,7 +57,7 @@ def d_displace(nmode: int, alpha: complex, mode: int = 0, *, backend: str = "num
     alpha = complex(alpha)
     d = xp.zeros(2 * nmode, dtype=float)
     d = _set(xp, d, (mode,), xp.sqrt(2.0) * alpha.real)
-    return _set(xp, d, (nmode + mode,), xp.sqrt(2.0) * alpha.imag)
+    return cast(np.ndarray, _set(xp, d, (nmode + mode,), xp.sqrt(2.0) * alpha.imag))
 
 
 def S_squeeze(nmode: int, r: float, mode: int = 0, *, backend: str = "numpy") -> np.ndarray:
@@ -70,7 +70,7 @@ def S_squeeze(nmode: int, r: float, mode: int = 0, *, backend: str = "numpy") ->
     xp = _get_xp(backend)
     S = xp.eye(2 * nmode)
     S = _set(xp, S, (mode, mode), xp.exp(-r))
-    return _set(xp, S, (nmode + mode, nmode + mode), xp.exp(r))
+    return cast(np.ndarray, _set(xp, S, (nmode + mode, nmode + mode), xp.exp(r)))
 
 
 def S_phase(nmode: int, theta: float, mode: int = 0, *, backend: str = "numpy") -> np.ndarray:
@@ -87,7 +87,7 @@ def S_phase(nmode: int, theta: float, mode: int = 0, *, backend: str = "numpy") 
     S = _set(xp, S, (i, i), c)
     S = _set(xp, S, (i, p), -s)
     S = _set(xp, S, (p, i), s)
-    return _set(xp, S, (p, p), c)
+    return cast(np.ndarray, _set(xp, S, (p, p), c))
 
 
 def S_beamsplitter(

@@ -87,6 +87,7 @@ def scan_circuit(circuit: LabCircuit, sweep: dict[str, Any]) -> dict[str, Any]:
         raise CircuitV0Error("sweep.n must be an int in [2, 200]")
 
     core = circuit.core
+    assert core is not None  # scan is Gaussian-path only (Fock has core=None)
     node = next((nd for nd in core.ops if nd.id == node_id), None)
     if node is None:
         raise CircuitV0Error(f"sweep: unknown node_id {node_id!r}")
@@ -118,7 +119,7 @@ def scan_circuit(circuit: LabCircuit, sweep: dict[str, Any]) -> dict[str, Any]:
     xs = np.linspace(pmin, pmax, n)
     ys: list[float | None] = []
     for x in xs:
-        st = compiled.run(sweep_x=float(x))  # type: ignore[no-untyped-call]
+        st = compiled.run(sweep_x=float(x))
         ys.append(_safe_logneg(st, list(modes_A)))
     return {
         "node_id": node_id,

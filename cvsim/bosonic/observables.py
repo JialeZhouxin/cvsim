@@ -45,7 +45,7 @@ def _mean_photon_component(c: Component, mode: int | None) -> complex:
     def one(i: int) -> complex:
         xx = V[i, i] + r[i] ** 2
         pp = V[m + i, m + i] + r[m + i] ** 2
-        return 0.5 * (xx + pp - 1.0)
+        return complex(0.5 * (xx + pp - 1.0))
 
     if mode is not None:
         if not 0 <= mode < m:

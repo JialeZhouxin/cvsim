@@ -17,6 +17,8 @@ Honesty note: ``log_neg_loss`` mirrors the *per-term* PPT log-negativity
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import numpy as np
 
 from cvsim.backend import _get_xp, _set
@@ -32,19 +34,19 @@ def apply_gaussian(backend: str, S: np.ndarray, V: np.ndarray) -> np.ndarray:
     xp = _get_xp(backend)
     S = xp.asarray(S, dtype=float)
     V = xp.asarray(V, dtype=float)
-    return S @ V @ S.T
+    return cast(np.ndarray, S @ V @ S.T)
 
 
-def _partial_transpose(xp, V: np.ndarray, nmode: int, modes_A: list[int]) -> np.ndarray:
+def _partial_transpose(xp: Any, V: np.ndarray, nmode: int, modes_A: list[int]) -> np.ndarray:
     """V ↦ Λ V Λ with p-quadrature flip on modes_A (xxpp; mirror of analyse)."""
     lam = xp.ones(2 * nmode, dtype=float)
     for k in modes_A:
         lam = _set(xp, lam, (nmode + k,), -1.0)
     L = xp.diag(lam)
-    return L @ V @ L
+    return cast(np.ndarray, L @ V @ L)
 
 
-def _raw_symplectic_spectrum(xp, V: np.ndarray) -> np.ndarray:
+def _raw_symplectic_spectrum(xp: Any, V: np.ndarray) -> np.ndarray:
     """|eig(i Ω V)| one-per-pair (no vacuum-floor clip; mirror of analyse).
 
     PT covariances are typically not positive-definite, so the Cholesky path
@@ -53,10 +55,10 @@ def _raw_symplectic_spectrum(xp, V: np.ndarray) -> np.ndarray:
     m = V.shape[0] // 2
     ev = xp.linalg.eigvals(1j * xp.asarray(omega(m)) @ V)
     nu_all = xp.sort(xp.abs(ev.real))
-    return nu_all[::2]
+    return cast(np.ndarray, nu_all[::2])
 
 
-def log_neg_loss(backend: str, V: np.ndarray, modes_A: int) -> np.ndarray:
+def log_neg_loss(backend: str, V: np.ndarray, modes_A: int) -> float:
     """Log-negativity E_N(V, modes_A) in bits — jnp-differentiable.
 
     Mirrors ``analyse.log_negativity`` on the given backend:
@@ -81,4 +83,4 @@ def log_neg_loss(backend: str, V: np.ndarray, modes_A: int) -> np.ndarray:
     nu = _raw_symplectic_spectrum(xp, Vp)
     # log2 guard mirrors analyse.py (floor only against float noise, not a cutoff)
     contrib = -xp.log2(xp.maximum(2.0 * nu, 1e-300))
-    return xp.sum(xp.maximum(contrib, 0.0))
+    return cast(float, xp.sum(xp.maximum(contrib, 0.0)))

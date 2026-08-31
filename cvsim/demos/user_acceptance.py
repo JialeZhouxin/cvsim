@@ -28,7 +28,7 @@ from cvsim.bosonic import (
 from cvsim.bosonic import (
     phase as b_phase,
 )
-from cvsim.fock import FockState, norm
+from cvsim.fock import FockDensity, FockState, norm
 from cvsim.fock import beamsplitter as f_bs
 from cvsim.fock import loss as f_loss
 from cvsim.fock import mean_photon as f_n
@@ -114,6 +114,7 @@ def _u4() -> tuple[bool, str]:
     cutoffs = [4, 6, 8, 12, 20]
     errs = [abs(f_n(f_squeeze(FockState.vacuum(N), r)) - n_ex) for N in cutoffs]
     rich = f_squeeze_gate(FockState.vacuum(40), r)
+    assert isinstance(rich, FockState)
     low = FockState(amps=rich.amps[:4].copy())
     deficit = 1.0 - norm(low)
     ok = errs[-1] < 1e-3 and errs[-1] < errs[0] and deficit > 1e-4
@@ -197,7 +198,7 @@ def _u8() -> tuple[bool, str]:
         and abs(f_trace(rho) - 1.0) < 1e-12
     )
 
-    ok = b_cond_ok and g_samp_ok and gb_ok and f_ok
+    ok = bool(b_cond_ok and g_samp_ok and gb_ok and f_ok)
     return ok, f"B_cond={b_cond_ok} G_samp={g_samp_ok} GB={gb_ok} F_loss={f_ok}"
 
 
@@ -208,7 +209,9 @@ def _u9() -> tuple[bool, str]:
     w_ok = abs(w_vac - 1.0 / np.pi) < 1e-12 and w1 < -1e-3
 
     rho = f_loss(FockState.fock(1, 12), 0.4)
+    assert isinstance(rho, FockDensity)
     rho2 = f_displace(rho, 0.3)
+    assert isinstance(rho2, FockDensity)
     dens_ok = abs(f_trace(rho2) - 1.0) < 1e-10
 
     o, st = homodyne_sample_and_condition(GaussianState.vacuum(1), rng=np.random.default_rng(1))

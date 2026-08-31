@@ -53,7 +53,7 @@ def _dens_joint_pn(state: FockLike) -> np.ndarray:
 
 def mean_photon(state: FockLike, mode: int | None = None) -> float:
     """⟨n⟩ from pure |c|² or from diag(ρ)."""
-    if _is_density(state):
+    if isinstance(state, FockDensity):
         if state.nmode == 1:
             if mode is not None and mode != 0:
                 raise IndexError(f"mode {mode} out of range for nmode=1")
@@ -99,7 +99,7 @@ def pnrd_probs(state: FockLike, mode: int | None = None) -> np.ndarray:
     Gaussian-state counterpart (joint P(n) via thewalrus):
     ``cvsim.gaussian.pnr_probs``.
     """
-    if _is_density(state):
+    if isinstance(state, FockDensity):
         if state.nmode == 1:
             if mode is not None and mode != 0:
                 raise IndexError(f"mode {mode} out of range for nmode=1")
@@ -183,7 +183,7 @@ def _ho_basis_x(N: int, x: np.ndarray) -> np.ndarray:
 def _amps_for_phi(amps: np.ndarray, phi: float) -> np.ndarray:
     """Rotate so that measuring x is measuring x_φ: |n⟩ → e^{-i n φ}|n⟩."""
     n = np.arange(amps.size)
-    return amps * np.exp(-1j * phi * n)
+    return np.asarray(amps * np.exp(-1j * phi * n))
 
 
 def _pdf_from_amps(amps: np.ndarray, qs: np.ndarray) -> np.ndarray:
@@ -194,7 +194,7 @@ def _pdf_from_amps(amps: np.ndarray, qs: np.ndarray) -> np.ndarray:
     s = pdf.sum()
     if s <= _EPS:
         raise ValueError("homodyne_sample: PDF sum ~ 0")
-    return pdf / s
+    return np.asarray(pdf / s)
 
 
 def homodyne_sample(
@@ -257,7 +257,7 @@ def _x_phi_matrix(cutoff: int, phi: float) -> np.ndarray:
     a = annihilation(cutoff)
     ad = a.conj().T
     eip = np.exp(-1j * phi)
-    return (eip * a + np.conj(eip) * ad) / np.sqrt(2.0)
+    return np.asarray((eip * a + np.conj(eip) * ad) / np.sqrt(2.0))
 
 
 def _x_eigen_amps(cutoff: int, outcome: float, phi: float) -> np.ndarray:
@@ -435,15 +435,15 @@ def _marginal_density(state: FockLike, mode: int) -> np.ndarray:
             return state.rho
         rho4 = state.rho.reshape(N, N, N, N)
         if mode == 0:
-            return np.einsum("abcb->ac", rho4)
-        return np.einsum("abad->bd", rho4)
+            return np.asarray(np.einsum("abcb->ac", rho4))
+        return np.asarray(np.einsum("abad->bd", rho4))
     if state.nmode == 1:
         if mode != 0:
             raise IndexError(f"mode {mode} out of range for nmode=1")
-        return np.outer(state.amps, state.amps.conj())
+        return np.asarray(np.outer(state.amps, state.amps.conj()))
     if mode == 0:
-        return np.einsum("ab,cb->ac", state.amps, state.amps.conj())
-    return np.einsum("ab,ac->bc", state.amps, state.amps.conj())
+        return np.asarray(np.einsum("ab,cb->ac", state.amps, state.amps.conj()))
+    return np.asarray(np.einsum("ab,ac->bc", state.amps, state.amps.conj()))
 
 
 def _q_function(state: FockLike, mode: int, betas: np.ndarray) -> np.ndarray:

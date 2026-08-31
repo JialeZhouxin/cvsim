@@ -30,6 +30,8 @@ Honesty notes:
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import numpy as np
 from scipy.linalg import expm as _expm_np
 
@@ -38,18 +40,18 @@ from cvsim.fock import channels
 from cvsim.fock.gates import _squeeze_U
 
 
-def _expm(xp, G: np.ndarray) -> np.ndarray:
+def _expm(xp: Any, G: np.ndarray) -> np.ndarray:
     """Matrix exponential: scipy for numpy; jax.scipy.linalg for jax (lazy)."""
     if xp is np:
-        return _expm_np(G)
+        return np.asarray(_expm_np(G))
     import jax.scipy.linalg as jsl  # lazy: jax touched only on the jax path
 
-    return jsl.expm(G)
+    return cast(np.ndarray, jsl.expm(G))
 
 
-def _annihilation(xp, N: int) -> np.ndarray:
+def _annihilation(xp: Any, N: int) -> np.ndarray:
     """Truncated a with a|n⟩ = √n |n−1⟩ — mirror of ``gates.annihilation``."""
-    return xp.diag(xp.sqrt(xp.arange(1.0, N)), 1).astype(complex)
+    return cast(np.ndarray, xp.diag(xp.sqrt(xp.arange(1.0, N)), 1).astype(complex))
 
 
 def squeeze_u(backend: str, N: int, r: float) -> np.ndarray:
@@ -90,10 +92,10 @@ def kerr_diag(backend: str, N: int, chi: float) -> np.ndarray:
     """
     xp = _get_xp(backend)
     n = xp.arange(N)
-    return xp.diag(xp.exp(1j * chi * n * n))
+    return cast(np.ndarray, xp.diag(xp.exp(1j * chi * n * n)))
 
 
-def _cat_amps(xp, N: int, alpha: complex) -> np.ndarray:
+def _cat_amps(xp: Any, N: int, alpha: complex) -> np.ndarray:
     """Even cat (|α⟩ + |−α⟩)/√(2(1+e^{−2|α|²})) amplitudes, normalized.
 
     c_n = e^{−|α|²/2}·(1+(−1)ⁿ)·αⁿ/√n! / √(2(1+e^{−2|α|²})) — mirror of
@@ -101,16 +103,19 @@ def _cat_amps(xp, N: int, alpha: complex) -> np.ndarray:
     """
     n = xp.arange(N)
     fact = xp.concatenate([xp.ones(1), xp.cumprod(xp.arange(1.0, N))])
-    return (
-        xp.exp(-(abs(alpha) ** 2) / 2.0)
-        / xp.sqrt(2.0 * (1.0 + xp.exp(-2.0 * abs(alpha) ** 2)))
-        * (1.0 + (-1.0) ** n)
-        * alpha**n
-        / xp.sqrt(fact)
+    return cast(
+        np.ndarray,
+        (
+            xp.exp(-(abs(alpha) ** 2) / 2.0)
+            / xp.sqrt(2.0 * (1.0 + xp.exp(-2.0 * abs(alpha) ** 2)))
+            * (1.0 + (-1.0) ** n)
+            * alpha**n
+            / xp.sqrt(fact)
+        ),
     )
 
 
-def _loss_superop(xp, rho: np.ndarray, T: float) -> np.ndarray:
+def _loss_superop(xp: Any, rho: np.ndarray, T: float) -> np.ndarray:
     """ρ' = Σ_k E_k ρ E_k† (1-mode loss, transmissivity T).
 
     Kraus ops pre-built in numpy as a constant tensor (mirror of
@@ -119,7 +124,7 @@ def _loss_superop(xp, rho: np.ndarray, T: float) -> np.ndarray:
     """
     N = rho.shape[0]
     K = np.stack(channels._kraus_ops(N, T))
-    return xp.einsum("kam,mn,kbn->ab", K, rho, xp.conj(K))
+    return cast(np.ndarray, xp.einsum("kam,mn,kbn->ab", K, rho, xp.conj(K)))
 
 
 def cat_fidelity(
@@ -150,7 +155,7 @@ def cat_fidelity(
     if T < 1.0:
         rho = _loss_superop(xp, rho, T)
     cat = _cat_amps(xp, cutoff, alpha)
-    return xp.real(xp.conj(cat) @ rho @ cat)
+    return cast(float, xp.real(xp.conj(cat) @ rho @ cat))
 
 
 def bs_overlap(backend: str, theta: float, *, cutoff: int = 8) -> float:
@@ -164,4 +169,4 @@ def bs_overlap(backend: str, theta: float, *, cutoff: int = 8) -> float:
     psi = _set(xp, psi, (1, 0), 1.0)
     vec = psi.reshape(N * N)
     out = bs_u(backend, N, theta) @ vec
-    return xp.abs(out[1]) ** 2  # |⟨0,1|ψ⟩|²
+    return cast(float, xp.abs(out[1]) ** 2)  # |⟨0,1|ψ⟩|²

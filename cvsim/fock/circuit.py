@@ -90,12 +90,12 @@ def _kerr_diag(N: int, chi: float) -> np.ndarray:
 def _squeeze_U(N: int, r: float) -> np.ndarray:
     a = annihilation(N)
     ad = a.conj().T
-    return expm(0.5 * r * (a @ a - ad @ ad))
+    return np.asarray(expm(0.5 * r * (a @ a - ad @ ad)))
 
 
 def _displace_U(N: int, alpha: complex) -> np.ndarray:
     a = annihilation(N)
-    return expm(alpha * a.conj().T - np.conj(alpha) * a)
+    return np.asarray(expm(alpha * a.conj().T - np.conj(alpha) * a))
 
 
 def _bs_U(N: int, theta: float, phi: float) -> np.ndarray:
@@ -103,13 +103,13 @@ def _bs_U(N: int, theta: float, phi: float) -> np.ndarray:
     a = annihilation(N)
     ad = a.conj().T
     G = theta * (np.exp(1j * phi) * np.kron(ad, a) - np.exp(-1j * phi) * np.kron(a, ad))
-    return expm(G)
+    return np.asarray(expm(G))
 
 
 def _tms_U(N: int, r: float) -> np.ndarray:
     a = annihilation(N)
     ad = a.conj().T
-    return expm(r * (np.kron(ad, ad) - np.kron(a, a)))
+    return np.asarray(expm(r * (np.kron(ad, ad) - np.kron(a, a))))
 
 
 def _quadrature_matrices(N: int) -> tuple[np.ndarray, np.ndarray]:
@@ -121,12 +121,12 @@ def _quadrature_matrices(N: int) -> tuple[np.ndarray, np.ndarray]:
 
 def _cz_U(N: int, weight: float) -> np.ndarray:
     x, _ = _quadrature_matrices(N)
-    return expm(1j * weight * np.kron(x, x))
+    return np.asarray(expm(1j * weight * np.kron(x, x)))
 
 
 def _cx_U(N: int, weight: float) -> np.ndarray:
     x, p = _quadrature_matrices(N)
-    return expm(1j * weight * np.kron(x, p))
+    return np.asarray(expm(1j * weight * np.kron(x, p)))
 
 
 def _mz_U(N: int, theta: float, phi: float) -> np.ndarray:
@@ -134,7 +134,7 @@ def _mz_U(N: int, theta: float, phi: float) -> np.ndarray:
     bs1 = _bs_U(N, theta, phi)
     ph = _phase_diag(N, phi)
     bs2 = _bs_U(N, np.pi / 4, 0.0)
-    return bs2 @ np.kron(np.eye(N), ph) @ bs1
+    return np.asarray(bs2 @ np.kron(np.eye(N), ph) @ bs1)
 
 
 def _factor1(op_name: str, N: int, fixed: dict[str, Any]) -> np.ndarray:
@@ -186,7 +186,7 @@ def _interferometer_U(Ns: tuple[int, ...], U: np.ndarray) -> np.ndarray:
                 else:
                     term = np.kron(term, np.eye(Ns[k], dtype=complex))
             H = H + L[i, j] * term
-    return expm(H)
+    return np.asarray(expm(H))
 
 
 def _kron_apply(U1: np.ndarray, amps: np.ndarray, mode: int) -> np.ndarray:
@@ -210,7 +210,7 @@ def _full_apply(U: np.ndarray, amps: np.ndarray) -> np.ndarray:
     d = amps.size
     if U.shape != (d, d):
         raise ValueError(f"U shape {U.shape} incompatible with state dim {d}")
-    return U @ amps.ravel()
+    return np.asarray(U @ amps.ravel())
 
 
 class FockCircuit:
@@ -438,7 +438,7 @@ class FockCircuit:
         )
         return CompiledFock(self.nmode, self.cutoffs, segments, params, initial=self.initial)
 
-    def run(self, *, rng=None, **params: float) -> Any:
+    def run(self, *, rng: Any = None, **params: float) -> Any:
         """Execute with parameter values (single path: compile then run).
 
         Returns ``FockState`` if no measurements, else
@@ -504,7 +504,9 @@ class CompiledFock(CompiledCircuit):
             amps[tuple(self.initial)] = 1.0  # per-mode Fock number state
         return FockState(amps=amps)
 
-    def _apply_merged(self, ops, nmode, values, st):
+    def _apply_merged(
+        self, ops: list[tuple[Any, ...]], nmode: int, values: dict[str, Any], st: Any
+    ) -> Any:
         if isinstance(st, FockDensity):
             return self._apply_merged_density(ops, values, st)
         amps = st.amps
@@ -558,7 +560,9 @@ class CompiledFock(CompiledCircuit):
                     )
         return FockState(amps=amps)
 
-    def _apply_merged_density(self, ops, values, st) -> FockDensity:
+    def _apply_merged_density(
+        self, ops: list[tuple[Any, ...]], values: dict[str, Any], st: FockDensity
+    ) -> FockDensity:
         """ρ' = U ρ U† per merged op (Kronecker, no full-space material)."""
         rho = st.rho
         Ns = tuple(self.cutoffs)
@@ -602,6 +606,7 @@ class CompiledFock(CompiledCircuit):
             if v not in values:
                 raise ValueError(f"Missing parameter '{v}' for {op_name}")
             kwargs[k] = values[v]
+        val: float | complex
         if op_name == "measure_pnr":
             val, st = pnr_sample_and_condition(st, modes[0], rng=rng)
             results[kwargs["name"]] = val

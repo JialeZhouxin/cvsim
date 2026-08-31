@@ -274,7 +274,9 @@ class GaussianCircuit:
 
         *rng* seeds Homodyne sampling for reproducible measurements.
         """
-        return self.compile().run(rng=rng, **params)
+        r = self.compile().run(rng=rng, **params)
+        assert isinstance(r, (GaussianState, tuple))
+        return r
 
     # -- serialization (circuit_v1 IR, ADR-0003) --------------------------
 

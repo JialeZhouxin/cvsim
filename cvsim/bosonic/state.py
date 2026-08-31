@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -76,7 +77,7 @@ class BosonicState:
         # gates still refuse empty states via gates._nmode.
         if not self.components:
             return 0
-        return self.components[0].V.shape[0] // 2
+        return int(self.components[0].V.shape[0] // 2)
 
     @classmethod
     def vacuum(cls, nmode: int = 1) -> BosonicState:
@@ -94,7 +95,7 @@ class BosonicState:
         )
 
     @classmethod
-    def from_gaussian(cls, state) -> BosonicState:
+    def from_gaussian(cls, state: Any) -> BosonicState:
         """Wrap object with .V and .rbar as one component w=1 (duck type)."""
         return cls(
             components=[

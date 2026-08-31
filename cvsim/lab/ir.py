@@ -472,6 +472,7 @@ def _apply_measure(
     ``gaussian/compile.py:_run_op`` which also skips remove_mode for heterodyne).
     threshold is rejected (Q6=C: Gaussian Lab never supported it).
     """
+    outcome: float | complex
     if op_name == "measure_homodyne":
         phi = _num(fixed.get("phi", 0.0), where, "phi")
         if rng is None:
@@ -524,7 +525,9 @@ def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> 
     measured: list[dict[str, Any]] = []
     # IR node pointer aligned with segment order: merged segments consume
     # len(ops) IR nodes, break-point op segments consume 1.
-    ir_nodes = circuit.core.ops
+    core = circuit.core
+    assert core is not None  # execution path is Gaussian (Fock uses run_circuit)
+    ir_nodes = core.ops
     ir_idx = 0
     run_results: dict[str, float] = {}  # ParamRef sources for feedforward ops
     for seg in compiled._segments:

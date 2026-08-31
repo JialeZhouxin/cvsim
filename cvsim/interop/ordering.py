@@ -32,7 +32,7 @@ def _check(V: np.ndarray, rbar: np.ndarray) -> int:
     rbar = np.asarray(rbar, dtype=float)
     if rbar.shape != (n,):
         raise ValueError(f"rbar must have shape ({n},), got {rbar.shape}")
-    return n // 2
+    return int(n // 2)
 
 
 def to_xpxp(V: np.ndarray, rbar: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

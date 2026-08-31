@@ -143,11 +143,11 @@ def _compile_segments(
 def _run_op(
     op: tuple[Any, ...],
     st: GaussianState,
-    results: dict[str, float],
+    results: dict[str, float | complex],
     values: dict[str, Any],
     *,
     rng: np.random.Generator | None = None,
-) -> tuple[GaussianState, dict[str, float]]:
+) -> tuple[GaussianState, dict[str, float | complex]]:
     """Execute one break-point op (channel / measure / ParamRef op).
 
     Values already bound for ``pnames``; ParamRef resolved from ``results``.
@@ -160,13 +160,14 @@ def _run_op(
         kwargs[k] = values[v]
     if op_name == "measure_homodyne":
         phys_mode = modes[0]
+        val: float | complex
         val, st = homodyne_sample_and_condition(st, phys_mode, kwargs["phi"], rng=rng)
         results[kwargs["name"]] = val
         st = st.remove_mode(phys_mode)
     elif op_name == "measure_heterodyne":
         phys_mode = modes[0]
-        val, st = heterodyne_sample_and_condition(st, phys_mode, rng=rng)
-        results[kwargs["name"]] = val
+        beta, st = heterodyne_sample_and_condition(st, phys_mode, rng=rng)
+        results[kwargs["name"]] = beta
     elif op_name == "measure_threshold":
         val = sample_threshold(st, modes[0], rng=rng)
         results[kwargs["name"]] = int(val)
@@ -246,10 +247,14 @@ _DISPATCH = {
 
 def _apply(op_name: str, st: GaussianState, modes: tuple[int, ...], **kwargs: Any) -> GaussianState:
     """Dispatch one op (channels + dynamic unitary ops)."""
-    return _DISPATCH[op_name](st, modes, **kwargs)
+    r = _DISPATCH[op_name](st, modes, **kwargs)
+    assert isinstance(r, GaussianState)
+    return r
 
 
-def _squeeze_gate(st, m, r, phi=0.0):
+def _squeeze_gate(
+    st: GaussianState, m: tuple[int, ...], r: float, phi: float = 0.0
+) -> GaussianState:
     return apply_symplectic(
         st,
         _factor(("squeeze", m, {"r": r, "phi": phi}, {}, {}), st.nmode)[0],
@@ -257,7 +262,7 @@ def _squeeze_gate(st, m, r, phi=0.0):
     )
 
 
-def _displace_gate(st, m, alpha):
+def _displace_gate(st: GaussianState, m: tuple[int, ...], alpha: complex) -> GaussianState:
     return apply_symplectic(
         st,
         np.eye(2 * st.nmode),
@@ -266,47 +271,47 @@ def _displace_gate(st, m, alpha):
     )
 
 
-def _phase_gate(st, m, theta):
+def _phase_gate(st: GaussianState, m: tuple[int, ...], theta: float) -> GaussianState:
     return apply_symplectic(st, S_phase(st.nmode, theta, m[0]), validate=False)
 
 
-def _bs_gate(st, m1, m2, theta, phi):
+def _bs_gate(st: GaussianState, m1: int, m2: int, theta: float, phi: float) -> GaussianState:
     return apply_symplectic(st, S_beamsplitter(st.nmode, m1, m2, theta, phi), validate=False)
 
 
-def _mz_gate(st, m1, m2, theta, phi):
+def _mz_gate(st: GaussianState, m1: int, m2: int, theta: float, phi: float) -> GaussianState:
     return apply_symplectic(st, S_mach_zehnder(st.nmode, m1, m2, theta, phi), validate=False)
 
 
-def _tms_gate(st, m1, m2, r):
+def _tms_gate(st: GaussianState, m1: int, m2: int, r: float) -> GaussianState:
     return apply_symplectic(st, S_two_mode_squeeze(st.nmode, r, m1, m2), validate=False)
 
 
-def _cz_gate(st, m1, m2, weight):
+def _cz_gate(st: GaussianState, m1: int, m2: int, weight: float) -> GaussianState:
     return apply_symplectic(st, S_CZ(st.nmode, weight, m1, m2), validate=False)
 
 
-def _cx_gate(st, m1, m2, weight):
+def _cx_gate(st: GaussianState, m1: int, m2: int, weight: float) -> GaussianState:
     return apply_symplectic(st, S_CX(st.nmode, weight, m1, m2), validate=False)
 
 
-def _interf_gate(st, U):
+def _interf_gate(st: GaussianState, U: np.ndarray) -> GaussianState:
     return apply_symplectic(st, S_from_unitary(U, validate=True), validate=False)
 
 
-def _loss_gate(st, T, mode, nbar):
+def _loss_gate(st: GaussianState, T: float, mode: int, nbar: float) -> GaussianState:
     from cvsim.gaussian.channels import loss as loss_fn
 
     return loss_fn(st, T, mode, nbar)
 
 
-def _amp_gate(st, G, mode, nbar):
+def _amp_gate(st: GaussianState, G: float, mode: int | None, nbar: float) -> GaussianState:
     from cvsim.gaussian.channels import amplifier as amp_fn
 
     return amp_fn(st, G, mode, nbar)
 
 
-def _pn_gate(st, sigma, mode):
+def _pn_gate(st: GaussianState, sigma: float, mode: int | None) -> GaussianState:
     from cvsim.gaussian.channels import phase_noise as pn_fn
 
     return pn_fn(st, sigma, mode)

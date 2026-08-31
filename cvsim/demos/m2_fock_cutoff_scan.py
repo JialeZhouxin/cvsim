@@ -22,6 +22,7 @@ def main() -> None:
     errs = []
     for N in CUTOFFS:
         st = squeeze(FockState.vacuum(N), r=R)
+        assert isinstance(st, FockState)
         n = mean_photon(st)
         nm = norm(st)
         err = abs(n - N_EXACT)
@@ -38,6 +39,7 @@ def main() -> None:
     # AC2.3: true truncation deficit — evolve at high cutoff, then chop to low N
     # (truncated unitary alone preserves ‖ψ‖; projecting infinite/high space does not)
     rich = squeeze_gate(FockState.vacuum(40), r=R)
+    assert isinstance(rich, FockState)
     low = project_to_cutoff(rich.amps, 4)
     deficit = 1.0 - norm(low)
     print(f"  project N=40→4: retained prob={norm(low):.6f}  deficit={deficit:.3e}")

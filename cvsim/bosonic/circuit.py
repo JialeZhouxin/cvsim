@@ -248,7 +248,9 @@ class BosonicCircuit:
         self, *, rng: np.random.Generator | None = None, **params: float
     ) -> BosonicState | tuple[BosonicState, dict[str, float]]:
         """Execute circuit. Returns ``BosonicState`` or ``(state, results)``."""
-        return self.compile().run(rng=rng, **params)
+        r = self.compile().run(rng=rng, **params)
+        assert isinstance(r, (BosonicState, tuple))
+        return r
 
     # -- serialization (circuit_v1 IR, ADR-0003) --------------------------
 
@@ -288,6 +290,10 @@ class BosonicCircuit:
 
     @staticmethod
     def _partition(
-        op_name: str, modes: list[int], *, _fixed_str_keys: frozenset[str] = frozenset(), **kwargs
+        op_name: str,
+        modes: list[int],
+        *,
+        _fixed_str_keys: frozenset[str] = frozenset(),
+        **kwargs: Any,
     ) -> tuple[str, tuple[int, ...], dict[str, Any], dict[str, str], dict[str, ParamRef]]:
         return partition(op_name, modes, _fixed_str_keys=_fixed_str_keys, **kwargs)

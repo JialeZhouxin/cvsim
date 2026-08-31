@@ -21,7 +21,7 @@ from cvsim.symplectic import (
 def _nmode(state: BosonicState) -> int:
     if not state.components:
         raise ValueError("empty BosonicState")
-    return state.components[0].V.shape[0] // 2
+    return int(state.components[0].V.shape[0] // 2)
 
 
 def apply_symplectic(

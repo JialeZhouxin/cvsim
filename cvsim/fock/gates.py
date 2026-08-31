@@ -57,7 +57,7 @@ def _squeeze_U(N: int, r: float) -> np.ndarray:
     a = annihilation(N)
     ad = a.conj().T
     G = 0.5 * r * (a @ a - ad @ ad)
-    return expm(G)
+    return np.asarray(expm(G))
 
 
 def _displace_U(N: int, alpha: complex) -> np.ndarray:
@@ -65,7 +65,7 @@ def _displace_U(N: int, alpha: complex) -> np.ndarray:
     ad = a.conj().T
     alpha = complex(alpha)
     G = alpha * ad - np.conj(alpha) * a
-    return expm(G)
+    return np.asarray(expm(G))
 
 
 def squeeze(state: FockLike1, r: float, mode: int = 0) -> FockLike1:
@@ -220,7 +220,7 @@ def mach_zehnder(
 
     def G_bs(th: float, ph: float) -> np.ndarray:
         eip = np.exp(1j * ph)
-        return th * (eip * a0.conj().T @ a1 - np.conj(eip) * a1.conj().T @ a0)
+        return np.asarray(th * (eip * a0.conj().T @ a1 - np.conj(eip) * a1.conj().T @ a0))
 
     n = np.arange(N)
     P = np.diag(np.exp(1j * phi * n))

@@ -113,7 +113,7 @@ def symplectic_eigenvalues(
     nu = nu_all[::2]
     # Clip roundoff below the vacuum floor; atol makes the floor adjustable.
     nu = np.maximum(nu, 0.5 - atol)
-    return nu.astype(float)
+    return np.asarray(nu.astype(float))
 
 
 def purity(
@@ -264,7 +264,7 @@ def _partial_transpose_cov(
     for k in modes_A:
         lam[nmode + k] = -1.0
     L = np.diag(lam)
-    return L @ V @ L
+    return np.asarray(L @ V @ L)
 
 
 def _symplectic_eigenvalues_raw(V: np.ndarray) -> np.ndarray:

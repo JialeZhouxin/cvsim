@@ -34,7 +34,7 @@ class GaussianState:
 
     @property
     def nmode(self) -> int:
-        return self.V.shape[0] // 2
+        return int(self.V.shape[0] // 2)
 
     def is_physical(self, *, atol: float = 1e-10) -> bool:
         """Uncertainty relation V + iΩ/2 ≽ 0 (ħ=1, xxpp)."""

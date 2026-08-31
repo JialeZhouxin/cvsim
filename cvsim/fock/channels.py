@@ -10,16 +10,6 @@ from cvsim.fock.density import FockDensity
 from cvsim.fock.state import FockState
 
 
-def _to_density(state: FockState | FockDensity) -> FockDensity:
-    if isinstance(state, FockDensity):
-        return state
-    if isinstance(state, FockState):
-        if state.nmode not in (1, 2):
-            raise ValueError("fock.loss supports nmode 1 or 2 only")
-        return FockDensity.from_pure(state)
-    raise TypeError("state must be FockState or FockDensity")
-
-
 def _kraus_ops(N: int, T: float) -> list[np.ndarray]:
     """E_k |n⟩ = √C(n,k) (√T)^{n-k} (√(1-T))^k |n-k⟩, k=0..N-1."""
     sT = np.sqrt(T)
@@ -40,7 +30,7 @@ def _apply_kraus_1mode(rho: np.ndarray, T: float) -> np.ndarray:
     out = np.zeros((N, N), dtype=complex)
     for E in _kraus_ops(N, T):
         out += E @ rho @ E.conj().T
-    return 0.5 * (out + out.conj().T)
+    return np.asarray(0.5 * (out + out.conj().T))
 
 
 def _apply_kraus_2mode_side(rho: np.ndarray, N: int, T: float, mode: int) -> np.ndarray:
@@ -50,7 +40,7 @@ def _apply_kraus_2mode_side(rho: np.ndarray, N: int, T: float, mode: int) -> np.
     for E in _kraus_ops(N, T):
         Ef = np.kron(E, eye) if mode == 0 else np.kron(eye, E)
         out += Ef @ rho @ Ef.conj().T
-    return 0.5 * (out + out.conj().T)
+    return np.asarray(0.5 * (out + out.conj().T))
 
 
 def loss(

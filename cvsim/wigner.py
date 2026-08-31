@@ -37,7 +37,7 @@ def wigner_point_gaussian(V: np.ndarray, rbar: np.ndarray, x: float, p: float) -
     s_boost = float(s @ Vinv @ s)
     env = pref * np.exp(-0.5 * quad + 0.5 * s_boost)
     phase = complex(np.exp(1j * float(delta @ Vinv @ s)))
-    return env * phase
+    return complex(env * phase)
 
 
 def wigner_gaussian(state: GaussianState, x: float, p: float) -> float:
@@ -62,7 +62,7 @@ def _wigner_kernel_nm(n: int, m: int, x: float, p: float) -> complex:
     pref = np.exp(-2.0 * r2) / np.pi
     if n <= m:
         lag = eval_genlaguerre(n, m - n, 4.0 * r2)
-        return (
+        return complex(
             pref
             * ((-1.0) ** n)
             * np.sqrt(factorial(n) / factorial(m))
@@ -70,7 +70,7 @@ def _wigner_kernel_nm(n: int, m: int, x: float, p: float) -> complex:
             * lag
         )
     lag = eval_genlaguerre(m, n - m, 4.0 * r2)
-    return (
+    return complex(
         pref * ((-1.0) ** m) * np.sqrt(factorial(m) / factorial(n)) * (2.0 * alpha) ** (n - m) * lag
     )
 
@@ -151,11 +151,11 @@ def wigner_grid(
     X, P = np.meshgrid(xs, ps, indexing="xy")
     if isinstance(state, GaussianState):
 
-        def fn(x, p):
+        def fn(x: float, p: float) -> float:
             return wigner_gaussian(state, x, p)
     elif isinstance(state, BosonicState):
 
-        def fn(x, p):
+        def fn(x: float, p: float) -> float:
             return wigner_bosonic(state, x, p)
     elif isinstance(state, (FockState, FockDensity)):
         if state.nmode != 1:

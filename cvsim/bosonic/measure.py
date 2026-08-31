@@ -242,7 +242,7 @@ def _vacuum_probability_complex(V: np.ndarray, rbar: np.ndarray, mode: int) -> c
     if np.linalg.eigvalsh(A).min() <= 0.0:
         raise ValueError(f"V+½I on mode {mode} is not positive-definite")
     exponent = -0.5 * complex(r1 @ np.linalg.solve(A, r1))
-    return np.exp(exponent) / np.sqrt(np.linalg.det(A))
+    return complex(np.exp(exponent) / np.sqrt(np.linalg.det(A)))
 
 
 def p_click(state: BosonicState, mode: int = 0) -> float:
