@@ -69,8 +69,10 @@ class BosonicCircuit:
     def _resolve_initial(initial: list[str | None]) -> BosonicState:
         """Resolve a per-mode list of state-source names to a BosonicState.
 
-        Items: ``None`` = vacuum, ``"gkp0"`` / ``"gkp1"``; tensor-multiplied
-        component-wise for the multi-mode initial state (B6 R1).
+        Items: ``None`` = vacuum, ``"gkp0"`` / ``"gkp1"`` (1d X basis),
+        ``"gkp0_2d"`` / ``"gkp1_2d"`` (2d square-lattice Z basis, pure state
+        via ``cross="full"``); tensor-multiplied component-wise for the
+        multi-mode initial state (B6 R1).
         """
         from cvsim.bosonic.gkp import gkp0, gkp1
         from cvsim.bosonic.state import tensor_product
@@ -83,8 +85,15 @@ class BosonicCircuit:
                 states.append(gkp0())
             elif item == "gkp1":
                 states.append(gkp1())
+            elif item == "gkp0_2d":
+                states.append(gkp0(lattice="2d", cross="full"))
+            elif item == "gkp1_2d":
+                states.append(gkp1(lattice="2d", cross="full"))
             else:
-                raise ValueError(f"initial: unknown state source {item!r} (None|'gkp0'|'gkp1')")
+                raise ValueError(
+                    "initial: unknown state source {item!r} "
+                    "(None|'gkp0'|'gkp1'|'gkp0_2d'|'gkp1_2d')"
+                )
         return tensor_product(states)
 
     # -- L3: circuit composition ------------------------------------------

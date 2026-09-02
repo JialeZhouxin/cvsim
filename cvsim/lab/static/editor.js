@@ -128,11 +128,12 @@ function parseExtensions(payload, nmode) {
     }
     const bad = payload.initial.some((n) =>
       backend === "fock" ? (!Number.isInteger(n) || n < 0)
-      : !(n === null || n === "gkp0" || n === "gkp1"));
+      : !(n === null || n === "gkp0" || n === "gkp1"
+          || n === "gkp0_2d" || n === "gkp1_2d"));
     if (bad) {
       return { error: backend === "fock"
         ? `initial 必须是 ${nmode} 个非负整数`
-        : `initial 每项只能是 null / gkp0 / gkp1` };
+        : `initial 每项只能是 null / gkp0 / gkp1 / gkp0_2d / gkp1_2d` };
     }
     initial = [...payload.initial];
   }
@@ -624,7 +625,8 @@ export function initEditor(root, hooks) {
       const sel = document.createElement("select");
       sel.className = "select mono";
       const cur = initial ? initial[i] : null;
-      for (const [val, text] of [[null, "真空"], ["gkp0", "gkp0"], ["gkp1", "gkp1"]]) {
+      for (const [val, text] of [[null, "真空"], ["gkp0", "gkp0"], ["gkp1", "gkp1"],
+        ["gkp0_2d", "gkp0_2d(Z基)"], ["gkp1_2d", "gkp1_2d(Z基)"]]) {
         const opt = document.createElement("option");
         opt.value = val === null ? "" : val;
         opt.textContent = text;

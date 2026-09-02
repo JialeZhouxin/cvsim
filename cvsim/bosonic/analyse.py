@@ -38,9 +38,23 @@ import numpy as np
 from cvsim.bosonic.component_eng import is_hermitian
 from cvsim.bosonic.state import BosonicState, Component
 
+# Log-domain floor: float64 subnormal limit is ~4.9e-324 (ln ≈ −744.4).
+# Any per-pair Tr(ρᵢρⱼ) contribution whose total log-scale falls below this
+# is physically 0 (the weights/envelope have already underflowed); skipping
+# the exp() avoids both 0·inf=nan and subnormal precision garbage.
+_LOG_CUTOFF = -745.0
 
-def _M_complex(c1: np.ndarray, V1: np.ndarray, c2: np.ndarray, V2: np.ndarray) -> complex:
-    """∫ exp(−½(x−c₁)ᵀV₁⁻¹(x−c₁) − ½(x−c₂)ᵀV₂⁻¹(x−c₂)) dx (complex centers, general V)."""
+
+def _M_complex_log(
+    c1: np.ndarray, V1: np.ndarray, c2: np.ndarray, V2: np.ndarray
+) -> tuple[float, float]:
+    """log|M| + arg of the complex-centre Gaussian integral M.
+
+    Returns ``(log|M|, arg)`` so ``M = exp(log|M|)·exp(i·arg)``. Kept entirely
+    in the log domain — ``log|M|`` may be hundreds in magnitude (e.g. GKP
+    grid_size≥3 full-cross far pairs) but is a plain float, never ``exp``'d
+    here, so no overflow.
+    """
     A = np.linalg.inv(V1) + np.linalg.inv(V2)
     b = np.linalg.inv(V1) @ c1 + np.linalg.inv(V2) @ c2
     exp_arg = (
@@ -49,28 +63,56 @@ def _M_complex(c1: np.ndarray, V1: np.ndarray, c2: np.ndarray, V2: np.ndarray) -
     )
     # ∫ exp(-xᵀA x/2 + b·x) dx = (2π)^m/√det A · exp(½ bᵀA⁻¹b)
     m = V1.shape[0] // 2
-    return complex((2.0 * np.pi) ** m / np.sqrt(np.linalg.det(A)) * np.exp(exp_arg))
+    _, logdet_A = np.linalg.slogdet(A)
+    log_abs = m * np.log(2.0 * np.pi) - 0.5 * logdet_A + exp_arg.real
+    return log_abs, exp_arg.imag
 
 
-def _K_re(ci: Component, cj: Component) -> complex:
-    """Tr(ρ_i ρ_j) kernel = 2π ∫ Re[G(c_i)] Re[G(c_j)] with S factors."""
+def _K_pair(ci: Component, cj: Component) -> complex:
+    """Per-pair ``w_i·w_j·Tr(ρ_i ρ_j)`` (B7 strict-kernel term), log-domain merged.
+
+    ``Tr(ρ_i ρ_j) = 2π ∫ Re[G(c_i)]·Re[G(c_j)] = ½Re[M_i_j] + ½Re[M_i_j*]`` where
+    ``M`` is the complex-centre Gaussian integral. The S (amplitude) factor is
+    already folded into the component weights, so only the bare Wigner kernel
+    is used. The w amplitude factor *cancels* the large ``exp(+½sᵀV⁻¹s)`` boost
+    of far cross pairs (``JVJ=−¼V⁻¹`` identity) — analytically exact, but in
+    float the boost ``exp(+754)`` and the weight ``exp(−823)`` each go out of
+    range before meeting. This computes ``log|w_i| + log|w_j| + log|M_kernel|``
+    in the log domain first, then only exponentiates a genuinely representable
+    result (or yields 0 for subnormal-scale contributions).
+    """
     c_i = np.asarray(ci.rbar, dtype=complex)
     c_j = np.asarray(cj.rbar, dtype=complex)
     Vi = np.asarray(ci.V, dtype=float)
     Vj = np.asarray(cj.V, dtype=float)
-    # prefactors: each G has pref = 1/(π^m √det(2V)); Re products:
-    # ∫Re[Gi]Re[Gj] = ½Re[∫GiGj] + ½Re[∫Gi conj(Gj)]
-    p1 = 1.0 / (np.pi ** (Vi.shape[0] // 2) * np.sqrt(np.linalg.det(2.0 * Vi)))
-    p2 = 1.0 / (np.pi ** (Vj.shape[0] // 2) * np.sqrt(np.linalg.det(2.0 * Vj)))
-    M1 = _M_complex(c_i, Vi, c_j, Vj)
-    M2 = _M_complex(c_i, Vi, np.conj(c_j), Vj)
-    # Numeric-stability note: |M| can overflow exp() for well-separated
-    # complex centres (s large, e.g. GKP grid_size≥3 full-cross far pairs)
-    # even though the physical result is finite through cancellation in the
-    # ½(M1+M2) Re combination. Large-s states are far outside the test
-    # envelope; see probe scripts for the verified range. ponytail: revisit
-    # with a shared log-scale factor if large-s cross states become relevant.
-    return complex(2.0 * np.pi * p1 * p2 * (0.5 * np.real(M1) + 0.5 * np.real(M2)))
+    m = Vi.shape[0] // 2
+    # prefactors: each G has pref = 1/(π^m √det(2V)); combined with the
+    # kernel 2π·½, log_lpre = log(2π) + log pᵢ + log pⱼ + log(½).
+    _, logdet_2Vi = np.linalg.slogdet(2.0 * Vi)
+    _, logdet_2Vj = np.linalg.slogdet(2.0 * Vj)
+    log_lpre = np.log(2.0 * np.pi) - m * np.log(np.pi) - 0.5 * logdet_2Vi \
+        - m * np.log(np.pi) - 0.5 * logdet_2Vj + np.log(0.5)
+    # M1 = ∫ G_i G_j, M2 = ∫ G_i conj(G_j): log-domain values.
+    log_a1, phase1 = _M_complex_log(c_i, Vi, c_j, Vj)
+    log_a2, phase2 = _M_complex_log(c_i, Vi, np.conj(c_j), Vj)
+    # Re[M] = exp(log_a)·cos(phase). Combine M1,M2 sharing a common scale
+    # amax so the brackets exp(log_a − amax) ≤ 1 never overflow.
+    amax = max(log_a1, log_a2)
+    bracket = np.exp(log_a1 - amax) * np.cos(phase1) \
+        + np.exp(log_a2 - amax) * np.cos(phase2)
+    # Total log-scale: weights + kernel amplitude prefactor + shared boost.
+    # w is complex (phase carries interference sign, e.g. (—1)^k for 2d Z;
+    # cat cross weights can be ±i). Keep magnitude in log domain and carry
+    # the phase separately so complex w isn't truncated.
+    wi = complex(ci.w)
+    wj = complex(cj.w)
+    log_w_mag = np.log(abs(wi)) + np.log(abs(wj)) if wi and wj else -np.inf
+    w_phase = np.angle(wi) + np.angle(wj)
+    total_log = log_w_mag + log_lpre + amax
+    if not np.isfinite(total_log) or total_log < _LOG_CUTOFF:
+        return 0.0 + 0.0j
+    real_amp = bracket * np.exp(total_log)
+    return complex(real_amp * np.exp(1j * w_phase))
 
 
 def _strict_tr2(state_a: BosonicState, state_b: BosonicState | None = None) -> complex:
@@ -79,15 +121,18 @@ def _strict_tr2(state_a: BosonicState, state_b: BosonicState | None = None) -> c
     B7 convention: S (amplitude factor ⟨g_a|g_b⟩) is folded into the
     component weights (w_cross = ±ov/N for cat; c_i c_j S_ij / Z for GKP)
     — the public weight_sum = Σw = 1 semantics — so the kernel here is the
-    bare Wigner inner product ``_K_re`` = 2π ∫ Re[G(c_i)]·Re[G(c_j)], with
-    no extra S factor (w already carries it).
+    bare Wigner inner product, with no extra S factor (w already carries it).
+
+    Per-pair terms go through ``_K_pair``, which absorbs ``w_i·w_j`` and
+    merges everything in the log domain (``_LOG_CUTOFF``) so far-pair
+    complex-centre exponentials never overflow (B7 numeric stability).
     """
     comps_a = state_a.components
     comps_b = state_a.components if state_b is None else state_b.components
     acc = 0.0 + 0.0j
     for ci in comps_a:
         for cj in comps_b:
-            acc += ci.w * cj.w * _K_re(ci, cj)
+            acc += _K_pair(ci, cj)
     return acc
 
 

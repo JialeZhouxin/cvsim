@@ -801,6 +801,12 @@ test("F7: stateFromJson — backend/initial/cutoff 解析 + 校验", () => {
   assert.equal(bo.state.backend, "bosonic");
   assert.deepEqual(bo.state.initial, ["gkp0", null]);
   assert.ok(stateFromJson({ ...base, backend: "bosonic", initial: ["even_cat", null] }).error); // 未知态名
+  // GKP 2d Z 基初态名单(gkp0_2d/gkp1_2d)通过校验;未知态名仍拒收(AC-6)
+  const bo2d = stateFromJson({ ...base, backend: "bosonic", initial: ["gkp0_2d", null] });
+  assert.equal(bo2d.error, undefined);
+  assert.equal(bo2d.state.backend, "bosonic");
+  assert.deepEqual(bo2d.state.initial, ["gkp0_2d", null]);
+  assert.ok(stateFromJson({ ...base, backend: "bosonic", initial: ["gkp9", null] }).error); // 未知态名
   assert.ok(stateFromJson({ ...base, initial: [1] }).error); // 长度不符
   assert.ok(stateFromJson({ ...base, initial: [1, -1] }).error);
   assert.ok(stateFromJson({ ...base, cutoff: 0 }).error);
