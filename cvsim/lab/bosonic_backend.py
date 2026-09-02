@@ -31,7 +31,7 @@ def _bosonic_adaptive_n(state: BosonicState, n: int) -> int:
 
     Bosonic GKP states carry K~O(10-100) Gaussian components; a full
     n=64 grid on each is O(seconds per point). Cap the grid for large K
-    (aligns Fock F7 slowCutoff spirit — teaching view, not science grid).
+    (same spirit as Fock F7 slowCutoff: bounded cost, documented error).
     """
     k = state.n_components
     if k > 32:

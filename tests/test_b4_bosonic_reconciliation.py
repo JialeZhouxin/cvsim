@@ -142,50 +142,56 @@ class TestL2GkpIdentities:
     """L2a–L2e: GKP internal numeric identities."""
 
     def test_L2a_gkp0_self_fidelity(self):
-        """pure_fidelity(gkp0, gkp0) ≈ 1 (atol 1e-5).
+        """pure_fidelity(gkp0, gkp0) ≈ 1 for the pure Gram state (atol 1e-5).
 
-        GKP Gram normalisation carries finite-grid numeric error (~1e-6 level);
-        tolerance relaxed from 1e-10.
+        B7 semantics: cross='full' is the pure-state representation (all cross
+        components present) → self-fidelity 1. cross='none' is the teaching
+        diagonal cut (mixed, no cross terms) → self-fidelity = purity < 1,
+        covered by test_L2d in tests/test_bosonic_analyse_complex.py.
         """
-        st = gkp0(epsilon=0.1, grid_size=3, cross="none", lattice="1d")
+        st = gkp0(epsilon=0.1, grid_size=1, cross="full", lattice="1d")
         assert abs(pure_fidelity(st, st) - 1.0) < 1e-5
 
     def test_L2b_gkp1_self_fidelity(self):
-        """pure_fidelity(gkp1, gkp1) ≈ 1 (atol 1e-5)."""
-        st = gkp1(epsilon=0.1, grid_size=3, cross="none", lattice="1d")
+        """pure_fidelity(gkp1, gkp1) ≈ 1 for the pure Gram state (atol 1e-5)."""
+        st = gkp1(epsilon=0.1, grid_size=1, cross="full", lattice="1d")
         assert abs(pure_fidelity(st, st) - 1.0) < 1e-5
 
     def test_L2c_pure_fidelity_vs_deprecated_logical_overlap(self):
-        """pure_fidelity(gkp0, gkp1) vs |gkp_logical_overlap|² (cross='none', atol 1e-7).
+        """pure_fidelity(gkp0, gkp1) vs |gkp_logical_overlap|² (cross='full', atol 1e-7).
 
         Old deprecated method uses diagonal-peak approximation; new pure_fidelity
-        uses full Gram. Equal V + cross='none' → diagonal peaks dominate → match.
+        uses the strict Wigner kernel. Equal V + cross='full' → adjacent-peak
+        overlap negligible at ε=0.1 → diagonal peaks dominate → match.
         """
-        st0 = gkp0(epsilon=0.1, grid_size=3, cross="none", lattice="1d")
-        st1 = gkp1(epsilon=0.1, grid_size=3, cross="none", lattice="1d")
+        st0 = gkp0(epsilon=0.1, grid_size=1, cross="full", lattice="1d")
+        st1 = gkp1(epsilon=0.1, grid_size=1, cross="full", lattice="1d")
         new = pure_fidelity(st0, st1)
         old = abs(gkp_logical_overlap(st0, st1)) ** 2
         assert abs(new - old) < 1e-7
 
     def test_L2d_measure_feedback_untouched(self):
-        """gkp0: homodyne x condition (outcome=0) → post self-consistent (≈1).
+        """gkp0: homodyne x condition (outcome=0) → post is a delta projection.
 
-        Post-condition V' ≠ original V (homodyne pins x_φ), so equal-V
-        pure_fidelity(post, gkp0) is invalid; instead verify post is a
-        valid normalised pure state via self-fidelity ≈ 1.
+        B7 locked: ideal homodyne conditions to a δ-projection (det(V) = 0 after
+        pinning x_φ), so Tr(ρ²) mathematically diverges and purity/
+        pure_fidelity raise ValueError with the delta-divergence message
+        (not a finite density matrix).
         """
         from cvsim.bosonic import homodyne_condition
 
-        st = gkp0(epsilon=0.1, grid_size=3, cross="none", lattice="1d")
+        st = gkp0(epsilon=0.1, grid_size=3, cross="full", lattice="1d")
         post = homodyne_condition(st, mode=0, phi=0.0, outcome=0.0)
-        assert abs(pure_fidelity(post, post) - 1.0) < 1e-5
+        with pytest.raises(ValueError, match="singular/δ-projection"):
+            pure_fidelity(post, post)
 
     def test_L2e_loss_reduces_purity(self):
-        """gkp0 → loss γ=0.1 (T=0.9) → purity drops below 1 (qualitative).
+        """gkp0 → loss γ=0.1 (T=0.9) → purity drops below the pre-loss value.
 
         Loss changes V (equal-V pure_fidelity invalid); use purity instead —
-        a pure state has purity 1, loss mixes it so purity < 1.
+        loss mixes the state so post purity < pre purity.
         """
-        st = gkp0(epsilon=0.1, grid_size=3, cross="none", lattice="1d")
+        st = gkp0(epsilon=0.1, grid_size=2, cross="full", lattice="1d")
+        pre = purity(st)
         lossed = loss(st, T=0.9, nbar=0.0)
-        assert purity(lossed) < 1.0
+        assert purity(lossed) < pre

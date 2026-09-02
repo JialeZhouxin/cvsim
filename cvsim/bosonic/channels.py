@@ -58,6 +58,11 @@ def loss(
         raise ValueError(f"nbar must be >= 0, got {nbar}")
     m = state.nmode
     X, Y = _channel_XY(m, _acted_modes(m, mode), np.sqrt(T), (1.0 - T) * (nbar + 0.5))
+    # B7 w-convention: cross weights carry S_ij. Under pure loss the
+    # post-channel amplitude is S'_ij = S^T while the channel attenuates
+    # each off-diagonal component by κ = S^{1−T}; κ·S'_ij = S_ij, so the
+    # weights are UNCHANGED (only V, r̄ transform). Verified vs Fock
+    # (lossy cat purity 0.7454156756599988 both paths, 1e-15).
     return _apply_affine(state, X, Y)
 
 
@@ -78,6 +83,8 @@ def amplifier(
         raise ValueError(f"nbar must be >= 0, got {nbar}")
     m = state.nmode
     X, Y = _channel_XY(m, _acted_modes(m, mode), np.sqrt(G), (G - 1.0) * (nbar + 0.5))
+    # B7: same cancellation as loss — κ = S^{1−1/G}, post amplitude
+    # S' = S^{1/G}, κ·S' = S ⇒ weights unchanged (only V, r̄ transform).
     return _apply_affine(state, X, Y)
 
 

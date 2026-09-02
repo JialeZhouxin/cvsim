@@ -250,7 +250,8 @@ def homodyne_condition(
       w *= (2πσ)^{-1/2} exp(−(outcome−μ)²/(2σ))  # L may be complex
     Then renorm ∑w=1. Does not delete modes.
 
-    Honesty: teaching closed-form extension; not full Generaldyne POVM.
+    Honesty: closed-form extension (complex-centre analytic continuation);
+    not a full Generaldyne POVM (finite-resolution limit documented).
     """
     m = _check_mode(state, mode)
     u = np.zeros(2 * m, dtype=float)

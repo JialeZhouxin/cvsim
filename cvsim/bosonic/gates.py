@@ -46,6 +46,11 @@ def squeeze(state: BosonicState, r: float, mode: int = 0) -> BosonicState:
 
 def displace(state: BosonicState, alpha: complex, mode: int = 0) -> BosonicState:
     m = _nmode(state)
+    # D(α) is a pure phase-space translation in the Wigner representation
+    # (Weyl shift): r̄ ← r̄ + d, V and w unchanged. The relative phase of
+    # cross components is carried by Re[G(c)] itself (cos(δᵀV⁻¹s) term) —
+    # adding a w phase here double-counts (displaced-cat fidelity 0.7696
+    # instead of 0.79679).
     return apply_symplectic(state, np.eye(2 * m), d_displace(m, alpha, mode))
 
 

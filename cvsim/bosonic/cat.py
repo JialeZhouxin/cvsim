@@ -26,8 +26,11 @@ def _cat4(alpha: float, even: bool) -> BosonicState:
     # even: |ψ⟩∝|α⟩+|-α⟩,  odd: |α⟩-|-α⟩
     sign = 1.0 if even else -1.0
     # |ψ⟩ = (|α⟩ ± |-α⟩)/√N, N=2(1±ov)
-    # Wigner/Gaussian-component weights (note 04): diag 1/N, cross ±ov/N
-    # so ∑w = 2/N ± 2ov/N = 1
+    # Component weights for ρ = |ψ⟩⟨ψ|: diag 1/N, cross 1/N (the S_ij
+    # B7 convention: amplitude factor folded into w (w_cross = ±ov/N), so
+    # weight_sum(state) = Σw = 1 (public API semantics) and the Wigner
+    # kernel uses the no-S form (S lives in w). The Wigner component
+    # Re[G(c)] carries only phase; S itself multiplies the weight.
     norm = 2.0 * (1.0 + sign * ov)
     w_diag = 1.0 / norm
     w_cross = sign * ov / norm
