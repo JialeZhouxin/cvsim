@@ -222,15 +222,23 @@ try {
   const stale = await evalJs(ws, `(() => { const s = document.getElementById("scan-summary"); return { hidden: s.hidden, text: s.textContent }; })()`);
   check("new run clears stale scan summary (#8)", stale.hidden && stale.text === "", JSON.stringify(stale));
 
-  /* 4c. #6: colorbar min/max tick labels render finite numbers (max >= min) */
+  /* 4c. #6: symmetric Wigner color scale keeps W=0 at black. */
   const cb = await evalJs(ws, `(() => {
     const g = (id) => document.getElementById(id);
     const hi = Number(g("colorbar-max").textContent);
     const lo = Number(g("colorbar-min").textContent);
-    return { max: g("colorbar-max").textContent, min: g("colorbar-min").textContent,
-             ok: Number.isFinite(hi) && Number.isFinite(lo) && hi >= lo };
+    const zero = g("colorbar-zero")?.textContent;
+    return { max: g("colorbar-max").textContent, zero, min: g("colorbar-min").textContent,
+             ok: Number.isFinite(hi) && Number.isFinite(lo) && hi > 0 && lo < 0
+               && Math.abs(hi + lo) <= Math.max(1e-12, hi * 1e-6) && zero === "0" };
   })()`);
-  check("colorbar min/max tick labels rendered (#6)", cb.ok, JSON.stringify(cb));
+  check("colorbar symmetric ticks with zero marker", cb.ok, JSON.stringify(cb));
+  const zeroColor = await evalJs(ws, `(() => {
+    const ctx = document.getElementById("colorbar-canvas").getContext("2d");
+    const p = ctx.getImageData(4, 64, 1, 1).data;
+    return { rgb: [...p.slice(0, 3)], dark: Math.max(...p.slice(0, 3)) <= 12 };
+  })()`);
+  check("colorbar W=0 midpoint is black", zeroColor.dark, JSON.stringify(zeroColor));
 
   /* 5. hit-test every interactive control across viewport widths — no element
         may be covered by another (e.g. the Wigner canvas overlapping toolbar

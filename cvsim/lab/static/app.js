@@ -20,13 +20,14 @@ const DEFAULT_JSON = {
   ui: {},
 };
 
-/* inferno-style LUT anchors (matplotlib inferno, 16 samples) — physics-data
-   convention, independent of theme tokens. Interpolated to 256 in JS. */
+/* Diverging Wigner LUT: negative interference = blue/purple, W=0 = black,
+   positive peaks = orange/yellow/white. Interpolated to 256 in JS. */
 const LUT_ANCHORS = [
-  [0, 0, 4], [31, 4, 55], [63, 8, 104], [96, 13, 128],
-  [129, 20, 138], [161, 28, 133], [189, 38, 113], [213, 48, 89],
-  [233, 59, 66], [250, 75, 47], [253, 100, 36], [252, 128, 34],
-  [246, 158, 42], [231, 189, 58], [207, 221, 79], [164, 252, 105],
+  [15, 20, 75], [29, 25, 105], [48, 22, 125], [78, 25, 135],
+  [111, 29, 125], [111, 35, 100], [75, 24, 65], [24, 8, 28],
+  [0, 0, 0], [24, 7, 2], [70, 17, 3], [125, 31, 2],
+  [180, 60, 7], [224, 111, 22], [247, 177, 54], [255, 223, 105],
+  [255, 250, 210],
 ];
 
 function buildLut() {
@@ -123,14 +124,16 @@ function drawHeatmap(W) {
   const octx = off.getContext("2d");
   let wmin = Infinity, wmax = -Infinity;
   for (const row of W) for (const v of row) { if (v < wmin) wmin = v; if (v > wmax) wmax = v; }
-  const span = wmax - wmin || 1;
-  /* #6: colorbar min/max 刻度（axisVal 格式，与坐标轴一致） */
-  $("colorbar-max").textContent = axisVal(wmax);
-  $("colorbar-min").textContent = axisVal(wmin);
+  /* Symmetric scale anchors the physical zero at LUT midpoint (black). */
+  const scale = Math.max(Math.abs(wmin), Math.abs(wmax)) || 1;
+  /* #6: symmetric colorbar ticks (axisVal format, matching axes). */
+  $("colorbar-max").textContent = axisVal(scale);
+  $("colorbar-zero").textContent = "0";
+  $("colorbar-min").textContent = axisVal(-scale);
   const img = octx.createImageData(n, n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
-      const t = Math.min(255, Math.max(0, Math.round(((W[j][i] - wmin) / span) * 255)));
+      const t = Math.min(255, Math.max(0, Math.round(((W[j][i] + scale) / (2 * scale)) * 255)));
       const o = (j * n + i) * 4;
       img.data[o] = LUT[t * 3];
       img.data[o + 1] = LUT[t * 3 + 1];
@@ -273,6 +276,7 @@ function drawWignerResult(result) {
     const cb = colorbar.getContext("2d");
     cb.clearRect(0, 0, 8, 128);
     $("colorbar-max").textContent = "—";
+    $("colorbar-zero").textContent = "—";
     $("colorbar-min").textContent = "—";
     $("axis-svg").replaceChildren();
     wignerNote.hidden = false;
