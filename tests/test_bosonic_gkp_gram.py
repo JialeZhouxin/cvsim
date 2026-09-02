@@ -53,3 +53,27 @@ def test_logical_overlap_0_vs_1_small():
     z1 = gkp1(eps, grid_size=N, cross="full")
     ov = gkp_logical_overlap(z0, z1)
     assert abs(ov) < 0.5
+
+
+def test_1d_cross_centre_phase_pinned():
+    """Regression lock for the 1d cross-component Wigner phase (B7).
+
+    For anisotropic V=½diag(ε,1/ε) the cross centre of |g_i⟩⟨g_j| is
+    m = (r_i+r_j)/2 + i·s with s = V·J·(r_i−r_j). For adjacent comb teeth
+    (Δx = Δ) this gives imag(p) = ±Δ/(2ε) — NOT the isotropic ±Δ/2. The
+    value is the exact Wigner phase for anisotropic V (verified: it makes
+    the cross state pure); this test pins it so future edits of
+    _append_cross_pair_vec can't silently drift the 1d numerics.
+    """
+    eps, N = 0.2, 1
+    delta = np.sqrt(2.0 * np.pi)
+    st = gkp0(eps, grid_size=N, cross="nn")
+    expect_half = delta / (2.0 * eps)
+    expect_imag = delta / (2.0 * eps)  # Δx = Δ for adjacent teeth
+    cross = [c for c in st.components if abs(c.rbar[1].imag) > 1e-14]
+    assert len(cross) == 2 * (2 * N)  # 2 per adjacent pair, N=1
+    for c in cross:
+        # midpoint x of adjacent pair
+        assert any(abs(abs(float(c.rbar[0].real)) - (k + 0.5) * delta) < 1e-12
+                   for k in range(-N, N))
+        assert abs(abs(float(c.rbar[1].imag)) - expect_imag) < 1e-10
