@@ -28,10 +28,11 @@ def test_1d_full_still_k_and_sum():
 
 
 def test_2d_full_count():
+    # single-mode square lattice: M=2N+1 peaks; full cross -> M² components
     N = 1
-    M = (2 * N + 1) ** 2  # 9 peaks
+    M = 2 * N + 1  # 3 peaks (not a 2D peak grid)
     st = gkp0(0.2, grid_size=N, lattice="2d", cross="full")
-    assert st.n_components == M * M  # 81
+    assert st.n_components == M * M  # 9
     assert abs(weight_sum(st) - 1.0) < 1e-12
 
 
