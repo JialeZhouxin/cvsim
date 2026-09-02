@@ -149,6 +149,31 @@ def _build_gram_state(
     return BosonicState(components=comps)
 
 
+def _gkp_comb_peaks_and_coeffs(
+    epsilon: float,
+    grid_size: int,
+    *,
+    x_of_k: Callable[[int, float], float],
+    alternate_phase: bool = False,
+) -> tuple[list[np.ndarray], np.ndarray, list[float], list[int]]:
+    """Shared comb geometry for both lattices (single source, no duplication).
+
+    Returns ``(peaks, V, c, ks)``: single-mode position comb along x (p=0),
+    V = ½diag(ε,1/ε) (squeezed vacuum, pure), envelope c_k ∝ exp(−½πεk²)
+    times (−1)^k when ``alternate_phase`` (Z basis).
+    """
+    N = int(grid_size)
+    delta = np.sqrt(2.0 * np.pi)
+    V = 0.5 * np.diag([epsilon, 1.0 / epsilon])
+    ks = list(range(-N, N + 1))
+    peaks = [np.array([float(x_of_k(k, delta)), 0.0], dtype=float) for k in ks]
+    # envelope a_k ∝ exp(−π ε k² / 2); Z basis (gkp1, 2d) multiplies by (−1)^k
+    c = [
+        float(np.exp(-0.5 * np.pi * epsilon * k * k) * ((-1.0) ** k if alternate_phase else 1.0))
+        for k in ks
+    ]
+    return peaks, V, c, ks
+
 def _gkp_x_comb(
     epsilon: float,
     grid_size: int,
@@ -163,21 +188,14 @@ def _gkp_x_comb(
     if cross not in ("none", "nn", "full"):
         raise ValueError(f"cross must be 'none', 'nn', or 'full', got {cross!r}")
 
-    N = int(grid_size)
-    delta = np.sqrt(2.0 * np.pi)
-    V = 0.5 * np.diag([epsilon, 1.0 / epsilon])
-    ks = list(range(-N, N + 1))
-    peaks = [np.array([float(x_of_k(k, delta)), 0.0], dtype=float) for k in ks]
-    # envelope a_k ∝ exp(−π ε k² / 2)
-    c = [float(np.exp(-0.5 * np.pi * epsilon * k * k)) for k in ks]
+    peaks, V, c, ks = _gkp_comb_peaks_and_coeffs(epsilon, grid_size, x_of_k=x_of_k)
     nn_pairs: list[tuple[int, int]] | None = None
-    if cross == "nn" and N >= 1:
+    if cross == "nn" and int(grid_size) >= 1:
         # consecutive indices in ks
         nn_pairs = [(i, i + 1) for i in range(len(ks) - 1)]
     return _build_gram_state(peaks, V, c, cross=cross, nn_pairs=nn_pairs)
 
-
-def _gkp_xp_grid(
+def _gkp_z_comb(
     epsilon: float,
     grid_size: int,
     *,
@@ -201,20 +219,10 @@ def _gkp_xp_grid(
     if cross not in ("none", "full"):
         raise ValueError(f"cross must be 'none' or 'full' for 2d, got {cross!r}")
 
-    N = int(grid_size)
-    delta = np.sqrt(2.0 * np.pi)
-    # Single-mode square lattice: position comb peaks at (x_of_k, 0); V is the
-    # squeezed vacuum of the 1D comb (anisotropic, pure for ε≠1). The peak
-    # coefficients carry the (−1)^k logical-Z phase for the Z basis (gkp1).
-    V = 0.5 * np.diag([epsilon, 1.0 / epsilon])
-    ks = list(range(-N, N + 1))
-    peaks = [np.array([float(x_of_k(k, delta)), 0.0], dtype=float) for k in ks]
-    c = [
-        float(np.exp(-0.5 * np.pi * epsilon * k * k) * ((-1.0) ** k if alternate_phase else 1.0))
-        for k in ks
-    ]
+    peaks, V, c, _ = _gkp_comb_peaks_and_coeffs(
+        epsilon, grid_size, x_of_k=x_of_k, alternate_phase=alternate_phase
+    )
     return _build_gram_state(peaks, V, c, cross=cross)
-
 
 def _dispatch(
     epsilon: float,
@@ -229,7 +237,7 @@ def _dispatch(
         raise ValueError(f"lattice must be '1d' or '2d', got {lattice!r}")
     if lattice == "1d":
         return _gkp_x_comb(epsilon, grid_size, cross=cross, x_of_k=x_of_k)
-    return _gkp_xp_grid(
+    return _gkp_z_comb(
         epsilon, grid_size, cross=cross, x_of_k=x_of_k, alternate_phase=alternate_phase
     )
 
@@ -272,22 +280,21 @@ def gkp1(
        2d |1⟩ is NOT a peak shift; it differs only in the cross-component sign.
     Same K / cross rules as gkp0. Teaching Gram pure-state; not Clifford.
     """
-    if lattice == "1d":
-        return _dispatch(
-            epsilon,
-            grid_size,
-            cross=cross,
-            lattice=lattice,
-            x_of_k=lambda k, d: (k + 0.5) * d,
-            alternate_phase=False,
-        )
+    # per-basis map: (x_of_k, alternate_phase) — no if-cascade
+    basis: dict[str, tuple[Callable[[int, float], float], bool]] = {
+        "1d": (lambda k, d: (k + 0.5) * d, False),
+        "2d": (lambda k, d: k * d, True),
+    }
+    if lattice not in basis:
+        raise ValueError(f"lattice must be '1d' or '2d', got {lattice!r}")
+    x_of_k, alternate_phase = basis[lattice]
     return _dispatch(
         epsilon,
         grid_size,
         cross=cross,
         lattice=lattice,
-        x_of_k=lambda k, d: k * d,
-        alternate_phase=True,
+        x_of_k=x_of_k,
+        alternate_phase=alternate_phase,
     )
 
 
