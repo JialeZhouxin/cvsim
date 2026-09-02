@@ -221,7 +221,7 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 
 | Feature | Now | Gap |
 |---------|-----|-----|
-| State factories | BosonicState/Component + even/odd cat + gkp0/gkp1 + coherent | —（B1 done） |
+| State factories | BosonicState/Component + even/odd cat + gkp0/gkp1 + coherent | —（B1 done）；GKP 逻辑基（0.3.0）：`lattice="1d"`=X 基（|1⟩ 峰错半格）、`lattice="2d"`=单模平方格 Z 基（|1⟩ 峰不动、系数 (−1)^k，物理定义见 `docs/gkp-2d-square-lattice.md`；对账入口 `pure_fidelity`） |
 | Gates | 11 门（D/R/S/F/BS/MZ/S₂/CZ/CX/interferometer）K=1 atol 对齐 | —（B1 done） |
 | Channels | loss/amplifier/phase_noise（X,Y 逐分量仿射） | —（B1 done） |
 | Measures | measure.py：homodyne 精确（CDF 网格反演）+ heterodyne 精确（2D Q-surface + 顺序 CDF 反演，ADR-0007）+ threshold outcome-only | —（B3 done，backlog #1 关闭） |
@@ -246,3 +246,4 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 | 0.1.0 | 2026-08-13 | Vision created from grill Q1–Q13: GKP QEC teaching main stage + production backend; C1–C4 pillars; A1 single-mode anchor (arbitrary-m architecture); R1 layered reconciliation; P1 bricks-not-protocols; M1 measure surface; B1 circuit third consumer; G1 GUI three-piece; B0–B7 roadmap; non-goals (Kerr/protocols/multi-mode/PNR/AD) |
 | 0.1.1 | 2026-08-14 | 架构层 amend（grill A1–A12，任务 08-14-bosonic-architecture）：A4 测量并入 measure.py（observables 只留矩）；A5 homodyne 精确采样策略锁 CDF 网格反演（§2.3）；组件工程补 is_hermitian（A3）。详见 design.md + ADR-0006 |
 | 0.2.0 | 2026-08-14 | **B0–B1 done**（任务 08-14-bosonic-b1，commit `fe94357`）：门全集 11（K=1 atol 1e-10）、通道 3、measure.py（homodyne/heterodyne 教学切 + threshold outcome-only）、coherent 工厂、BOSONIC_PUBLIC 冻结 33 名、phaseB1 markers；全套 1059 passed。§0 状态 / §9 gap 表同步；契约层 `.trellis/spec/cvsim/` 新建 |
+| 0.3.0 | 2026-09-02 | **GKP 2d 单模平方格 Z 基**（任务 09-02-gkp-2d-square-lattice，commit `c1cbeaa`）：`lattice="2d"` 从 (x,p) 网格峰+各向同性 V 重定义为单模位置梳（x=kΔ, p=0, V=½diag(ε,1/ε)）+ gkp1 交替相位 (−1)^k（Z 基，峰不动），与 1d X 基互补；交叉分量 Wigner 相位 `s=V·J·Δr`（B7 修正，对各向异性 V 才纯）；逻辑对账入口 `pure_fidelity`（`gkp_logical_overlap` 仅 X 基有效）。破坏性 2d 语义变更（0.x 预发布，公共 API 签名不变）；物理事实源 `docs/gkp-2d-square-lattice.md`。§9 gap 表同步 |
