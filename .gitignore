@@ -25,6 +25,15 @@ build/
 .workbuddy/
 .hallmark
 
+# teaching workspace (teach skill, local-only)
+/MISSION.md
+/RESOURCES.md
+/NOTES.md
+/lessons/
+/reference/
+/learning-records/
+/assets/
+
 # internal notes / personal context (not part of the simulator)
 CONTEXT.md
 user-model.md
