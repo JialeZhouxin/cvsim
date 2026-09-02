@@ -16,11 +16,37 @@ from __future__ import annotations
 import pytest
 
 from cvsim.bosonic import BosonicCircuit, pure_fidelity
+from cvsim.lab import CircuitV0Error, load_circuit
 
 pytestmark = pytest.mark.phaseB6
 
 
 class TestGkp2dFrontendInitial:
+    def test_lab_loader_accepts_gkp2d_sources(self):
+        """Lab 后端应接受前端发送的 2d GKP 初态名单。"""
+        payload = {
+            "schema": "circuit_v1",
+            "nmode": 2,
+            "backend": "bosonic",
+            "initial": ["gkp0_2d", "gkp1_2d"],
+            "ops": [],
+        }
+        circuit = load_circuit(payload)
+        assert circuit.backend == "bosonic"
+        assert circuit.raw["initial"] == ["gkp0_2d", "gkp1_2d"]
+
+    def test_lab_loader_keeps_rejecting_unknown_initial(self):
+        """未知初态名仍在 Lab 入口被拒绝。"""
+        payload = {
+            "schema": "circuit_v1",
+            "nmode": 1,
+            "backend": "bosonic",
+            "initial": ["gkp9"],
+            "ops": [],
+        }
+        with pytest.raises(CircuitV0Error, match="gkp0_2d"):
+            load_circuit(payload)
+
     def test_initial_gkp2d_sources_build(self):
         """AC-1: 新名字构造成功,_initial_spec 保真,每模 49 组件。
 

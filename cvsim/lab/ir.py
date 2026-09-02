@@ -436,9 +436,12 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
     initial = data.get("initial")
     if initial is not None:
         if not isinstance(initial, list) or not all(
-            item is None or item in ("gkp0", "gkp1") for item in initial
+            item is None or item in ("gkp0", "gkp1", "gkp0_2d", "gkp1_2d")
+            for item in initial
         ):
-            raise CircuitV0Error("initial must be a list of null/'gkp0'/'gkp1' per mode")
+            raise CircuitV0Error(
+                "initial must be a list of null/'gkp0'/'gkp1'/'gkp0_2d'/'gkp1_2d' per mode"
+            )
         if len(initial) != data.get("nmode"):
             raise CircuitV0Error(f"initial list length {len(initial)} != nmode {data.get('nmode')}")
     return LabCircuit(
