@@ -144,6 +144,7 @@ markers = [
     "phaseB5: Bosonic B5 circuit DSL tests",
     "phaseB6: Bosonic B6 GUI three-piece tests",
     "phaseB7: Bosonic B7 complex-centre analyse kernel tests",
+    "phaseB8: Bosonic B8 non-Gaussian kerr gate tests",
 ]
 filterwarnings = [
     "error:cvsim.*",

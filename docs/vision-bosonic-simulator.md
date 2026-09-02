@@ -5,8 +5,8 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md); Fock peer in [`vision-fock-simulator.md`](./vision-fock-simulator.md). Cross-representation rules owned by Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-08-19
-**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B6 done (2026-08-19)**：基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结 45 名）+ 组件工程（merge/truncate/underflow/normalize + LeakReport + is_hermitian，phaseB2 marker）+ 测量精度（homodyne CDF 网格反演 + homodyne_pdf，phaseB3 marker）+ 调和对账（purity/pure_fidelity 闭式 + R1 分层套件，phaseB4 marker）+ BosonicCircuit DSL（circuit_v1 第三消费者 + to_ir/from_ir，phaseB5 marker）+ **GUI 三件套**（initial 态源 + 双 V fidelity + Lab 同壳第三后端：palette whitelist / fidelity sweep / 分步执行，phaseB6 marker，vision §6.2 解锁）；B7 bridges+tutorials next
+**Last updated:** 2026-08-19（Kerr non-goal 部分 amend 2026-09-02：bosonic 增 `kerr` 非高斯能力，见 §1.3）
+**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B7 done (2026-09-02)**；基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结）+ 组件工程 + 测量精度 + 调和对账 + BosonicCircuit DSL + GUI 三件套 + **B7 复中心内核/严格 Wigner 核** + **非高斯 `kerr` 门（分量展开，phaseB8）**；从真空出位置梳 GKP 仍为 non-goal（需 stabilizer 测量+反馈）
 **Codebase today:** `cvsim/bosonic` B1 生产面（state/cat/gkp/gates 11 门/channels 3/measure.py 三测量/observables 矩；单模 homodyne 教学切，B3 换精确）
 
 ---
@@ -31,7 +31,7 @@ Gaussian's "production" claim rests on scale + precision (m→100, fast compile)
 
 | Excluded | Note |
 |----------|------|
-| **Kerr / arbitrary non-Gaussian gates in component form** | Selection table verdict: Kerr continuous twisting → Fock. Bosonic eats Gaussian gates + factories + measurements only |
+| **Arbitrary non-Gaussian gates in component form** | 2026-09-02 amend: bosonic adds **`kerr`** (non-Gaussian, component expansion, phaseB8) — see note below. Other arbitrary non-Gaussian gates still excluded. Note: Kerr alone cannot produce a position-comb GKP from vacuum (needs stabilizer measurement + displacement feedback, Gaussian-dominated) → **from-vacuum GKP remains non-goal** (see docs/phase0-kerr-component-expansion.md + Boudreault arXiv:2507.09684) |
 | **Protocol library** (e.g. built-in GKP QEC rounds) | P1 locked: bricks in the library, protocols in tutorials / GUI scripts. Library must not grow into an error-correction framework |
 | **Multi-mode production-grade** | A1 locked: single-mode production anchor; architecture written for arbitrary m; dual-mode is an open question (K² blowup is real engineering, no scene driving it yet) |
 | **Component-form PNR path** | M1 locked: PNR teaching scenes switch to Fock. Component PNR is "theoretically possible, more convoluted than Gaussian" (notes §5.4) — open question |

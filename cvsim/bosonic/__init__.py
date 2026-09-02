@@ -10,6 +10,7 @@ from cvsim.bosonic.gates import (
     displace,
     fourier,
     interferometer,
+    kerr,
     mach_zehnder,
     phase,
     squeeze,
@@ -84,4 +85,5 @@ __all__ = [
     "cz",
     "cx",
     "interferometer",
+    "kerr",
 ]

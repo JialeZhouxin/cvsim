@@ -242,6 +242,7 @@ BOSONIC_PUBLIC = {
     "cz",
     "cx",
     "interferometer",
+    "kerr",
 }
 
 
