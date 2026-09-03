@@ -32,6 +32,7 @@ from cvsim.gaussian.gates import (
     squeeze,
     two_mode_squeeze,
 )
+from cvsim.gaussian.ir import ir_schema
 from cvsim.gaussian.observables import (
     det_cov,
     heterodyne_condition,
@@ -100,6 +101,7 @@ __all__ = [
     "fidelity",
     "GaussianCircuit",
     "ParamRef",
+    "ir_schema",
     "export_cov_for_walrus",
     "pnr_probs",
     "gbs_sample",

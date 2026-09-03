@@ -20,6 +20,7 @@ from cvsim.fock.gates import (
     squeeze,
     two_mode_squeeze,
 )
+from cvsim.fock.ir import ir_schema
 from cvsim.fock.observables import (
     heterodyne_condition,
     heterodyne_sample,
@@ -51,6 +52,7 @@ __all__ = [
     "FockState",
     "FockDensity",
     "FockCircuit",
+    "ir_schema",  # ticket 1: schema snapshot (MINOR addition, 2026-09-03)
     "truncation_leakage",
     "check_leakage",
     "estimate_leakage",

@@ -25,6 +25,20 @@ SCHEMA = "circuit_v1"
 #: below as a real field). ``cutoff`` is handled separately (not ignored).
 EXTENSION_FIELDS = frozenset({"view", "seed", "ui", "backend"})
 
+#: Core-enforced parameter ranges (Q6: only ranges the library functions
+#: actually raise on — spec `.scratch/schema-single-source/spec.md`). Fock
+#: loss names its transmissivity ``eta`` (gaussian/bosonic use ``T``).
+CORE_PARAM_RANGES: dict[str, dict[str, tuple[float, float]]] = {
+    "loss": {"eta": (0.0, 1.0)},
+}
+
+#: Initial-state registry (schema snapshot, Q4+C aligned with the bosonic
+#: source table). Fock initial semantics are per-mode photon numbers, not
+#: named sources — so the registry declares the value shape, not a name
+#: enum (per-mode upper bound is the cutoff, not a static schema constraint;
+#: vacuum = 0 photons follows from kind="int" + min=0).
+INITIAL_REGISTRY: dict[str, Any] = {"kind": "int", "min": 0}
+
 
 @dataclass(frozen=True)
 class OpMeta:
@@ -172,7 +186,8 @@ def to_ir(circuit: FockCircuit) -> dict[str, Any]:
     doc: dict[str, Any] = {"schema": SCHEMA, "nmode": circuit.nmode, "ops": ops}
     if cutoff != 10:
         doc["cutoff"] = cutoff
-    if circuit.initial is not None and any(n != 0 for n in circuit.initial):
+    vacuum = INITIAL_REGISTRY["min"]  # vacuum = 0 photons (kind=int, min=0)
+    if circuit.initial is not None and any(n != vacuum for n in circuit.initial):
         doc["initial"] = list(circuit.initial)
     return doc
 
@@ -233,3 +248,47 @@ def from_ir(data: dict[str, Any]) -> FockCircuit:
             kw[k] = _decode(v, meta.value_kind[k])
         _build_op(circuit, node["op"], tuple(node.get("modes", [])), kw)
     return circuit
+
+def ir_schema() -> dict[str, Any]:
+    """Read-only schema snapshot: op shapes + initial registry (schema snapshot).
+
+    Pure-data dict — the authoritative entry point for circuit_v1 schema
+    knowledge of this package (ADR-0003; spec ticket 1). ``OpMeta`` stays
+    private; callers get plain JSON-native data only::
+
+        {"ops": {op: {"arity", "value_kind", "defaults"}},
+         "initial": {"kind": "int", "min": 0},
+         "core_ranges": {op: {param: [lo, hi]}}}
+
+    Fock initial semantics (CONTEXT: 初始态字段): per-mode photon numbers
+    (``None`` initial = vacuum; the per-mode upper bound is the cutoff, not
+    a static schema constraint). Returns a fresh deep copy per call —
+    mutating the payload cannot affect package state.
+    """
+    return {
+        "ops": {
+            name: {
+                "arity": meta.arity,
+                "value_kind": dict(meta.value_kind),
+                "defaults": _json_defaults(meta.defaults),
+            }
+            for name, meta in OP_META.items()
+        },
+        "initial": dict(INITIAL_REGISTRY),
+        "core_ranges": {
+            op: {p: list(r) for p, r in params.items()}
+            for op, params in CORE_PARAM_RANGES.items()
+        },
+    }
+
+def _json_defaults(defaults: dict[str, Any]) -> dict[str, Any]:
+    """JSON-native defaults: numpy floats/arrays out, plain scalars/lists in."""
+    out: dict[str, Any] = {}
+    for k, v in defaults.items():
+        if isinstance(v, np.generic):
+            out[k] = v.item()
+        elif isinstance(v, np.ndarray):
+            out[k] = v.tolist()
+        else:
+            out[k] = v
+    return out

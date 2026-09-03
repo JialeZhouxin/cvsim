@@ -17,7 +17,7 @@ from cvsim.bosonic.gates import (
     two_mode_squeeze,
 )
 from cvsim.bosonic.gkp import gkp0, gkp1, gkp_logical_overlap
-from cvsim.bosonic.ir import from_ir, to_ir
+from cvsim.bosonic.ir import from_ir, ir_schema, to_ir
 from cvsim.bosonic.measure import (
     heterodyne_condition,
     heterodyne_pdf,
@@ -65,6 +65,7 @@ __all__ = [
     "pure_fidelity",
     "to_ir",
     "from_ir",
+    "ir_schema",  # ticket 1: schema snapshot (MINOR addition, 2026-09-03)
     "homodyne_mean",
     "homodyne_var",
     "homodyne_pdf",

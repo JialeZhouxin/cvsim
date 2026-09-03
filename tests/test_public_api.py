@@ -56,6 +56,7 @@ GAUSSIAN_PUBLIC = {
     "fidelity",
     "GaussianCircuit",
     "ParamRef",
+    "ir_schema",  # ticket 1: schema snapshot (MINOR addition, 2026-09-03)
     "export_cov_for_walrus",
     "pnr_probs",
     "gbs_sample",
@@ -126,6 +127,7 @@ FOCK_PUBLIC = {
     "FockDensity",
     "FockSparse",
     "FockCircuit",  # F7: circuit DSL + initial (per-mode number-state initial)
+    "ir_schema",  # ticket 1: schema snapshot (MINOR addition, 2026-09-03)
     # leakage trio (F1)
     "truncation_leakage",
     "check_leakage",
@@ -217,6 +219,7 @@ BOSONIC_PUBLIC = {
     "pure_fidelity",
     "to_ir",
     "from_ir",
+    "ir_schema",  # ticket 1: schema snapshot (MINOR addition, 2026-09-03)
     "BosonicCircuit",
     "ParamRef",
     "homodyne_mean",

@@ -260,16 +260,24 @@ class FockCircuit:
 
     @staticmethod
     def _validate_initial(initial: list[int] | None, cutoffs: list[int]) -> list[int] | None:
-        """Per-mode Fock number-state occupation list; None = vacuum."""
+        """Per-mode Fock number-state occupation list; None = vacuum.
+
+        Constants come from ``cvsim.fock.ir.INITIAL_REGISTRY`` (the single
+        registry — same data ``ir_schema()`` publishes): kind="int", min=0;
+        the per-mode upper bound is the mode cutoff, vacuum = 0 photons.
+        """
         if initial is None:
             return None
+        from cvsim.fock.ir import INITIAL_REGISTRY
+
+        lower = INITIAL_REGISTRY["min"]
         if not isinstance(initial, (list, tuple)):
             raise ValueError(f"initial must be a list of ints, got {initial!r}")
         if len(initial) != len(cutoffs):
             raise ValueError(f"initial len {len(initial)} != nmode {len(cutoffs)}")
         for i, (n, c) in enumerate(zip(initial, cutoffs, strict=True)):
-            if not isinstance(n, int) or isinstance(n, bool) or not 0 <= n < c:
-                raise ValueError(f"initial[{i}]={n!r} must be an int in [0, {c})")
+            if not isinstance(n, int) or isinstance(n, bool) or not lower <= n < c:
+                raise ValueError(f"initial[{i}]={n!r} must be an int in [{lower}, {c})")
         return list(initial)
 
     # -- composition ------------------------------------------------------

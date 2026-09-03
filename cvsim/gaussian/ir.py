@@ -43,6 +43,13 @@ class OpMeta:
     defaults: dict[str, Any]  # omitted params = library builder defaults
 
 
+#: Core-enforced parameter ranges (Q6: only ranges the library functions
+#: actually raise on — spec `.scratch/schema-single-source/spec.md`). UI
+#: teaching scales (min/max sliders) do NOT belong here.
+CORE_PARAM_RANGES: dict[str, dict[str, tuple[float, float]]] = {
+    "loss": {"T": (0.0, 1.0)},
+}
+
 OP_META: dict[str, OpMeta] = {
     "squeeze": OpMeta("one", {"r": "num", "phi": "num"}, {"r": 0.0, "phi": 0.0}),
     "displace": OpMeta("one", {"alpha": "complex"}, {"alpha": 0.0}),
@@ -165,6 +172,49 @@ def _check_value(v: Any, kind: str, where: str) -> None:
     else:  # pragma: no cover — OP_META is static
         raise ValueError(f"{where}: unknown value kind {kind!r}")
 
+
+def ir_schema() -> dict[str, Any]:
+    """Read-only schema snapshot: op shapes + initial registry (schema snapshot).
+
+    Pure-data dict — the authoritative entry point for circuit_v1 schema
+    knowledge of this package (ADR-0003; spec ticket 1). ``OpMeta`` stays
+    private; callers get plain JSON-native data only::
+
+        {"ops": {op: {"arity", "value_kind", "defaults"}},
+         "initial": None,
+         "core_ranges": {op: {param: [lo, hi]}}}
+
+    Gaussian initial semantics: vacuum start (no ``initial`` sources).
+    Returns a fresh deep copy per call — mutating the payload cannot affect
+    package state.
+    """
+    return {
+        "ops": {
+            name: {
+                "arity": meta.arity,
+                "value_kind": dict(meta.value_kind),
+                "defaults": _json_defaults(meta.defaults),
+            }
+            for name, meta in OP_META.items()
+        },
+        "initial": None,
+        "core_ranges": {
+            op: {p: list(r) for p, r in params.items()}
+            for op, params in CORE_PARAM_RANGES.items()
+        },
+    }
+
+def _json_defaults(defaults: dict[str, Any]) -> dict[str, Any]:
+    """JSON-native defaults: numpy floats/arrays out, plain scalars/lists in."""
+    out: dict[str, Any] = {}
+    for k, v in defaults.items():
+        if isinstance(v, np.generic):
+            out[k] = v.item()
+        elif isinstance(v, np.ndarray):
+            out[k] = v.tolist()
+        else:
+            out[k] = v
+    return out
 
 def validate_ir(data: dict[str, Any]) -> CircuitV1:
     """Structural validation of a circuit_v1 JSON dict (ADR-0003 #6).
