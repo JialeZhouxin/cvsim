@@ -439,6 +439,17 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
             item is None or item in ("gkp0", "gkp1", "gkp0_2d", "gkp1_2d")
             for item in initial
         ):
+            # 整数项 = Fock 语义的 initial 跨到了 bosonic（GUI 切换 bug 的典型
+            # 现场），给出可诊断的提示而不是让用户猜白名单。
+            if isinstance(initial, list) and all(
+                isinstance(item, int) and not isinstance(item, bool)
+                for item in initial
+            ):
+                raise CircuitV0Error(
+                    "initial looks like Fock photon numbers (ints) but backend is "
+                    "'bosonic': bosonic takes GKP source names per mode "
+                    "(null/'gkp0'/'gkp1'/'gkp0_2d'/'gkp1_2d')"
+                )
             raise CircuitV0Error(
                 "initial must be a list of null/'gkp0'/'gkp1'/'gkp0_2d'/'gkp1_2d' per mode"
             )

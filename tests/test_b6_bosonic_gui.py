@@ -337,6 +337,36 @@ class TestLabGolden:
         with pytest.raises(CircuitV0Error, match="whitelist"):
             load_circuit(data)
 
+    def test_fock_semantic_initial_gets_diagnosable_error(self):
+        """Fock 整数 initial 进 bosonic = GUI 切换残留（已修）——报错可诊断：
+        提示'这是 fock 光子数语义，bosonic 要 GKP 源名'而非裸白名单。"""
+        from cvsim.lab.ir import CircuitV0Error, load_circuit
+
+        data = {
+            "schema": "circuit_v1",
+            "nmode": 2,
+            "backend": "bosonic",
+            "initial": [0, 3],  # fock 语义的光子数
+            "ops": [],
+        }
+        with pytest.raises(CircuitV0Error, match="Fock photon numbers"):
+            load_circuit(data)
+
+    def test_generic_invalid_initial_keeps_original_message(self):
+        """非整数非法项（如字符串）仍走原白名单报错，不误报 fock 提示。"""
+        from cvsim.lab.ir import CircuitV0Error, load_circuit
+
+        data = {
+            "schema": "circuit_v1",
+            "nmode": 1,
+            "backend": "bosonic",
+            "initial": ["even_cat"],
+            "ops": [],
+        }
+        with pytest.raises(CircuitV0Error, match="initial must be a list") as exc_info:
+            load_circuit(data)
+        assert "Fock photon numbers" not in str(exc_info.value)
+
 
 # ===========================================================================
 # Old JSON unchanged (exit 3)

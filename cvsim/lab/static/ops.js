@@ -7,6 +7,10 @@
    (measure result names) never get sliders — JSON/id-managed. */
 "use strict";
 
+//: initial 字段单点语义（F7/B6）：parse/serialize/remap 集中在 initial.js，
+//: ops.js 序列化与 editor.js 状态机都从这里取，禁止再写 backend 三元式。
+import { serializeInitial } from "./initial.js";
+
 export const TAU = 2 * Math.PI;
 
 export const OPS = {
@@ -493,23 +497,17 @@ export function toV1Json(state) {
     view: {},
     ui: Object.keys(staff).length ? { staff } : {},
   };
-  // F7 extensions: backend 缺省 gaussian（不写 = 旧文件字节不变）；
-  // initial 非全零才写；cutoff 非默认（全 10）才写，均匀写 int 否则 list。
+  // F7/B6 extensions: backend 缺省 gaussian（不写 = 旧文件字节不变）；
+  // initial 非“全真空”才写（语义按后端二分，见 initial.js）；
+  // cutoff 非默认（全 10）才写，均匀写 int 否则 list。
   if (state.backend === "fock") outDoc.backend = "fock";
   if (state.backend === "bosonic") outDoc.backend = "bosonic";
-  // B6: bosonic per-mode 态名（非全真空才写；缺省不写 = 真空）
-  if (state.backend === "bosonic" && Array.isArray(state.initial)
-      && state.initial.slice(0, nmode).some((v) => v !== null)) {
-    outDoc.initial = state.initial.slice(0, nmode);
-  }
+  const initPayload = serializeInitial(state.backend, state.initial, nmode);
+  if (initPayload !== undefined) outDoc.initial = initPayload;
   const v = state.view && typeof state.view === "object" ? state.view : {};
   outDoc.view = { wigner_mode: v.wigner_mode, lim: v.lim, n: v.n };
   if (Array.isArray(v.joint_modes) && v.joint_modes.length === 2) {
     outDoc.view.joint_modes = v.joint_modes;
-  }
-  if (state.backend === "fock" && Array.isArray(state.initial)
-      && state.initial.some((n) => n !== 0)) {
-    outDoc.initial = state.initial.slice(0, nmode);
   }
   if (state.backend === "fock" && Array.isArray(state.cutoffs)) {
     const cut = state.cutoffs.slice(0, nmode);

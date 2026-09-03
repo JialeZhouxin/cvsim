@@ -4,6 +4,7 @@
 "use strict";
 
 import { OPS, addNode, backendOps, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, removeSource, sourceModes, toV1Json, updateParam } from "./ops.js";
+import { BOSONIC_SOURCE_OPTIONS, initialCacheKey, parseInitial, remapForBackend, vacuumDefault } from "./initial.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -13,7 +14,7 @@ const defaultState = () => ({
   view: { wigner_mode: 0, lim: 5.0, n: 64, joint_modes: null },
   ui: {},
   backend: "gaussian", // F7: representation backend (缺省 gaussian = 旧 JSON 零破坏)
-  initial: null,       // F7: per-mode Fock 数态初始态（null = 全真空）
+  initial: null,       // F7/B6: per-mode 初始态，语义按 backend 二分（见 initial.js）
   cutoffs: [],         // F7: per-mode cutoffs（缺省全 10，均匀时 JSON 写 int）
 });
 
@@ -111,7 +112,8 @@ export function stateFromJson(payload) {
 }
 
 /** F7: backend/initial/cutoff extension fields (shared by v0 + v1 paths).
-    nmode must be the resolved mode count of the loaded circuit. */
+    nmode must be the resolved mode count of the loaded circuit.
+    initial 语义在 initial.js 单点维护（F7 fock 整数 / B6 bosonic 源名）。 */
 function parseExtensions(payload, nmode) {
   let backend = "gaussian";
   if (payload.backend !== undefined) {
@@ -121,22 +123,9 @@ function parseExtensions(payload, nmode) {
     }
     backend = payload.backend;
   }
-  let initial = null;
-  if (payload.initial !== undefined && payload.initial !== null) {
-    if (!Array.isArray(payload.initial) || payload.initial.length !== nmode) {
-      return { error: `initial 必须是长度为 ${nmode} 的数组` };
-    }
-    const bad = payload.initial.some((n) =>
-      backend === "fock" ? (!Number.isInteger(n) || n < 0)
-      : !(n === null || n === "gkp0" || n === "gkp1"
-          || n === "gkp0_2d" || n === "gkp1_2d"));
-    if (bad) {
-      return { error: backend === "fock"
-        ? `initial 必须是 ${nmode} 个非负整数`
-        : `initial 每项只能是 null / gkp0 / gkp1 / gkp0_2d / gkp1_2d` };
-    }
-    initial = [...payload.initial];
-  }
+  const parsed = parseInitial(backend, payload.initial, nmode);
+  if (parsed.error) return { error: parsed.error };
+  const initial = parsed.initial;
   let cutoffs = Array(nmode).fill(10);
   if (payload.cutoff !== undefined) {
     if (Number.isInteger(payload.cutoff) && payload.cutoff >= 1) {
@@ -549,7 +538,6 @@ export function initEditor(root, hooks) {
     pushHistory();
     let nodes = state.nodes;
     let view = state.view;
-    let initial = state.initial;
     let cutoffs = state.cutoffs;
     if (next === "fock") {
       if (!nodes.some((n) => n.op === "vacuum")) {
@@ -558,7 +546,6 @@ export function initEditor(root, hooks) {
         nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
       }
       const nm = sourceModes(nodes);
-      initial = padTo(initial, nm, 0);
       cutoffs = padTo(cutoffs, nm, 10);
       if (nm >= 2 && !Array.isArray(view.joint_modes)) {
         view = { ...view, joint_modes: [0, 1] }; // HOM 剧本：joint 卡默认开
@@ -569,10 +556,15 @@ export function initEditor(root, hooks) {
         for (let k = 1; nodes.some((n) => n.id === vid); k++) vid = "vac" + k;
         nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
       }
-      const nm = sourceModes(nodes);
-      initial = padTo(initial, nm, null); // B6: per-mode GKP 源名（真空）
     }
-    state = { ...state, backend: next, nodes, view, initial, cutoffs };
+    // B6/F7: initial 跨后端语义重映射（单点在 initial.js）。真空对应项保留
+    // （fock 0 ↔ bosonic null），非真空项重置 + UI 提示，永不静默截断。
+    const nm = sourceModes(nodes);
+    const remap = remapForBackend(state.backend, next, state.initial, nm);
+    if (remap.reset > 0) {
+      hooks.onStatus(`${remap.reset} 项初始态因后端切换被重置为真空`, false);
+    }
+    state = { ...state, backend: next, nodes, view, initial: remap.initial, cutoffs };
     render();
   }
 
@@ -590,15 +582,16 @@ export function initEditor(root, hooks) {
       nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
     }
     const nm = sourceModes(nodes);
-    const fill = state.backend === "bosonic" ? null : 0;
+    // B6/F7: initial 补长也走单点重映射（from === to 同后端：原值保留 + 真空补位）
+    const remap = remapForBackend(state.backend, state.backend, state.initial, nm);
     state = { ...state, nodes,
-      initial: padTo(state.initial, nm, fill), cutoffs: padTo(state.cutoffs, nm, 10) };
+      initial: remap.initial, cutoffs: padTo(state.cutoffs, nm, 10) };
     render();
   }
 
   function setInitial(i, v) {
     const nm = sourceModes(state.nodes);
-    const fill = state.backend === "bosonic" ? null : 0;
+    const fill = vacuumDefault(state.backend);
     const next = Array(nm).fill(fill).map((_, k) =>
       (state.initial ? state.initial[k] : fill));
     next[i] = v;
@@ -609,12 +602,10 @@ export function initEditor(root, hooks) {
     emit(toV1Json(state), "graph");
   }
 
-  /* B6: bosonic 初始态 = 每模 GKP 源选择（真空/gkp0/gkp1；缺省真空） */
-  function renderBosonicInitial() {
-    const nm = sourceModes(state.nodes);
+  /* B6: bosonic 初始态 = 每模 GKP 源选择（真空/gkp0/gkp1/2d；选项表在 initial.js） */
+  function renderBosonicInitial(nm) {
     const initial = state.initial;
-    if (dom.initialInputs.dataset.nmode === String(nm)) return;
-    dom.initialInputs.dataset.nmode = String(nm);
+    dom.initialInputs.dataset.nmode = initialCacheKey("bosonic", nm);
     dom.initialInputs.replaceChildren();
     for (let i = 0; i < nm; i++) {
       const wrap = document.createElement("label");
@@ -625,8 +616,7 @@ export function initEditor(root, hooks) {
       const sel = document.createElement("select");
       sel.className = "select mono";
       const cur = initial ? initial[i] : null;
-      for (const [val, text] of [[null, "真空"], ["gkp0", "gkp0"], ["gkp1", "gkp1"],
-        ["gkp0_2d", "gkp0_2d(Z基)"], ["gkp1_2d", "gkp1_2d(Z基)"]]) {
+      for (const [val, text] of BOSONIC_SOURCE_OPTIONS) {
         const opt = document.createElement("option");
         opt.value = val === null ? "" : val;
         opt.textContent = text;
@@ -654,47 +644,57 @@ export function initEditor(root, hooks) {
     if (dom.backendSelect) dom.backendSelect.value = state.backend;
     if (!dom.initialCard) return;
     dom.initialCard.hidden = false;
-    if (bosonic) { renderBosonicInitial(); return; }
     const nm = sourceModes(state.nodes);
+    // 缓存键含 backend（initialCacheKey）：切换后端必重建控件，
+    // 防止 bosonic 下残留 fock 数字输入框（模数不变早退 bug）。
+    if (dom.initialInputs.dataset.nmode === initialCacheKey(state.backend, nm)) {
+      // 同键仍需同步 fock 数字输入值（cutoff 变化等场景）
+      if (!bosonic) syncFockInputValues();
+      return;
+    }
+    if (bosonic) { renderBosonicInitial(nm); return; }
     const cutoffs = state.cutoffs;
     const initial = state.initial;
-    if (dom.initialInputs.dataset.nmode !== String(nm)) {
-      dom.initialInputs.dataset.nmode = String(nm);
-      dom.initialInputs.replaceChildren();
-      for (let i = 0; i < nm; i++) {
-        const wrap = document.createElement("label");
-        wrap.className = "param";
-        const lab = document.createElement("span");
-        lab.className = "param__name mono";
-        lab.textContent = `mode ${i}`;
-        const inp = document.createElement("input");
-        inp.type = "number";
-        inp.className = "param__num mono";
-        inp.min = 0;
-        inp.max = (cutoffs[i] ?? 10) - 1;
-        inp.step = 1;
-        inp.value = initial ? initial[i] : 0;
-        inp.addEventListener("change", () => {
-          const v = Number(inp.value);
-          if (!Number.isInteger(v) || v < 0) {
-            hooks.onStatus("初始态光子数必须是非负整数", false);
-            inp.value = state.initial ? state.initial[i] : 0;
-            return;
-          }
-          setInitial(i, v);
-        });
-        wrap.append(lab, inp);
-        dom.initialInputs.appendChild(wrap);
-      }
-    } else {
-      [...dom.initialInputs.children].forEach((wrap, i) => {
-        const inp = wrap.querySelector("input");
-        if (!inp) return;
-        inp.max = (cutoffs[i] ?? 10) - 1;
-        const want = initial ? initial[i] : 0;
-        if (inp.value !== String(want)) inp.value = want;
+    dom.initialInputs.dataset.nmode = initialCacheKey("fock", nm);
+    dom.initialInputs.replaceChildren();
+    for (let i = 0; i < nm; i++) {
+      const wrap = document.createElement("label");
+      wrap.className = "param";
+      const lab = document.createElement("span");
+      lab.className = "param__name mono";
+      lab.textContent = `mode ${i}`;
+      const inp = document.createElement("input");
+      inp.type = "number";
+      inp.className = "param__num mono";
+      inp.min = 0;
+      inp.max = (cutoffs[i] ?? 10) - 1;
+      inp.step = 1;
+      inp.value = initial ? initial[i] : 0;
+      inp.addEventListener("change", () => {
+        const v = Number(inp.value);
+        if (!Number.isInteger(v) || v < 0) {
+          hooks.onStatus("初始态光子数必须是非负整数", false);
+          inp.value = state.initial ? state.initial[i] : 0;
+          return;
+        }
+        setInitial(i, v);
       });
+      wrap.append(lab, inp);
+      dom.initialInputs.appendChild(wrap);
     }
+  }
+
+  /** fock 数字输入值同步（控件已存在、仅值/上限可能变化的场景）。 */
+  function syncFockInputValues() {
+    const cutoffs = state.cutoffs;
+    const initial = state.initial;
+    [...dom.initialInputs.children].forEach((wrap, i) => {
+      const inp = wrap.querySelector("input");
+      if (!inp) return;
+      inp.max = (cutoffs[i] ?? 10) - 1;
+      const want = initial ? initial[i] : 0;
+      if (inp.value !== String(want)) inp.value = want;
+    });
   }
 
   if (dom.backendSelect) {

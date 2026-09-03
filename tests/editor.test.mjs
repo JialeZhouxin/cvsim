@@ -907,3 +907,85 @@ test("F7: stateFromV1 — fock 载入（loss eta→T、squeeze 无 phi、name �
   assert.equal(rtLoss.params.T, 0.8);
   assert.deepEqual(toV1Json(rt.state).ops.find((o) => o.op === "loss").params, { eta: 0.8 });
 });
+
+/* ── B6/F7: initial 单点语义（initial.js）+ backend 切换往返 ────────────── */
+
+test("initial.js: parseInitial — 语义按 backend 二分（fock 整数 / bosonic 源名）", async () => {
+  const { parseInitial, vacuumDefault, initialCacheKey } = await import("../cvsim/lab/static/initial.js");
+  // fock
+  assert.deepEqual(parseInitial("fock", [1, 0], 2), { initial: [1, 0] });
+  assert.ok(parseInitial("fock", ["gkp0", null], 2).error); // 源名进 fock → 拒
+  // bosonic
+  assert.deepEqual(parseInitial("bosonic", ["gkp0", null], 2), { initial: ["gkp0", null] });
+  assert.ok(parseInitial("bosonic", [0, 0], 2).error); // 整数进 bosonic → 拒（422 现场）
+  // 缺省 / 长度 / gaussian（gaussian 语义沿用旧 parseExtensions：非 fock 按源名校验，
+  // initial 不参与 gaussian 执行，但入口校验不放松）
+  assert.deepEqual(parseInitial("fock", undefined, 2), { initial: null });
+  assert.ok(parseInitial("fock", [0], 2).error);
+  assert.deepEqual(parseInitial("gaussian", ["gkp0", null], 2), { initial: ["gkp0", null] });
+  assert.ok(parseInitial("gaussian", [0, 0], 2).error);
+  // vacuumDefault / cache key
+  assert.equal(vacuumDefault("bosonic"), null);
+  assert.equal(vacuumDefault("fock"), 0);
+  assert.equal(initialCacheKey("bosonic", 2), "bosonic:2");
+});
+
+test("initial.js: serializeInitial — 非全真空才写，gaussian 永不写", async () => {
+  const { serializeInitial } = await import("../cvsim/lab/static/initial.js");
+  assert.equal(serializeInitial("gaussian", [1, 1], 2), undefined);
+  assert.equal(serializeInitial("fock", [0, 0], 2), undefined);   // 全真空省略
+  assert.deepEqual(serializeInitial("fock", [0, 2], 2), [0, 2]);
+  assert.equal(serializeInitial("bosonic", [null, null], 2), undefined); // 全真空省略
+  assert.deepEqual(serializeInitial("bosonic", ["gkp0", null], 2), ["gkp0", null]);
+  assert.equal(serializeInitial("bosonic", [0, 0], 2), undefined); // 跨后端残留不外泄
+  assert.equal(serializeInitial("fock", [null, null], 2), undefined);
+});
+
+test("initial.js: remapForBackend — 真空对应保留，非真空重置并计数（Q2=B）", async () => {
+  const { remapForBackend } = await import("../cvsim/lab/static/initial.js");
+  // fock → bosonic：0 保留为 null，非零重置
+  const fb = remapForBackend("fock", "bosonic", [0, 3, null], 3);
+  assert.deepEqual(fb.initial, [null, null, null]);
+  assert.equal(fb.reset, 1); // 只数非真空对应项
+  // bosonic → fock：null 保留为 0，源名重置
+  const bf = remapForBackend("bosonic", "fock", [null, "gkp0"], 2);
+  assert.deepEqual(bf.initial, [0, 0]);
+  assert.equal(bf.reset, 1);
+  // 同后端（加模场景）：原值保留 + 真空补位
+  const same = remapForBackend("fock", "fock", [2], 3);
+  assert.deepEqual(same.initial, [2, 0, 0]);
+  assert.equal(same.reset, 0);
+  // gaussian → 任意：无旧语义，全缺省真空
+  const g = remapForBackend("gaussian", "bosonic", undefined, 2);
+  assert.deepEqual(g.initial, [null, null]);
+  assert.equal(g.reset, 0);
+});
+
+test("B6/F7 回归: fock→bosonic 切换后 toV1Json 不再产出非法 initial（422 根因）", () => {
+  const nm2 = addNode(addNode([], "vacuum"), "vacuum");
+  // fock 状态：默认全 0（真空）+ 一个非零项
+  const fockState = { seed: 0, nodes: nm2, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock", initial: [0, 3], cutoffs: [10, 10] };
+  // 模拟 setBackend('bosonic') 的重映射（与 editor.js 同一来源）
+  const st = { ...fockState, backend: "bosonic", initial: [null, null] };
+  const payload = toV1Json(st);
+  // 修复前: payload.initial === [0, 3] → 服务端 422；修复后: 全真空不写
+  assert.equal(payload.initial, undefined);
+  // 非真空 bosonic initial 照常写
+  const st2 = { ...st, initial: ["gkp0", null] };
+  assert.deepEqual(toV1Json(st2).initial, ["gkp0", null]);
+  // 反向: bosonic → fock，旧 [null,null] 不再泄漏进 payload
+  const back = { ...st2, backend: "fock", initial: [0, 0] };
+  assert.equal(toV1Json(back).initial, undefined);
+});
+
+test("B6/F7 回归: stateFromJson 对 fock 整数进 bosonic 报错（前端守门）", () => {
+  const base = {
+    schema: "circuit_v1", nmode: 2, backend: "bosonic",
+    ops: [], seed: 0, view: { wigner_mode: 0, lim: 5.0, n: 64 },
+  };
+  assert.ok(stateFromJson({ ...base, initial: [0, 0] }).error);
+  assert.ok(stateFromJson({ ...base, initial: ["gkp9", null] }).error);
+  const ok = stateFromJson({ ...base, initial: ["gkp0_2d", null] });
+  assert.equal(ok.error, undefined);
+  assert.deepEqual(ok.state.initial, ["gkp0_2d", null]);
+});
