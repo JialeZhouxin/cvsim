@@ -30,6 +30,8 @@ from cvsim.bosonic.measure import (
     homodyne_sample_and_condition,
     homodyne_var,
     p_click,
+    pnr_probs,
+    pnr_sample,
     sample_threshold,
 )
 from cvsim.bosonic.observables import mean_photon
@@ -69,6 +71,8 @@ __all__ = [
     "homodyne_sample",
     "homodyne_sample_and_condition",
     "homodyne_condition",
+    "pnr_probs",
+    "pnr_sample",
     "heterodyne_pdf",
     "heterodyne_sample",
     "heterodyne_condition",

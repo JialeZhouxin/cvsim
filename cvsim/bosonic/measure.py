@@ -46,6 +46,178 @@ from cvsim.bosonic.observables import (
 from cvsim.bosonic.state import BosonicState, Component
 
 _IM_TOL = 1e-8
+_PNR_RADIUS = 0.95
+_LOG_MAX = float(np.log(np.finfo(float).max))
+_LOG_MIN = float(np.log(np.nextafter(0.0, 1.0)))
+
+# ---------------------------------------------------------------------------
+# photon-number resolving measurement — probability only
+# ---------------------------------------------------------------------------
+
+
+def _pnr_cutoff(cutoff: object) -> int:
+    """Validate PNR coefficient count without accepting bool as an integer."""
+    if not isinstance(cutoff, (int, np.integer)) or isinstance(cutoff, bool) or cutoff < 1:
+        raise ValueError(f"cutoff must be a positive int, got {cutoff!r}")
+    return int(cutoff)
+
+
+def _pnr_mode(state: BosonicState, mode: object) -> int:
+    """Validate PNR mode and keep public invalid-mode errors consistent."""
+    if not isinstance(mode, (int, np.integer)) or isinstance(mode, bool):
+        raise IndexError(f"mode {mode!r} is not a valid mode index")
+    mode_i = int(mode)
+    _check_mode(state, mode_i)
+    return mode_i
+
+
+def _pnr_component_log_generating(
+    V: np.ndarray, rbar: np.ndarray, t: complex
+) -> complex:
+    """Return complex logarithm of one Gaussian component's ``G(t)``.
+
+    ``rbar.T`` is intentional: complex component centres use analytic
+    transpose quadratic form, not a conjugate transpose. The logarithm keeps
+    large complex-centre terms representable until component weights are
+    applied; this matters for finite GKP cross components whose weight and
+    generating function can separately underflow/overflow while their product
+    is finite.
+    """
+    V = np.asarray(V, dtype=float)
+    r = np.asarray(rbar, dtype=complex)
+    if V.shape != (2, 2) or r.shape != (2,):
+        raise ValueError(
+            f"pnr component must have V shape (2, 2) and rbar shape (2,), got "
+            f"{V.shape} and {r.shape}"
+        )
+    if not np.all(np.isfinite(V)) or not np.all(np.isfinite(r)):
+        raise ValueError("pnr_probs: component V/rbar contains non-finite values")
+    if float(np.min(np.linalg.eigvalsh(V))) <= 0.0:
+        raise ValueError("pnr_probs: component covariance must be positive-definite")
+
+    try:
+        with np.errstate(all="raise"):
+            A = np.linalg.inv(V)
+            c = (1.0 - t) / (1.0 + t)
+            B = A + 2.0 * c * np.eye(2)
+            det_term = np.linalg.det(V) * np.linalg.det(B)
+            Ab = A @ r
+            exponent = -0.5 * (r @ Ab) + 0.5 * (Ab @ np.linalg.solve(B, Ab))
+            log_prefactor = np.log(2.0) - np.log(1.0 + t) - 0.5 * np.log(det_term)
+            value = complex(log_prefactor + exponent)
+    except (FloatingPointError, np.linalg.LinAlgError, ZeroDivisionError) as exc:
+        raise ValueError("pnr_probs: generating function is not representable") from exc
+    if not np.all(np.isfinite([value.real, value.imag])):
+        raise ValueError("pnr_probs: generating function produced a non-finite value")
+    return value
+
+
+def _pnr_generating(state: BosonicState, mode: int, ts: np.ndarray) -> np.ndarray:
+    """Evaluate weighted total generating function at Cauchy points.
+
+    Component terms are summed after a per-point log-magnitude rescale. This
+    preserves Hermitian interference while avoiding invalid intermediate
+    ``0 * inf`` products from distant complex-centre components.
+    """
+    m = state.nmode
+    indices = [mode, m + mode]
+    out = np.zeros(ts.shape, dtype=complex)
+    prepared = [
+        (c.w, c.V[np.ix_(indices, indices)], c.rbar[indices])
+        for c in state.components
+        if c.w != 0.0
+    ]
+    for i, t in enumerate(ts):
+        logs: list[complex] = []
+        for weight, V, rbar in prepared:
+            log_value = _pnr_component_log_generating(V, rbar, complex(t))
+            log_weight = np.log(abs(weight)) + 1j * np.angle(weight)
+            log_term = log_weight + log_value
+            if not np.all(np.isfinite([log_term.real, log_term.imag])):
+                raise ValueError("pnr_probs: weighted generating function is non-finite")
+            logs.append(log_term)
+        if not logs:
+            continue
+        scale = max(log_term.real for log_term in logs)
+        scaled = sum(np.exp(log_term - scale) for log_term in logs)
+        if not np.isfinite(scaled):
+            raise ValueError("pnr_probs: weighted generating function is non-finite")
+        if scaled == 0.0:
+            continue
+        total_log = scale + np.log(scaled)
+        if not np.all(np.isfinite([total_log.real, total_log.imag])):
+            raise ValueError("pnr_probs: total generating function is non-finite")
+        if total_log.real < _LOG_MIN:
+            continue
+        if total_log.real > _LOG_MAX:
+            raise ValueError("pnr_probs: total generating function is non-finite")
+        try:
+            with np.errstate(all="raise"):
+                out[i] = np.exp(total_log)
+        except FloatingPointError as exc:
+            raise ValueError("pnr_probs: total generating function is non-finite") from exc
+    if not np.all(np.isfinite(out)):
+        raise ValueError("pnr_probs: total generating function is non-finite")
+    return out
+
+
+def pnr_probs(
+    state: BosonicState,
+    mode: int = 0,
+    *,
+    cutoff: int = 30,
+) -> np.ndarray:
+    """Return first ``cutoff`` single-mode photon-number probabilities.
+
+    Component generating functions are summed before Cauchy extraction, so
+    complex centres and weights retain interference terms. Returned array is
+    not renormalized; omitted tail mass is expected for finite ``cutoff``.
+    For a multi-mode state, only selected mode's ``(x, p)`` block is used and
+    no joint distribution is formed.
+    """
+    cutoff_i = _pnr_cutoff(cutoff)
+    mode_i = _pnr_mode(state, mode)
+    # Radius 0.95 keeps requested high-order coefficients above round-off noise;
+    # 8*cutoff points suppress aliasing from the nearest singularity at t=-1.
+    n_points = max(128, 8 * cutoff_i)
+    theta = 2.0 * np.pi * np.arange(n_points, dtype=float) / n_points
+    ts = _PNR_RADIUS * np.exp(1j * theta)
+    values = _pnr_generating(state, mode_i, ts)
+    coeffs = np.fft.fft(values)[:cutoff_i] / n_points
+    coeffs = coeffs / (_PNR_RADIUS ** np.arange(cutoff_i, dtype=float))
+    if not np.all(np.isfinite(coeffs)):
+        raise ValueError("pnr_probs: extracted probabilities are non-finite")
+    imag_max = float(np.max(np.abs(coeffs.imag))) if coeffs.size else 0.0
+    if imag_max > _IM_TOL:
+        raise ValueError(f"pnr_probs has large imaginary part: max |Im|={imag_max:.3e}")
+    probs = np.asarray(coeffs.real, dtype=np.float64)
+    scale = max(1.0, float(np.max(np.abs(probs))))
+    negative = probs < 0.0
+    if np.any(negative):
+        if float(np.min(probs)) < -1e-10 * scale:
+            raise ValueError(
+                f"pnr_probs produced a negative probability: min={float(np.min(probs)):.3e}"
+            )
+        probs[negative] = 0.0
+    return probs
+
+
+def pnr_sample(
+    state: BosonicState,
+    mode: int = 0,
+    *,
+    cutoff: int = 30,
+    rng: np.random.Generator | None = None,
+) -> int:
+    """Draw one photon number from ``pnr_probs`` within finite ``cutoff``."""
+    probs = pnr_probs(state, mode, cutoff=cutoff)
+    total = float(np.sum(probs))
+    if not np.isfinite(total) or total <= _SIG_EPS:
+        raise ValueError("pnr_sample: probability mass within cutoff is ~0")
+    probabilities = probs / total
+    if rng is None:
+        rng = np.random.default_rng()
+    return int(rng.choice(probabilities.size, p=probabilities))
 
 # ---------------------------------------------------------------------------
 # heterodyne — exact 2D Q-surface (ADR-0007)

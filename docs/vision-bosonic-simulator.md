@@ -5,9 +5,9 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md); Fock peer in [`vision-fock-simulator.md`](./vision-fock-simulator.md). Cross-representation rules owned by Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-08-19（Kerr non-goal 部分 amend 2026-09-02：bosonic 增 `kerr` 非高斯能力，见 §1.3）
-**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B7 done (2026-09-02)**；基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结）+ 组件工程 + 测量精度 + 调和对账 + BosonicCircuit DSL + GUI 三件套 + **B7 复中心内核/严格 Wigner 核** + **非高斯 `kerr` 门（分量展开，phaseB8）**；从真空出位置梳 GKP 仍为 non-goal（需 stabilizer 测量+反馈）
-**Codebase today:** `cvsim/bosonic` B1 生产面（state/cat/gkp/gates 11 门/channels 3/measure.py 三测量/observables 矩；单模 homodyne 教学切，B3 换精确）
+**Last updated:** 2026-09-02（Kerr 及单模 PNR 部分 amend：`kerr` 见 §1.3，PNR 见 §2.3）
+**Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B7 done (2026-09-02)**；基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结）+ 组件工程 + 测量精度 + 调和对账 + BosonicCircuit DSL + GUI 三件套 + **B7 复中心内核/严格 Wigner 核** + **非高斯 `kerr` 门（分量展开，phaseB8）** + **单模 `pnr_probs`/`pnr_sample`（Phase 1）**；从真空出位置梳 GKP 仍为 non-goal（需 stabilizer 测量+反馈）
+**Codebase today:** `cvsim/bosonic` B1 生产面（state/cat/gkp/gates 11 门/channels 3/measure.py 三测量 + 单模 PNR/observables 矩；单模 homodyne 教学切，B3 换精确）
 
 ---
 
@@ -34,7 +34,7 @@ Gaussian's "production" claim rests on scale + precision (m→100, fast compile)
 | **Arbitrary non-Gaussian gates in component form** | 2026-09-02 amend: bosonic adds **`kerr`** (non-Gaussian, component expansion, phaseB8) — see note below. Other arbitrary non-Gaussian gates still excluded. Note: Kerr alone cannot produce a position-comb GKP from vacuum (needs stabilizer measurement + displacement feedback, Gaussian-dominated) → **from-vacuum GKP remains non-goal** (see docs/phase0-kerr-component-expansion.md + Boudreault arXiv:2507.09684) |
 | **Protocol library** (e.g. built-in GKP QEC rounds) | P1 locked: bricks in the library, protocols in tutorials / GUI scripts. Library must not grow into an error-correction framework |
 | **Multi-mode production-grade** | A1 locked: single-mode production anchor; architecture written for arbitrary m; dual-mode is an open question (K² blowup is real engineering, no scene driving it yet) |
-| **Component-form PNR path** | M1 locked: PNR teaching scenes switch to Fock. Component PNR is "theoretically possible, more convoluted than Gaussian" (notes §5.4) — open question |
+| **PNR condition/posterior** | `pnr_condition` and `pnr_sample_and_condition` remain deferred: a PNR posterior is generally non-Gaussian and cannot be represented exactly by finite Gaussian components. |
 | **AD (differentiable)** | Open question. Component-weight differentiability is heavy engineering; GKP teaching doesn't need it |
 | **Tensor networks / cloud / multi-user** | Inherits Fock stance, no re-litigation |
 
@@ -60,6 +60,7 @@ Gaussian's "production" claim rests on scale + precision (m→100, fast compile)
 
 - **Homodyne:** per-component affine + likelihood reweighting (teaching closed form, notes §5.2). B3 upgrades sampling to **exact edge distribution** (cross terms included, no "diagonal-peak pool" approximation — that is the teaching cut, explicitly not production). **Sampling strategy (A5, 2026-08-14): CDF grid inversion** — P(x) = Σ_k w_k p_k(x) 是复权重混合（无正概率权重，拒绝采样不可行）；网格 δx ≤ σ_min/5 自动定，uniform + searchsorted 反演，10³ shots 向量化；条件化 ρ_post = Σ_k [w_k p_k(x)] ρ_k / P(x) 同一核。
 - **Heterodyne / threshold:** threshold = outcome-only {0,1}, no state update; heterodyne **精确化（ADR-0007）**：2D Q-surface Q(β)=Σ_k w_k Q_k(β)（复中心解析延拓）+ 顺序 CDF 反演（x 边缘 → 条件 p），条件化同一核 w_k ∝ w_k·Q_k(β)，模删除语义不变。
+- **单模 PNR（Phase 1）:** `pnr_probs(state, mode=0, *, cutoff=30)` 返回目标 mode 前 `cutoff` 个 photon-number 边际概率，`pnr_sample(..., rng=None)` 在该有限数组内归一化后单次采样。复中心/复权重全分量求和后提取；多模输入不产生联合分布。`pnr_condition`、`pnr_sample_and_condition` 仍不提供。
 
 ---
 
@@ -224,7 +225,7 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 | State factories | BosonicState/Component + even/odd cat + gkp0/gkp1 + coherent | —（B1 done）；GKP 逻辑基（0.3.0）：`lattice="1d"`=X 基（|1⟩ 峰错半格）、`lattice="2d"`=单模平方格 Z 基（|1⟩ 峰不动、系数 (−1)^k，物理定义见 `docs/gkp-2d-square-lattice.md`；对账入口 `pure_fidelity`） |
 | Gates | 11 门（D/R/S/F/BS/MZ/S₂/CZ/CX/interferometer）K=1 atol 对齐 | —（B1 done） |
 | Channels | loss/amplifier/phase_noise（X,Y 逐分量仿射） | —（B1 done） |
-| Measures | measure.py：homodyne 精确（CDF 网格反演）+ heterodyne 精确（2D Q-surface + 顺序 CDF 反演，ADR-0007）+ threshold outcome-only | —（B3 done，backlog #1 关闭） |
+| Measures | measure.py：homodyne 精确（CDF 网格反演）+ heterodyne 精确（2D Q-surface + 顺序 CDF 反演，ADR-0007）+ threshold outcome-only + 单模 PNR 概率/采样（Phase 1） | `pnr_condition`、联合多模 PNR 仍 deferred |
 | Component engineering | — | merge/truncate/underflow/normalization + leakage + is_hermitian（B2） |
 | Analyse | mean_photon | purity/overlap/pure_fidelity 闭式（B2/B4）；entropy defer |
 | Circuit DSL | — | BosonicCircuit + IR + run_steps（B5） |
@@ -235,7 +236,7 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 ## 10. Open questions
 
 1. **Dual-mode production-grade** (A1 defer): K² component blowup — real engineering, no scene driving it yet. Unlock condition: a dual-mode GKP teaching scene or surface-code story.
-2. **Component-form PNR** (M1 defer): theory path exists (notes §5.4), more convoluted than Gaussian. Unlock: a scene where PNR must stay in Bosonic.
+2. **PNR posterior conditioning**: `pnr_condition` requires a representation decision because finite Gaussian components cannot exactly carry a Fock posterior. Unlock: an explicit posterior representation and ADR.
 3. **AD / differentiability**: component-weight gradient engineering. Unlock: a design loop that needs Bosonic gradients.
 4. **Tensor networks**: long-term research item, not committed (inherited).
 
@@ -247,3 +248,4 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 | 0.1.1 | 2026-08-14 | 架构层 amend（grill A1–A12，任务 08-14-bosonic-architecture）：A4 测量并入 measure.py（observables 只留矩）；A5 homodyne 精确采样策略锁 CDF 网格反演（§2.3）；组件工程补 is_hermitian（A3）。详见 design.md + ADR-0006 |
 | 0.2.0 | 2026-08-14 | **B0–B1 done**（任务 08-14-bosonic-b1，commit `fe94357`）：门全集 11（K=1 atol 1e-10）、通道 3、measure.py（homodyne/heterodyne 教学切 + threshold outcome-only）、coherent 工厂、BOSONIC_PUBLIC 冻结 33 名、phaseB1 markers；全套 1059 passed。§0 状态 / §9 gap 表同步；契约层 `.trellis/spec/cvsim/` 新建 |
 | 0.3.0 | 2026-09-02 | **GKP 2d 单模平方格 Z 基**（任务 09-02-gkp-2d-square-lattice，commit `c1cbeaa`）：`lattice="2d"` 从 (x,p) 网格峰+各向同性 V 重定义为单模位置梳（x=kΔ, p=0, V=½diag(ε,1/ε)）+ gkp1 交替相位 (−1)^k（Z 基，峰不动），与 1d X 基互补；交叉分量 Wigner 相位 `s=V·J·Δr`（B7 修正，对各向异性 V 才纯）；逻辑对账入口 `pure_fidelity`（`gkp_logical_overlap` 仅 X 基有效）。破坏性 2d 语义变更（0.x 预发布，公共 API 签名不变）；物理事实源 `docs/gkp-2d-square-lattice.md`。§9 gap 表同步 |
+| 0.4.0 | 2026-09-02 | **单模 Bosonic PNR 概率与采样**（任务 `09-02-add-missing-optical-ops` Phase 1）：新增 `pnr_probs`/`pnr_sample`，生成函数 + Cauchy 提取保留复中心/复权重，目标 mode 支持多模输入的单模 block；`pnr_condition`、联合多模 PNR 和后验电路仍非目标。 |
