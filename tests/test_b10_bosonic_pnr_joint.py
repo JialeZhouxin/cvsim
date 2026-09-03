@@ -159,6 +159,13 @@ def test_b10_modes_validation() -> None:
     for bad in (0, True, 1.5):
         with pytest.raises(TypeError):
             pnr_probs(state, modes=bad)  # type: ignore[arg-type]
+    # TypeError: non-int *elements* inside a valid container — must be
+    # rejected, not silently truncated by int() coercion (AC-4 element-wise).
+    for bad_elem in ((0.5,), (True,), ("a",), (1.5, 0), (np.float64(0.5),)):
+        with pytest.raises(TypeError):
+            pnr_probs(state, modes=bad_elem)  # type: ignore[arg-type]
+        with pytest.raises(TypeError):
+            pnr_sample(state, modes=bad_elem, cutoff=5)  # type: ignore[arg-type]
     # ValueError: duplicate indices / empty tuple
     with pytest.raises(ValueError):
         pnr_probs(state, modes=(0, 0), cutoff=5)

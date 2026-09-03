@@ -117,17 +117,6 @@ def _pnr_component_log_generating(
         raise ValueError("pnr_probs: generating function produced a non-finite value")
     return value
 
-def _pnr_joint_component_log_generating(
-    A: np.ndarray, rbar: np.ndarray, ts: np.ndarray
-) -> complex:
-    """log G(t⃗) for one Gaussian component over a single multi-mode point.
-
-    Kept as a scalar reference for the single-point path; the grid path uses
-    ``_pnr_component_log_grid`` (batched over all Cauchy points). ``A = V⁻¹``.
-    """
-    return complex(_pnr_component_log_grid(A, rbar, ts.reshape(1, -1))[0])
-
-
 def _pnr_component_log_grid(
     A: np.ndarray, rbar: np.ndarray, flat: np.ndarray
 ) -> np.ndarray:
@@ -182,15 +171,21 @@ def _pnr_component_log_grid(
     return np.asarray(logG, dtype=complex)
 
 def _pnr_mode_seq(state: BosonicState, modes: object) -> tuple[int, ...]:
-    """Validate a joint-mode selection tuple and return sorted unique indices."""
+    """Validate a joint-mode selection and return mode indices in input order.
+
+    Accepts a tuple/list/ndarray of non-negative int mode indices. Element types
+    are validated *before* any ``int()`` coercion so floats/bools/strings are
+    rejected rather than silently truncated. Returns the indices un-sorted (input
+    order determines tensor-axis order).
+    """
     if isinstance(modes, (bool, np.bool_)) or not isinstance(modes, (tuple, list, np.ndarray)):
         raise TypeError(f"modes must be a tuple or None, got {type(modes).__name__}")
+    for x in modes:
+        if not isinstance(x, (int, np.integer)) or isinstance(x, bool):
+            raise TypeError("modes elements must be integers; use mode= for a single mode")
     seq = tuple(int(x) for x in modes)
     if not seq:
         raise ValueError("modes must be a non-empty tuple of mode indices")
-    for x in seq:
-        if not isinstance(x, (int, np.integer)) or isinstance(x, bool):
-            raise TypeError("modes elements must be integers; use mode= for a single mode")
     m = state.nmode
     for x in seq:
         if not 0 <= x < m:

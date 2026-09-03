@@ -103,32 +103,6 @@ def tmsv_Vr(r: float) -> tuple[np.ndarray, np.ndarray]:
     return V, np.zeros(4, dtype=complex)
 
 
-def kerr_components_tmsv(r: float, chi: float, q: int) -> list[tuple[np.ndarray, np.ndarray, complex]]:
-    """TMSV 经 kerr(mode 0) 后的分量表示（近似演示锚）。
-
-    诚实标注：这是探针的**演示近似**，不是生产 kerr 实现。TMSV 是零均值高斯，
-    kerr 后态的严格分量展开超纲；这里用「位移相干态网格近似」——把 mode 0 的
-    kerr 相位作用表示为 q 个旋转相干分量的叠加（角度 2π/q 网格），
-    只用于验证「复中心 × 关联 V」核的数值通路，gold 对照用 fock expm。
-    """
-    # 走最保守路线：直接用（近似）相位旋转网格做分量，V 保持 TMSV 关联。
-    # mode 0 旋转 φ_j → 复中心 r̄_j = (x1 cosφ − p1 sinφ) + i(...) 网格。
-    # 探针目的：复中心 + 关联 V 的联合生成函数数值行为，不追求物理精确。
-    raise NotImplementedError("场景 3 改用 cat⊗TMSV 乘积纠缠替代——见 main() 注释")
-
-
-def cat_tmsv_components(alpha: float, theta: float, r: float) -> list[tuple[np.ndarray, np.ndarray, complex]]:
-    """cat(mode0) ⊗ TMSV(mode 1,2) 乘积纠缠？——不对：cat 与 TMSV 不共享模。
-
-    真正的场景 3：**双模纠缠非高斯** = TMSV 边缘叠加。构造：
-    |Ψ⟩ ∝ |α,α⟩·c0 + |α,−α⟩·c1 + |−α,α⟩·c2 + |−α,−α⟩·c3（4 相干乘积叠加，
-    复中心 + 复权重），关联由叠加产生（非乘积态）。
-    金锚 = fock: 4 个双模相干直和归一。
-    """
-    Vt, _ = tmsv_Vr(r)  # noqa: F841 — 场景 3 用的 V 见 main()；此处仅演示
-    raise NotImplementedError
-
-
 # ---------------------------------------------------------------------------
 # 联合 PNR：分块生成函数 + 逐轴 Cauchy 提取（B10 候选核）
 # ---------------------------------------------------------------------------
