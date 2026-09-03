@@ -32,7 +32,9 @@ Bosonic (cat/GKP), and bridges" —— 第三个生产级 peer 是既定方向�
    GUI 剧本，不做库 API。对齐 Fock 立场"algorithms are users' business"。
 5. **测量面 M1**：homodyne（精确化）+ heterodyne + threshold；threshold 复用
    Gaussian 已锁定语义（outcome-only，无态更新）。B9 Phase 1 解锁单模边际
-   `pnr_probs` 与有限 cutoff 内的 `pnr_sample`；PNR 条件化、联合多模 PNR 仍延期。
+   `pnr_probs` 与有限 cutoff 内的 `pnr_sample`；B10 Phase 2a 解锁联合多模
+   PNR（`modes=None` 全模 / `modes=(…)` 子集，或与单模 `mode=` 互斥）；
+   PNR 条件化仍延期。
 6. **电路 B1：BosonicCircuit = circuit_common 第三消费者**。任意 m、组件式
    执行（每 op 逐组件仿射 + 权重规则）、to_ir/from_ir 对齐 Fock F3。
    ADR-0004 的泛化承诺兑现（Fock 是第二消费者）。AD（可微）进 open questions。
@@ -52,7 +54,8 @@ Bosonic (cat/GKP), and bridges" —— 第三个生产级 peer 是既定方向�
 - 曾考虑不造 DSL、GUI 用脚本直调积木（B2）：被否。前端复用壳要求电路编辑器
   接 circuit_v1，不造 DSL 壳就断了。
 - 曾考虑把全部 PNR 能力一次性做完（M3）：被否。B9 先交付可验证的单模边际
-  概率/采样；条件化和联合多模路径仍需独立表示与规模设计。
+  概率/采样；B10 Phase 2a 接着交付联合多模 PNR（复中心干涉核，逐点 branch
+  anchor + 向量化 Cauchy 提取）；PNR 条件化仍需独立表示与规模设计。
 
 ## 后果
 
@@ -64,4 +67,4 @@ Bosonic (cat/GKP), and bridges" —— 第三个生产级 peer 是既定方向�
 - 契约：修改物理语义必须先改 `docs/vision-bosonic-simulator.md`；K=1 退化
   到 Gaussian 是硬不变量（atol 1e-7）；组件泄漏纪律镜像 Fock 截断纪律
   （warn >1e-6，fail >1e-3）。
-- 开放：双模生产级、PNR 条件化/联合多模路径、AD、tensor networks（vision §10）。
+- 开放：双模生产级、PNR 条件化、AD、tensor networks（vision §10）。

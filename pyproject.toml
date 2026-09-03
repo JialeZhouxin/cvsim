@@ -145,6 +145,7 @@ markers = [
     "phaseB6: Bosonic B6 GUI three-piece tests",
     "phaseB7: Bosonic B7 complex-centre analyse kernel tests",
     "phaseB8: Bosonic B8 non-Gaussian kerr gate tests",
+    "phaseB10: Bosonic B10 joint multimode PNR probability/sampling tests",
 ]
 filterwarnings = [
     "error:cvsim.*",

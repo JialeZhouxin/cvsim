@@ -49,6 +49,12 @@ _IM_TOL = 1e-8
 _PNR_RADIUS = 0.95
 _LOG_MAX = float(np.log(np.finfo(float).max))
 _LOG_MIN = float(np.log(np.nextafter(0.0, 1.0)))
+# Sentinel: distinguish "modes not passed" (B9 single-mode path) from an
+# explicit ``modes=None`` (all-modes joint). ``mode``/``modes`` are selected
+# by this, keeping ``pnr_probs(state)`` and ``pnr_probs(state, mode=j)``
+# byte-compatible with B9 while adding a joint tensor path.
+_MODES_DEFAULT = object()
+_MODE_DEFAULT = object()
 
 # ---------------------------------------------------------------------------
 # photon-number resolving measurement — probability only
@@ -111,6 +117,89 @@ def _pnr_component_log_generating(
         raise ValueError("pnr_probs: generating function produced a non-finite value")
     return value
 
+def _pnr_joint_component_log_generating(
+    A: np.ndarray, rbar: np.ndarray, ts: np.ndarray
+) -> complex:
+    """log G(t⃗) for one Gaussian component over a single multi-mode point.
+
+    Kept as a scalar reference for the single-point path; the grid path uses
+    ``_pnr_component_log_grid`` (batched over all Cauchy points). ``A = V⁻¹``.
+    """
+    return complex(_pnr_component_log_grid(A, rbar, ts.reshape(1, -1))[0])
+
+
+def _pnr_component_log_grid(
+    A: np.ndarray, rbar: np.ndarray, flat: np.ndarray
+) -> np.ndarray:
+    """Vectorised log G(t⃗) for one Gaussian component on a flat multi-axis grid.
+
+    ``flat`` has shape ``(n_grid, k)``; each row is one Cauchy point
+    ``t⃗ = (t_{j_1}, …, t_{j_k})``. Returns an ``(n_grid,)`` complex array of
+    ``log G`` values. ``A = V⁻¹`` is t-independent (pre-inverted once).
+
+    ``B = A + 2 Σ_j c_j P_j`` and ``quad = −½ r̄ᵀAr̄ + ½ (Ar̄)ᵀB⁻¹(Ar̄)``. The
+    logarithm keeps large complex-centre terms representable until weights apply.
+    """
+    A = np.asarray(A, dtype=complex)
+    r = np.asarray(rbar, dtype=complex)
+    flat = np.asarray(flat, dtype=complex)
+    dim = A.shape[0]
+    if A.shape[0] != A.shape[1] or A.shape[0] % 2 != 0:
+        raise ValueError("pnr joint component A=V⁻¹ must be square even-dimensional")
+    if r.ndim != 1 or r.shape[0] != dim:
+        raise ValueError("pnr joint component: A/rbar shape mismatch")
+    if flat.ndim != 2 or flat.shape[1] != dim // 2:
+        raise ValueError("pnr joint component: flat grid shape mismatch")
+    if not np.all(np.isfinite(A)) or not np.all(np.isfinite(r)) or not np.all(np.isfinite(flat)):
+        raise ValueError("pnr_probs: joint component contains non-finite values")
+    if float(np.min(np.linalg.eigvalsh(A.real))) <= 0.0:
+        raise ValueError("pnr_probs: component covariance must be positive-definite")
+    k = flat.shape[1]
+    n_grid = flat.shape[0]
+    try:
+        with np.errstate(all="raise"):
+            c = (1.0 - flat) / (1.0 + flat)          # (n_grid, k)
+            B = np.broadcast_to(A[None, :, :], (n_grid, dim, dim)).copy()
+            eye2 = np.eye(2, dtype=complex)
+            for jj in range(k):
+                B[:, 2 * jj : 2 * jj + 2, 2 * jj : 2 * jj + 2] += (
+                    (2.0 * c[:, jj])[:, None, None] * eye2
+                )
+            Ab = A @ r                                # (dim,)
+            X = np.linalg.solve(B, Ab[None, :, None])[:, :, 0]  # (n_grid,dim)
+            quad = -0.5 * (r @ Ab) + 0.5 * np.einsum("i,gi->g", Ab, X)
+            detVB = np.linalg.det(B) / np.linalg.det(A.real)
+            sq = np.sqrt(detVB)
+            target = -np.angle(1.0 + flat).sum(axis=1)
+            flip = np.abs(np.angle(sq) - target) > (np.pi / 2.0)
+            sq[flip] = -sq[flip]
+            prod1p = np.prod(1.0 + flat, axis=1)
+            logG = k * np.log(2.0) - np.log(prod1p * sq) + quad
+    except (FloatingPointError, np.linalg.LinAlgError, ZeroDivisionError) as exc:
+        raise ValueError("pnr_probs: joint generating function is not representable") from exc
+    if not np.all(np.isfinite(logG)):
+        raise ValueError("pnr_probs: joint generating function produced a non-finite value")
+    return np.asarray(logG, dtype=complex)
+
+def _pnr_mode_seq(state: BosonicState, modes: object) -> tuple[int, ...]:
+    """Validate a joint-mode selection tuple and return sorted unique indices."""
+    if isinstance(modes, (bool, np.bool_)) or not isinstance(modes, (tuple, list, np.ndarray)):
+        raise TypeError(f"modes must be a tuple or None, got {type(modes).__name__}")
+    seq = tuple(int(x) for x in modes)
+    if not seq:
+        raise ValueError("modes must be a non-empty tuple of mode indices")
+    for x in seq:
+        if not isinstance(x, (int, np.integer)) or isinstance(x, bool):
+            raise TypeError("modes elements must be integers; use mode= for a single mode")
+    m = state.nmode
+    for x in seq:
+        if not 0 <= x < m:
+            raise IndexError(f"mode {x} out of range for nmode={m}")
+    if len(set(seq)) != len(seq):
+        raise ValueError(f"modes contains duplicate indices: {seq}")
+    return tuple(seq)
+
+
 
 def _pnr_generating(state: BosonicState, mode: int, ts: np.ndarray) -> np.ndarray:
     """Evaluate weighted total generating function at Cauchy points.
@@ -160,37 +249,102 @@ def _pnr_generating(state: BosonicState, mode: int, ts: np.ndarray) -> np.ndarra
         raise ValueError("pnr_probs: total generating function is non-finite")
     return out
 
-
-def pnr_probs(
-    state: BosonicState,
-    mode: int = 0,
-    *,
-    cutoff: int = 30,
+def _pnr_joint_generating(
+    state: BosonicState, modes: tuple[int, ...], ts_grid: np.ndarray
 ) -> np.ndarray:
-    """Return first ``cutoff`` single-mode photon-number probabilities.
+    """Vectorised weighted joint generating function on a multi-axis torus grid.
 
-    Component generating functions are summed before Cauchy extraction, so
-    complex centres and weights retain interference terms. Returned array is
-    not renormalized; omitted tail mass is expected for finite ``cutoff``.
-    For a multi-mode state, only selected mode's ``(x, p)`` block is used and
-    no joint distribution is formed.
+    ``ts_grid`` has shape ``(n_points,) * k`` and each index carries a complex
+    t⃗ = (t_{j_1}, …, t_{j_k}). Per component, ``logG`` is evaluated on the
+    selected-mode block (V/rbar sliced by each mode's (x, p) indices); weights
+    are merged in log domain per grid point (replicates the B9
+    ``_pnr_generating`` 0×inf discipline, vectorised).
     """
-    cutoff_i = _pnr_cutoff(cutoff)
-    mode_i = _pnr_mode(state, mode)
-    # Radius 0.95 keeps requested high-order coefficients above round-off noise;
-    # 8*cutoff points suppress aliasing from the nearest singularity at t=-1.
-    n_points = max(128, 8 * cutoff_i)
+    m = state.nmode
+    k = len(modes)
+    # Collect per-(x,p) index blocks for the selected modes, in ``modes`` order.
+    blk_indices = [x for mm in modes for x in (mm, m + mm)]
+    prepared = [
+        (c.w, c.V[np.ix_(blk_indices, blk_indices)], c.rbar[blk_indices])
+        for c in state.components
+        if c.w != 0.0
+    ]
+    # Pre-invert the component covariance once (it does not depend on t⃗); the
+    # per-point kernel then handles only the t-dependent 2c·P shift. This avoids
+    # re-inverting at every one of the n_points^k torus points × components.
+    prepared = [
+        (w, np.linalg.inv(Vc), rbar) for w, Vc, rbar in prepared
+    ]
+    if not prepared:
+        raise ValueError("pnr_probs: state has no components with non-zero weight")
+    # Vectorised kernel: process all grid points at once per component.
+    # Each component's logG is a (n_points,)*k array; we add log-weight and
+    # merge across components in log domain (replicates B9 0×inf discipline).
+    shape = ts_grid.shape[:-1]
+    flat = ts_grid.reshape(-1, k)          # (n_grid, k) complex
+    n_grid = flat.shape[0]
+    log_terms = np.empty((len(prepared), n_grid), dtype=complex)
+    for pi, (weight, A, rbar) in enumerate(prepared):
+        log_terms[pi] = _pnr_component_log_grid(A, rbar, flat)
+        lw = np.log(abs(weight)) + 1j * np.angle(weight)
+        log_terms[pi] += lw
+    if not np.all(np.isfinite(log_terms)):
+        raise ValueError("pnr_probs: joint weighted generating function is non-finite")
+    scale = np.max(log_terms.real, axis=0)
+    scaled = np.sum(np.exp(log_terms - scale), axis=0)
+    total_log = scale + np.log(scaled)
+    out_flat = np.zeros(n_grid, dtype=complex)
+    finite = np.isfinite(total_log.real) & np.isfinite(total_log.imag)
+    lo = total_log.real < _LOG_MIN
+    hi = (total_log.real > _LOG_MAX) & finite
+    ok = finite & (~lo) & (~hi)
+    if np.any(hi):
+        raise ValueError("pnr_probs: joint total generating function is non-finite")
+    try:
+        with np.errstate(all="raise"):
+            out_flat[ok] = np.exp(total_log[ok])
+    except FloatingPointError as exc:
+        raise ValueError("pnr_probs: joint total generating function is non-finite") from exc
+    if not np.all(np.isfinite(out_flat)):
+        # Any *kept* point must be finite; points below _LOG_MIN are zero.
+        kept = ok
+        if np.any(~np.isfinite(out_flat[kept])):
+            raise ValueError("pnr_probs: joint total generating function is non-finite")
+    return out_flat.reshape(shape)
+
+def _pnr_joint_n_points(cutoff: int) -> int:
+    return max(128, 8 * cutoff)
+
+def _pnr_joint_probs(
+    state: BosonicState, modes: tuple[int, ...], cutoff: int
+) -> np.ndarray:
+    """Joint P(n⃗) on the selected modes via per-axis Cauchy extraction."""
+    k = len(modes)
+    n_points = _pnr_joint_n_points(cutoff)
     theta = 2.0 * np.pi * np.arange(n_points, dtype=float) / n_points
-    ts = _PNR_RADIUS * np.exp(1j * theta)
-    values = _pnr_generating(state, mode_i, ts)
-    coeffs = np.fft.fft(values)[:cutoff_i] / n_points
-    coeffs = coeffs / (_PNR_RADIUS ** np.arange(cutoff_i, dtype=float))
-    if not np.all(np.isfinite(coeffs)):
-        raise ValueError("pnr_probs: extracted probabilities are non-finite")
-    imag_max = float(np.max(np.abs(coeffs.imag))) if coeffs.size else 0.0
+    # Multi-axis torus grid: shape (n_points,)*k, each point carrying a complex
+    # t⃗ = (t_{j_1}, …, t_{j_k}) in a trailing (k,) axis.
+    ts_grid = np.empty((n_points,) * k + (k,), dtype=complex)
+    for idx_arr in np.ndindex(*((n_points,) * k)):
+        ts = _PNR_RADIUS * np.exp(1j * theta[np.asarray(idx_arr)])
+        ts_grid[idx_arr] = ts
+    values = _pnr_joint_generating(state, modes, ts_grid)
+    coeffs = np.fft.fftn(values) / (n_points**k)
+    slices = tuple(slice(0, cutoff) for _ in range(k))
+    probs = np.asarray(coeffs[slices])
+    # Radius correction per axis: divide by radius**(n_1+…+n_k).
+    ns = [np.arange(cutoff, dtype=float)] * k
+    meshes = np.meshgrid(*ns, indexing="ij")
+    corr = np.zeros_like(meshes[0])
+    for gm in meshes:
+        corr += gm
+    probs = probs / (_PNR_RADIUS ** corr)
+    if not np.all(np.isfinite(probs)):
+        raise ValueError("pnr_probs: extracted joint probabilities are non-finite")
+    imag_max = float(np.max(np.abs(probs.imag))) if probs.size else 0.0
     if imag_max > _IM_TOL:
         raise ValueError(f"pnr_probs has large imaginary part: max |Im|={imag_max:.3e}")
-    probs = np.asarray(coeffs.real, dtype=np.float64)
+    probs = np.asarray(probs.real, dtype=np.float64)
     scale = max(1.0, float(np.max(np.abs(probs))))
     negative = probs < 0.0
     if np.any(negative):
@@ -201,23 +355,128 @@ def pnr_probs(
         probs[negative] = 0.0
     return probs
 
+def _pnr_joint_sample(
+    state: BosonicState, modes: tuple[int, ...], cutoff: int, rng: np.random.Generator
+) -> tuple[int, ...]:
+    """Sequential marginal-condition sampling on a joint PNR tensor.
+
+    Draw n_1 from the marginal of mode 1 (all other modes summed), then
+    n_2 from the conditional P(n_2 | n_1), and so on. Uses the joint
+    ``pnr_probs`` tensor so each conditional is exact on the same lattice.
+    """
+    joint = _pnr_joint_probs(state, modes, cutoff)
+    if joint.ndim == 1:
+        total = float(np.sum(joint))
+        if not np.isfinite(total) or total <= _SIG_EPS:
+            raise ValueError("pnr_sample: probability mass within cutoff is ~0")
+        return (int(rng.choice(joint.size, p=joint / total)),)
+    seq: list[int] = []
+    for _step in range(joint.ndim):
+        # Marginal at this step: sum over all remaining (rightmost) axes.
+        marg = joint
+        if seq:
+            # Slice to the already-chosen leading indices.
+            idx = tuple(seq)
+            marg = joint[idx]
+        if marg.ndim > 1:
+            marg = marg.sum(axis=tuple(range(1, marg.ndim)))
+        total = float(np.sum(marg))
+        if not np.isfinite(total) or total <= _SIG_EPS:
+            raise ValueError("pnr_sample: probability mass within cutoff is ~0")
+        pick = int(rng.choice(marg.size, p=marg / total))
+        seq.append(pick)
+    return tuple(seq)
+
+
+def pnr_probs(
+    state: BosonicState,
+    mode: int | object = _MODE_DEFAULT,
+    *,
+    modes: tuple[int, ...] | int | None | object = _MODES_DEFAULT,
+    cutoff: int = 30,
+) -> np.ndarray:
+    """Return first ``cutoff`` photon-number probabilities.
+
+    Selecting a distribution
+    ------------------------
+    - ``mode=j`` (default): single-mode marginal over mode ``j`` (B9 path).
+    - ``modes=None``: joint distribution over **all** modes, shape
+      ``(cutoff,)*nmode``.
+    - ``modes=(j, …, k)``: joint distribution over the selected mode subset,
+      shape ``(cutoff,)*len(modes)``. A length-1 tuple is allowed and goes
+      through the tensor path (``(cutoff,)``).
+
+    ``mode`` and ``modes`` are mutually exclusive (``TypeError`` if both). The
+    returned tensor is not renormalised; omitted tail mass is expected for
+    finite ``cutoff``.
+
+    Component generating functions are summed before Cauchy extraction, so
+    complex centres and weights retain interference terms.
+    """
+    if modes is not _MODES_DEFAULT and mode is not _MODE_DEFAULT:
+        raise TypeError("mode and modes are mutually exclusive")
+    cutoff_i = _pnr_cutoff(cutoff)
+    if modes is _MODES_DEFAULT:
+        # B9 single-mode path (byte-compatible).
+        mode_i = _pnr_mode(state, 0 if mode is _MODE_DEFAULT else mode)
+        n_points = max(128, 8 * cutoff_i)
+        theta = 2.0 * np.pi * np.arange(n_points, dtype=float) / n_points
+        ts = _PNR_RADIUS * np.exp(1j * theta)
+        values = _pnr_generating(state, mode_i, ts)
+        coeffs = np.fft.fft(values)[:cutoff_i] / n_points
+        coeffs = coeffs / (_PNR_RADIUS ** np.arange(cutoff_i, dtype=float))
+        if not np.all(np.isfinite(coeffs)):
+            raise ValueError("pnr_probs: extracted probabilities are non-finite")
+        imag_max = float(np.max(np.abs(coeffs.imag))) if coeffs.size else 0.0
+        if imag_max > _IM_TOL:
+            raise ValueError(f"pnr_probs has large imaginary part: max |Im|={imag_max:.3e}")
+        probs = np.asarray(coeffs.real, dtype=np.float64)
+        scale = max(1.0, float(np.max(np.abs(probs))))
+        negative = probs < 0.0
+        if np.any(negative):
+            if float(np.min(probs)) < -1e-10 * scale:
+                raise ValueError(
+                    f"pnr_probs produced a negative probability: min={float(np.min(probs)):.3e}"
+                )
+            probs[negative] = 0.0
+        return probs
+
+    # Joint path: resolve ``modes`` (None → all modes, tuple → subset).
+    seq = tuple(range(state.nmode)) if modes is None else _pnr_mode_seq(state, modes)
+    return _pnr_joint_probs(state, seq, cutoff_i)
+
 
 def pnr_sample(
     state: BosonicState,
-    mode: int = 0,
+    mode: int | object = _MODE_DEFAULT,
     *,
+    modes: tuple[int, ...] | int | None | object = _MODES_DEFAULT,
     cutoff: int = 30,
     rng: np.random.Generator | None = None,
-) -> int:
-    """Draw one photon number from ``pnr_probs`` within finite ``cutoff``."""
-    probs = pnr_probs(state, mode, cutoff=cutoff)
-    total = float(np.sum(probs))
-    if not np.isfinite(total) or total <= _SIG_EPS:
-        raise ValueError("pnr_sample: probability mass within cutoff is ~0")
-    probabilities = probs / total
+) -> int | tuple[int, ...]:
+    """Draw a photon-number outcome.
+
+    - Single-mode path (no ``modes``): returns ``int`` (B9 compatible).
+    - Joint path (``modes=None`` or a tuple): sequential marginal-condition
+      sampling over the marginal / conditional tensors, returns
+      ``tuple[int, ...]``.
+
+    Finite-``cutoff`` mass is normalised within the returned distribution.
+    """
+    if modes is not _MODES_DEFAULT and mode is not _MODE_DEFAULT:
+        raise TypeError("mode and modes are mutually exclusive")
     if rng is None:
         rng = np.random.default_rng()
-    return int(rng.choice(probabilities.size, p=probabilities))
+    if modes is _MODES_DEFAULT:
+        probs = pnr_probs(state, mode, cutoff=cutoff)
+        total = float(np.sum(probs))
+        if not np.isfinite(total) or total <= _SIG_EPS:
+            raise ValueError("pnr_sample: probability mass within cutoff is ~0")
+        probabilities = probs / total
+        return int(rng.choice(probabilities.size, p=probabilities))
+
+    seq = tuple(range(state.nmode)) if modes is None else _pnr_mode_seq(state, modes)
+    return _pnr_joint_sample(state, seq, cutoff, rng)
 
 # ---------------------------------------------------------------------------
 # heterodyne — exact 2D Q-surface (ADR-0007)
