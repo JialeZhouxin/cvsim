@@ -87,8 +87,11 @@ def test_l4_amp_mz_in_palette_contract():
     assert "mz:" in ops and "马赫-曾德尔" in ops
     assert "sweep: [1, 4]" in ops
     assert "advanced: true" in ops  # nbar advanced (loss + amplifier)
-    ir = (STATIC_DIR / ".." / "ir.py").read_text(encoding="utf-8")
-    assert '"amplifier"' in ir and '"mz"' in ir
+    # ticket 4: the ir.py whitelist-literal grep retired — the whitelist is
+    # derived in cvsim.lab.schema (core ir_schema - UI-hidden), and the
+    # data-level contract (per-op membership) is the golden /schema tests
+    # in test_lab_schema.py. UI metadata grep above stays (Q2/Q6 teaching
+    # scales remain in ops.js by design).
 
 
 def test_offline_guard_no_external_urls():

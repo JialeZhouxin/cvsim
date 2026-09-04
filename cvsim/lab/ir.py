@@ -36,76 +36,22 @@ from cvsim.gaussian import (
 )
 from cvsim.gaussian.ir import SCHEMA as SCHEMA
 from cvsim.gaussian.ir import CircuitV1, validate_ir
-
-#: Bosonic backend op whitelist (B6, same-shell third backend). Mirrors the
-#: F7 unlock: the Bosonic builder exposes the full gate/channel/measure set
-#: including cz/cx/interferometer/gaussian_channel/measure_threshold — valid
-#: core ops not in the Gaussian whitelist, unlocked wholesale for the new
-#: backend (no historical v0 UI restriction to honor).
-BOSONIC_WHITELIST = frozenset(
-    {
-        "squeeze",
-        "displace",
-        "phase",
-        "fourier",
-        "beamsplitter",
-        "two_mode_squeeze",
-        "mach_zehnder",
-        "cz",
-        "cx",
-        "interferometer",
-        "loss",
-        "amplifier",
-        "phase_noise",
-        "gaussian_channel",
-        "measure_homodyne",
-        "measure_heterodyne",
-        "measure_threshold",
-    }
+from cvsim.lab.schema import (
+    _EXTENSIONS,
+    BOSONIC_SOURCES,
+    BOSONIC_WHITELIST,
+    FOCK_WHITELIST,
+    LAB_WHITELIST,
 )
+
 SCHEMA_V0 = "circuit_v0"
 
-#: Lab op whitelist (lab vision §4 + L4/L5 amendments). v1 files may carry
-#: core-only ops (cz/cx/interferometer/phase_noise/gaussian_channel/
-#: mach_zehnder); those are valid IR but not unlocked in the Lab UI — the
-#: Lab loader rejects them (whitelist is a UI concept, ADR-0003 #3).
-LAB_WHITELIST = frozenset(
-    {
-        "displace",
-        "phase",
-        "squeeze",
-        "fourier",
-        "loss",
-        "amplifier",
-        "beamsplitter",
-        "two_mode_squeeze",
-        "mz",
-        "measure_homodyne",
-        "measure_heterodyne",
-    }
-)
-#: Fock backend op whitelist (vision-gaussian-lab-ui §4.7, F7). Core Fock IR
-#: also carries interferometer/apply_unitary/apply_kraus — valid IR, not
-#: unlocked in the Fock Lab UI (matrix editor deferred, anti-whitelist creed).
-FOCK_WHITELIST = frozenset(
-    {
-        "displace",
-        "phase",
-        "squeeze",
-        "kerr",
-        "beamsplitter",
-        "two_mode_squeeze",
-        "mach_zehnder",
-        "cz",
-        "cx",
-        "loss",
-        "amplifier",
-        "phase_noise",
-        "measure_pnr",
-        "measure_homodyne",
-        "measure_heterodyne",
-    }
-)
+#: Lab op whitelists — **derived views** over the Lab schema assembly
+#: layer (ticket 4): declared once in ``cvsim.lab.schema`` as core
+#: `ir_schema()` ops minus an explicit UI-hidden set, imported back here.
+#: The loader texts below are byte-identical to the pre-ticket hand-written
+#: sets (golden 422 tests lock them). B6/F7 unlock history now lives in
+#: `schema._UI_HIDDEN`.
 #: v0-only source ops — translated away by :func:`translate_v0` (no source
 #: concept in v1: coherent ≡ displace, tmsv ≡ two_mode_squeeze).
 SOURCE_V0 = frozenset({"vacuum", "coherent", "tmsv"})
@@ -347,11 +293,18 @@ def _parse_view(raw: Any) -> View:
         raise CircuitV0Error("view must be an object")
     wigner_mode = _as_pos_int(raw.get("wigner_mode", 0), "view.wigner_mode")
     lim = raw.get("lim", 5.0)
-    if not isinstance(lim, (int, float)) or isinstance(lim, bool) or lim <= 0 or lim > 50:
-        raise CircuitV0Error("view.lim must be a positive number <= 50")
+    _vlim = _EXTENSIONS["view"]["lim_max"]
+    _vmin = _EXTENSIONS["view"]["lim_min_exclusive"]
+    if not isinstance(lim, (int, float)) or isinstance(lim, bool) or lim <= _vmin or lim > _vlim:
+        raise CircuitV0Error(
+            f"view.lim must be a positive number <= {int(_vlim)}"
+        )
     n = raw.get("n", 64)
-    if not isinstance(n, int) or isinstance(n, bool) or n < 2 or n > 512:
-        raise CircuitV0Error("view.n must be an int in [2, 512]")
+    _vn = _EXTENSIONS["view"]["n"]
+    if not isinstance(n, int) or isinstance(n, bool) or n < _vn[0] or n > _vn[1]:
+        raise CircuitV0Error(
+            f"view.n must be an int in [{_vn[0]}, {_vn[1]}]"
+        )
     jm = raw.get("joint_modes")
     if jm is not None and (
         not isinstance(jm, list)
@@ -486,7 +439,10 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
         raise CircuitV0Error(str(e)) from e
     initial = data.get("initial")
     if initial is not None:
-        _bosonic_sources = ["gkp0", "gkp1", "gkp0_2d", "gkp1_2d"]
+        # derived from the core initial registry (schema.BOSONIC_SOURCES,
+        # ticket 4) — no hand-written mirror; text below stays byte-identical
+        # (golden tests lock it).
+        _bosonic_sources = list(BOSONIC_SOURCES)
         if not isinstance(initial, list) or not all(
             item is None or item in _bosonic_sources
             for item in initial

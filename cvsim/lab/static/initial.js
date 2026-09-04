@@ -8,13 +8,10 @@
    纯函数 + 常量表，零 DOM / 零依赖（node --test 可测）。 */
 "use strict";
 
-//: bosonic 每模合法源名（与 ir.py _load_bosonic 白名单一致；null = 真空）。
-//: 票3: 运行时从 /schema 派生（mergeInitialSchema/setInitialSchema），
-//: 常量保留为未注入时的回退（node --test 旧路径）；app.js schema 必到。
-export const BOSONIC_SOURCES = Object.freeze(["gkp0", "gkp1", "gkp0_2d", "gkp1_2d"]);
-
-/** 票3: schema.initial 注入（app.js init() 成功后调用一次）。
-    名单/选项表重建为派生值（mergeInitialSchema 纯函数产出）。 */
+//: bosonic 每模合法源名/下拉选项 — 票 4：名单**只**从 /schema 派生
+//:（schema.initial.bosonic.sources，单一事实源 = 核心 ir.py 注册表）；
+//: 手写 BOSONIC_SOURCES/OPTIONS 镜像已删。schema 未注入（app.js 未到/
+//: node --test 旧路径）读口 fail-fast throw（frozen-graph：无回退）。
 let INITIAL_SCHEMA = null;
 export function setInitialSchema(doc) {
   if (!doc || typeof doc !== "object" || !doc.initial?.bosonic?.sources) {
@@ -34,29 +31,30 @@ export function mergeInitialSchema(schema) {
   return { sources, options };
 }
 
-/** 生效源名（schema 注入后派生，未注入 = 回退常量）。 */
+/** 生效源名（schema 注入后派生；未注入 = fail-fast，无静默回退）。 */
 function activeSources() {
-  return INITIAL_SCHEMA ? INITIAL_SCHEMA.sources : BOSONIC_SOURCES;
+  requireSchema("activeSources");
+  return INITIAL_SCHEMA.sources;
 }
 
 /** 生效下拉选项（同上）。 */
 function activeOptions() {
-  return INITIAL_SCHEMA ? INITIAL_SCHEMA.options : BOSONIC_SOURCE_OPTIONS;
+  requireSchema("activeOptions");
+  return INITIAL_SCHEMA.options;
 }
 
-/** editor.js 消费口（下拉选项表；schema 注入后派生，未注入 = 回退常量）。 */
+function requireSchema(who) {
+  if (!INITIAL_SCHEMA) {
+    throw new Error(
+      `${who}: /schema 未注入 — initial 名单无回退镜像（frozen-graph，票 4）`
+    );
+  }
+}
+
+/** editor.js 消费口（下拉选项表；schema 注入后派生）。 */
 export function bosonicSourceOptions() {
   return activeOptions();
 }
-
-//: bosonic 每模下拉框选项 [value, label]（value null → "" 占位，渲染层翻译）。
-export const BOSONIC_SOURCE_OPTIONS = Object.freeze([
-  [null, "真空"],
-  ["gkp0", "gkp0"],
-  ["gkp1", "gkp1"],
-  ["gkp0_2d", "gkp0_2d(Z基)"],
-  ["gkp1_2d", "gkp1_2d(Z基)"],
-]);
 
 //: initial 是否是 backend 语义下的合法单项（payload 值层面，不含长度）。
 function itemOk(backend, item) {

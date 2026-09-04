@@ -1,11 +1,12 @@
-/* 票3 — schema 运行时合并层（GET /schema 消费端，单一事实源）。
-   **票3 实况（review F1）**：票 2 golden meta 无 params 键（{arity,
-   value_kind, defaults}），deriveOps 的参数形状合并在真实载荷上
-   **inert**——本文件的 derive* 纯函数是票 4 收编项（schema 扩
-   per-op params 或消费方改读 value_kind 时激活）；票 3 运行时真正
-   派生的只有：editor.js deriveEditorTables（改名/边界）与
-   initial.js mergeInitialSchema（名单）。app.js 经 schema_store.js
-   注入的 tables 亦只含这三类。BASE_OPS 再导出供测试对照。
+/* 票3/4 — schema 运行时合并层（GET /schema 消费端，单一事实源）。
+   票 4 实况：deriveOps 已接线（app.js init() 发布进 schema_store，
+   backendOps 经 opsForBackend 读派生表）——backends 字段从 schema
+   派生，ops.js 手写 backends 字段已删。参数形状 merge 仍 inert
+   （golden meta 无 params 键，锁定 descope 不加键；本分支为未来
+   激活点，见 deriveOps pass2 注释）。改名表：
+   deriveParamRenames 同为纯函数 + 测试（激活点同上）；运行时改名
+   表（表示级差异 loss T→eta / squeeze phi drop）按票 3 锁定决策
+   保留在 deriveEditorTables（editor.js）。BASE_OPS 再导出供测试对照。
 
    纯函数（收 schema 参数返回新表，不改 BASE_OPS），node --test 注入 mock
    fixture 直测（zero-dep）。store: schema_store.js（leaf，防循环）。 */
@@ -15,7 +16,6 @@ import { OPS as BASE_OPS } from "./ops.js";
 
 //: BASE_OPS 再导出（测试消费 base 键集；不改 ops.js 导出面）。
 export { BASE_OPS };
-import { BOSONIC_SOURCES, BOSONIC_SOURCE_OPTIONS } from "./initial.js";
 
 //: v0 源（UI 概念，schema 无此三键；载入旧 JSON 兼容，palette 纪律不变）。
 export const V0_SOURCES = Object.freeze(["vacuum", "tmsv", "coherent"]);
@@ -36,14 +36,18 @@ export function deriveOps(schema) {
     irToUi[ir] = entry.uiName || ir;
   }
   const out = {};
-  // pass 1: base 条目全部保留（含 v0 源 + schema 未列的 JSON-only op）
+  // pass 1: base 条目全部保留（含 v0 源 + schema 未列的 JSON-only op）。
+  // 票 4：v0 源补 backends: ["gaussian"] —— 结构事实（v0 源仅在
+  // gaussian 工作台存在，frozen-graph 下无回退），非镜像；
+  // schema 未列的其它 base 键同样补 ["gaussian"]（当前无此类，
+  // 未来 JSON-only op 落此默认，UI 元数据行可覆盖）。
   for (const [ui, meta] of Object.entries(BASE_OPS)) {
-    out[ui] = meta;
+    out[ui] = { ...meta, backends: ["gaussian"] };
   }
   // pass 2: schema 覆盖（per-op backends；参数形状仅当 meta.params 存在——
   // 票 3 实况（review F1）：golden meta 无 params 键，此时 base 参数形状
-  // 原样保留（label/tip/刻度/advanced/sweep 全留守）；票 4 schema 扩
-  // per-op params 时本分支自然激活）。
+  // 原样保留（label/tip/刻度/advanced/sweep 全留守）；本分支维持为
+  // schema 扩 per-op params 时的激活点（锁定 descope，不加键）。
   for (const [ir, entry] of Object.entries(schema.ops)) {
     const ui = irToUi[ir];
     const base = Object.hasOwn(BASE_OPS, ui) ? BASE_OPS[ui] : null;

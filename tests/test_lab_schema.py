@@ -1,16 +1,17 @@
-"""Schema assembly + `GET /schema` (ticket 2 of schema single-source).
+"""Schema assembly + `GET /schema` (tickets 2+4 of schema single-source).
 
 Golden payload shape (spec `.scratch/schema-single-source/spec.md`, design
-frozen) + 422 error-text invariants + data-level cross assertions against
-the dual-write mirrors (ops.js `backends` fields / initial.js
-`BOSONIC_SOURCES`) — the CI guardrail until ticket 3/4 switch the consumers
-and delete the mirrors.
+frozen) + 422 error-text invariants. Ticket 4 retired the ticket-2
+data-level cross assertions: the dual-write mirrors (ops.js `backends`
+fields / initial.js `BOSONIC_SOURCES`) are deleted and the whitelists are
+now *derived* in `cvsim.lab.schema` (core `ir_schema()` minus the
+UI-hidden set) — mirror drift is structurally impossible, so there is no
+second side left to cross-assert against.
 """
 
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -254,102 +255,3 @@ def test_422_whitelist_byte_identical_node_id():
         load_circuit(body_noid)
     assert _detail_for(body_noid) == str(exc2.value)
     assert _detail_for(body_noid).startswith("ops[?]:")
-
-# -- data-level cross assertions vs the dual-write mirrors ---------------------
-
-def _opsjs_ops() -> dict[str, list[str]]:
-    """Parse ops.js `backends: [...]` per op key (UI names)."""
-    js = (STATIC_DIR / "ops.js").read_text(encoding="utf-8")
-    out: dict[str, list[str]] = {}
-    for m in re.finditer(r"^  (\w+): \{", js, re.M):
-        name = m.group(1)
-        start = m.end()
-        depth = 1
-        i = start
-        while depth > 0 and i < len(js):
-            if js[i] == "{":
-                depth += 1
-            elif js[i] == "}":
-                depth -= 1
-            i += 1
-        body = js[start:i]
-        bm = re.search(r"backends: \[([^\]]*)\]", body)
-        if bm:
-            backs = sorted(b.strip().strip('"') for b in bm.group(1).split(",") if b.strip())
-            out[name] = backs
-    return out
-
-#: ops.js UI name → IR name (mirror of ops.js UI_TO_V1_OP, fixed table until
-#: ticket 3 switches the frontend to schema's uiName).
-_UI_TO_V1 = {"homodyne": "measure_homodyne", "heterodyne": "measure_heterodyne"}
-#: v0 sources expand on the IR side (translate_v0): the tmsv source node id
-#: is preserved onto its two_mode_squeeze op, so its sweepable params land
-#: under the IR gate name.
-_SOURCE_EXPANSION = {"tmsv": "two_mode_squeeze"}
-
-def test_cross_schema_ops_match_opsjs_backends():
-    """`/schema` ops[*].backends ↔ ops.js backends fields (dual-write guard).
-
-    Both directions: schema→ops.js (every schema op present + equal) and
-    ops.js→schema (every ops.js IR-mappable entry present — JS-side drift
-    fails loudly too). vacuum/tmsv/coherent are UI source concepts (expanded
-    before the IR, translate_v0), so they have no schema counterpart by design.
-    """
-    schema_ops = assemble_schema()["ops"]
-    # IR names: measure_homodyne's UI key is homodyne, etc.
-    ui_by_ir = {"measure_homodyne": "homodyne", "measure_heterodyne": "heterodyne"}
-    ir_by_ui = {v: k for k, v in ui_by_ir.items()}
-    sources = {"vacuum", "tmsv", "coherent"}
-    js_ops = _opsjs_ops()
-    for ir_name, entry in schema_ops.items():
-        ui_key = ui_by_ir.get(ir_name, ir_name)
-        assert ui_key in js_ops, f"ops.js missing {ui_key}"
-        assert sorted(entry["backends"]) == js_ops[ui_key], ir_name
-    for ui_name, backs in js_ops.items():
-        if ui_name in sources:
-            continue
-        ir_name = ir_by_ui.get(ui_name, ui_name)
-        assert ir_name in schema_ops, f"ops.js {ui_name} has no /schema entry"
-        assert sorted(schema_ops[ir_name]["backends"]) == backs, ir_name
-
-def test_cross_schema_initial_sources_match_initialjs():
-    """/schema bosonic sources ↔ initial.js BOSONIC_SOURCES."""
-    js = (STATIC_DIR / "initial.js").read_text(encoding="utf-8")
-    m = re.search(r"BOSONIC_SOURCES = Object\.freeze\(\[([^\]]*)\]\)", js)
-    assert m, "BOSONIC_SOURCES not found in initial.js"
-    names = [s.strip().strip('"').strip("'") for s in m.group(1).split(",") if s.strip()]
-    sources = assemble_schema()["initial"]["bosonic"]["sources"]
-    assert sources == names
-
-def test_cross_schema_sweepable_matches_opsjs_sweep():
-    """/schema sweepable ↔ ops.js `sweep: [..]` param metadata.
-
-    ops.js keys are UI names and UI param names; normalize via the same
-    fixed rename tables ops.js itself carries (phase phi→theta on the IR
-    side is handled by SWEEPABLE_PARAMS as-is — the pre-existing phase
-    phi/theta mismatch is not this ticket's scope).
-    """
-    js = (STATIC_DIR / "ops.js").read_text(encoding="utf-8")
-    js_sweep: dict[str, list[str]] = {}
-    for m in re.finditer(r"^  (\w+): \{", js, re.M):
-        name = m.group(1)
-        start = m.end()
-        depth = 1
-        i = start
-        while depth > 0 and i < len(js):
-            if js[i] == "{":
-                depth += 1
-            elif js[i] == "}":
-                depth -= 1
-            i += 1
-        body = js[start:i]
-        params: list[str] = []
-        for pm in re.finditer(r"(\w+): \{ min: [^}]*?sweep: \[", body):
-            params.append(pm.group(1))
-        params += re.findall(r"^ {6}(\w+): \{\n\s+min: [^}]*?sweep: \[", body, re.M)
-        if params:
-            ir_name = _SOURCE_EXPANSION.get(name, _UI_TO_V1.get(name, name))
-            js_sweep[ir_name] = sorted(params)
-    sweepable = assemble_schema()["extensions"]["sweepable"]
-    for op, params in js_sweep.items():
-        assert sorted(sweepable.get(op, [])) == params, op

@@ -3,10 +3,14 @@
 Both are analysis queries over one swept param of one node. Extracted from
 ``lab/ir.py`` so ir.py keeps only schema + translate + execution dispatch.
 scan_circuit + its private helpers (_safe_logneg / _inject_symbolic_param)
-and the SWEEPABLE_PARAMS constant live here; fidelity_sweep (+ its GKP
-target/reduce helpers) moved here from ``bosonic_backend.py``. Imports shared
-types/helpers from ``cvsim.lab.ir`` (no circular import: ir.py does not
-module-import this file; mirrors gaussian_backend.py pattern).
+and the sweepable-params table live here; fidelity_sweep (+ its GKP
+target/reduce helpers) moved here from ``bosonic_backend.py``. Imports
+shared types/helpers from ``cvsim.lab.ir`` (no circular import: ir.py does
+not module-import this file; mirrors gaussian_backend.py pattern).
+
+Ticket 4: ``SWEEPABLE_PARAMS`` is *declared* in ``cvsim.lab.schema``
+(single declaration point, next to the ``/schema`` ``sweepable``
+extension it feeds) and imported back here as a derived view.
 """
 
 from __future__ import annotations
@@ -19,25 +23,14 @@ import numpy as np
 
 from cvsim.bosonic import BosonicCircuit, BosonicState, pure_fidelity
 from cvsim.gaussian import GaussianCircuit, GaussianState, log_negativity
-from cvsim.lab.ir import (
+from cvsim.lab.ir import (  # noqa: F401 — re-exported derived views
     MEASUREMENT_OPS,
     CircuitV0Error,
     LabCircuit,
     _num,
     _require,
 )
-
-#: real-numeric params sweepable by /scan (mirrors ops.js `sweep` metadata).
-#: complex params (alpha) and structural params (nmode) are excluded.
-SWEEPABLE_PARAMS: dict[str, frozenset[str]] = {
-    "squeeze": frozenset({"r"}),
-    "phase": frozenset({"phi"}),
-    "loss": frozenset({"T"}),
-    "beamsplitter": frozenset({"theta"}),
-    "two_mode_squeeze": frozenset({"r"}),
-    "amplifier": frozenset({"G"}),
-    "mz": frozenset({"theta", "phi"}),
-}
+from cvsim.lab.schema import _EXTENSIONS, SWEEPABLE_PARAMS  # noqa: F401
 
 
 def _safe_logneg(state: GaussianState, modes_A: list[int]) -> float | None:
@@ -83,8 +76,11 @@ def scan_circuit(circuit: LabCircuit, sweep: dict[str, Any]) -> dict[str, Any]:
     if not pmin < pmax:
         raise CircuitV0Error(f"sweep: min must be < max (got {pmin}, {pmax})")
     n = sweep.get("n")
-    if not isinstance(n, int) or isinstance(n, bool) or not 2 <= n <= 200:
-        raise CircuitV0Error("sweep.n must be an int in [2, 200]")
+    _sn = _EXTENSIONS["sweep"]["n"]
+    if not isinstance(n, int) or isinstance(n, bool) or not _sn[0] <= n <= _sn[1]:
+        raise CircuitV0Error(
+            f"sweep.n must be an int in [{_sn[0]}, {_sn[1]}]"
+        )
 
     core = circuit.core
     assert core is not None  # scan is Gaussian-path only (Fock has core=None)
@@ -178,8 +174,11 @@ def fidelity_sweep(
     if not pmin < pmax:
         raise CircuitV0Error(f"sweep: min must be < max (got {pmin}, {pmax})")
     n = sweep.get("n")
-    if not isinstance(n, int) or isinstance(n, bool) or not 2 <= n <= 200:
-        raise CircuitV0Error("sweep.n must be an int in [2, 200]")
+    _sn = _EXTENSIONS["sweep"]["n"]
+    if not isinstance(n, int) or isinstance(n, bool) or not _sn[0] <= n <= _sn[1]:
+        raise CircuitV0Error(
+            f"sweep.n must be an int in [{_sn[0]}, {_sn[1]}]"
+        )
     if not isinstance(rounds, int) or isinstance(rounds, bool) or not 1 <= rounds <= 100:
         raise CircuitV0Error("rounds must be an int in [1, 100]")
     if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:

@@ -4,6 +4,7 @@
 import { initEditor, loadJson } from "./editor.js";
 import { OPS, sourceModes, toV1Json } from "./ops.js";
 import { publishSchema } from "./schema_store.js";
+import { deriveOps } from "./ops_schema.js";
 import { setInitialSchema } from "./initial.js";
 import { setEditorSchema, deriveEditorTables } from "./editor.js";
 import { initFockPanel } from "./fock.js";
@@ -872,10 +873,13 @@ async function init() {
     const dEt = deriveEditorTables(schema);
     setEditorSchema(schema);   // editor.js 校验边界派生（先派生+内验）
     setInitialSchema(schema);   // initial.js 名单派生
+    // 票 4: palette 托盘也走派生表（deriveOps：backends 来自 schema，
+    // v0 源补 gaussian 结构事实）——ops.js 手写 backends 字段已删。
     publishSchema(schema, {
       uiToOp: Object.fromEntries(Object.entries(dEt.irToUi).map(([ir, ui]) => [ui, ir])),
       uiToParam: dEt.v1ToUiParam,
       fockUiToParam: dEt.fockV1ToUiParam,
+      ops: deriveOps(schema),
     });
     schemaOk = true;
   } catch {

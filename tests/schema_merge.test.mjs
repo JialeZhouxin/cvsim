@@ -75,14 +75,15 @@ test("deriveOps: label/tip/刻度/palette 标记留守 base", () => {
   assert.equal(ops.homodyne.measure, true);
 });
 
-test("deriveOps: v0 源 (vacuum/tmsv/coherent) 原样保留（schema 无此三键）", () => {
+test("deriveOps: v0 源 (vacuum/tmsv/coherent) 保留 + 结构事实 backends 补全（票 4）", () => {
   const ops = deriveOps(MOCK_SCHEMA);
   for (const s of V0_SOURCES) {
     assert.ok(ops[s], `${s} 保留`);
-    assert.deepEqual(ops[s], BASE_OPS[s]);
+    // 票 4：v0 源补 backends: ["gaussian"]（结构事实，非镜像）；
+    // 其余字段（label/tip/params/kind）与 BASE_OPS 原样相等。
+    assert.deepEqual(ops[s], { ...BASE_OPS[s], backends: ["gaussian"] });
   }
 });
-
 test("deriveOps: 不改 BASE_OPS（纯函数，返回新表）", () => {
   const before = JSON.stringify(BASE_OPS.phase);
   deriveOps(MOCK_SCHEMA);

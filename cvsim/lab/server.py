@@ -34,7 +34,7 @@ def _whitelist_label(allowed: list[str]) -> str:
     """Whitelist label from the rejected-with set (single template input):
     'Fock Lab' / 'Bosonic Lab'; anything else = the gaussian legacy 'Lab'.
     """
-    from cvsim.lab.ir import BOSONIC_WHITELIST, FOCK_WHITELIST
+    from cvsim.lab.schema import BOSONIC_WHITELIST, FOCK_WHITELIST
 
     allowed_set = set(allowed)
     if allowed_set == set(FOCK_WHITELIST):

@@ -3,13 +3,39 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  OPS, OP_NAMES, TAU, paramsFromOp, sourceModes, opGroup, backendOps,
-  FOCK_PALETTE, GAUSSIAN_PALETTE,
+  OPS, OP_NAMES, TAU, paramsFromOp, sourceModes, opGroup,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
   sortNodes, sourceRows, removeSource, updateParam, updateMode, toV1Json,
   cellOccupied,
 } from "../cvsim/lab/static/ops.js";
+// ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
+import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
+import { publishSchema, opsForBackend } from "../cvsim/lab/static/schema_store.js";
 import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
+import { setInitialSchema } from "../cvsim/lab/static/initial.js";
+
+// Minimal hand-written /schema payload (shape = ticket-2 golden; ops keys
+// are IR names; uiName present only where IR name differs). backends values
+// = ticket-4 derived whitelist (schema.py: core ir_schema - UI-hidden).
+const IR_BY_UI = { homodyne: "measure_homodyne", heterodyne: "measure_heterodyne" };
+const BACKENDS_BY_UI = {
+  vacuum: ["gaussian"], tmsv: ["gaussian"], coherent: ["gaussian"], mz: ["gaussian"],
+  kerr: ["fock"], measure_pnr: ["fock"],
+  interferometer: ["bosonic"], gaussian_channel: ["bosonic"], measure_threshold: ["bosonic"],
+  fourier: ["gaussian", "bosonic"],
+  cz: ["fock", "bosonic"], cx: ["fock", "bosonic"], phase_noise: ["fock", "bosonic"], mach_zehnder: ["fock", "bosonic"],
+};
+const MOCK_SCHEMA = {
+  ops: Object.fromEntries(Object.entries(OPS).map(([ui, meta]) => {
+    const ir = IR_BY_UI[ui] ?? ui;
+    const entry = { backends: BACKENDS_BY_UI[ui] ?? ["gaussian", "fock", "bosonic"], meta: { arity: "one" } };
+    if (ir !== ui) entry.uiName = ui;
+    return [ir, entry];
+  })),
+  initial: { gaussian: null, fock: { kind: "int", min: 0 }, bosonic: { kind: "enum", sources: ["gkp0", "gkp1", "gkp0_2d", "gkp1_2d"], vacuum: null } },
+  extensions: { cutoff: [1, 30], view: { lim_max: 50, lim_min_exclusive: 0, n: [2, 512] }, sweep: { n: [2, 200] }, shots: [1, 100000], rounds: [1, 100] },
+};
+// palette derived publish happens in the F7 tests at file end (avoids polluting fallback-path tests).
 
 const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze", "kerr", "cz", "cx", "mach_zehnder", "phase_noise", "measure_pnr", "interferometer", "gaussian_channel", "measure_threshold"];
 
@@ -43,59 +69,6 @@ test("UX: opGroup — source/gate/channel/measure, palette:false → null", () =
   assert.equal(opGroup("nope"), null);
 });
 
-test("F7/B6: backends metadata — per-backend palette tables", () => {
-  // gaussian-only
-  assert.deepEqual(OPS.vacuum.backends, ["gaussian"]);
-  assert.deepEqual(OPS.mz.backends, ["gaussian"]);
-  // fock-only
-  assert.deepEqual(OPS.kerr.backends, ["fock"]);
-  assert.deepEqual(OPS.measure_pnr.backends, ["fock"]);
-  // bosonic-only
-  assert.deepEqual(OPS.interferometer.backends, ["bosonic"]);
-  assert.deepEqual(OPS.gaussian_channel.backends, ["bosonic"]);
-  assert.deepEqual(OPS.measure_threshold.backends, ["bosonic"]);
-  // gaussian + bosonic
-  assert.deepEqual(OPS.fourier.backends, ["gaussian", "bosonic"]);
-  // fock + bosonic（cz/cx/phase_noise/mach_zehnder 亦 bosonic）
-  assert.deepEqual(OPS.cz.backends, ["fock", "bosonic"]);
-  assert.deepEqual(OPS.cx.backends, ["fock", "bosonic"]);
-  assert.deepEqual(OPS.phase_noise.backends, ["fock", "bosonic"]);
-  assert.deepEqual(OPS.mach_zehnder.backends, ["fock", "bosonic"]);
-  // shared three-backend
-  assert.deepEqual(OPS.displace.backends, ["gaussian", "fock", "bosonic"]);
-  assert.deepEqual(OPS.beamsplitter.backends, ["gaussian", "fock", "bosonic"]);
-  assert.deepEqual(OPS.homodyne.backends, ["gaussian", "fock", "bosonic"]);
-  // every op declares its backend table
-  for (const op of OP_NAMES) {
-    assert.ok(Array.isArray(OPS[op].backends) && OPS[op].backends.length > 0, `${op} 缺 backends`);
-  }
-});
-
-test("F7: backendOps — Fock 托盘集正确（含 kerr/cz/cx/measure_pnr，无 interferometer/apply_unitary/fourier）", () => {
-  assert.deepEqual(backendOps("fock").sort(), [...FOCK_PALETTE]);
-  assert.ok(backendOps("fock").includes("kerr"));
-  assert.ok(backendOps("fock").includes("cz"));
-  assert.ok(backendOps("fock").includes("cx"));
-  assert.ok(backendOps("fock").includes("measure_pnr"));
-  assert.ok(backendOps("fock").includes("homodyne"));
-  assert.ok(backendOps("fock").includes("heterodyne"));
-  assert.ok(backendOps("fock").includes("phase_noise"));
-  assert.ok(backendOps("fock").includes("mach_zehnder"));
-  // 反白名单教义：矩阵编辑器 defer
-  assert.ok(!backendOps("fock").includes("interferometer"));
-  assert.ok(!backendOps("fock").includes("apply_unitary"));
-  assert.ok(!backendOps("fock").includes("fourier"));
-  assert.ok(!backendOps("fock").includes("mz"));
-  // Fock 无源节点托盘
-  assert.ok(!backendOps("fock").includes("vacuum"));
-  assert.ok(!backendOps("fock").includes("coherent"));
-  assert.ok(!backendOps("fock").includes("tmsv"));
-  // gaussian 托盘
-  assert.deepEqual(backendOps("gaussian").sort(), [...GAUSSIAN_PALETTE]);
-  assert.ok(backendOps("gaussian").includes("fourier"));
-  assert.ok(!backendOps("gaussian").includes("kerr"));
-  assert.ok(!backendOps("gaussian").includes("measure_pnr"));
-});
 
 test("F7: fock op metadata — params sane, measure_pnr name is a string param", () => {
   assert.equal(OPS.kerr.kind, "single");
@@ -776,6 +749,7 @@ test("F7: toV1Json — measure ops carry a result name (Fock IR requires it)", (
 });
 
 test("F7: stateFromJson — backend/initial/cutoff 解析 + 校验", () => {
+  setInitialSchema(MOCK_SCHEMA); // ticket 4: no mirror fallback — inject first
   const base = {
     schema: "circuit_v1", nmode: 2, seed: 0,
     ops: [{ op: "kerr", modes: [0], params: { chi: 1.5 } }],
@@ -911,6 +885,7 @@ test("F7: stateFromV1 — fock 载入（loss eta→T、squeeze 无 phi、name �
 /* ── B6/F7: initial 单点语义（initial.js）+ backend 切换往返 ────────────── */
 
 test("initial.js: parseInitial — 语义按 backend 二分（fock 整数 / bosonic 源名）", async () => {
+  setInitialSchema(MOCK_SCHEMA); // ticket 4: no mirror fallback — inject first
   const { parseInitial, vacuumDefault, initialCacheKey } = await import("../cvsim/lab/static/initial.js");
   // fock
   assert.deepEqual(parseInitial("fock", [1, 0], 2), { initial: [1, 0] });
@@ -931,6 +906,7 @@ test("initial.js: parseInitial — 语义按 backend 二分（fock 整数 / boso
 });
 
 test("initial.js: serializeInitial — 非全真空才写，gaussian 永不写", async () => {
+  setInitialSchema(MOCK_SCHEMA); // ticket 4: no mirror fallback — inject first
   const { serializeInitial } = await import("../cvsim/lab/static/initial.js");
   assert.equal(serializeInitial("gaussian", [1, 1], 2), undefined);
   assert.equal(serializeInitial("fock", [0, 0], 2), undefined);   // 全真空省略
@@ -988,4 +964,46 @@ test("B6/F7 回归: stateFromJson 对 fock 整数进 bosonic 报错（前端守�
   const ok = stateFromJson({ ...base, initial: ["gkp0_2d", null] });
   assert.equal(ok.error, undefined);
   assert.deepEqual(ok.state.initial, ["gkp0_2d", null]);
+});
+
+test("ticket-4 F7/B6: backends derived (deriveOps); ops.js carries none", () => {
+  // v0 sources: structural fact -> gaussian (deriveOps pass 1)
+  const d = deriveOps(MOCK_SCHEMA);
+  assert.deepEqual(d.vacuum.backends, ["gaussian"]);
+  assert.deepEqual(d.mz.backends, ["gaussian"]);
+  assert.deepEqual(d.kerr.backends, ["fock"]);
+  assert.deepEqual(d.measure_pnr.backends, ["fock"]);
+  assert.deepEqual(d.interferometer.backends, ["bosonic"]);
+  assert.deepEqual(d.gaussian_channel.backends, ["bosonic"]);
+  assert.deepEqual(d.measure_threshold.backends, ["bosonic"]);
+  assert.deepEqual(d.fourier.backends, ["gaussian", "bosonic"]);
+  assert.deepEqual(d.cz.backends, ["fock", "bosonic"]);
+  assert.deepEqual(d.displace.backends, ["gaussian", "fock", "bosonic"]);
+  assert.deepEqual(d.homodyne.backends, ["gaussian", "fock", "bosonic"]);
+});
+
+test("ticket-4 F7: opsForBackend derived palette (fock has kerr/cz/cx/measure_pnr; no interferometer/fourier)", () => {
+  publishSchema(MOCK_SCHEMA, { ops: deriveOps(MOCK_SCHEMA), uiToOp: {}, uiToParam: {}, fockUiToParam: {} });
+  assert.ok(opsForBackend("fock").includes("kerr"));
+  assert.ok(opsForBackend("fock").includes("cz"));
+  assert.ok(opsForBackend("fock").includes("cx"));
+  assert.ok(opsForBackend("fock").includes("measure_pnr"));
+  assert.ok(opsForBackend("fock").includes("homodyne"));
+  assert.ok(opsForBackend("fock").includes("heterodyne"));
+  assert.ok(opsForBackend("fock").includes("phase_noise"));
+  assert.ok(opsForBackend("fock").includes("mach_zehnder"));
+  // anti-whitelist creed: matrix editor deferred (UI-hidden -> not derived)
+  assert.ok(!opsForBackend("fock").includes("interferometer"));
+  assert.ok(!opsForBackend("fock").includes("apply_unitary"));
+  assert.ok(!opsForBackend("fock").includes("fourier"));
+  assert.ok(!opsForBackend("fock").includes("mz"));
+  // Fock has no source nodes in the palette
+  assert.ok(!opsForBackend("fock").includes("vacuum"));
+  assert.ok(!opsForBackend("fock").includes("coherent"));
+  assert.ok(!opsForBackend("fock").includes("tmsv"));
+  // gaussian palette
+  assert.ok(opsForBackend("gaussian").includes("fourier"));
+  assert.ok(!opsForBackend("gaussian").includes("kerr"));
+  assert.ok(!opsForBackend("gaussian").includes("measure_pnr"));
+  assert.ok(opsForBackend("bosonic").includes("measure_threshold"));
 });

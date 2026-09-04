@@ -3,9 +3,9 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, backendOps, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, removeSource, sourceModes, toV1Json, updateParam } from "./ops.js";
+import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, removeSource, sourceModes, toV1Json, updateParam } from "./ops.js";
 import { initialCacheKey, parseInitial, remapForBackend, vacuumDefault, bosonicSourceOptions } from "./initial.js";
-import { schemaTables } from "./schema_store.js";
+import { opsForBackend, schemaTables } from "./schema_store.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -580,7 +580,7 @@ export function initEditor(root, hooks) {
   function renderPalette() {
     dom.palette.replaceChildren();
     for (const [gid, title] of PALETTE_GROUPS) {
-      const ops = backendOps(state.backend).filter((op) => opGroup(op) === gid);
+      const ops = opsForBackend(state.backend).filter((op) => opGroup(op) === gid);
       if (!ops.length) continue;
       const group = document.createElement("details");
       group.className = "palette__group";
