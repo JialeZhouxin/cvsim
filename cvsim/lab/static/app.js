@@ -8,6 +8,7 @@ import { deriveOps } from "./ops_schema.js";
 import { setInitialSchema } from "./initial.js";
 import { setEditorSchema, deriveEditorTables } from "./editor.js";
 import { initFockPanel } from "./fock.js";
+import { createSeqGuard, requestLab, makeRefCountedBusy } from "./request.js";
 
 /* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
 const DEFAULT_JSON = {
@@ -98,6 +99,18 @@ function setStatus(text, ok = true) {
   statusEl.textContent = text;
   statusEl.dataset.state = ok ? "ok" : "error";
 }
+
+/* 候选 2：统一 requestLab 错误渲染（深模块收敛 5 处重复的 catch/状态码文案
+   为单函数）。http → 状态码 + detail；network → “网络错误: …”。 */
+function reportError(e, fallback) {
+  if (e.kind === "http") setStatus(e.status + " · " + (e.detail || fallback), false);
+  else setStatus("网络错误: " + e.detail, false);
+}
+
+/* 候选 2（P2a）：seed 前置校验（doSample/doBatch 共用，提取消重复）。
+   返回非 null 表示非法，requestLab validate 会 abort 请求。 */
+const validateSeed = (p) =>
+  (Number.isInteger(p.seed) && p.seed >= 0) ? null : "seed 必须是非负整数";
 
 function fmt(x, digits = 5) {
   if (typeof x !== "number" || !Number.isFinite(x)) return "—";
@@ -414,23 +427,21 @@ async function runBosonicFidelity() {
                     target: { state: $("bos-target").value, mode: 0 } };
   payload.rounds = rounds;
   setStatus(`fidelity sweep · loss=${lossSeq.id} · rounds=${rounds}`);
-  try {
-    const resp = await fetch("/fidelity", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await resp.json();
-    if (!resp.ok) {
-      $("bos-fidelity-note").textContent = (body.detail || "fidelity sweep 失败") + "（详情可用 /run）";
+  const seq = seqGuard.next(); // 候选 2：fidelity 此前完全不设防，纳入 seq guard
+  await requestLab("/fidelity", {
+    payload, seq, guard: seqGuard,
+    busy: busyRunSample,
+    onOk: (body) => {
+      drawFidSvg(body.xs, body.ys);
+      setStatus(`fidelity · ${body.ys.filter((y) => y !== null).length} 点`);
+    },
+    onError: (e) => {
+      const detail = e.detail || "fidelity sweep 失败";
+      $("bos-fidelity-note").textContent = detail + "（详情可用 /run）";
       $("bos-fidelity-note").hidden = false;
-      setStatus(resp.status + " · " + (body.detail || "fidelity sweep 失败"), false);
-      return;
-    }
-    drawFidSvg(body.xs, body.ys);
-    setStatus(`fidelity · ${body.ys.filter((y) => y !== null).length} 点`);
-  } catch (e) {
-    setStatus("网络错误: " + e.message, false);
-  }
+      reportError(e, "fidelity sweep 失败");
+    },
+  });
 }
 
 function syncBackendPanels(backend) {
@@ -447,18 +458,20 @@ function syncBackendPanels(backend) {
 }
 
 /* ── run pipeline: debounce (120ms) + seq guard ────────── */
-let seqCounter = 0; // sole sequence source (OCR: editor's own seq was colliding)
-let latestSeq = 0;
+const seqGuard = createSeqGuard(); // 收敛 app.js 的 seqCounter/latestSeq 两口
 let debounceTimer = null;
-let busy = false;
 
-function setBusy(b) {
-  busy = b;
-  runBtn.disabled = b;
-  sampleBtn.disabled = b;
-  runBtn.setAttribute("aria-busy", String(b));
-  sampleBtn.setAttribute("aria-busy", String(b));
-}
+const busyRunSample = makeRefCountedBusy((on) => {
+  runBtn.disabled = on;
+  sampleBtn.disabled = on;
+  runBtn.setAttribute("aria-busy", String(on));
+  sampleBtn.setAttribute("aria-busy", String(on));
+});
+
+const busyScan = makeRefCountedBusy((on) => {
+  if (on) scanBtn.disabled = true;
+  else refreshScanModesA(); // 复原 = 重评估（nmode>=2 才可点），非简单 disabled=false
+});
 
 function hideMeasurement() {
   measurementPanel.hidden = true;
@@ -483,73 +496,47 @@ function showMeasurement(body) {
 }
 
 async function doRun(circuitJson, seq) {
-  setBusy(true);
   const t0 = performance.now();
-  try {
-    const resp = await fetch("/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      // B6: bosonic 一次拉全部分步快照（断点中间态）；gaussian/fock 忽略 detail
-      body: JSON.stringify(circuitJson.backend === "bosonic"
-        ? { ...circuitJson, detail: "steps" }
-        : circuitJson),
-    });
-    const body = await resp.json();
-    if (seq !== latestSeq) return; // stale response: drop
-    if (!resp.ok) {
-      setStatus(resp.status + " · " + (body.detail || "运行失败"), false);
-      return;
-    }
-    render(body, circuitJson.view?.wigner_mode);
-    hideMeasurement(); // analytic view: manual run / param change leaves sample view
-    setStatus(`ok · ${(performance.now() - t0).toFixed(0)} ms`);
-  } catch (e) {
-    if (seq !== latestSeq) return;
-    setStatus("网络错误: " + e.message, false);
-  } finally {
-    if (seq === latestSeq) setBusy(false); // stale request must not clear busy
-  }
+  // B6: bosonic 一次拉全部分步快照（断点中间态）；gaussian/fock 忽略 detail
+  const payload = circuitJson.backend === "bosonic"
+    ? { ...circuitJson, detail: "steps" }
+    : circuitJson;
+  const res = await requestLab("/run", {
+    payload, seq, guard: seqGuard,
+    busy: busyRunSample,
+    onOk: (body) => {
+      render(body, circuitJson.view?.wigner_mode);
+      hideMeasurement(); // analytic view: manual run / param change leaves sample view
+      setStatus(`ok · ${(performance.now() - t0).toFixed(0)} ms`);
+    },
+    onError: (e) => reportError(e, "运行失败"),
+  });
+  return res;
 }
 
 async function doSample(seq) {
-  setBusy(true);
   const t0 = performance.now();
-  try {
-    const payload = toV1Json(editor.getState());
-    payload.view.wigner_mode = Number(modeSelect.value) || 0;
-    payload.seed = Number(seedInput.value);
-    if (!Number.isInteger(payload.seed) || payload.seed < 0) {
-      if (seq !== latestSeq) return;
-      setStatus("seed 必须是非负整数", false);
-      return;
-    }
-    const resp = await fetch("/sample", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await resp.json();
-    if (seq !== latestSeq) return; // stale response: drop
-    if (!resp.ok) {
-      setStatus(resp.status + " · " + (body.detail || "抽样失败"), false);
-      return;
-    }
-    render(body, payload.view.wigner_mode);
-    showMeasurement(body);
-    seedInput.value = body.seed;
-    setStatus(`sampled · seed ${body.seed} · ${(performance.now() - t0).toFixed(0)} ms`);
-  } catch (e) {
-    if (seq !== latestSeq) return;
-    setStatus("网络错误: " + e.message, false);
-  } finally {
-    if (seq === latestSeq) setBusy(false); // stale request must not clear busy
-  }
+  const payload = toV1Json(editor.getState());
+  payload.view.wigner_mode = Number(modeSelect.value) || 0;
+  payload.seed = Number(seedInput.value);
+  await requestLab("/sample", {
+    payload, seq, guard: seqGuard,
+    busy: busyRunSample,
+    validate: validateSeed,
+    onOk: (body) => {
+      render(body, payload.view.wigner_mode);
+      showMeasurement(body);
+      seedInput.value = body.seed;
+      setStatus(`sampled · seed ${body.seed} · ${(performance.now() - t0).toFixed(0)} ms`);
+    },
+    onError: (e) => reportError(e, "抽样失败"),
+  });
 }
 
 function scheduleRun(circuitJson) {
-  latestSeq = ++seqCounter;
+  const seq = seqGuard.next();
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => doRun(circuitJson, latestSeq), 120);
+  debounceTimer = setTimeout(() => doRun(circuitJson, seq), 120);
 }
 
 /* ── scan panel (L4, F-LAB-SCAN) ──────────────────────── */
@@ -681,8 +668,7 @@ function drawScanCurve(body) {
 }
 
 async function doScan() {
-  latestSeq = ++seqCounter; // supersede pending run/sample/scan; stale responses dropped
-  const seq = latestSeq;
+  const seq = seqGuard.next(); // supersede pending run/sample/scan; stale responses dropped
   const state = editor.getState();
   const node = state.nodes.find((n) => n.id === scanNode.value);
   const param = scanParam.value;
@@ -711,63 +697,36 @@ async function doScan() {
   const scanSummary = $("scan-summary");
   scanSummary.hidden = true;
   scanSummary.textContent = "";
-  scanBtn.disabled = true;
   const t0 = performance.now();
-  try {
-    const resp = await fetch("/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await resp.json();
-    if (seq !== latestSeq) return; // stale scan response: drop
-    if (!resp.ok) {
-      setStatus(resp.status + " · " + (body.detail || "扫描失败"), false);
-      return;
-    }
-    drawScanCurve(body);
-    scanSvg.scrollIntoView({ block: "nearest" }); // 曲线可能在折叠面板下方——滚到可见
-    setStatus(`scan ok · ${body.ys.length} 点 · ${(performance.now() - t0).toFixed(0)} ms`);
-  } catch (e) {
-    setStatus("网络错误: " + e.message, false);
-  } finally {
-    if (seq === latestSeq) refreshScanModesA(); // stale request must not touch UI
-  }
+  await requestLab("/scan", {
+    payload, seq, guard: seqGuard,
+    busy: busyScan,
+    onOk: (body) => {
+      drawScanCurve(body);
+      scanSvg.scrollIntoView({ block: "nearest" }); // 曲线可能在折叠面板下方——滚到可见
+      setStatus(`scan ok · ${body.ys.length} 点 · ${(performance.now() - t0).toFixed(0)} ms`);
+    },
+    onError: (e) => reportError(e, "扫描失败"),
+  });
 }
 
 /* F7: Batch 1000（固定 shots，/batch 端点）— 双色叠画采样对照 */
 async function doBatch() {
-  latestSeq = ++seqCounter;
-  const seq = latestSeq;
-  setBusy(true);
+  const seq = seqGuard.next();
   const t0 = performance.now();
-  try {
-    const payload = toV1Json(editor.getState());
-    payload.shots = 1000;
-    payload.seed = Number(seedInput.value);
-    if (!Number.isInteger(payload.seed) || payload.seed < 0) {
-      setStatus("seed 必须是非负整数", false);
-      return;
-    }
-    const resp = await fetch("/batch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const body = await resp.json();
-    if (seq !== latestSeq) return; // stale response: drop
-    if (!resp.ok) {
-      setStatus(resp.status + " · " + (body.detail || "批量抽样失败"), false);
-      return;
-    }
-    fockPanel.renderBatch(body);
-    setStatus(`batch ${body.shots} shots · seed ${body.seed} · ${(performance.now() - t0).toFixed(0)} ms`);
-  } catch (e) {
-    if (seq !== latestSeq) return;
-    setStatus("网络错误: " + e.message, false);
-  } finally {
-    if (seq === latestSeq) setBusy(false); // stale request must not clear busy
-  }
+  const payload = toV1Json(editor.getState());
+  payload.shots = 1000;
+  payload.seed = Number(seedInput.value);
+  await requestLab("/batch", {
+    payload, seq, guard: seqGuard,
+    busy: busyRunSample,
+    validate: validateSeed,
+    onOk: (body) => {
+      fockPanel.renderBatch(body);
+      setStatus(`batch ${body.shots} shots · seed ${body.seed} · ${(performance.now() - t0).toFixed(0)} ms`);
+    },
+    onError: (e) => reportError(e, "批量抽样失败"),
+  });
 }
 
 /* ── editor wiring ─────────────────────────────────────── */
@@ -802,15 +761,13 @@ runBtn.addEventListener("click", () => {
   debounceTimer = null;
   const payload = toV1Json(editor.getState());
   payload.view.wigner_mode = Number(modeSelect.value) || 0;
-  latestSeq = ++seqCounter;
-  doRun(payload, latestSeq); // manual run: immediate, no debounce
+  doRun(payload, seqGuard.next()); // manual run: immediate, no debounce
 });
 
 sampleBtn.addEventListener("click", () => {
   clearTimeout(debounceTimer); // sample supersedes pending debounced run
   debounceTimer = null;
-  latestSeq = ++seqCounter;
-  doSample(latestSeq); // Measure once: immediate
+  doSample(seqGuard.next()); // Measure once: immediate
 });
 
 /* ── Save / Load (A5) ──────────────────────────────────── */

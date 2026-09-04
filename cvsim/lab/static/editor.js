@@ -444,7 +444,6 @@ export function initEditor(root, hooks) {
   let lastGood = JSON.stringify(toV1Json(state)); // frozen-graph policy
   let suppress = false; // graph→JSON writes don't echo-trigger rebuild
   let suppressEmit = false; // #13: dragstart→dragend 期间抑制 emit，drop/取消后单次
-  let seq = 0; // stale-response guard
 
   /* ── undo/redo: state is immutable (every mutation builds a new object),
      so the stacks can hold plain state references — zero copies ── */
@@ -475,8 +474,8 @@ export function initEditor(root, hooks) {
     else if (k === "y") { e.preventDefault(); redo(); }
   });
 
-  function emit(circuitJson, source) {
-    hooks.onRun(circuitJson, ++seq, source);
+  function emit(circuitJson) {
+    hooks.onRun(circuitJson);
   }
 
   function renderJson() {
@@ -493,7 +492,7 @@ export function initEditor(root, hooks) {
     hooks.onState(state);
     if (dom.undoBtn) dom.undoBtn.disabled = !hist.canUndo();
     if (dom.redoBtn) dom.redoBtn.disabled = !hist.canRedo();
-    if (!suppressEmit) emit(toV1Json(state), "graph");
+    if (!suppressEmit) emit(toV1Json(state));
   }
 
   const staff = initStaff(dom.staff, {
@@ -557,7 +556,7 @@ export function initEditor(root, hooks) {
       state = { ...state, nodes: state.nodes.map((x) => (x.id === id ? updateParam(x, key, value) : x)) };
       renderJson();
       hooks.onState(state);
-      emit(toV1Json(state), "graph");
+      emit(toV1Json(state));
     },
     onPickSweep: (id) => hooks.onPickSweep?.(id),
     onStatus: (msg, ok) => hooks.onStatus(msg, ok),
@@ -565,7 +564,7 @@ export function initEditor(root, hooks) {
     onDragStart: () => { suppressEmit = true; },
     onDragEnd: () => {
       suppressEmit = false;
-      emit(toV1Json(state), "graph");
+      emit(toV1Json(state));
     },
   });
 
@@ -620,7 +619,7 @@ export function initEditor(root, hooks) {
           card.classList.remove("is-dragging");
           staff.setDragPayload(null);
           suppressEmit = false;
-          emit(toV1Json(state), "graph"); // drop/取消后单次 emit
+          emit(toV1Json(state)); // drop/取消后单次 emit
         });
         card.addEventListener("click", tryAdd);
         items.appendChild(card);
@@ -697,7 +696,7 @@ export function initEditor(root, hooks) {
     state = { ...state, initial: next };
     renderJson();
     hooks.onState(state);
-    emit(toV1Json(state), "graph");
+    emit(toV1Json(state));
   }
 
   /* B6: bosonic 初始态 = 每模 GKP 源选择（真空/gkp0/gkp1/2d；选项表在 initial.js） */
