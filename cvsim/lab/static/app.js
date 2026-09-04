@@ -3,6 +3,9 @@
 
 import { initEditor, loadJson } from "./editor.js";
 import { OPS, sourceModes, toV1Json } from "./ops.js";
+import { publishSchema } from "./schema_store.js";
+import { setInitialSchema } from "./initial.js";
+import { setEditorSchema, deriveEditorTables } from "./editor.js";
 import { initFockPanel } from "./fock.js";
 
 /* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
@@ -856,17 +859,48 @@ modeSelect.addEventListener("change", () => {
 });
 
 async function init() {
+  /* 票3: 先拉 /schema —— 单一事实源注入（ops/initial/editor 合并层）。
+     失败显式红条挡板（不静默降级，frozen-graph 纪律）：editor 不初始化
+     palette，不 boot 运行按钮。schema 载荷 = 票2 assemble_schema() 输出。 */
+  let schemaOk = false;
+  try {
+    const schema = await (await fetch("/schema")).json();
+    // 单点注入（schema_store.js leaf）：各消费方派生自己的表（票3 seam）。
+    // 单点注入（schema_store.js leaf）：三派生先全部成功再一次性
+    // publish（review F3：若 setEditorSchema 在 publishSchema 后抛，
+    // store 非 null 而 editor 回退 → 静默混用；全前置消陙窗口）。
+    const dEt = deriveEditorTables(schema);
+    setEditorSchema(schema);   // editor.js 校验边界派生（先派生+内验）
+    setInitialSchema(schema);   // initial.js 名单派生
+    publishSchema(schema, {
+      uiToOp: Object.fromEntries(Object.entries(dEt.irToUi).map(([ir, ui]) => [ui, ir])),
+      uiToParam: dEt.v1ToUiParam,
+      fockUiToParam: dEt.fockV1ToUiParam,
+    });
+    schemaOk = true;
+  } catch {
+    setStatus("后端 schema 不可用：/schema 拉取失败 — 请检查服务是否启动", false);
+  }
   try {
     const h = await (await fetch("/health")).json();
     $("version-tag").textContent = "cvsim " + h.cvsim + " · " + h.schema;
   } catch { /* offline header keeps the — */ }
-  syncBackendPanels(editor.getState().backend);
-  editor.render();
-  refreshScanNodes();
-  const bosFid = $("bos-fidelity-btn");
-  if (bosFid) bosFid.addEventListener("click", runBosonicFidelity);
-  const bosTrg = $("bos-target");
-  if (bosTrg) bosTrg.addEventListener("change", runBosonicFidelity);
+  if (schemaOk) {
+    syncBackendPanels(editor.getState().backend);
+    editor.render();
+    refreshScanNodes();
+    const bosFid = $("bos-fidelity-btn");
+    if (bosFid) bosFid.addEventListener("click", runBosonicFidelity);
+    const bosTrg = $("bos-target");
+    if (bosTrg) bosTrg.addEventListener("change", runBosonicFidelity);
+  } else {
+    // 红条已挂：按钮全部禁用。恢复路径 = 手动刷新页面（重拉 /schema；
+    // 页内无重试控件——init() 已返回，注入不可恢复，票 3 范围内诚实标注）
+    for (const id of ["run-btn", "sample-btn", "scan-btn", "save-btn", "fidelity-btn", "bos-fidelity-btn"]) {
+      const el = $(id);
+      if (el) el.disabled = true;
+    }
+  }
 }
 
 init();

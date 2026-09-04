@@ -101,7 +101,11 @@ try {
   await send(ws, "Page.reload");
 
   await evalJs(ws, `(async () => { while (!document.getElementById("json-input")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
-  await evalJs(ws, `(async () => { while (!document.querySelector(".staff__row")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
+  // 票3: init() now awaits /schema before first render — wait for the
+  // palette (post-schema) instead of the first staff row, else the inject
+  // below races an empty OPS merge and the scene silently no-ops.
+  await evalJs(ws, `(async () => { while (!document.querySelector(".palette__item")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
+
 
   /* inject the GKP QEC scene through the JSON editor (v1 path) */
   await evalJs(ws, `(() => {

@@ -131,17 +131,19 @@ try {
   await send(ws, "Runtime.enable");
   await evalJs(ws, `(async () => { while (!document.getElementById("staff")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
 
+  // 票3: init() awaits /schema before first render — wait for palette
+  await evalJs(ws, `(async () => { while (!document.querySelector(".palette__item")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
+
   /* 1. default scene (vacuum×2 + displace×2 @ x=0) renders as staff */
   const staff = await waitEval(ws, `(() => {
     const s = document.getElementById("staff");
-    if (!s || !s.querySelector(".staff__row")) return null;
     return {
       rows: s.querySelectorAll(".staff__row").length,
       gates: s.querySelectorAll(".gate:not(.gate--preview):not(.gate--ghost)").length,
       srcLabels: [...s.querySelectorAll(".staff__source")].map((e) => e.textContent).filter(Boolean),
       palette: [...document.querySelectorAll(".palette__item")].map((e) => e.dataset.op),
       jsonHasDisplace: document.getElementById("json-input").value.includes('"op": "displace"'),
-      gridLines: getComputedStyle(s.querySelector(".staff__grid")).backgroundImage !== "none",
+      gridLines: getComputedStyle(s.querySelector(".staff__row"), "::before").borderTopWidth !== "0px",
     };
   })()`);
   check("staff: default scene = 2 lanes (2 vacuum sources)", staff.rows === 2, JSON.stringify(staff));

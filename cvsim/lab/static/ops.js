@@ -1,4 +1,8 @@
 /* Gaussian Lab F7 — op metadata (whitelist subset, mirrors ir.py).
+   票3: backends/参数形状/改名派生自 `GET /schema`（merge 层 =
+   ops_schema.js deriveOps；schema_store.js 注入点在 app.js init()）。
+   本文件的 `backends` 字段/改名表退为**未注入时的回退**（node --test
+   旧路径）；app.js schema 必到（失败红条挡板）——读取路径已切 schema。
    `sweep: [min, max]` marks a real-numeric param as sweepable by /scan with
    an adaptive default range (mirrors ir.py SWEEPABLE_PARAMS); params without
    `sweep` (alpha, nmode…) are not sweepable.
@@ -10,6 +14,7 @@
 //: initial 字段单点语义（F7/B6）：parse/serialize/remap 集中在 initial.js，
 //: ops.js 序列化与 editor.js 状态机都从这里取，禁止再写 backend 三元式。
 import { serializeInitial } from "./initial.js";
+import { schemaTables } from "./schema_store.js";
 
 export const TAU = 2 * Math.PI;
 
@@ -429,7 +434,8 @@ export function updateMode(node, mode) {
   return { ...node, mode: v };
 }
 
-//: UI op names → circuit_v1 IR names (mirror of cvsim.lab.ir V0_TO_V1_OP).
+//: UI op names → circuit_v1 IR names (票3: 派生自 schema uiName，运行时
+//: 经 schema_store 读取；以下常量为未注入时的回退，仅 node --test 旧路径)。
 const UI_TO_V1_OP = {
   homodyne: "measure_homodyne",
   heterodyne: "measure_heterodyne",
@@ -438,10 +444,17 @@ const UI_TO_V1_OP = {
 const UI_TO_V1_PARAM = { phase: { phi: "theta" } };
 //: Fock IR param mapping (fock core speaks eta for loss; squeeze has only r).
 //  keyed by v1 op name; null value = param dropped on the fock path.
+//  票3 保留：表示级事实（fock 参数集与 gaussian 不同），非镜像。
 const FOCK_UI_TO_V1_PARAM = {
   loss: { T: "eta", nbar: null }, // fock loss is pure (no thermal nbar)
   squeeze: { phi: null },          // fock squeeze has only r
 };
+//: 生效改名表（schema 注入后派生；未注入回退常量）。
+function renames() {
+  const s = schemaTables();
+  if (s) return { uiToOp: s.uiToOp, uiToParam: s.uiToParam, fockUiToParam: s.fockUiToParam };
+  return { uiToOp: UI_TO_V1_OP, uiToParam: UI_TO_V1_PARAM, fockUiToParam: FOCK_UI_TO_V1_PARAM };
+}
 
 /** Build the circuit_v1 payload the backend consumes (schema from ADR-0003).
     Sources are expanded (vacuum counts nmode; tmsv → two_mode_squeeze;
@@ -469,10 +482,11 @@ export function toV1Json(state) {
       }
       continue;
     }
-    const out = { id: n.id, op: UI_TO_V1_OP[n.op] || n.op, params: {} };
+    const R = renames();
+    const out = { id: n.id, op: R.uiToOp[n.op] || n.op, params: {} };
     const pnames = state.backend === "fock"
-      ? { ...(UI_TO_V1_PARAM[out.op] || {}), ...(FOCK_UI_TO_V1_PARAM[out.op] || {}) }
-      : (UI_TO_V1_PARAM[out.op] || {});
+      ? { ...(R.uiToParam[out.op] || {}), ...(R.fockUiToParam[out.op] || {}) }
+      : (R.uiToParam[out.op] || {});
     for (const [k, v] of Object.entries(n.params)) {
       const pk = pnames[k];
       if (pk === null) continue; // fock: param absent from the fock IR (loss nbar / squeeze phi)

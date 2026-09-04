@@ -9,7 +9,45 @@
 "use strict";
 
 //: bosonic 每模合法源名（与 ir.py _load_bosonic 白名单一致；null = 真空）。
+//: 票3: 运行时从 /schema 派生（mergeInitialSchema/setInitialSchema），
+//: 常量保留为未注入时的回退（node --test 旧路径）；app.js schema 必到。
 export const BOSONIC_SOURCES = Object.freeze(["gkp0", "gkp1", "gkp0_2d", "gkp1_2d"]);
+
+/** 票3: schema.initial 注入（app.js init() 成功后调用一次）。
+    名单/选项表重建为派生值（mergeInitialSchema 纯函数产出）。 */
+let INITIAL_SCHEMA = null;
+export function setInitialSchema(doc) {
+  if (!doc || typeof doc !== "object" || !doc.initial?.bosonic?.sources) {
+    throw new TypeError("/schema 载荷非法（缺 initial.bosonic.sources）");
+  }
+  INITIAL_SCHEMA = mergeInitialSchema(doc);
+}
+export function currentInitialSchema() {
+  return INITIAL_SCHEMA;
+}
+
+/** schema 载荷 → {sources, options}（纯函数）。null 第一项 = 真空占位。 */
+export function mergeInitialSchema(schema) {
+  const sources = [...(schema.initial?.bosonic?.sources ?? [])];
+  if (!sources.length) throw new TypeError("schema.initial.bosonic.sources 为空");
+  const options = [[null, "真空"], ...sources.map((s) => [s, s])];
+  return { sources, options };
+}
+
+/** 生效源名（schema 注入后派生，未注入 = 回退常量）。 */
+function activeSources() {
+  return INITIAL_SCHEMA ? INITIAL_SCHEMA.sources : BOSONIC_SOURCES;
+}
+
+/** 生效下拉选项（同上）。 */
+function activeOptions() {
+  return INITIAL_SCHEMA ? INITIAL_SCHEMA.options : BOSONIC_SOURCE_OPTIONS;
+}
+
+/** editor.js 消费口（下拉选项表；schema 注入后派生，未注入 = 回退常量）。 */
+export function bosonicSourceOptions() {
+  return activeOptions();
+}
 
 //: bosonic 每模下拉框选项 [value, label]（value null → "" 占位，渲染层翻译）。
 export const BOSONIC_SOURCE_OPTIONS = Object.freeze([
@@ -25,7 +63,7 @@ function itemOk(backend, item) {
   if (backend === "fock") {
     return Number.isInteger(item) && item >= 0;
   }
-  return item === null || BOSONIC_SOURCES.includes(item);
+  return item === null || activeSources().includes(item);
 }
 
 /** payload.initial → editor state.initial（backend 语义校验）。
@@ -41,7 +79,7 @@ export function parseInitial(backend, payload, nmode) {
     return {
       error: backend === "fock"
         ? `initial 必须是 ${nmode} 个非负整数`
-        : `initial 每项只能是 null / ${BOSONIC_SOURCES.join(" / ")}`,
+        : `initial 每项只能是 null / ${activeSources().join(" / ")}`,
     };
   }
   return { initial: [...payload] };
@@ -56,7 +94,7 @@ export function serializeInitial(backend, initial, nmode) {
   const out = initial.slice(0, nmode);
   const okItem = backend === "fock"
     ? ((v) => Number.isInteger(v) && v >= 0)
-    : ((v) => v === null || BOSONIC_SOURCES.includes(v));
+    : ((v) => v === null || activeSources().includes(v));
   if (!out.every(okItem)) return undefined; // 跨后端残留：不写非法 payload
   const empty = backend === "fock"
     ? out.every((n) => n === 0)

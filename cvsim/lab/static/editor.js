@@ -4,7 +4,8 @@
 "use strict";
 
 import { OPS, addNode, backendOps, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, removeSource, sourceModes, toV1Json, updateParam } from "./ops.js";
-import { BOSONIC_SOURCE_OPTIONS, initialCacheKey, parseInitial, remapForBackend, vacuumDefault } from "./initial.js";
+import { initialCacheKey, parseInitial, remapForBackend, vacuumDefault, bosonicSourceOptions } from "./initial.js";
+import { schemaTables } from "./schema_store.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -36,6 +37,8 @@ export function stateFromJson(payload) {
   if (payload.schema !== "circuit_v0") return { error: "schema 必须是 circuit_v0 或 circuit_v1" };
   if (!Array.isArray(payload.nodes)) return { error: "nodes 必须是数组" };
   const seed = payload.seed === undefined ? 0 : payload.seed;
+  // 票3 review F4：seed 无上界（server ir.py 只查非负 int；shots 是采样
+  // 次数非 seed 域）——不耦合 extensions.shots。
   if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
   const nodes = [];
   const seenIds = new Set();
@@ -91,11 +94,14 @@ export function stateFromJson(payload) {
   if (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0) {
     return { error: "view.wigner_mode 必须是非负整数" };
   }
-  if (typeof rawView.lim !== "number" || !Number.isFinite(rawView.lim) || rawView.lim <= 0 || rawView.lim > 50) {
-    return { error: "view.lim 必须是 (0, 50] 的数值" };
+  const T = tables();
+  if (typeof rawView.lim !== "number" || !Number.isFinite(rawView.lim)
+      || rawView.lim <= T.viewLimMinExcl || rawView.lim > T.viewLimMax) {
+    return { error: `view.lim 必须是 (${T.viewLimMinExcl}, ${T.viewLimMax}] 的数值` };
   }
-  if (typeof rawView.n !== "number" || !Number.isFinite(rawView.n) || rawView.n < 2 || rawView.n > 512) {
-    return { error: "view.n 必须在 [2, 512]" };
+  if (typeof rawView.n !== "number" || !Number.isFinite(rawView.n)
+      || rawView.n < T.viewN[0] || rawView.n > T.viewN[1]) {
+    return { error: `view.n 必须在 [${T.viewN[0]}, ${T.viewN[1]}]` };
   }
   const view = { wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n, joint_modes: null };
   if (rawView.joint_modes !== undefined && rawView.joint_modes !== null) {
@@ -128,29 +134,112 @@ function parseExtensions(payload, nmode) {
   const initial = parsed.initial;
   let cutoffs = Array(nmode).fill(10);
   if (payload.cutoff !== undefined) {
-    if (Number.isInteger(payload.cutoff) && payload.cutoff >= 1) {
+    const cutMax = tables().cutoff[1];
+    const okInt = Number.isInteger(payload.cutoff) && payload.cutoff >= 1
+      && payload.cutoff <= cutMax;
+    const okArr = Array.isArray(payload.cutoff) && payload.cutoff.length === nmode
+      && payload.cutoff.every((c) => Number.isInteger(c) && c >= 1 && c <= cutMax);
+    if (okInt) {
       cutoffs = Array(nmode).fill(payload.cutoff);
-    } else if (Array.isArray(payload.cutoff) && payload.cutoff.length === nmode
-        && payload.cutoff.every((c) => Number.isInteger(c) && c >= 1)) {
+    } else if (okArr) {
       cutoffs = [...payload.cutoff];
     } else {
-      return { error: `cutoff 必须是 ≥1 的整数或长度为 ${nmode} 的数组` };
+      return { error: `cutoff 必须在 [1, ${cutMax}]（整数或长度为 ${nmode} 的数组）` };
     }
   }
   return { backend, initial, cutoffs };
 }
 
-//: v1 IR op → UI op (mirror of cvsim.lab.ir V0_TO_V1_OP, inverted).
+//: v1 IR op → UI op (票3: 改查 schema uiName 派生表；未注入 = 回退常量).
 const V1_TO_UI_OP = {
   measure_homodyne: "homodyne",
   measure_heterodyne: "heterodyne",
 };
 
+//: 票3: editor 层 schema 注入（app.js init() 成功后调用一次）。
+//: 消费 extensions (view/cutoff/shots 边界) + ops[].uiName 改名派生。
+let EDITOR_SCHEMA = null;
+let EDITOR_DERIVED = null;
+export function setEditorSchema(doc) {
+  if (!doc || typeof doc !== "object" || !doc.ops || !doc.extensions) {
+    throw new TypeError("/schema 载荷非法（缺 ops/extensions）");
+  }
+  EDITOR_SCHEMA = doc;
+  EDITOR_DERIVED = deriveEditorTables(doc);
+}
+export function currentEditorSchema() {
+  return EDITOR_SCHEMA;
+}
+
+/** schema → editor 校验表（纯函数，票3）。view/seed/cutoff 边界 + 改名。 */
+export function deriveEditorTables(schema) {
+  const ext = schema.extensions;
+  const irToUi = {};
+  for (const [ir, entry] of Object.entries(schema.ops)) {
+    if (entry.uiName) irToUi[ir] = entry.uiName;
+  }
+  // UI键→IR名 查找表（pnames 消费形；与回退常量同形）。schema 无参数级
+  // uiName 字段：phase theta↔phi 规则定案于 spec；其余同名直译（无键）。
+  // fock 表示级差异（loss T→eta/nbar 丢、squeeze phi 丢）schema 单份 meta
+  // 表达不了（meta = 首白名单包 = gaussian 视角）——镜像 fock ir_schema
+  // 表示级事实，常量保留（票3 PRD「2 张保留」；票4 或 schema 扩 per-backend
+  // meta 时再收编）。
+  // 两张表（票3）：v1ToUiParam = UI键→IR名 改名（phase theta↔phi 规则
+  // 定案于 spec；同名直译无键）。fockV1ToUiParam = fock 表示级差异
+  // （loss T→eta/nbar 丢、squeeze phi 丢）——schema 单份 meta 表达不了
+  // （meta = 首白名单包 = gaussian 视角），镜像 fock ir_schema 表示级
+  // 事实，常量保留（票3 PRD「2 张保留」；票4 或 schema 扩 per-backend
+  // meta 时再收编）。gaussian 路径只读前者（drops 不得外溢）。
+  const v1ToUiParam = schema.ops.phase ? { phase: { phi: "theta" } } : {};
+  const fockV1ToUiParam = {
+    loss: { T: "eta", nbar: null },
+    squeeze: { phi: null },
+  };
+  return {
+    viewN: ext.view?.n ?? [2, 512],
+    viewLimMax: ext.view?.lim_max ?? 50,
+    viewLimMinExcl: ext.view?.lim_min_exclusive ?? 0,
+    cutoff: ext.cutoff ?? [1, 30],
+    shots: ext.shots ?? [0, 100000],
+    irToUi,
+    v1ToUiParam,
+    fockV1ToUiParam,
+  };
+}
+
+/** 生效表（schema 注入后派生，未注入 = 旧常量回退，仅 node --test 旧路径）。 */
 //: UI param → v1 IR param (inverse of UI_TO_V1_PARAM in ops.js).
 const V1_TO_UI_PARAM = { phase: { phi: "theta" } };
 //: Fock IR param → UI param (inverse of FOCK_UI_TO_V1_PARAM in ops.js;
 //  key = UI param, value = fock IR param).
-const FOCK_V1_TO_UI_PARAM = { loss: { T: "eta" } };
+const FOCK_V1_TO_UI_PARAM = { loss: { T: "eta", nbar: null }, squeeze: { phi: null } };
+
+function tables() {
+  if (EDITOR_DERIVED) return EDITOR_DERIVED;
+  const s = schemaTables();
+  if (s) {
+    return {
+      viewN: [2, 512],
+      viewLimMax: 50,
+      viewLimMinExcl: 0,
+      cutoff: [1, 30],
+      shots: [0, 100000],
+      irToUi: { ...s.irToUiOp },
+      v1ToUiParam: { ...s.v1ToUiParam },
+      fockV1ToUiParam: { ...s.fockV1ToUiParam },
+    };
+  }
+  return {
+    viewN: [2, 512],
+    viewLimMax: 50,
+    viewLimMinExcl: 0,
+    cutoff: [1, 30],
+    shots: [0, 100000],
+    irToUi: { ...V1_TO_UI_OP },
+    v1ToUiParam: { ...V1_TO_UI_PARAM },
+    fockV1ToUiParam: { ...FOCK_V1_TO_UI_PARAM },
+  };
+}
 
 function nextFreeV1Id(i, seenIds) {
   // auto ids must never collide with explicit ids (n0 + explicit "n0")
@@ -170,6 +259,8 @@ function stateFromV1(payload) {
     return { error: "nmode 必须是不小于 1 的整数" };
   }
   const seed = payload.seed === undefined ? 0 : payload.seed;
+  // 票3 review F4：seed 无上界（server ir.py 只查非负 int；shots 是采样
+  // 次数非 seed 域）——不耦合 extensions.shots。
   if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
   const nodes = [];
   const staff = payload.ui && typeof payload.ui === "object" ? payload.ui.staff : undefined;
@@ -189,7 +280,7 @@ function stateFromV1(payload) {
   for (let i = 0; i < payload.ops.length; i++) {
     const o = payload.ops[i];
     if (!o || typeof o !== "object") return { error: `ops[${i}] 非法` };
-    const uiOp = V1_TO_UI_OP[o.op] || o.op;
+    const uiOp = tables().irToUi[o.op] || o.op;
     if (!Object.hasOwn(OPS, uiOp)) return { error: `ops[${i}]: op ${o.op} 不在 Lab 白名单` };
     const meta = OPS[uiOp];
     const id = o.id !== undefined ? o.id : nextFreeV1Id(i, assigned);
@@ -199,9 +290,10 @@ function stateFromV1(payload) {
     assigned.add(id);
     const node = { id, op: uiOp, params: {} };
     const isFock = payload.backend === "fock";
+    const T = tables();
     const pnames = isFock
-      ? { ...(V1_TO_UI_PARAM[uiOp] || {}), ...(FOCK_V1_TO_UI_PARAM[uiOp] || {}) }
-      : (V1_TO_UI_PARAM[uiOp] || {});
+      ? { ...(T.v1ToUiParam[uiOp] || {}), ...(T.fockV1ToUiParam[uiOp] || {}) }
+      : (T.v1ToUiParam[uiOp] || {});
     const params = { ...o.params };
     const isBosonic = payload.backend === "bosonic";
     if (uiOp === "displace" && isBosonic && params.alpha
@@ -214,9 +306,12 @@ function stateFromV1(payload) {
     }
     for (const [k, d] of Object.entries(meta.params)) {
       // phase: IR speaks theta, UI speaks phi
-      const v = params[pnames[k] !== undefined ? pnames[k] : k];
-      // fock squeeze has no phi in the IR: optional on the fock path
-      const optionalOnFock = isFock && uiOp === "squeeze" && k === "phi";
+      const irKey = pnames[k] !== undefined ? pnames[k] : k;
+      // fock drop-table (null value): param absent from the fock IR
+      // (loss nbar / squeeze phi) — optional with base default
+      const droppedOnFock = isFock && pnames[k] === null;
+      const v = droppedOnFock ? undefined : params[irKey];
+      const optionalOnFock = (isFock && uiOp === "squeeze" && k === "phi") || droppedOnFock;
       if (d.advanced || d.optional || optionalOnFock) {
         if (d.string) {
           // string params (measure result names): preserve explicit names
@@ -263,11 +358,14 @@ function stateFromV1(payload) {
   if (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0) {
     return { error: "view.wigner_mode 必须是非负整数" };
   }
-  if (typeof rawView.lim !== "number" || !Number.isFinite(rawView.lim) || rawView.lim <= 0 || rawView.lim > 50) {
-    return { error: "view.lim 必须是 (0, 50] 的数值" };
+  const T = tables();
+  if (typeof rawView.lim !== "number" || !Number.isFinite(rawView.lim)
+      || rawView.lim <= T.viewLimMinExcl || rawView.lim > T.viewLimMax) {
+    return { error: `view.lim 必须是 (${T.viewLimMinExcl}, ${T.viewLimMax}] 的数值` };
   }
-  if (typeof rawView.n !== "number" || !Number.isFinite(rawView.n) || rawView.n < 2 || rawView.n > 512) {
-    return { error: "view.n 必须在 [2, 512]" };
+  if (typeof rawView.n !== "number" || !Number.isFinite(rawView.n)
+      || rawView.n < T.viewN[0] || rawView.n > T.viewN[1]) {
+    return { error: `view.n 必须在 [${T.viewN[0]}, ${T.viewN[1]}]` };
   }
   const view = { wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n, joint_modes: null };
   if (rawView.joint_modes !== undefined && rawView.joint_modes !== null) {
@@ -616,7 +714,7 @@ export function initEditor(root, hooks) {
       const sel = document.createElement("select");
       sel.className = "select mono";
       const cur = initial ? initial[i] : null;
-      for (const [val, text] of BOSONIC_SOURCE_OPTIONS) {
+      for (const [val, text] of bosonicSourceOptions()) {
         const opt = document.createElement("option");
         opt.value = val === null ? "" : val;
         opt.textContent = text;

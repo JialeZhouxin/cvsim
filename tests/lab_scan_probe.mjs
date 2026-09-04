@@ -107,7 +107,11 @@ try {
 
   /* wait for the editor to finish initial render before injecting (input
      events fired earlier are lost — no listener bound yet) */
-  await evalJs(ws, `(async () => { while (!document.querySelector(".staff__row")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
+  // 票3: init() now awaits /schema before first render — wait for the
+  // palette (post-schema) instead of the first staff row, else the inject
+  // below races an empty OPS merge and the scene silently no-ops.
+  await evalJs(ws, `(async () => { while (!document.querySelector(".palette__item")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
+
 
   /* 1. panel renders with adaptive defaults for a sweepable scene (L5.5:
      the new default scene has no sweepable params, so inject a TMSV+loss
