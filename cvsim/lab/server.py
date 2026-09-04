@@ -30,6 +30,20 @@ from cvsim.lab.fock_backend import batch_fock_circuit, run_fock_circuit
 app = FastAPI(title="cvsim Lab (Gaussian/Fock)", version="0.2.0")
 
 
+def _whitelist_label(allowed: list[str]) -> str:
+    """Whitelist label from the rejected-with set (single template input):
+    'Fock Lab' / 'Bosonic Lab'; anything else = the gaussian legacy 'Lab'.
+    """
+    from cvsim.lab.ir import BOSONIC_WHITELIST, FOCK_WHITELIST
+
+    allowed_set = set(allowed)
+    if allowed_set == set(FOCK_WHITELIST):
+        return "Fock Lab"
+    if allowed_set == set(BOSONIC_WHITELIST):
+        return "Bosonic Lab"
+    return "Lab"
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     from importlib.metadata import PackageNotFoundError, version
@@ -39,6 +53,18 @@ def health() -> dict[str, Any]:
     except PackageNotFoundError:
         cvsim_version = "unknown"
     return {"status": "ok", "schema": SCHEMA, "cvsim": cvsim_version}
+
+@app.get("/schema")
+def schema() -> dict[str, Any]:
+    """Schema snapshot (single-source ticket 2): core ``ir_schema()`` data
+    assembled with the Lab whitelists + extension-field boundaries.
+
+    Static per process (same package, same process — Q7: no version
+    negotiation); consumers fetch once at startup (ticket 3+).
+    """
+    from cvsim.lab.schema import assemble_schema
+
+    return assemble_schema()
 
 
 def _payload(
@@ -69,6 +95,23 @@ def _payload(
     return payload
 
 
+def _422(e: Exception) -> HTTPException:
+    """422 from a domain error: structured whitelist errors render the single
+    shared message template from their {code, where, op, allowed} data (Q8)
+    — byte-identical to the ir.py golden text (golden 422 tests lock it);
+    everything else keeps the original str(e) text verbatim."""
+    structured = getattr(e, "structured", None)
+    if structured is not None:
+        code = structured["code"]
+        if code == "op_not_whitelisted":
+            detail = (
+                f"{structured['where']}: op {structured['op']!r} not in "
+                f"{_whitelist_label(structured['allowed'])} whitelist: "
+                f"{structured['allowed']}"
+            )
+            return HTTPException(status_code=422, detail=detail)
+    return HTTPException(status_code=422, detail=str(e))
+
 @app.post("/run")
 def run(body: dict[str, Any]) -> dict[str, Any]:
     try:
@@ -88,7 +131,7 @@ def run(body: dict[str, Any]) -> dict[str, Any]:
     except (CircuitV0Error, ValueError) as e:
         # ValueError covers library-side guards (loss T range, wigner_grid,
         # np.linalg.LinAlgError is a ValueError subclass) → user-error 422.
-        raise HTTPException(status_code=422, detail=str(e)) from e
+        raise _422(e) from e
     return _payload(result)
 
 
@@ -109,7 +152,7 @@ def sample(body: dict[str, Any]) -> dict[str, Any]:
             return payload
         result = sample_circuit(circuit, np.random.default_rng(circuit.seed))
     except (CircuitV0Error, ValueError) as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+        raise _422(e) from e
     return _payload(result, seed=circuit.seed, sampled=True)
 
 
@@ -130,7 +173,7 @@ def batch(body: dict[str, Any]) -> dict[str, Any]:
             raise CircuitV0Error("shots must be an int in [1, 100000]")
         return batch_fock_circuit(circuit, shots, circuit.seed)
     except (CircuitV0Error, ValueError) as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+        raise _422(e) from e
 
 
 @app.post("/scan")
@@ -151,7 +194,7 @@ def scan(body: dict[str, Any]) -> dict[str, Any]:
             raise CircuitV0Error("sweep must be an object")
         return scan_circuit(circuit, sweep)
     except (CircuitV0Error, ValueError) as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+        raise _422(e) from e
 
 
 @app.post("/fidelity")
@@ -173,7 +216,7 @@ def fidelity(body: dict[str, Any]) -> dict[str, Any]:
             raise CircuitV0Error("sweep must be an object")
         return fidelity_sweep(circuit, sweep, seed=circuit.seed, rounds=rounds)
     except (CircuitV0Error, ValueError) as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
+        raise _422(e) from e
 
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"

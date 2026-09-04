@@ -18,8 +18,9 @@ from typing import Any
 
 import numpy as np
 
-from cvsim.bosonic.circuit import BosonicCircuit, BosonicState
+from cvsim.bosonic.circuit import BosonicCircuit
 from cvsim.bosonic.circuit import ParamRef as ParamRef
+from cvsim.bosonic.state import BosonicState
 
 SCHEMA = "circuit_v1"
 

@@ -133,7 +133,43 @@ _LAB_REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
 
 
 class CircuitV0Error(ValueError):
-    """Invalid circuit payload (v0 or v1); message is UI-safe."""
+    """Invalid circuit payload (v0 or v1); message is UI-safe.
+
+    Structured form (Q8, schema ticket 2): whitelist/initial rejections also
+    carry ``code`` (error class), ``where`` (rendered prefix, verbatim from
+    the raise site), ``op`` (offending op name or None) and ``allowed`` (the
+    legal set, JSON-native) so the server can render one shared message
+    template from single-source data. The default ``str(e)`` text stays
+    authoritative and unchanged (golden 422 tests lock it byte-for-byte);
+    the frontend does not consume ``code`` yet (extension space).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        where: str | None = None,
+        op: str | None = None,
+        allowed: list[str] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.where = where
+        self.op = op
+        self.allowed = allowed
+
+    @property
+    def structured(self) -> dict[str, Any] | None:
+        """``{code, where, op, allowed}`` when this error carries structure."""
+        if self.code is None:
+            return None
+        return {
+            "code": self.code,
+            "where": self.where,
+            "op": self.op,
+            "allowed": self.allowed,
+        }
 
 
 @dataclass
@@ -369,9 +405,14 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
         raise CircuitV0Error(str(e)) from e
     for node in core.ops:
         if node.op not in LAB_WHITELIST:
+            where = f"ops[{node.id or '?'}]"
             raise CircuitV0Error(
-                f"ops[{node.id or '?'}]: op {node.op!r} not in Lab whitelist: "
-                f"{sorted(LAB_WHITELIST)}"
+                f"{where}: op {node.op!r} not in Lab whitelist: "
+                f"{sorted(LAB_WHITELIST)}",
+                code="op_not_whitelisted",
+                where=where,
+                op=node.op,
+                allowed=sorted(LAB_WHITELIST),
             )
     return LabCircuit(core=core, seed=seed, view=view, ui=ui, raw=data)
 
@@ -389,8 +430,13 @@ def _load_fock(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]) 
         op = node.get("op") if isinstance(node, dict) else None
         if op not in FOCK_WHITELIST:
             nid = node.get("id") if isinstance(node, dict) else "?"
+            where = f"ops[{nid or '?'}]"
             raise CircuitV0Error(
-                f"ops[{nid or '?'}]: op {op!r} not in Fock Lab whitelist: {sorted(FOCK_WHITELIST)}"
+                f"{where}: op {op!r} not in Fock Lab whitelist: {sorted(FOCK_WHITELIST)}",
+                code="op_not_whitelisted",
+                where=where,
+                op=op,
+                allowed=sorted(FOCK_WHITELIST),
             )
     try:
         validate_fock_ir(data)
@@ -425,9 +471,14 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
         op = node.get("op") if isinstance(node, dict) else None
         if op not in BOSONIC_WHITELIST:
             nid = node.get("id") if isinstance(node, dict) else "?"
+            where = f"ops[{nid or '?'}]"
             raise CircuitV0Error(
-                f"ops[{nid or '?'}]: op {op!r} not in Bosonic Lab "
-                f"whitelist: {sorted(BOSONIC_WHITELIST)}"
+                f"{where}: op {op!r} not in Bosonic Lab "
+                f"whitelist: {sorted(BOSONIC_WHITELIST)}",
+                code="op_not_whitelisted",
+                where=where,
+                op=op,
+                allowed=sorted(BOSONIC_WHITELIST),
             )
     try:
         validate_bosonic_ir(data)
@@ -435,8 +486,9 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
         raise CircuitV0Error(str(e)) from e
     initial = data.get("initial")
     if initial is not None:
+        _bosonic_sources = ["gkp0", "gkp1", "gkp0_2d", "gkp1_2d"]
         if not isinstance(initial, list) or not all(
-            item is None or item in ("gkp0", "gkp1", "gkp0_2d", "gkp1_2d")
+            item is None or item in _bosonic_sources
             for item in initial
         ):
             # 整数项 = Fock 语义的 initial 跨到了 bosonic（GUI 切换 bug 的典型
@@ -448,10 +500,16 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
                 raise CircuitV0Error(
                     "initial looks like Fock photon numbers (ints) but backend is "
                     "'bosonic': bosonic takes GKP source names per mode "
-                    "(null/'gkp0'/'gkp1'/'gkp0_2d'/'gkp1_2d')"
+                    "(null/'gkp0'/'gkp1'/'gkp0_2d'/'gkp1_2d')",
+                    code="initial_semantics_mismatch",
+                    op=None,
+                    allowed=_bosonic_sources,
                 )
             raise CircuitV0Error(
-                "initial must be a list of null/'gkp0'/'gkp1'/'gkp0_2d'/'gkp1_2d' per mode"
+                "initial must be a list of null/'gkp0'/'gkp1'/'gkp0_2d'/'gkp1_2d' per mode",
+                code="initial_invalid_item",
+                op=None,
+                allowed=_bosonic_sources,
             )
         if len(initial) != data.get("nmode"):
             raise CircuitV0Error(f"initial list length {len(initial)} != nmode {data.get('nmode')}")
