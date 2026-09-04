@@ -8,7 +8,7 @@ import { deriveOps } from "./ops_schema.js";
 import { setInitialSchema } from "./initial.js";
 import { setEditorSchema, deriveEditorTables } from "./editor.js";
 import { initFockPanel } from "./fock.js";
-import { createSeqGuard, requestLab, makeRefCountedBusy } from "./request.js";
+import { createSeqGuard, requestLab, makeRefCountedBusy, REQUEST_KIND } from "./request.js";
 
 /* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
 const DEFAULT_JSON = {
@@ -101,9 +101,11 @@ function setStatus(text, ok = true) {
 }
 
 /* 候选 2：统一 requestLab 错误渲染（深模块收敛 5 处重复的 catch/状态码文案
-   为单函数）。http → 状态码 + detail；network → “网络错误: …”。 */
+   为单函数）。validate → 文案直显；http → 状态码 + detail（缺省用站点
+   fallback）；network → “网络错误: …”。 */
 function reportError(e, fallback) {
-  if (e.kind === "http") setStatus(e.status + " · " + (e.detail || fallback), false);
+  if (e.kind === REQUEST_KIND.VALIDATE) setStatus(e.detail, false);
+  else if (e.kind === REQUEST_KIND.HTTP) setStatus(e.status + " · " + (e.detail || fallback), false);
   else setStatus("网络错误: " + e.detail, false);
 }
 
@@ -501,7 +503,7 @@ async function doRun(circuitJson, seq) {
   const payload = circuitJson.backend === "bosonic"
     ? { ...circuitJson, detail: "steps" }
     : circuitJson;
-  const res = await requestLab("/run", {
+  await requestLab("/run", {
     payload, seq, guard: seqGuard,
     busy: busyRunSample,
     onOk: (body) => {
@@ -511,7 +513,6 @@ async function doRun(circuitJson, seq) {
     },
     onError: (e) => reportError(e, "运行失败"),
   });
-  return res;
 }
 
 async function doSample(seq) {

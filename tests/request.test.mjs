@@ -14,20 +14,38 @@ function errBody(status, detail) {
   return { ok: false, status, json: async () => ({ detail }) };
 }
 
-test("validate 失败 → 不发请求、不置忙，返回 kind=validate", async () => {
+test("validate 失败 → 不发请求、不置忙，经 onError 上报 kind=validate", async () => {
   let fetched = false;
   let busyCalls = 0;
+  let errArgs = null;
   const res = await requestLab("/run", {
     payload: { seed: -1 },
     fetchImpl: async () => { fetched = true; return okBody({}); },
     busy: () => { busyCalls += 1; },
     validate: () => "seed 必须是非负整数",
+    onError: (e) => { errArgs = e; },
   });
   assert.equal(fetched, false);
   assert.equal(busyCalls, 0);
   assert.equal(res.ok, false);
   assert.equal(res.kind, "validate");
   assert.equal(res.detail, "seed 必须是非负整数");
+  // validate 也走上报通道：调用方忘收返回值也不会静默
+  assert.deepEqual(errArgs, { kind: "validate", detail: "seed 必须是非负整数" });
+});
+
+test("HTTP 非 2xx 无 detail（非 JSON 错误体）→ detail 为 undefined，留给调用方 fallback", async () => {
+  let errArgs = null;
+  const res = await requestLab("/run", {
+    payload: {},
+    onError: (e) => { errArgs = e; },
+    fetchImpl: async () => ({ ok: false, status: 500, json: async () => { throw new Error("not json"); } }),
+  });
+  assert.equal(res.ok, false);
+  assert.equal(res.kind, "http");
+  assert.equal(res.status, 500);
+  assert.equal(res.detail, undefined);
+  assert.equal(errArgs.detail, undefined);
 });
 
 test("成功 → busy(true) 再 busy(false)，onOk 收 body+status", async () => {
@@ -117,7 +135,6 @@ test("过期网络错误 → 静默丢弃（不调 onError）", async () => {
 
 test("seqGuard：next 自增 + isCurrent 只在最新", () => {
   const g = createSeqGuard();
-  assert.equal(g.current(), 0);
   const a = g.next();
   assert.equal(a, 1);
   assert.equal(g.isCurrent(a), true);
@@ -125,7 +142,6 @@ test("seqGuard：next 自增 + isCurrent 只在最新", () => {
   assert.equal(b, 2);
   assert.equal(g.isCurrent(a), false);
   assert.equal(g.isCurrent(b), true);
-  assert.equal(g.current(), 2);
 });
 
 test("makeRefCountedBusy：计数归零才 apply(false)，stale 归还不误清新请求", () => {

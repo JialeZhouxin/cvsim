@@ -5,7 +5,9 @@
    node --test 直接驱动的关键（app.js 0 导出的病根正是副作用内联）。
 
    契约：
-   - validate 失败 → **不发请求**、不置忙、返回 {ok:false,kind:'validate',detail}。
+   - validate 失败 → **不发请求**、不置忙，经 onError 上报并返回
+     {ok:false,kind:'validate',detail}（与 http/network 同通道，调用方
+     忘收返回值也不会静默——修复 seed 非法点击无提示的 UX 回归）。
    - busy：进入置 busy(true)，结束（含 stale）一律 busy(false)——每个请求
      都归还自己的占用；同回调下的并发安全由引用计数 busy 保证
      （app.js makeRefCountedBusy：stale 的 busy(false) 只降计数不误清）。
@@ -20,7 +22,6 @@ export function createSeqGuard() {
   let cur = 0;
   return {
     next() { return ++cur; },
-    current() { return cur; },
     isCurrent(n) { return n === cur; },
   };
 }
@@ -48,29 +49,32 @@ export const REQUEST_KIND = Object.freeze({
 
 /** 执行一次 POST 请求（深模块：envelope + seq + busy + 错误全在内）。
     opts:
-      { payload, seq?, guard?, busy?, validate?, onOk?, onError?,
-        fetchImpl?, signal? }
+      { payload, seq?, guard?, busy?, validate?, onOk?, onError?, fetchImpl? }
     - guard?+seq?：提供时启用陈旧丢弃；seq 必须是 guard.next() 的返回。
     - busy?(on)：置忙/复原回调（调用方决定禁哪些控件）。
-    - validate?(payload)→string?：前置校验，返回错误文案则 abort。
+    - validate?(payload)→string?：前置校验，返回错误文案则 abort（不发请求、
+      不置忙，经 onError 上报）。
     - onOk?(body, status)：成功（仅当非过期）。
-    - onError?(err)：err={kind,detail,status?}（仅当非过期）。
-    - fetchImpl?：注入 fetch（测试），缺省全局 fetch。
-    - signal?：透传 AbortSignal（本模块不设默认超时，YAGNI）。 */
+    - onError?(err)：err={kind,detail,status?}（validate/http/network
+      一律经此上报，仅当非过期）。
+    - fetchImpl?：注入 fetch（测试），缺省全局 fetch。 */
 export async function requestLab(path, opts = {}) {
   const {
     payload,
     seq, guard,
     busy, validate, onOk, onError,
     fetchImpl = globalThis.fetch,
-    signal,
   } = opts;
 
   const stale = () => !!(guard && seq !== undefined) && !guard.isCurrent(seq);
 
   if (validate) {
     const detail = validate(payload);
-    if (detail) return { ok: false, kind: REQUEST_KIND.VALIDATE, detail };
+    if (detail) {
+      const err = { kind: REQUEST_KIND.VALIDATE, detail };
+      if (onError) onError(err);
+      return { ok: false, ...err };
+    }
   }
 
   if (busy) busy(true);
@@ -79,7 +83,6 @@ export async function requestLab(path, opts = {}) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: payload === undefined ? undefined : JSON.stringify(payload),
-      signal,
     });
     /* 过期：静默丢弃，不调 onOk/onError（busy 在 finally 归还）。 */
     if (stale()) return { ok: false, kind: REQUEST_KIND.STALE };
@@ -90,7 +93,9 @@ export async function requestLab(path, opts = {}) {
       body = null;
     }
     if (!resp.ok) {
-      const detail = (body && body.detail) || `HTTP ${resp.status}`;
+      /* detail 缺省交给调用方 fallback（"500 · 运行失败"），不再捏造
+         "HTTP {status}"——旧 fallback 参数曾是永不可达的死代码。 */
+      const detail = body && body.detail !== undefined ? body.detail : undefined;
       const err = { kind: REQUEST_KIND.HTTP, detail, status: resp.status };
       if (onError) onError(err);
       return { ok: false, ...err };
