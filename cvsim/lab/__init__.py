@@ -1,12 +1,12 @@
-"""Gaussian Lab: local workbench backend (circuit_v1 IR + v0 translation).
+"""Gaussian Lab: local workbench backend (``circuit_v1`` IR).
 
 Vision: ``docs/vision-gaussian-lab-ui.md``. L0: IR + ``/run``; L2: frontend
-editor; L3: save/load (A5) + ``/sample`` true sampling (A6); ADR-0003:
-core ``circuit_v1`` schema, v0 files translated on load; F7: Fock dual
-backend (``backend`` extension field + ``/batch``); ADR-0010: run/sample
-dispatch single point.
+editor; L3: save/load (A5) + ``/sample`` true sampling (A6); ADR-0003 named
+the core ``circuit_v1`` schema; ADR-0011 retired the v0 translator (v1
+only). F7: Fock dual backend (``backend`` extension field + ``/batch``);
+ADR-0010: run/sample dispatch single point.
 
-Public surface = top-level verbs only (schema/translate/run/sample/scan).
+Public surface = top-level verbs only (schema/run/sample/scan).
 The three runner modules stay importable for direct consumers that need
 them, but server.py goes through dispatch — never around it.
 """
@@ -18,7 +18,6 @@ from cvsim.lab.ir import (
     LabCircuit,
     View,
     load_circuit,
-    translate_v0,
 )
 from cvsim.lab.result import LabResult
 from cvsim.lab.scan import fidelity_sweep, scan_circuit
@@ -40,5 +39,4 @@ __all__ = [
     "sample_circuit",
     "scan_circuit",
     "fidelity_sweep",
-    "translate_v0",
 ]

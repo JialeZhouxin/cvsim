@@ -5,15 +5,13 @@
 "use strict";
 
 export const DEFAULT_SCENE = {
-  schema: "circuit_v0",
+  schema: "circuit_v1",
   seed: 0,
-  nodes: [
-    { id: "s0", op: "vacuum", params: { nmode: 1 } },
-    { id: "s1", op: "vacuum", params: { nmode: 1 } },
-    { id: "d0", op: "displace", params: { alpha: 1.0 }, mode: 0, ui: { x: 0 } },
-    { id: "d1", op: "displace", params: { alpha: 1.0 }, mode: 1, ui: { x: 0 } },
+  nmode: 2,
+  ops: [
+    { id: "d0", op: "displace", modes: [0], params: { alpha: [1.0, 0.0] } },
+    { id: "d1", op: "displace", modes: [1], params: { alpha: [1.0, 0.0] } },
   ],
-  edges: [],
   view: { wigner_mode: 0, lim: 5.0, n: 64 },
-  ui: {},
+  ui: { staff: { d0: 0, d1: 0 } },
 };

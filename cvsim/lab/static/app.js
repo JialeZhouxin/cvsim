@@ -741,8 +741,8 @@ async function init() {
     const dEt = deriveEditorTables(schema);
     setEditorSchema(schema);   // editor.js 校验边界派生（先派生+内验）
     setInitialSchema(schema);   // initial.js 名单派生
-    // 票 4: palette 托盘也走派生表（deriveOps：backends 来自 schema，
-    // v0 源补 gaussian 结构事实）——ops.js 手写 backends 字段已删。
+    // 票 4: palette 托盘也走派生表（deriveOps——ops.js 手写 backends
+    // 字段已删；v0 退役后 backends 经 schema 单点收发，见 ADR-0011）。
     publishSchema(schema, {
       uiToOp: Object.fromEntries(Object.entries(dEt.irToUi).map(([ir, ui]) => [ui, ir])),
       uiToParam: dEt.v1ToUiParam,

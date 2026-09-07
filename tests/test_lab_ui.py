@@ -151,9 +151,9 @@ def test_a3_logneg_freeze():
 
     r = 0.6
     payload = {
-        "schema": "circuit_v0",
-        "nodes": [{"id": "s", "op": "tmsv", "params": {"r": r}}],
-        "edges": [],
+        "schema": "circuit_v1",
+        "nmode": 2,
+        "ops": [{"id": "s", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": r}}],
         "view": {"wigner_mode": 0, "lim": 5.0, "n": 64},
     }
     resp = client.post("/run", json=payload)

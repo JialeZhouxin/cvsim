@@ -127,8 +127,9 @@ def batch(body: dict[str, Any]) -> dict[str, Any]:
 def scan(body: dict[str, Any]) -> dict[str, Any]:
     """F-LAB-SCAN: single-param sweep → E_N curve (pure, no RNG).
 
-    Body = circuit_v0 + ``sweep`` segment (UI-session config, not part of the
-    circuit_v0 schema). All domain errors → 422 with a UI-safe detail.
+    Body = circuit JSON (``circuit_v1``, ADR-0011) + ``sweep`` segment
+    (UI-session config, not part of the circuit schema). All domain errors
+    → 422 with a UI-safe detail.
     (Note: LinAlgError is NOT a ValueError subclass — always list it explicitly
     in except tuples.)
     """

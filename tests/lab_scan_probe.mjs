@@ -120,13 +120,13 @@ try {
     const input = document.getElementById("json-input");
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
     const payload = {
-      schema: "circuit_v0", seed: 0,
-      nodes: [
-        { id: "s0", op: "tmsv", params: { r: 0.6 }, modes: [0, 1] },
-        { id: "l0", op: "loss", params: { T: 0.8 }, mode: 0 },
-        { id: "l1", op: "loss", params: { T: 0.8 }, mode: 1 },
+      schema: "circuit_v1", seed: 0, nmode: 2,
+      ops: [
+        { id: "s0", op: "two_mode_squeeze", params: { r: 0.6 }, modes: [0, 1] },
+        { id: "l0", op: "loss", params: { T: 0.8 }, modes: [0] },
+        { id: "l1", op: "loss", params: { T: 0.8 }, modes: [1] },
       ],
-      edges: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {},
+      view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {},
     };
     setter.call(input, JSON.stringify(payload));
     input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -190,9 +190,9 @@ try {
 
   /* 3. E_N curve vs analytic 2r/ln2 (page-side fetch, mirrors A7) */
   const analytic = await evalJs(ws, `(async () => {
-    const state = { schema: "circuit_v0", seed: 0,
-      nodes: [{ id: "s0", op: "tmsv", params: { r: 0.6 }, modes: [0, 1] }],
-      edges: [], view: { wigner_mode: 0, lim: 4, n: 32 }, ui: {} };
+    const state = { schema: "circuit_v1", seed: 0, nmode: 2,
+      ops: [{ id: "s0", op: "two_mode_squeeze", params: { r: 0.6 }, modes: [0, 1] }],
+      view: { wigner_mode: 0, lim: 4, n: 32 }, ui: {} };
     state.sweep = { node_id: "s0", param: "r", min: 0.1, max: 1.1, n: 20, modes_A: [0] };
     const r = await fetch("/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state) });
     const j = await r.json();

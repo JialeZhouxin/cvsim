@@ -27,97 +27,17 @@ function padTo(arr, n, v) {
 
 /* ── JSON ↔ graph two-way sync (pure parts) ────────────── */
 /** Parse + validate a circuit JSON payload into editor state.
-    circuit_v1 (ADR-0003, native) is inverted back to the graph model:
-    implicit vacuum source, op name/param remapping (measure_*, phase theta).
-    circuit_v0 files keep the legacy path. Returns {state} or {error}.
-    Unknown ops / malformed shapes are errors (frozen-graph policy). */
+    circuit_v1 only (ADR-0011: v0 read path removed). Returns {state} or
+    {error}. Unknown ops / malformed shapes are errors (frozen-graph
+    policy). */
 export function stateFromJson(payload) {
   if (!payload || typeof payload !== "object") return { error: "circuit 必须是对象" };
-  if (payload.schema === "circuit_v1") return stateFromV1(payload);
-  if (payload.schema !== "circuit_v0") return { error: "schema 必须是 circuit_v0 或 circuit_v1" };
-  if (!Array.isArray(payload.nodes)) return { error: "nodes 必须是数组" };
-  const seed = payload.seed === undefined ? 0 : payload.seed;
-  // 票3 review F4：seed 无上界（server ir.py 只查非负 int；shots 是采样
-  // 次数非 seed 域）——不耦合 extensions.shots。
-  if (!Number.isInteger(seed) || seed < 0) return { error: "seed 必须是非负整数" };
-  const nodes = [];
-  const seenIds = new Set();
-  let gateIdx = 0; // legacy layout: gates get grid columns in array order, sources excluded
-  for (let i = 0; i < payload.nodes.length; i++) {
-    const n = payload.nodes[i];
-    if (!n || typeof n !== "object") return { error: `nodes[${i}] 非法` };
-    // Object.hasOwn: __proto__/constructor are inherited OPS keys (OCR)
-    if (!Object.hasOwn(OPS, n.op)) return { error: `nodes[${i}]: 未知 op ${n.op}` };
-    const meta = OPS[n.op];
-    if (typeof n.id !== "string" || n.id.length === 0 || seenIds.has(n.id)) {
-      return { error: `nodes[${i}]: id 必须是非空唯一字符串` };
-    }
-    seenIds.add(n.id);
-    const node = { id: n.id, op: n.op, params: {} };
-    for (const [k, d] of Object.entries(meta.params)) {
-      const v = n.params?.[k];
-      if (d.advanced || d.optional) {
-        // optional param (loss nbar / homodyne phi): fill default when absent
-        node.params[k] = typeof v === "number" && Number.isFinite(v) ? v : d.def;
-        continue;
-      }
-      // malformed values freeze the graph instead of silently defaulting (OCR)
-      if (typeof v !== "number" || !Number.isFinite(v)) {
-        return { error: `nodes[${i}].params.${k} 必须是有限数值` };
-      }
-      node.params[k] = v;
-    }
-    if (meta.kind === "single") {
-      if (!Number.isInteger(n.mode) || n.mode < 0) {
-        return { error: `nodes[${i}].mode 必须是非负整数` };
-      }
-      node.mode = n.mode;
-    }
-    if (meta.kind === "two") {
-      if (!Array.isArray(n.modes) || n.modes.length !== 2 || n.modes.some((m) => !Number.isInteger(m) || m < 0)) {
-        return { error: `nodes[${i}].modes 必须是两个非负整数` };
-      }
-      node.modes = [...n.modes];
-    }
-    // L5.5 staff layout x — honor ui.x when present (snapped to integer
-    // column), else array index (legacy/hand-written JSON falls back to grid
-    // columns, never errors). Sources stay layout-free.
-    const rawUi = n.ui && typeof n.ui === "object" ? n.ui : {};
-    if (meta.kind === "source") {
-      node.ui = Number.isFinite(rawUi.x) ? { x: Math.round(rawUi.x) } : undefined;
-    } else {
-      node.ui = Number.isFinite(rawUi.x) ? { x: Math.round(rawUi.x) } : { x: gateIdx++ };
-    }
-    nodes.push(node);
-  }
-  const rawView = payload.view && typeof payload.view === "object" ? payload.view : {};
-  if (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0) {
-    return { error: "view.wigner_mode 必须是非负整数" };
-  }
-  const T = tables();
-  if (typeof rawView.lim !== "number" || !Number.isFinite(rawView.lim)
-      || rawView.lim <= T.viewLimMinExcl || rawView.lim > T.viewLimMax) {
-    return { error: `view.lim 必须是 (${T.viewLimMinExcl}, ${T.viewLimMax}] 的数值` };
-  }
-  if (typeof rawView.n !== "number" || !Number.isFinite(rawView.n)
-      || rawView.n < T.viewN[0] || rawView.n > T.viewN[1]) {
-    return { error: `view.n 必须在 [${T.viewN[0]}, ${T.viewN[1]}]` };
-  }
-  const view = { wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n, joint_modes: null };
-  if (rawView.joint_modes !== undefined && rawView.joint_modes !== null) {
-    if (!Array.isArray(rawView.joint_modes) || rawView.joint_modes.length !== 2
-        || rawView.joint_modes[0] === rawView.joint_modes[1]
-        || rawView.joint_modes.some((m) => !Number.isInteger(m) || m < 0)) {
-      return { error: "view.joint_modes 必须是两个不同的非负整数" };
-    }
-    view.joint_modes = [...rawView.joint_modes];
-  }
-  const ext = parseExtensions(payload, sourceModes(nodes));
-  if (ext.error) return ext;
-  return { state: { seed, nodes, view, ui: {}, ...ext } };
+  if (payload.schema !== "circuit_v1") return { error: "schema 必须是 circuit_v1" };
+  return stateFromV1(payload);
 }
 
-/** F7: backend/initial/cutoff extension fields (shared by v0 + v1 paths).
+/** F7: backend/initial/cutoff extension fields (v1 load path; the v0
+    path was removed by ADR-0011).
     nmode must be the resolved mode count of the loaded circuit.
     initial 语义在 initial.js 单点维护（F7 fock 整数 / B6 bosonic 源名）。 */
 function parseExtensions(payload, nmode) {

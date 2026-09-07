@@ -1,4 +1,8 @@
-"""F-LAB-IR: circuit_v0 schema validation + golden equivalence (A9)."""
+"""F-LAB-IR: circuit_v1 schema validation + golden equivalence (A9).
+
+ADR-0011: circuit_v0 read compatibility removed. These tests now pin the
+v1-only loader path; v0 payloads are rejected (one negative case below).
+"""
 
 from __future__ import annotations
 
@@ -19,15 +23,15 @@ from cvsim.lab import CircuitV0Error, load_circuit, run_circuit
 from cvsim.wigner import wigner_grid
 
 MAIN_SCENE = {
-    "schema": "circuit_v0",
+    "schema": "circuit_v1",
     "seed": 0,
-    "nodes": [
-        {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-        {"id": "l0", "op": "loss", "params": {"T": 0.8}, "mode": 0},
-        {"id": "l1", "op": "loss", "params": {"T": 0.8}, "mode": 1},
-        {"id": "bs", "op": "beamsplitter", "params": {"theta": np.pi / 4}, "modes": [0, 1]},
+    "nmode": 2,
+    "ops": [
+        {"id": "s0", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+        {"id": "l0", "op": "loss", "modes": [0], "params": {"T": 0.8}},
+        {"id": "l1", "op": "loss", "modes": [1], "params": {"T": 0.8}},
+        {"id": "bs", "op": "beamsplitter", "modes": [0, 1], "params": {"theta": np.pi / 4}},
     ],
-    "edges": [],
     "view": {"wigner_mode": 0, "lim": 5.0, "n": 64},
     "ui": {"position": "ignored"},
 }
@@ -43,46 +47,39 @@ def _hand_main_scene() -> GaussianState:
 # --- schema validation -------------------------------------------------------
 
 
-def test_rejects_wrong_schema_version():
-    """schema v1 but v0 shape (nodes key, no nmode): v1 path rejects."""
-    data = dict(MAIN_SCENE, schema="circuit_v1")
-    with pytest.raises(CircuitV0Error, match="nmode"):
-        load_circuit(data)
+def test_rejects_v0_schema():
+    with pytest.raises(CircuitV0Error, match="unsupported schema"):
+        load_circuit({"schema": "circuit_v0", "nodes": []})
 
 
 def test_rejects_unknown_op():
-    data = {"schema": "circuit_v0", "nodes": [{"id": "x", "op": "cz", "params": {}}]}
+    data = {
+        "schema": "circuit_v1",
+        "nmode": 1,
+        "ops": [{"id": "x", "op": "nonsense_op", "modes": [0], "params": {}}],
+    }
     with pytest.raises(CircuitV0Error, match="unknown op"):
         load_circuit(data)
 
 
-def test_rejects_missing_mode_on_single_mode_op():
+def test_rejects_missing_modes_field():
     data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "g", "op": "squeeze", "params": {"r": 0.5}},
-        ],
+        "schema": "circuit_v1",
+        "nmode": 1,
+        "ops": [{"id": "g", "op": "squeeze", "params": {"r": 0.5}}],
     }
-    with pytest.raises(CircuitV0Error, match="requires field 'mode'"):
+    with pytest.raises(CircuitV0Error, match="modes"):
         load_circuit(data)
 
 
 def test_rejects_two_mode_op_with_single_mode_list():
     data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "s", "op": "vacuum", "params": {"nmode": 2}},
-            {"id": "b", "op": "beamsplitter", "params": {"theta": 0.5}, "modes": [0]},
-        ],
+        "schema": "circuit_v1",
+        "nmode": 2,
+        "ops": [{"id": "b", "op": "beamsplitter", "modes": [0], "params": {"theta": 0.5}}],
     }
-    with pytest.raises(CircuitV0Error, match="length 2"):
+    with pytest.raises(CircuitV0Error, match="exactly 2 modes"):
         load_circuit(data)
-
-
-def test_rejects_empty_nodes():
-    with pytest.raises(CircuitV0Error, match="non-empty"):
-        load_circuit({"schema": "circuit_v0", "nodes": []})
 
 
 def test_rejects_bad_view():
@@ -97,87 +94,12 @@ def test_rejects_negative_seed():
         load_circuit(data)
 
 
-def test_source_must_be_first():
-    data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "g", "op": "squeeze", "params": {"r": 0.5}, "mode": 0},
-            {"id": "s", "op": "vacuum", "params": {}},
-        ],
-    }
-    with pytest.raises(CircuitV0Error, match="source op must be first"):
-        load_circuit(data)
-
-
-def test_two_sources_rejected_when_gate_in_between():
-    """L5.5: sources may repeat (direct-product append), but a gate between
-    sources is still illegal (sources must lead the node list)."""
-    data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "a", "op": "vacuum", "params": {}},
-            {"id": "p", "op": "phase", "params": {"phi": 1.0}, "mode": 0},
-            {"id": "b", "op": "vacuum", "params": {}},
-        ],
-    }
-    with pytest.raises(CircuitV0Error, match="source op must be first"):
-        run_circuit(load_circuit(data))
-
-
-def test_multi_source_vacuum_equiv_single_nmode():
-    """L5.5: vacuum×2 + displace×2 ≡ vacuum nmode=2 (direct product)."""
-
-    def scene(multi: bool) -> dict:
-        nodes = [{"id": "s0", "op": "vacuum", "params": {"nmode": 1 if multi else 2}}]
-        if multi:
-            nodes.append({"id": "s1", "op": "vacuum", "params": {"nmode": 1}})
-        return {
-            "schema": "circuit_v0",
-            "nodes": nodes
-            + [
-                {"id": "d0", "op": "displace", "params": {"alpha": 1.0}, "mode": 0},
-                {"id": "d1", "op": "displace", "params": {"alpha": 1.0}, "mode": 1},
-            ],
-        }
-
-    r1 = run_circuit(load_circuit(scene(True)))  # two vacuum sources
-    r2 = run_circuit(load_circuit(scene(False)))  # single vacuum nmode=2
-    assert r1.nmode == 2 and r2.nmode == 2
-    assert np.allclose(gaussian_rbar(r1), gaussian_rbar(r2))
-    assert np.allclose(gaussian_V(r1), gaussian_V(r2))
-
-
-def test_multi_source_tmsv_append_third_mode():
-    """L5.5: vacuum + tmsv appended → 3 modes, tmsv block entangled only within
-    its own pair (V block diagonal across source groups)."""
-    data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "a", "op": "vacuum", "params": {}},
-            {"id": "b", "op": "tmsv", "params": {"r": 0.5}, "modes": [1, 2]},
-        ],
-    }
-    res = run_circuit(load_circuit(data))
-    assert res.nmode == 3
-    # xxpp split layout: rows = [x0,x1,x2,p0,p1,p2]
-    # tmsv pair (modes 1,2) entangled: x1-x2 and p1-p2 cross terms nonzero
-    assert abs(gaussian_V(res)[1, 2]) > 0  # x1·x2
-    assert abs(gaussian_V(res)[4, 5]) > 0  # p1·p2
-    # vacuum mode 0 uncorrelated with the pair: x0/p0 rows empty off-diagonal
-    assert np.abs(gaussian_V(res)[0, 1:]).max() < 1e-12  # x0 row
-    assert (
-        np.abs(np.concatenate([gaussian_V(res)[3, :3], gaussian_V(res)[3, 4:]])).max() < 1e-12
-    )  # p0 row
-
-
 def test_mode_out_of_range():
     """v1 trust boundary: modes >= nmode rejected at load (not at run)."""
     data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "g", "op": "squeeze", "params": {"r": 0.5}, "mode": 3},
-        ],
+        "schema": "circuit_v1",
+        "nmode": 1,
+        "ops": [{"id": "g", "op": "squeeze", "modes": [3], "params": {"r": 0.5}}],
     }
     with pytest.raises(CircuitV0Error, match="out of range"):
         load_circuit(data)
@@ -212,12 +134,13 @@ def test_golden_meters_match_direct_calls():
 
 def test_heterodyne_removes_mode():
     data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "s", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-            {"id": "h", "op": "heterodyne", "params": {}, "mode": 0},
+        "schema": "circuit_v1",
+        "seed": 0,
+        "nmode": 2,
+        "ops": [
+            {"id": "s", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+            {"id": "h", "op": "measure_heterodyne", "modes": [0], "params": {"name": "h"}},
         ],
-        "edges": [],
         "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
     }
     res = run_circuit(load_circuit(data))
@@ -236,16 +159,22 @@ def test_heterodyne_removes_mode():
 
 def test_homodyne_removes_mode():
     """v1 semantics (design §0): homodyne removes the measured mode — same as
-    GaussianCircuit; v0 kept it in place. Guided state = condition + remove."""
+    GaussianCircuit. Guided state = condition + remove."""
     from cvsim.gaussian import homodyne_condition, homodyne_mean
 
     data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "s", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-            {"id": "h", "op": "homodyne", "params": {"phi": 0.0}, "mode": 0},
+        "schema": "circuit_v1",
+        "seed": 0,
+        "nmode": 2,
+        "ops": [
+            {"id": "s", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+            {
+                "id": "h",
+                "op": "measure_homodyne",
+                "modes": [0],
+                "params": {"phi": 0.0, "name": "h"},
+            },
         ],
-        "edges": [],
         "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
     }
     res = run_circuit(load_circuit(data))
@@ -270,27 +199,24 @@ def test_wigner_matches_direct_partial_trace_grid():
     np.testing.assert_allclose(wp, P[:, 0], atol=0.0)
 
 
-def test_ui_and_edges_are_ignored_by_run():
-    data = dict(MAIN_SCENE, ui={"pixels": {"s0": [1, 2]}}, edges=[{"from": "x", "to": "y"}])
+def test_ui_extra_keys_ignored_by_run():
+    data = dict(MAIN_SCENE, ui={"pixels": {"s0": [1, 2]}})
     res = run_circuit(load_circuit(data))
     hand = _hand_main_scene()
     np.testing.assert_allclose(gaussian_V(res), hand.V, atol=1e-10)
 
 
-def test_coherent_source_alpha_forms():
-    cases = [
-        (0.5, complex(0.5)),
-        ([0.3, -0.4], complex(0.3, -0.4)),
-        ({"re": 0.3, "im": -0.4}, complex(0.3, -0.4)),
-    ]
-    for alpha, expected in cases:
+def test_displace_complex_alpha_forms():
+    """v1 displace alpha = [re, im] complex literal; gaussian runs match coherent."""
+    for alpha in ([0.5, 0.0], [0.3, -0.4]):
         data = {
-            "schema": "circuit_v0",
-            "nodes": [{"id": "s", "op": "coherent", "params": {"alpha": alpha}}],
-            "edges": [],
+            "schema": "circuit_v1",
+            "seed": 0,
+            "nmode": 1,
+            "ops": [{"id": "d", "op": "displace", "modes": [0], "params": {"alpha": alpha}}],
             "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
         }
         res = run_circuit(load_circuit(data))
-        hand = GaussianState.coherent(expected)
+        hand = GaussianState.coherent(complex(alpha[0], alpha[1]))
         np.testing.assert_allclose(gaussian_rbar(res), hand.rbar, atol=1e-10)
         np.testing.assert_allclose(gaussian_V(res), hand.V, atol=1e-10)

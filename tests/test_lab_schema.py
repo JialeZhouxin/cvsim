@@ -270,9 +270,11 @@ def test_422_fock_initial_message_unchanged():
 
 
 def test_422_gaussian_whitelist_message_semantics_unchanged():
-    """Semantic content kept: op name + whitelist mention (format unified)."""
+    """Semantic content kept: op name + whitelist mention (format unified).
+    ADR-0011: v0 payload now hits the schema gate before the whitelist —
+    the unsupported-schema text is the Lab's honest answer."""
     msg = _detail_for({"schema": "circuit_v0", "nodes": [{"id": "x", "op": "cz", "params": {}}]})
-    assert "unknown op" in msg  # v0 translation errors untouched
+    assert "unsupported schema" in msg and "circuit_v1" in msg
 
 
 def test_422_fock_whitelist_message_contains_op():

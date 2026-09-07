@@ -48,7 +48,6 @@ EXPECTED_ALL = {
     "sample_circuit",
     "scan_circuit",
     "fidelity_sweep",
-    "translate_v0",
 }
 
 
@@ -122,14 +121,15 @@ def test_init_all_names():
     """R2/ADR-0008: lab.__all__ frozen at exactly 11 public names (verbs only).
 
     RunResult was removed with the unified LabResult contract; LabResult (the
-    response snapshot type) occupies its slot — still 11 names.
+    response snapshot type) occupies its slot — still 11 names. ADR-0011
+    removed ``translate_v0`` (v0 read path retired).
     """
     import cvsim.lab as lab
 
     assert set(lab.__all__) == EXPECTED_ALL, (
         f"lab.__all__ drift: got {set(lab.__all__)} expected {EXPECTED_ALL}"
     )
-    assert len(lab.__all__) == 12
+    assert len(lab.__all__) == 11
     assert "RunResult" not in lab.__all__, "RunResult deleted (ADR-0008)"
     assert not hasattr(lab, "RunResult"), "RunResult must be gone from the public surface"
 
@@ -219,9 +219,8 @@ def test_no_handbuilt_payload_dicts():
         "cvsim/lab/gaussian_backend.py": ['"schema"', '"wigner": (', "payload[", '"measured"'],
         "cvsim/lab/fock_backend.py": ['"schema"', "wigner[0][0]", '"wigner": (', "payload["],
         "cvsim/lab/bosonic_backend.py": ['"schema"', "wigner[0][0]", '"wigner": (', "payload["],
-        # ir.py: only whitelisted needle is translate_v0's request-side IR
-        # assembly ({"schema": SCHEMA, ...} building the *circuit* dict) —
-        # response payload keys must not appear there.
+        # ir.py: response payload keys must not appear there (result assembly
+        # lives in the per-backend runner modules, ADR-0010).
         "cvsim/lab/ir.py": ['"wigner"', '"meters"', '"measured"'],
     }
     for rel, needles in forbidden.items():

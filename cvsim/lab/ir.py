@@ -1,14 +1,15 @@
-"""Gaussian Lab circuit IR: `circuit_v1` load/translate + extension fields.
+"""Gaussian Lab circuit IR: `circuit_v1` load + extension fields.
 
 Public API only: ``cvsim.gaussian`` ``__all__`` + ``cvsim.wigner.wigner_grid``.
 No fastapi dependency here (see ``server.py``).
 
 Schema split (ADR-0003): core schema/validation live in ``cvsim.gaussian.ir``
-(``circuit_v1``, full op set). This module owns Lab concerns: v0 file
-compatibility (``translate_v0``), the Lab op whitelist, and the view/seed/ui/
-initial/detail extension fields. Execution lives in the per-backend runner
-modules (dispatch routes, ADR-0010) — this module no longer imports any
-gaussian execution symbol.
+(``circuit_v1``, full op set). This module owns Lab concerns: the Lab op
+whitelist and the view/seed/ui/initial/detail extension fields. Execution
+lives in the per-backend runner modules (dispatch routes, ADR-0010) — this
+module no longer imports any gaussian execution symbol.
+
+v0 read compatibility was removed (ADR-0011): only ``circuit_v1`` loads.
 
 v1 semantics (design §0, intentional unification vs v0):
 - mode indices are **logical** (runtime keeps a logical→physical map; a
@@ -34,27 +35,12 @@ from cvsim.lab.schema import (
     LAB_WHITELIST,
 )
 
-SCHEMA_V0 = "circuit_v0"
-
 #: Lab op whitelists — **derived views** over the Lab schema assembly
 #: layer (ticket 4): declared once in ``cvsim.lab.schema`` as core
 #: `ir_schema()` ops minus an explicit UI-hidden set, imported back here.
 #: The loader texts below are byte-identical to the pre-ticket hand-written
 #: sets (golden 422 tests lock them). B6/F7 unlock history now lives in
 #: `schema._UI_HIDDEN`.
-#: v0-only source ops — translated away by :func:`translate_v0` (no source
-#: concept in v1: coherent ≡ displace, tmsv ≡ two_mode_squeeze).
-SOURCE_V0 = frozenset({"vacuum", "coherent", "tmsv"})
-#: v0 op names → core v1 names (builder 1:1, ADR-0003 #3):
-#: homodyne/heterodyne → measure_homodyne/measure_heterodyne.
-V0_TO_V1_OP = {"homodyne": "measure_homodyne", "heterodyne": "measure_heterodyne"}
-#: v0 param names → v1 param names (phase used ``phi`` in the Lab UI;
-#: core builder/IR speak ``theta``).
-V0_TO_V1_PARAM = {"phase": {"phi": "theta"}}
-SINGLE_MODE_V0 = frozenset(
-    {"displace", "phase", "squeeze", "fourier", "loss", "amplifier", "homodyne", "heterodyne"}
-)
-TWO_MODE_V0 = frozenset({"beamsplitter", "two_mode_squeeze", "mz"})
 MEASUREMENT_OPS = frozenset({"measure_homodyne", "measure_heterodyne"})
 
 #: Lab-required params for break-point channel ops (core fills OpMeta
@@ -69,7 +55,8 @@ _LAB_REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
 
 
 class CircuitV0Error(ValueError):
-    """Invalid circuit payload (v0 or v1); message is UI-safe.
+    """Invalid circuit payload; message is UI-safe. (Name predates ADR-0011:
+    kept for import stability; v0 parsing has been removed.)
 
     Structured form (Q8, schema ticket 2): whitelist/initial rejections also
     carry ``code`` (error class), ``where`` (rendered prefix, verbatim from
@@ -159,116 +146,6 @@ def _num(v: Any, where: str, name: str) -> float:
     return float(v)
 
 
-def _as_complex(v: Any, where: str) -> complex:
-    """JSON has no complex: accept float/int, [re, im], or {"re":..,"im":..}."""
-    if isinstance(v, (int, float)):
-        return complex(v)
-    if isinstance(v, (list, tuple)) and len(v) == 2:
-        return complex(v[0], v[1])
-    if isinstance(v, dict) and "re" in v and "im" in v:
-        return complex(v["re"], v["im"])
-    raise CircuitV0Error(f"{where}: alpha must be number, [re, im], or {{re, im}}")
-
-
-# -- circuit_v0 → circuit_v1 translation ------------------------------------
-
-
-def translate_v0(data: dict[str, Any]) -> dict[str, Any]:
-    """Pure ``circuit_v0`` JSON → ``circuit_v1`` dict.
-
-    Sources become block-local gates on vacuum (exact equivalence, ADR-0003
-    #2): ``coherent`` → ``displace``, ``tmsv`` → ``two_mode_squeeze``,
-    ``vacuum`` contributes modes only. ``nmode`` = Σ source contributions.
-    ``mode``/``modes`` → unified ``modes``; ``view``/``seed``/``ui`` copied as
-    extension fields; ``edges`` dropped (v0 already ignored it).
-    """
-    if not isinstance(data, dict):
-        raise CircuitV0Error("payload must be a JSON object")
-    schema = data.get("schema")
-    if schema != SCHEMA_V0:
-        raise CircuitV0Error(f"unsupported schema {schema!r}; expected {SCHEMA_V0!r}")
-    raw_nodes = data.get("nodes")
-    if not isinstance(raw_nodes, list) or not raw_nodes:
-        raise CircuitV0Error("nodes must be a non-empty list")
-
-    nmode = 0
-    ops: list[dict[str, Any]] = []
-    seen_gate = False
-    for i, rn in enumerate(raw_nodes):
-        where = f"nodes[{i}]"
-        if not isinstance(rn, dict):
-            raise CircuitV0Error(f"{where}: must be an object")
-        op = _require(rn, "op", str, where)
-        params = rn.get("params", {})
-        if not isinstance(params, dict):
-            raise CircuitV0Error(f"{where}: params must be an object")
-        if op in SOURCE_V0:
-            if seen_gate:
-                raise CircuitV0Error(f"{where}: source op must be first (state already exists)")
-            if op == "vacuum":
-                nm = params.get("nmode", 1)
-                if not isinstance(nm, int) or isinstance(nm, bool) or nm < 1:
-                    raise CircuitV0Error(f"nodes[{i}]: vacuum nmode must be an int >= 1")
-                nmode += nm
-            else:
-                src_node: dict[str, Any] = {}
-                if "id" in rn:
-                    src_node["id"] = rn["id"]  # scan/UI reference the source node
-                if op == "coherent":
-                    alpha = _as_complex(params.get("alpha"), where)
-                    src_node.update(
-                        {
-                            "op": "displace",
-                            "modes": [nmode],
-                            "params": {"alpha": [alpha.real, alpha.imag]},
-                        }
-                    )
-                    nmode += 1
-                else:  # tmsv
-                    r = _num(params.get("r"), where, "r")
-                    src_node.update(
-                        {"op": "two_mode_squeeze", "modes": [nmode, nmode + 1], "params": {"r": r}}
-                    )
-                    nmode += 2
-                ops.append(src_node)
-        else:
-            seen_gate = True
-            if op in SINGLE_MODE_V0:
-                if "mode" not in rn:
-                    raise CircuitV0Error(f"{where}: op {op!r} requires field 'mode'")
-                modes = [_as_pos_int(rn["mode"], f"{where}.mode")]
-            elif op in TWO_MODE_V0:
-                if not isinstance(rn.get("modes"), list) or len(rn["modes"]) != 2:
-                    raise CircuitV0Error(f"{where}: op {op!r} requires 'modes' of length 2")
-                modes = [_as_pos_int(m, f"{where}.modes") for m in rn["modes"]]
-            else:
-                raise CircuitV0Error(
-                    f"{where}: unknown op {op!r}; whitelist: "
-                    f"{sorted(SOURCE_V0 | SINGLE_MODE_V0 | TWO_MODE_V0)}"
-                )
-            node: dict[str, Any] = {
-                "op": V0_TO_V1_OP.get(op, op),
-                "modes": modes,
-                "params": dict(params),
-            }
-            pnames = V0_TO_V1_PARAM.get(node["op"], {})
-            if pnames:
-                node["params"] = {pnames.get(k, k): v for k, v in params.items()}
-            if node["op"] in MEASUREMENT_OPS and "name" not in node["params"]:
-                # v1 measure ops carry a result name (builder 1:1); v0 files
-                # may omit it (heterodyne never had one) — synthesize.
-                node["params"]["name"] = rn.get("id") or f"m{i}"
-            if "id" in rn:
-                node["id"] = rn["id"]
-            ops.append(node)
-
-    out: dict[str, Any] = {"schema": SCHEMA, "nmode": nmode, "ops": ops}
-    for k in ("view", "seed", "ui"):
-        if k in data:
-            out[k] = data[k]
-    return out
-
-
 def _parse_view(raw: Any) -> View:
     if not isinstance(raw, dict):
         raise CircuitV0Error("view must be an object")
@@ -299,19 +176,18 @@ def _parse_view(raw: Any) -> View:
 
 
 def load_circuit(data: dict[str, Any]) -> LabCircuit:
-    """Load + validate a circuit payload: v1 native, v0 via :func:`translate_v0`.
+    """Load + validate a circuit payload. ``circuit_v1`` only (ADR-0011:
+    circuit_v0 read-compat removed).
 
-    Routes by ``backend`` (default ``gaussian`` — old files unchanged): the
-    Fock path validates against ``cvsim.fock.ir`` + FOCK_WHITELIST and keeps
-    the raw dict; the Gaussian path enforces LAB_WHITELIST as before.
+    Routes by ``backend``: the Fock/Bosonic path validates against
+    ``cvsim.fock.ir``/``cvsim.bosonic.ir`` + whitelist and keeps the raw
+    dict; the Gaussian path enforces LAB_WHITELIST as before.
     """
     if not isinstance(data, dict):
         raise CircuitV0Error("payload must be a JSON object")
-    if data.get("schema") == SCHEMA_V0:
-        data = translate_v0(data)
-    elif data.get("schema") != SCHEMA:
+    if data.get("schema") != SCHEMA:
         raise CircuitV0Error(
-            f"unsupported schema {data.get('schema')!r}; expected {SCHEMA!r} or {SCHEMA_V0!r}"
+            f"unsupported schema {data.get('schema')!r}; expected {SCHEMA!r}"
         )
     backend = data.get("backend", "gaussian")
     if backend not in ("gaussian", "fock", "bosonic"):

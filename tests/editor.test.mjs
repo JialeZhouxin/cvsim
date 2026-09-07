@@ -323,23 +323,26 @@ test("L5: toV1Json — v1 payload, sources expanded, no ui.x on ops", () => {
   assert.deepEqual(st.state.nodes.filter((n) => n.op !== "vacuum").map((n) => n.ui.x), [4, 5]);
 });
 
-test("L5: stateFromJson — missing ui.x falls back to array index", () => {
-  const legacy = {
-    schema: "circuit_v0",
-    nodes: [
-      { id: "s", op: "vacuum", params: {} },
-      { id: "a", op: "phase", params: { phi: 1 }, mode: 0 },
-      { id: "b", op: "squeeze", params: { r: 0.4, phi: 0 }, mode: 1 },
+test("L5: stateFromJson — missing staff falls back to array index", () => {
+  // v1: graph model ops map from circuit_v1 ops (vacuum folded to nmode);
+  // layout columns come from ui.staff, missing entries → array order.
+  const base = {
+    schema: "circuit_v1",
+    nmode: 2,
+    ops: [
+      { id: "a", op: "phase", params: { theta: 1 }, modes: [0] },
+      { id: "b", op: "squeeze", params: { r: 0.4, phi: 0 }, modes: [1] },
     ],
     view: { wigner_mode: 0, lim: 5, n: 64 },
   };
-  const { state, error } = stateFromJson(legacy);
+  const { state, error } = stateFromJson(base);
   assert.equal(error, undefined);
   assert.deepEqual(state.nodes.map((n) => n.ui?.x), [undefined, 0, 1]); // source layout-free
-  // explicit ui.x honored (snapped to integer column)
-  const withX = { ...legacy, nodes: [{ ...legacy.nodes[1], ui: { x: 7.5 } }] };
+  // explicit ui.staff honored
+  const withX = { ...base, ui: { staff: { a: 7, b: 3 } } };
   const { state: sx } = stateFromJson(withX);
-  assert.equal(sx.nodes[0].ui.x, 8); // round(7.5)
+  assert.equal(sx.nodes.find((n) => n.id === "a").ui.x, 7);
+  assert.equal(sx.nodes.find((n) => n.id === "b").ui.x, 3);
   // round-trip: ui.x survives
   const rt = stateFromJson(toV1Json(state));
   assert.deepEqual(rt.state.nodes.map((n) => n.ui?.x), [undefined, 0, 1]);
@@ -377,16 +380,16 @@ test("OCR guards: id collision after import, proto keys, dup ids", () => {
   const grown = addNode(state.nodes, "loss");
   assert.equal(grown[1].id, "n0"); // vac0 does not occupy the n-prefix
   // __proto__ / constructor must not pass the whitelist
-  assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "__proto__", params: {} }] }).error);
-  assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "constructor", params: {} }] }).error);
+  assert.ok(stateFromJson({ schema: "circuit_v1", nmode: 1, ops: [{ id: "x", op: "__proto__", modes: [0], params: {} }] }).error);
+  assert.ok(stateFromJson({ schema: "circuit_v1", nmode: 1, ops: [{ id: "x", op: "constructor", modes: [0], params: {} }] }).error);
   // duplicate ids rejected
-  const dup = { schema: "circuit_v0", nodes: [
-    { id: "a", op: "vacuum", params: {} },
-    { id: "a", op: "loss", params: { T: 0.9 }, mode: 0 },
+  const dup = { schema: "circuit_v1", nmode: 1, ops: [
+    { id: "a", op: "phase", modes: [0], params: { theta: 0.5 } },
+    { id: "a", op: "loss", modes: [0], params: { T: 0.9 } },
   ] };
   assert.ok(stateFromJson(dup).error);
   // malformed param freezes instead of silently defaulting
-  const bad = { schema: "circuit_v0", nodes: [{ id: "a", op: "squeeze", params: { r: "x" } }] };
+  const bad = { schema: "circuit_v1", nmode: 1, ops: [{ id: "a", op: "squeeze", modes: [0], params: { r: "x" } }] };
   assert.ok(stateFromJson(bad).error);
 });
 
@@ -417,11 +420,13 @@ test("stateFromJson: valid payload round-trips", () => {
   assert.equal(state.nodes[0].params.nmode, 1); // v1 nmode → implicit vacuum source
 });
 
-test("stateFromJson: rejects unknown op / wrong schema", () => {
+test("stateFromJson: rejects wrong schema / non-object (ADR-0011: v1 only)", () => {
   assert.ok(stateFromJson({ schema: "nope", nodes: [] }).error);
-  assert.ok(stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "mach_zehnder", params: {} }] }).error);
+  assert.ok(stateFromJson({ schema: "circuit_v0", nmode: 1, ops: [] }).error);
   assert.ok(stateFromJson(null).error);
-  assert.ok(stateFromJson({ schema: "circuit_v0", nodes: "nope" }).error);
+  assert.ok(stateFromJson("nope").error);
+  // core-only op rejected by Lab whitelist
+  assert.ok(stateFromJson({ schema: "circuit_v1", nmode: 2, ops: [{ id: "x", op: "mach_zehnder", modes: [0, 1], params: {} }] }).error);
 });
 
 test("L3: homodyne visible with phi default 0 / max TAU", () => {
@@ -447,12 +452,12 @@ test("L3: toV1Json preserves top-level seed", () => {
 
 test("L3: stateFromJson accepts seed + homodyne optional phi", () => {
   const payload = {
-    schema: "circuit_v0",
+    schema: "circuit_v1",
     seed: 7,
-    nodes: [
-      { id: "a", op: "vacuum", params: {} },
-      { id: "b", op: "homodyne", params: { phi: 1.5 }, mode: 0 },
-      { id: "c", op: "homodyne", params: {}, mode: 1 },
+    nmode: 2,
+    ops: [
+      { id: "b", op: "measure_homodyne", params: { phi: 1.5, name: "b" }, modes: [0] },
+      { id: "c", op: "measure_homodyne", params: { name: "c" }, modes: [1] },
     ],
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
   };
@@ -469,7 +474,7 @@ test("L3: stateFromJson accepts seed + homodyne optional phi", () => {
 });
 
 test("L3: stateFromJson rejects invalid seed", () => {
-  const base = { schema: "circuit_v0", seed: 0, nodes: [{ id: "a", op: "vacuum", params: {} }], view: { wigner_mode: 0, lim: 5, n: 64 } };
+  const base = { schema: "circuit_v1", seed: 0, nmode: 1, ops: [], view: { wigner_mode: 0, lim: 5, n: 64 } };
   assert.equal(stateFromJson(base).error, undefined); // seed 0 is valid (positive baseline)
   assert.ok(stateFromJson({ ...base, seed: -1 }).error);
   assert.ok(stateFromJson({ ...base, seed: 1.5 }).error);
@@ -477,7 +482,7 @@ test("L3: stateFromJson rejects invalid seed", () => {
 });
 
 test("L3: loadJson validates without mutating old state", () => {
-  const good = { schema: "circuit_v0", seed: 3, nodes: [{ id: "a", op: "vacuum", params: {} }], view: { wigner_mode: 0, lim: 5, n: 64 } };
+  const good = { schema: "circuit_v1", seed: 3, nmode: 1, ops: [], view: { wigner_mode: 0, lim: 5, n: 64 } };
   const bad = { schema: "nope", nodes: [] };
   const old = { seed: 0, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} };
   const ok = loadJson(good);
@@ -522,11 +527,11 @@ test("L4: sweep metadata — alpha excluded, real numerics included", () => {
 
 test("L4: stateFromJson accepts amplifier/mz", () => {
   const payload = {
-    schema: "circuit_v0",
+    schema: "circuit_v1",
     seed: 0,
-    nodes: [
-      { id: "s", op: "vacuum", params: {} },
-      { id: "a", op: "amplifier", params: { G: 2 }, mode: 0 },
+    nmode: 2,
+    ops: [
+      { id: "a", op: "amplifier", params: { G: 2 }, modes: [0] },
       { id: "m", op: "mz", params: { theta: 0.5, phi: 0.3 }, modes: [0, 1] },
     ],
     view: { wigner_mode: 0, lim: 5, n: 64 },
@@ -538,12 +543,12 @@ test("L4: stateFromJson accepts amplifier/mz", () => {
   const rt = stateFromJson(toV1Json(state));
   assert.equal(rt.error, undefined);
   // missing required G freezes
-  const noG = { ...payload, nodes: [{ id: "a", op: "amplifier", params: {}, mode: 0 }] };
+  const noG = { ...payload, ops: [{ id: "a", op: "amplifier", params: {}, modes: [0] }] };
   assert.ok(stateFromJson(noG).error);
 });
 
 test("stateFromJson: missing params freeze (frozen-graph policy)", () => {
-  const { error } = stateFromJson({ schema: "circuit_v0", nodes: [{ id: "x", op: "squeeze", params: {} }] });
+  const { error } = stateFromJson({ schema: "circuit_v1", nmode: 1, ops: [{ id: "x", op: "squeeze", modes: [0], params: {} }] });
   assert.ok(error);
   assert.ok(error.includes("r"));
 });
@@ -552,11 +557,8 @@ test("fourier gate: palette-visible gate, JSON round-trip loadable", () => {
   assert.equal(opGroup("fourier"), "gate");
   assert.deepEqual(Object.keys(OPS.fourier.params), []); // no knobs
   const payload = {
-    schema: "circuit_v0", seed: 0,
-    nodes: [
-      { id: "s", op: "vacuum", params: { nmode: 1 } },
-      { id: "f", op: "fourier", params: {}, mode: 0, ui: { x: 0 } },
-    ],
+    schema: "circuit_v1", seed: 0, nmode: 1,
+    ops: [{ id: "f", op: "fourier", params: {}, modes: [0], ui: { x: 0 } }],
     view: { wigner_mode: 0, lim: 5, n: 64 },
   };
   const { state, error } = stateFromJson(payload);
@@ -815,25 +817,26 @@ test("F7: stateFromJson — view.joint_modes 解析 + 校验", () => {
   assert.ok(stateFromJson({ ...base, view: { ...base.view, joint_modes: [0, -1] } }).error);
 });
 
-test("F7: v0 路径同样解析 backend/initial（无 backend 字段 → gaussian）", () => {
-  const v0 = {
-    schema: "circuit_v0",
-    nodes: [
-      { id: "s", op: "vacuum", params: { nmode: 2 } },
-      { id: "k", op: "kerr", params: { chi: 1.5 }, mode: 0 },
+test("F7: v1 直载解析 backend/initial（无 backend 字段 → gaussian）", () => {
+  const v1 = {
+    schema: "circuit_v1",
+    nmode: 2,
+    ops: [
+      { id: "k", op: "kerr", params: { chi: 1.5 }, modes: [0] },
     ],
     view: { wigner_mode: 0, lim: 5, n: 64 },
     backend: "fock",
     initial: [0, 1],
   };
-  const { state, error } = stateFromJson(v0);
+  const { state, error } = stateFromJson(v1);
   assert.equal(error, undefined);
   assert.equal(state.backend, "fock");
   assert.deepEqual(state.initial, [0, 1]);
-  assert.equal(state.nodes[1].params.chi, 1.5);
-  assert.equal(state.nodes[1].params.name, undefined); // kerr has no name param
-  // initial 长度 vs v0 源计模
-  const bad = stateFromJson({ ...v0, initial: [1] });
+  const kerr = state.nodes.find((n) => n.id === "k");
+  assert.equal(kerr.params.chi, 1.5);
+  assert.equal(kerr.params.name, undefined); // kerr has no name param
+  // initial 长度 vs nmode
+  const bad = stateFromJson({ ...v1, initial: [1] });
   assert.ok(bad.error);
 });
 

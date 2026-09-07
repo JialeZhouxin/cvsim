@@ -330,13 +330,12 @@ try {
   /* 7. legacy JSON without ui.x loads and renders as grid columns */
   const legacy = await evalJs(ws, `(async () => {
     const payload = {
-      schema: "circuit_v0", seed: 0,
-      nodes: [
-        { id: "v", op: "vacuum", params: { nmode: 2 } },
-        { id: "p", op: "phase", params: { phi: 1.2 }, mode: 0 },
-        { id: "d", op: "displace", params: { alpha: 1 }, mode: 1 },
+      schema: "circuit_v1", seed: 0, nmode: 2,
+      ops: [
+        { id: "p", op: "phase", params: { theta: 1.2 }, modes: [0] },
+        { id: "d", op: "displace", params: { alpha: [1.0, 0.0] }, modes: [1] },
       ],
-      edges: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {},
+      view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {},
     };
     const input = document.getElementById("json-input");
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;

@@ -15,7 +15,7 @@ from cvsim.lab.server import app
 
 client = TestClient(app)
 
-TMSV = {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]}
+TMSV = {"id": "s0", "op": "two_mode_squeeze", "params": {"r": 0.6}, "modes": [0, 1]}
 
 _S0 = {"node_id": "s0", "param": "r", "min": 0.0, "max": 1.0, "n": 10, "modes_A": [0]}
 
@@ -24,12 +24,12 @@ def _mz(theta, phi=0.4):
     return {"id": "m", "op": "mz", "params": {"theta": theta, "phi": phi}, "modes": [0, 1]}
 
 
-def _circuit(nodes, *, wigner_mode=0):
+def _circuit(ops, *, nmode=2, wigner_mode=0):
     return {
-        "schema": "circuit_v0",
+        "schema": "circuit_v1",
         "seed": 0,
-        "nodes": nodes,
-        "edges": [],
+        "nmode": nmode,
+        "ops": ops,
         "view": {"wigner_mode": wigner_mode, "lim": 4.0, "n": 32},
         "ui": {},
     }
@@ -45,7 +45,7 @@ def test_mz_equals_bs_phase_bs_ir():
         [
             TMSV,
             {"id": "b1", "op": "beamsplitter", "params": {"theta": theta}, "modes": [0, 1]},
-            {"id": "p", "op": "phase", "params": {"phi": phi}, "mode": 0},
+            {"id": "p", "op": "phase", "params": {"theta": phi}, "modes": [0]},
             {"id": "b2", "op": "beamsplitter", "params": {"theta": theta}, "modes": [0, 1]},
         ]
     )
@@ -97,9 +97,15 @@ def test_mz_422_non_numeric_theta():
 
 
 def test_mz_422_requires_two_modes():
-    data = _circuit([TMSV, _mz(0.4)], wigner_mode=0)
-    del data["nodes"][1]["modes"]
-    with pytest.raises(CircuitV0Error, match="requires 'modes'"):
+    data = {
+        "schema": "circuit_v1",
+        "seed": 0,
+        "nmode": 2,
+        "ops": [TMSV, {"id": "m", "op": "mz", "params": {"theta": 0.4, "phi": 0.4}}],
+        "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
+        "ui": {},
+    }
+    with pytest.raises(CircuitV0Error, match="modes"):
         load_circuit(data)
 
 
@@ -109,9 +115,9 @@ def test_mz_422_requires_two_modes():
 def test_amplifier_op_matches_direct():
     data = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "a", "op": "amplifier", "params": {"G": 2.0}, "mode": 0},
-        ]
+            {"id": "a", "op": "amplifier", "params": {"G": 2.0}, "modes": [0]},
+        ],
+        nmode=1,
     )
     res = run_circuit(load_circuit(data))
     st = amplifier(GaussianState.vacuum(1), 2.0, 0, 0.0)
@@ -123,9 +129,9 @@ def test_amplifier_nbar_advanced_default_zero():
     """nbar absent → 0 (quantum-limited): amplified vacuum ⟨n⟩ = G−1."""
     data = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "a", "op": "amplifier", "params": {"G": 2.0}, "mode": 0},
-        ]
+            {"id": "a", "op": "amplifier", "params": {"G": 2.0}, "modes": [0]},
+        ],
+        nmode=1,
     )
     res = run_circuit(load_circuit(data))
     assert res.meters["mean_photon"] == pytest.approx(1.0, abs=1e-9)  # G−1
@@ -134,9 +140,9 @@ def test_amplifier_nbar_advanced_default_zero():
 def test_amplifier_nbar_explicit_matches_direct():
     data = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "a", "op": "amplifier", "params": {"G": 3.0, "nbar": 0.5}, "mode": 0},
-        ]
+            {"id": "a", "op": "amplifier", "params": {"G": 3.0, "nbar": 0.5}, "modes": [0]},
+        ],
+        nmode=1,
     )
     res = run_circuit(load_circuit(data))
     st = amplifier(GaussianState.vacuum(1), 3.0, 0, 0.5)
@@ -146,9 +152,9 @@ def test_amplifier_nbar_explicit_matches_direct():
 def test_amplifier_422_g_lt_1():
     data = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "a", "op": "amplifier", "params": {"G": 0.5}, "mode": 0},
-        ]
+            {"id": "a", "op": "amplifier", "params": {"G": 0.5}, "modes": [0]},
+        ],
+        nmode=1,
     )
     with pytest.raises(ValueError, match="G must be >= 1"):  # library guard
         run_circuit(load_circuit(data))
@@ -159,9 +165,9 @@ def test_amplifier_422_g_lt_1():
 def test_amplifier_422_negative_nbar():
     data = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "a", "op": "amplifier", "params": {"G": 2.0, "nbar": -1}, "mode": 0},
-        ]
+            {"id": "a", "op": "amplifier", "params": {"G": 2.0, "nbar": -1}, "modes": [0]},
+        ],
+        nmode=1,
     )
     with pytest.raises(ValueError, match="nbar"):
         run_circuit(load_circuit(data))
@@ -171,9 +177,9 @@ def test_amplifier_422_negative_nbar():
 def test_amplifier_422_missing_G():
     data = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "a", "op": "amplifier", "params": {}, "mode": 0},
-        ]
+            {"id": "a", "op": "amplifier", "params": {}, "modes": [0]},
+        ],
+        nmode=1,
     )
     with pytest.raises(CircuitV0Error, match="G must be a number"):
         run_circuit(load_circuit(data))
@@ -217,7 +223,7 @@ def test_scan_pure_deterministic_no_rng():
 
 
 def test_scan_loss_t_endpoint_t1_identity():
-    body = _circuit([TMSV, {"id": "l", "op": "loss", "params": {"T": 0.8}, "mode": 0}])
+    body = _circuit([TMSV, {"id": "l", "op": "loss", "params": {"T": 0.8}, "modes": [0]}])
     body["sweep"] = {"node_id": "l", "param": "T", "min": 0.2, "max": 1.0, "n": 20, "modes_A": [0]}
     r = client.post("/scan", json=body)
     assert r.status_code == 200
@@ -252,7 +258,7 @@ def test_scan_amplifier_g_monotone():
     body = _circuit(
         [
             TMSV,
-            {"id": "a", "op": "amplifier", "params": {"G": 1.0}, "mode": 0},
+            {"id": "a", "op": "amplifier", "params": {"G": 1.0}, "modes": [0]},
         ]
     )
     body["sweep"] = {"node_id": "a", "param": "G", "min": 1.0, "max": 3.0, "n": 10, "modes_A": [0]}
@@ -266,9 +272,9 @@ def test_scan_amplifier_g_monotone():
 def test_scan_3mode_modes_a():
     body = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {"nmode": 3}},
-            {"id": "sq", "op": "squeeze", "params": {"r": 0.4}, "mode": 0},
-        ]
+            {"id": "sq", "op": "squeeze", "params": {"r": 0.4}, "modes": [0]},
+        ],
+        nmode=3,
     )
     body["sweep"] = {
         "node_id": "sq",
@@ -287,7 +293,14 @@ def test_scan_3mode_modes_a():
 
 
 def test_scan_1mode_circuit_rejected():
-    body = _circuit([{"id": "s", "op": "vacuum", "params": {}}])
+    body = {
+        "schema": "circuit_v1",
+        "seed": 0,
+        "nmode": 1,
+        "ops": [],
+        "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
+        "ui": {},
+    }
     body["sweep"] = {"node_id": "s", "param": "nmode", "min": 1, "max": 2, "n": 5, "modes_A": [0]}
     r = client.post("/scan", json=body)
     assert r.status_code == 422  # nmode not sweepable either way
@@ -322,9 +335,9 @@ def test_scan_422_matrix_ir(sweep, msg):
 def test_scan_422_duplicate_modes_a_3mode():
     data = _circuit(
         [
-            {"id": "s", "op": "vacuum", "params": {"nmode": 3}},
-            {"id": "sq", "op": "squeeze", "params": {"r": 0.4}, "mode": 0},
-        ]
+            {"id": "sq", "op": "squeeze", "params": {"r": 0.4}, "modes": [0]},
+        ],
+        nmode=3,
     )
     sweep = {"node_id": "sq", "param": "r", "min": 0.1, "max": 1.0, "n": 8, "modes_A": [0, 0]}
     with pytest.raises(CircuitV0Error, match="duplicate"):
@@ -332,11 +345,11 @@ def test_scan_422_duplicate_modes_a_3mode():
 
 
 def test_scan_rejects_coherent_alpha():
-    data = _circuit([{"id": "s", "op": "coherent", "params": {"alpha": 1.0}}])
+    data = _circuit([{"id": "s", "op": "displace", "params": {"alpha": [1.0, 0.0]}, "modes": [0]}])
     sweep = {"node_id": "s", "param": "alpha", "min": 0.0, "max": 1.0, "n": 10, "modes_A": [0]}
     with pytest.raises(CircuitV0Error, match="not sweepable"):
         scan_circuit(load_circuit(data), sweep)
-    body = _circuit([{"id": "s", "op": "coherent", "params": {"alpha": 1.0}}])
+    body = _circuit([{"id": "s", "op": "displace", "params": {"alpha": [1.0, 0.0]}, "modes": [0]}])
     body["sweep"] = sweep
     assert client.post("/scan", json=body).status_code == 422
 
@@ -345,7 +358,12 @@ def test_scan_rejects_measurement_nodes():
     data = _circuit(
         [
             TMSV,
-            {"id": "h", "op": "homodyne", "params": {}, "mode": 0},
+            {
+                "id": "h",
+                "op": "measure_homodyne",
+                "params": {"phi": 0.0, "name": "h"},
+                "modes": [0],
+            },
         ]
     )
     sweep = {"node_id": "s0", "param": "r", "min": 0.0, "max": 1.0, "n": 10, "modes_A": [0]}
@@ -364,9 +382,12 @@ def test_scan_endpoint_422_missing_sweep():
 
 
 def test_scan_endpoint_422_bad_circuit():
+    # circuit_v0 read path removed (ADR-0011) — schema rejection is the 422.
     body = {"schema": "circuit_v0", "nodes": [{"id": "x", "op": "cz", "params": {}}]}
     body["sweep"] = {"node_id": "x", "param": "r", "min": 0.0, "max": 1.0, "n": 10, "modes_A": [0]}
-    assert client.post("/scan", json=body).status_code == 422
+    r = client.post("/scan", json=body)
+    assert r.status_code == 422
+    assert "unsupported schema" in r.json()["detail"]
 
 
 def test_scan_does_not_mutate_circuit():
@@ -385,7 +406,7 @@ def test_scan_extreme_g_never_leaks_nan():
     body = _circuit(
         [
             TMSV,
-            {"id": "a0", "op": "amplifier", "params": {"G": 1.0}, "mode": 0},
+            {"id": "a0", "op": "amplifier", "params": {"G": 1.0}, "modes": [0]},
         ]
     )
     body["sweep"] = {

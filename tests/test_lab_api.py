@@ -14,15 +14,15 @@ from cvsim.wigner import wigner_grid
 client = TestClient(app)
 
 MAIN_SCENE = {
-    "schema": "circuit_v0",
+    "schema": "circuit_v1",
     "seed": 0,
-    "nodes": [
-        {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-        {"id": "l0", "op": "loss", "params": {"T": 0.8}, "mode": 0},
-        {"id": "l1", "op": "loss", "params": {"T": 0.8}, "mode": 1},
-        {"id": "bs", "op": "beamsplitter", "params": {"theta": np.pi / 4}, "modes": [0, 1]},
+    "nmode": 2,
+    "ops": [
+        {"id": "s0", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+        {"id": "l0", "op": "loss", "modes": [0], "params": {"T": 0.8}},
+        {"id": "l1", "op": "loss", "modes": [1], "params": {"T": 0.8}},
+        {"id": "bs", "op": "beamsplitter", "modes": [0, 1], "params": {"theta": np.pi / 4}},
     ],
-    "edges": [],
     "view": {"wigner_mode": 0, "lim": 5.0, "n": 64},
     "ui": {},
 }
@@ -49,14 +49,15 @@ def test_run_main_scene():
     assert body["measured"] == []
 
 
-def test_run_422_unknown_op():
+def test_run_422_op_not_whitelisted():
     data = {
-        "schema": "circuit_v0",
-        "nodes": [{"id": "x", "op": "cz", "params": {}}],
+        "schema": "circuit_v1",
+        "nmode": 2,
+        "ops": [{"id": "x", "op": "cz", "modes": [0, 1], "params": {"weight": 0.5}}],
     }
     r = client.post("/run", json=data)
     assert r.status_code == 422
-    assert "unknown op" in r.json()["detail"]
+    assert "not in Lab whitelist" in r.json()["detail"]
 
 
 def test_run_422_bad_view():
@@ -69,12 +70,11 @@ def test_run_422_bad_view():
 def test_run_422_library_guard_value_error():
     """Library-side guards (loss T out of range) must map to 422, not 500."""
     data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "s", "op": "vacuum", "params": {}},
-            {"id": "l", "op": "loss", "params": {"T": 1.5}, "mode": 0},
+        "schema": "circuit_v1",
+        "nmode": 1,
+        "ops": [
+            {"id": "l", "op": "loss", "modes": [0], "params": {"T": 1.5}},
         ],
-        "edges": [],
         "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
     }
     r = client.post("/run", json=data)
@@ -83,9 +83,9 @@ def test_run_422_library_guard_value_error():
 
 def test_wigner_vacuum_matches_direct():  # A4: Wigner(vacuum) == direct wigner_grid
     data = {
-        "schema": "circuit_v0",
-        "nodes": [{"id": "s", "op": "vacuum", "params": {}}],
-        "edges": [],
+        "schema": "circuit_v1",
+        "nmode": 1,
+        "ops": [],
         "view": {"wigner_mode": 0, "lim": 4.0, "n": 48},
     }
     r = client.post("/run", json=data)
@@ -97,12 +97,12 @@ def test_wigner_vacuum_matches_direct():  # A4: Wigner(vacuum) == direct wigner_
 
 def test_run_heterodyne_removes_mode_and_remaps_view():
     data = {
-        "schema": "circuit_v0",
-        "nodes": [
-            {"id": "s", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-            {"id": "h", "op": "heterodyne", "params": {}, "mode": 0},
+        "schema": "circuit_v1",
+        "nmode": 2,
+        "ops": [
+            {"id": "s", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+            {"id": "h", "op": "measure_heterodyne", "modes": [0], "params": {"name": "h"}},
         ],
-        "edges": [],
         "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
     }
     r = client.post("/run", json=data)
@@ -116,9 +116,9 @@ def test_run_heterodyne_removes_mode_and_remaps_view():
 def test_sample_endpoint_reproduces_same_seed():
     body = dict(
         MAIN_SCENE,
-        nodes=[
-            {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-            {"id": "h", "op": "heterodyne", "params": {}, "mode": 0},
+        ops=[
+            {"id": "s0", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+            {"id": "h", "op": "measure_heterodyne", "modes": [0], "params": {"name": "h"}},
         ],
         seed=7,
     )
@@ -137,9 +137,9 @@ def test_sample_endpoint_homodyne_removes_mode_wigner_ok():
     regular, Wigner viewable (no singular state remains)."""
     body = dict(
         MAIN_SCENE,
-        nodes=[
-            {"id": "s0", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]},
-            {"id": "h", "op": "homodyne", "params": {}, "mode": 0},
+        ops=[
+            {"id": "s0", "op": "two_mode_squeeze", "modes": [0, 1], "params": {"r": 0.6}},
+            {"id": "h", "op": "measure_homodyne", "modes": [0], "params": {"name": "h"}},
         ],
         seed=3,
         view={"wigner_mode": 0, "lim": 4.0, "n": 32},
@@ -161,9 +161,14 @@ def test_sample_endpoint_422_bad_seed():
 
 
 def test_sample_endpoint_422_bad_circuit():
-    body = {"schema": "circuit_v0", "nodes": [{"id": "x", "op": "cz", "params": {}}]}
+    body = {
+        "schema": "circuit_v0",
+        "nmode": 1,
+        "ops": [{"id": "x", "op": "cz", "modes": [0], "params": {}}],
+    }
     r = client.post("/sample", json=body)
     assert r.status_code == 422
+    assert "circuit_v0" in r.json()["detail"]
 
 
 def test_a8_no_private_or_other_rep_imports():

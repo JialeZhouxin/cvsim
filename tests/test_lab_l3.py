@@ -8,15 +8,24 @@ from conftest import gaussian_rbar, gaussian_V, wigner_result
 
 from cvsim.lab import load_circuit, run_circuit, sample_circuit
 
-TMSV = {"id": "s", "op": "tmsv", "params": {"r": 0.6}, "modes": [0, 1]}
+TMSV = {"id": "s", "op": "two_mode_squeeze", "params": {"r": 0.6}, "modes": [0, 1]}
 
 
-def _circuit(nodes, *, seed=7, wigner_mode=0):
+def _homodyne(phi=0.0, *, name="h", mode=0):
+    params = {"phi": phi, "name": name}
+    return {"id": name, "op": "measure_homodyne", "params": params, "modes": [mode]}
+
+
+def _heterodyne(*, name="h", mode=0):
+    return {"id": name, "op": "measure_heterodyne", "params": {"name": name}, "modes": [mode]}
+
+
+def _circuit(ops, *, nmode=2, seed=7, wigner_mode=0):
     return {
-        "schema": "circuit_v0",
+        "schema": "circuit_v1",
         "seed": seed,
-        "nodes": nodes,
-        "edges": [],
+        "nmode": nmode,
+        "ops": ops,
         "view": {"wigner_mode": wigner_mode, "lim": 4.0, "n": 32},
         "ui": {},
     }
@@ -26,7 +35,7 @@ def _circuit(nodes, *, seed=7, wigner_mode=0):
 
 
 def test_load_homodyne_phi_default_zero():
-    data = _circuit([TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}])
+    data = _circuit([TMSV, _homodyne()])
     res = run_circuit(load_circuit(data))
     assert len(res.measured) == 1
     entry = res.measured[0]
@@ -36,7 +45,7 @@ def test_load_homodyne_phi_default_zero():
 
 
 def test_load_homodyne_phi_kept():
-    data = _circuit([TMSV, {"id": "h", "op": "homodyne", "params": {"phi": 1.5}, "mode": 0}])
+    data = _circuit([TMSV, _homodyne(1.5)])
     res = run_circuit(load_circuit(data))
     assert res.measured[0]["phi"] == 1.5
 
@@ -45,7 +54,7 @@ def test_load_homodyne_phi_kept():
 
 
 def test_sample_heterodyne_removes_mode():
-    data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
+    data = _circuit([TMSV, _heterodyne()])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert len(res.measured) == 1
     entry = res.measured[0]
@@ -56,7 +65,7 @@ def test_sample_heterodyne_removes_mode():
 
 def test_sample_homodyne_removes_mode():
     """v1 semantics (design §0): homodyne removes the measured mode."""
-    data = _circuit([TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}])
+    data = _circuit([TMSV, _homodyne()])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert res.nmode == 1
     entry = res.measured[0]
@@ -65,7 +74,7 @@ def test_sample_homodyne_removes_mode():
 
 
 def test_sample_same_seed_reproducible():
-    data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
+    data = _circuit([TMSV, _heterodyne()])
     c = load_circuit(data)
     r1 = sample_circuit(c, np.random.default_rng(42))
     r2 = sample_circuit(c, np.random.default_rng(42))
@@ -80,8 +89,8 @@ def test_sample_multi_measurement_chain():
     data = _circuit(
         [
             TMSV,
-            {"id": "a", "op": "homodyne", "params": {}, "mode": 0},
-            {"id": "b", "op": "heterodyne", "params": {}, "mode": 1},
+            _homodyne(name="a", mode=0),
+            {"id": "b", "op": "measure_heterodyne", "params": {"name": "b"}, "modes": [1]},
         ]
     )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
@@ -94,7 +103,7 @@ def test_sample_multi_measurement_chain():
 
 def test_run_no_rng_deterministic():
     """/run stays pure: no RNG anywhere; /sample does not perturb it."""
-    data = _circuit([TMSV, {"id": "l", "op": "loss", "params": {"T": 0.8}, "mode": 0}])
+    data = _circuit([TMSV, {"id": "l", "op": "loss", "params": {"T": 0.8}, "modes": [0]}])
     c = load_circuit(data)
     a = run_circuit(c)
     b = run_circuit(c)
@@ -112,7 +121,7 @@ def test_sample_homodyne_removed_mode_not_viewable():
     """v1: homodyne removes the measured mode — no singular state remains.
     The remaining mode is regular and viewable; the measured mode is gone."""
     data = _circuit(
-        [TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}],
+        [TMSV, _homodyne()],
         wigner_mode=0,
     )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
@@ -126,7 +135,7 @@ def test_sample_homodyne_removed_mode_not_viewable():
 def test_sample_homodyne_other_mode_wigner_ok():
     """Unmeasured mode stays positive definite → normal Wigner grid."""
     data = _circuit(
-        [TMSV, {"id": "h", "op": "homodyne", "params": {}, "mode": 0}],
+        [TMSV, _homodyne()],
         wigner_mode=0,
     )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
@@ -136,7 +145,7 @@ def test_sample_homodyne_other_mode_wigner_ok():
 
 
 def test_sample_heterodyne_view_mode_valid():
-    data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
+    data = _circuit([TMSV, _heterodyne()])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert res.nmode == 1
     assert wigner_result(res) is not None
@@ -145,7 +154,7 @@ def test_sample_heterodyne_view_mode_valid():
 
 def test_sample_heterodyne_conditioned_removes_mode_and_keeps_meters():
     """After heterodyne the conditioned state is regular: purity/meters fine."""
-    data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
+    data = _circuit([TMSV, _heterodyne()])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert res.meters["singular"] is False
     assert res.meters["purity"] is not None
@@ -169,10 +178,10 @@ def test_sample_homodyne_phi_controls_variance():
         circuit = load_circuit(
             _circuit(
                 [
-                    {"id": "s", "op": "vacuum", "params": {}},
-                    {"id": "sq", "op": "squeeze", "params": {"r": r, "phi": 0.0}, "mode": 0},
-                    {"id": "h", "op": "homodyne", "params": {"phi": phi}, "mode": 0},
-                ]
+                    {"id": "sq", "op": "squeeze", "params": {"r": r, "phi": 0.0}, "modes": [0]},
+                    _homodyne(phi, name="h", mode=0),
+                ],
+                nmode=1,
             )
         )
         out = []
