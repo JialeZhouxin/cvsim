@@ -10,6 +10,7 @@ import { setEditorSchema, deriveEditorTables } from "./editor.js";
 import { initFockPanel } from "./fock.js";
 import { createSeqGuard, requestLab, makeRefCountedBusy, REQUEST_KIND } from "./request.js";
 import { buildLut, validateWignerGrid, wignerScale, wignerT } from "./colormap.js";
+import { finitePoints, plotDomain, makeScale, polylineSegments, svgPath } from "./curve.js";
 
 /* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
 const DEFAULT_JSON = {
@@ -351,10 +352,8 @@ function renderBosonicSteps(steps) {
 function drawFidSvg(xs, ys) {
   const svg = $("bos-fidelity-svg");
   const note = $("bos-fidelity-note");
-  const pts = xs.map((x, i) => ({ x: Number(x), y: ys[i] }))
-                .filter((p) => p.y !== null && Number.isFinite(p.y))
-                // Truncated GKP can overshoot numerically; clamp display only.
-                .map((p) => ({ ...p, y: Math.min(1, Math.max(0, p.y)) }));
+  // Truncated GKP can overshoot numerically; clamp display only (curve.js yClamp).
+  const pts = finitePoints(xs, ys, { yClamp: [0, 1] });
   note.hidden = false;
   if (pts.length === 0) {
     note.textContent = "无有效保真度点（检查 loss 节点）";
@@ -364,14 +363,9 @@ function drawFidSvg(xs, ys) {
   const W = svg.clientWidth || 560;
   const H = 200;
   const pad = { l: 46, r: 14, t: 14, b: 26 };
-  const x0 = Math.min(...pts.map((p) => p.x));
-  const x1 = Math.max(...pts.map((p) => p.x));
-  const y0 = Math.min(0, ...pts.map((p) => p.y));
-  let y1 = Math.max(...pts.map((p) => p.y));
-  y1 = Math.max(y1, y0 + 1e-9);
-  const X = (x) => pad.l + ((x - x0) / (x1 - x0 || 1)) * (W - pad.l - pad.r);
-  const Y = (y) => pad.t + (1 - (y - y0) / (y1 - y0)) * (H - pad.t - pad.b);
-  const path = pts.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)} ${Y(p.y).toFixed(1)}`).join(" ");
+  const { x0, x1, ylo: y0, yhi: y1 } = plotDomain({ xs, ys, baseline: 0 });
+  const { X, Y } = makeScale({ x0, x1, ylo: y0, yhi: y1, W, H, pad });
+  const path = svgPath(pts, X, Y);
   const cy = Y(0);
   const dots = pts.map((p) =>
     `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3"/>`).join("");
@@ -578,10 +572,7 @@ function drawScanCurve(body) {
   const xs = body.xs;
   const ys = body.ys;
   const W = 320, H = 150, padL = 34, padR = 10, padT = 10, padB = 18;
-  const finite = [];
-  for (let i = 0; i < ys.length; i++) {
-    if (typeof ys[i] === "number" && Number.isFinite(ys[i])) finite.push([xs[i], ys[i]]);
-  }
+  const finite = finitePoints(xs, ys); // scan 模式无钳制（E_N 无定义处 null → gap）
   if (!finite.length) {
     scanSvg.replaceChildren();
     scanNote.hidden = false;
@@ -592,7 +583,8 @@ function drawScanCurve(body) {
     return;
   }
   scanNote.hidden = true;
-  const ymin = Math.min(...finite.map(([, y]) => y));
+  const { x0, x1, ylo, yhi } = plotDomain({ xs, ys, yPad: 0.1 });
+  const ymin = Math.min(...finite.map(([, y]) => y)); // 摘要行仍要数据域（非绘图域）
   const ymax = Math.max(...finite.map(([, y]) => y));
   /* #8: 折叠摘要一行结果（折叠后仍可见） */
   const iMax = finite.findIndex(([, y]) => y === ymax);
@@ -600,11 +592,7 @@ function drawScanCurve(body) {
   // OCR: finite 非空已提前 return，ymax 取自同一数组 → findIndex 必命中，无 else 分支
   sum.hidden = false;
   sum.textContent = `E_N 最大 ${axisVal(ymax)} @ ${scanParam.value}=${axisVal(finite[iMax][0])}`;
-  const ylo = ymin === ymax ? ymin - 0.5 : ymin - (ymax - ymin) * 0.1;
-  const yhi = ymin === ymax ? ymin + 0.5 : ymax + (ymax - ymin) * 0.1;
-  const x0 = xs[0], x1 = xs[xs.length - 1];
-  const X = (x) => padL + ((x - x0) / (x1 - x0)) * (W - padL - padR);
-  const Y = (y) => padT + (1 - (y - ylo) / (yhi - ylo)) * (H - padT - padB);
+  const { X, Y } = makeScale({ x0, x1, ylo, yhi, W, H, pad: { l: padL, r: padR, t: padT, b: padB } });
   const style = getComputedStyle(document.documentElement);
   const rule = style.getPropertyValue("--color-rule").trim();
   const ink = style.getPropertyValue("--color-ink").trim();
@@ -617,15 +605,10 @@ function drawScanCurve(body) {
     const gy = padT + (i / 4) * (H - padT - padB);
     scanSvg.append(el("line", { x1: padL, y1: gy, x2: W - padR, y2: gy, stroke: rule, "stroke-width": 1 }));
   }
-  let seg = ""; // null ys → break the polyline (curve gap)
-  for (let i = 0; i < ys.length; i++) {
-    if (typeof ys[i] !== "number" || !Number.isFinite(ys[i])) {
-      if (seg) { scanSvg.append(el("polyline", { points: seg, fill: "none", stroke: accent, "stroke-width": 1.5 })); seg = ""; }
-      continue;
-    }
-    seg += (seg ? " " : "") + X(xs[i]).toFixed(2) + "," + Y(ys[i]).toFixed(2);
+  const slots = xs.map((x, i) => (typeof ys[i] === "number" && Number.isFinite(ys[i]) ? [x, ys[i]] : null));
+  for (const seg of polylineSegments(slots, X, Y, xs.length)) {
+    scanSvg.append(el("polyline", { points: seg, fill: "none", stroke: accent, "stroke-width": 1.5 }));
   }
-  if (seg) scanSvg.append(el("polyline", { points: seg, fill: "none", stroke: accent, "stroke-width": 1.5 }));
   const label = (tx, ty, anchor, text) => {
     const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: ink });
     t.textContent = text;
