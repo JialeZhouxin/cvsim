@@ -25,7 +25,7 @@ from cvsim.bosonic.state import BosonicState
 SCHEMA = "circuit_v1"
 
 #: Top-level extension fields (Lab/UI concepts; ignored at this layer).
-EXTENSION_FIELDS = frozenset({"view", "seed", "ui", "cutoff", "backend", "initial"})
+EXTENSION_FIELDS = frozenset({"view", "seed", "ui", "cutoff", "backend", "initial", "detail"})
 
 #: ``gaussian_channel`` execution-control flag stored in ``_ops.fixed``;
 #: not physics, not part of the IR (from_ir re-defaults validate=True).
@@ -238,6 +238,8 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
         raise ValueError(f"seed must be a non-negative int, got {data['seed']!r}")
     if "ui" in data and not isinstance(data["ui"], dict):
         raise ValueError(f"ui must be an object, got {type(data['ui']).__name__}")
+    if "detail" in data and data["detail"] not in (None, "steps"):
+        raise ValueError(f"detail must be None or 'steps', got {data['detail']!r}")
     raw_ops = data.get("ops")
     if not isinstance(raw_ops, list):
         raise ValueError(f"ops must be a list, got {type(raw_ops).__name__}")

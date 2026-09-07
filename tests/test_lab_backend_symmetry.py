@@ -39,6 +39,7 @@ IR_SRC = (ROOT / "cvsim/lab/ir.py").read_text(encoding="utf-8")
 EXPECTED_ALL = {
     "SCHEMA",
     "CircuitV0Error",
+    "DOMAIN_ERRORS",  # ADR-0010 #6: 422 policy single point
     "LabCircuit",
     "LabResult",
     "View",
@@ -128,7 +129,7 @@ def test_init_all_names():
     assert set(lab.__all__) == EXPECTED_ALL, (
         f"lab.__all__ drift: got {set(lab.__all__)} expected {EXPECTED_ALL}"
     )
-    assert len(lab.__all__) == 11
+    assert len(lab.__all__) == 12
     assert "RunResult" not in lab.__all__, "RunResult deleted (ADR-0008)"
     assert not hasattr(lab, "RunResult"), "RunResult must be gone from the public surface"
 
@@ -168,8 +169,9 @@ def test_runners_return_lab_result():
 
     from cvsim.lab.bosonic_backend import run_bosonic_circuit
     from cvsim.lab.fock_backend import run_fock_circuit
-    from cvsim.lab.ir import load_circuit, run_circuit
+    from cvsim.lab.ir import load_circuit
     from cvsim.lab.result import LabResult
+    from cvsim.lab.dispatch import run_circuit
 
     g = run_circuit(
         load_circuit(
@@ -290,9 +292,18 @@ def test_result_py_dependency_bottom():
 
 def test_bosonic_no_fock_private_import():
     """ADR-0008 Q3: the cross-package private break (bosonic importing fock's
-    _fock_measured) is gone — the shared collector lives in result.py."""
+    _fock_measured) is gone — the shared collector lives in result.py.
+
+    ADR-0010 #5 bends this once, deliberately: bosonic imports fock's
+    ``_wigner_mode_guard_fail`` (the single-point 422 message template).
+    That is shared *message* knowledge, not fock execution knowledge —
+    ADR-0010 #5 registers the exception here so this guard stays honest."""
     src = (ROOT / "cvsim/lab/bosonic_backend.py").read_text(encoding="utf-8")
-    assert "fock_backend" not in src.replace(
+    assert "from cvsim.lab.fock_backend import run_" not in src, (
+        "bosonic_backend must not import fock execution"
+    )
+    allowed = "from cvsim.lab.fock_backend import _wigner_mode_guard_fail"
+    stripped = src.replace(allowed, "")
+    assert "fock_backend" not in stripped.replace(
         "previously this module imported fock's private ``_fock_measured``", ""
-    ), "bosonic_backend must not import fock_backend"
-    assert "from cvsim.lab.fock_backend" not in src
+    ), "bosonic_backend must not import fock_backend (beyond the ADR-0010 template)"

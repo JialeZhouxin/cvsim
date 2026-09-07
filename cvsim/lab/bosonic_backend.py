@@ -24,7 +24,8 @@ from cvsim.bosonic import (
 from cvsim.bosonic import (
     purity as bosonic_purity,
 )
-from cvsim.lab.ir import CircuitV0Error, LabCircuit, View
+from cvsim.lab.fock_backend import _wigner_mode_guard_fail
+from cvsim.lab.ir import LabCircuit, View
 from cvsim.lab.result import LabResult, _measured_from_results, _wigner_slice, check_meters
 from cvsim.wigner import wigner_grid
 
@@ -104,13 +105,15 @@ def run_bosonic_circuit(
     """Bosonic /run + /sample shared path: from_ir → compile → run(rng).
 
     Deterministic per circuit when rng is a seeded Generator (B6 aligns Fock
-    F7: seed field drives reproducibility). ``steps=True`` (detail="steps")
-    adds per-break-point intermediate snapshots for the GUI evolution view;
-    ``sampled=True`` (/sample path) carries the seed + sampled flag in the
-    LabResult contract instead of the server patching the payload dict.
+    F7: seed field drives reproducibility). ``sampled=True`` (/sample path)
+    carries the seed + sampled flag in the LabResult contract instead of the
+    server patching the payload dict. Per-break-point snapshots ride on the
+    LabCircuit ``detail`` extension field (ADR-0010 #4) — this runner reads
+    it directly; ``steps`` from dispatch stays for direct-call symmetry.
     """
     bc = BosonicCircuit.from_ir(circuit.raw)
-    if steps:
+    want_steps = steps or circuit.detail == "steps"
+    if want_steps:
         state, results, raw_steps = bc.compile().run_steps(rng=rng)
     else:
         out = bc.run(rng=rng)
@@ -121,12 +124,12 @@ def run_bosonic_circuit(
     measured = _measured_from_results(circuit.raw, results)
     wmode = circuit.view.wigner_mode
     if state.nmode > 0 and wmode >= state.nmode:
-        raise CircuitV0Error(f"view.wigner_mode {wmode} out of range (nmode={state.nmode})")
+        raise _wigner_mode_guard_fail(wmode, state.nmode)
     wigner = None
     if state.nmode > 0:
         wigner = _bosonic_single_wigner(state, wmode, circuit.view)
     extensions: dict[str, Any] = {"dist": {"mode": wmode, "probs": None}}
-    if steps:
+    if want_steps:
         extensions["steps"] = [
             {
                 "step": i,

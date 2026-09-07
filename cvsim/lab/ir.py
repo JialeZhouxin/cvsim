@@ -1,12 +1,14 @@
-"""Gaussian Lab circuit IR: `circuit_v1` engine + `circuit_v0` translation.
+"""Gaussian Lab circuit IR: `circuit_v1` load/translate + extension fields.
 
 Public API only: ``cvsim.gaussian`` ``__all__`` + ``cvsim.wigner.wigner_grid``.
 No fastapi dependency here (see ``server.py``).
 
 Schema split (ADR-0003): core schema/validation live in ``cvsim.gaussian.ir``
 (``circuit_v1``, full op set). This module owns Lab concerns: v0 file
-compatibility (``translate_v0``), the Lab op whitelist, view/seed/ui
-extension fields, and the mean/sample execution paths.
+compatibility (``translate_v0``), the Lab op whitelist, and the view/seed/ui/
+initial/detail extension fields. Execution lives in the per-backend runner
+modules (dispatch routes, ADR-0010) — this module no longer imports any
+gaussian execution symbol.
 
 v1 semantics (design §0, intentional unification vs v0):
 - mode indices are **logical** (runtime keeps a logical→physical map; a
@@ -20,23 +22,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
-
 from cvsim.bosonic.ir import validate_ir as validate_bosonic_ir
 from cvsim.fock.ir import validate_ir as validate_fock_ir
-from cvsim.gaussian import (
-    GaussianCircuit,
-    GaussianState,
-    heterodyne_condition,
-    heterodyne_mean,
-    heterodyne_sample_and_condition,
-    homodyne_condition,
-    homodyne_mean,
-    homodyne_sample_and_condition,
-)
 from cvsim.gaussian.ir import SCHEMA as SCHEMA
 from cvsim.gaussian.ir import CircuitV1, validate_ir
-from cvsim.lab.result import LabResult
 from cvsim.lab.schema import (
     _EXTENSIONS,
     BOSONIC_SOURCES,
@@ -144,6 +133,7 @@ class LabCircuit:
     ui: dict[str, Any] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
     initial: list[int] | None = None
+    detail: str | None = None  # bosonic-only: "steps" → per-break-point snapshots (ADR-0010 #4)
 
 
 def _require(d: dict[str, Any], key: str, typ: type, where: str) -> Any:
@@ -353,7 +343,7 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
                 op=node.op,
                 allowed=sorted(LAB_WHITELIST),
             )
-    return LabCircuit(core=core, seed=seed, view=view, ui=ui, raw=data)
+    return LabCircuit(core=core, seed=seed, view=view, ui=ui, raw=data, detail=data.get("detail"))
 
 
 def _load_fock(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]) -> LabCircuit:
@@ -395,6 +385,7 @@ def _load_fock(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any]) 
         ui=ui,
         raw=data,
         initial=initial,
+        detail=data.get("detail"),
     )
 
 
@@ -459,151 +450,8 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
         view=view,
         ui=ui,
         raw=data,
+        detail=data.get("detail"),
     )
 
 
-# -- execution --------------------------------------------------------------
-
-
-def _apply_measure(
-    op_name: str,
-    state: GaussianState,
-    phys_modes: tuple[int, ...],
-    logical_mode: int,
-    fixed: dict[str, Any],
-    where: str,
-    *,
-    rng: np.random.Generator | None = None,
-) -> tuple[GaussianState, dict[str, Any]]:
-    """Apply one measurement op (Lab break-point segment). Returns (new_state, entry).
-
-    ``rng is None`` → mean path (deterministic, uses homodyne/heterodyne_mean);
-    ``rng`` given → true sampling. Semantics match the pre-unify ``_apply``:
-    homodyne removes the measured mode; heterodyne does not (mirrors
-    ``gaussian/compile.py:_run_op`` which also skips remove_mode for heterodyne).
-    threshold is rejected (Q6=C: Gaussian Lab never supported it).
-    """
-    outcome: float | complex
-    if op_name == "measure_homodyne":
-        phi = _num(fixed.get("phi", 0.0), where, "phi")
-        if rng is None:
-            outcome = homodyne_mean(state, phys_modes[0], phi)
-            st = homodyne_condition(state, phys_modes[0], phi, outcome)
-        else:
-            outcome, st = homodyne_sample_and_condition(state, phys_modes[0], phi, rng=rng)
-        return st.remove_mode(phys_modes[0]), {
-            "op": "measure_homodyne",
-            "mode": logical_mode,
-            "phi": phi,
-            "outcome": outcome,
-        }
-    if op_name == "measure_heterodyne":
-        if rng is None:
-            outcome = heterodyne_mean(state, phys_modes[0])
-            st = heterodyne_condition(state, phys_modes[0], outcome)
-        else:
-            outcome, st = heterodyne_sample_and_condition(state, phys_modes[0], rng=rng)
-        return st, {
-            "op": "measure_heterodyne",
-            "mode": logical_mode,
-            "outcome": [outcome.real, outcome.imag],
-        }
-    raise CircuitV0Error(f"{where}: unsupported measurement op {op_name!r} in Lab")
-
-
-def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> LabResult:
-    """Shared execution core: ordered ops → final GaussianState + result.
-
-    Non-measurement ops are delegated to ``GaussianCircuit.from_ir().compile()``
-    merged segments (``_apply_merged``) — the Lab no longer keeps its own
-    13-branch op dispatch. Measurement break-point segments run via Lab's own
-    ``_apply_measure`` to preserve the mean/sample path split + ``measured``
-    entry contract (op/mode/phi/outcome).
-
-    ``rng=None`` → mean path (/run); ``rng`` given → sample every measurement.
-    Mode-removal mapping is handled by ``compile_segments`` (circuit_common);
-    Lab only tracks logical mode indices (from IR nodes) for ``measured``
-    entries, since segment ops already carry physical coords.
-    """
-    try:
-        compiled = GaussianCircuit.from_ir(circuit.raw).compile()
-    except ValueError as e:
-        # compile_segments raises plain ValueError on mode-reference errors
-        # (e.g. displace after measured mode); Lab error surface is
-        # CircuitV0Error (server 422 contract).
-        raise CircuitV0Error(str(e)) from e
-    state = compiled._init_state()
-    measured: list[dict[str, Any]] = []
-    # IR node pointer aligned with segment order: merged segments consume
-    # len(ops) IR nodes, break-point op segments consume 1.
-    core = circuit.core
-    assert core is not None  # execution path is Gaussian (Fock uses run_circuit)
-    ir_nodes = core.ops
-    ir_idx = 0
-    run_results: dict[str, float] = {}  # ParamRef sources for feedforward ops
-    for seg in compiled._segments:
-        if seg[0] == "merged":
-            _, nmode, ops = seg
-            state = compiled._apply_merged(ops, nmode, {}, state)
-            ir_idx += len(ops)
-            continue
-        op_name, phys_modes, fixed, pnames, refs = seg[1]
-        node = ir_nodes[ir_idx]
-        ir_idx += 1
-        if op_name in MEASUREMENT_OPS:
-            # Measurements: Lab owns the path (mean/sample split + entry).
-            state, entry = _apply_measure(
-                op_name,
-                state,
-                phys_modes,
-                node.modes[0],
-                fixed,
-                f"ops[{node.id or '?'}]",
-                rng=rng,
-            )
-            # feedforward: record outcome under the measurement's name for
-            # later ParamRef resolution by _run_op.
-            name = fixed.get("name")
-            if name is not None:
-                run_results[name] = entry["outcome"]
-            measured.append(entry)
-        else:
-            # Channels (loss/amplifier/phase_noise/gaussian_channel) and any
-            # ParamRef-bearing op: delegate to the compiled dispatcher. No
-            # measured entry; values already bound (no symbolic params here).
-            # Lab-specific guard: amplifier with modes=[] means all modes in
-            # core semantics, but the Lab workbench always emits an explicit
-            # mode — reject instead of 500 (preserves pre-unify behavior).
-            if op_name == "amplifier" and not phys_modes:
-                raise CircuitV0Error(
-                    f"ops[{node.id or '?'}]: amplifier requires an explicit mode in Lab"
-                )
-            # Lab requires explicit numeric params (no core defaults): the
-            # pre-unify _apply validated each param via _num; core from_ir
-            # silently fills OpMeta defaults, so Lab re-checks presence on
-            # the original IR node params for the channel ops that have them.
-            if op_name in _LAB_REQUIRED_PARAMS:
-                for pname in _LAB_REQUIRED_PARAMS[op_name]:
-                    if pname not in node.params:
-                        raise CircuitV0Error(f"ops[{node.id or '?'}]: {pname} must be a number")
-            state, run_results = compiled._run_op(
-                seg[1],
-                state,
-                run_results,
-                {},
-                rng=rng,
-            )
-    from cvsim.lab.gaussian_backend import _build_result  # D1-A: local import
-
-    return _build_result(state, circuit.view, measured)
-
-
-def run_circuit(circuit: LabCircuit) -> LabResult:
-    """Compile + run (mean path): ordered ops → result. Pure, no RNG."""
-    return _execute(circuit, rng=None)
-
-
-def sample_circuit(circuit: LabCircuit, rng: np.random.Generator) -> LabResult:
-    """Compile + run with true sampling of every measurement node, in node
-    order; each measurement conditions the state for the next one."""
-    return _execute(circuit, rng=rng)
+# -- execution moved to gaussian_backend.py / dispatch.py (ADR-0010) --

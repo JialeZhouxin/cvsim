@@ -10,11 +10,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from cvsim.lab import (
+    DOMAIN_ERRORS,
     SCHEMA,
     CircuitV0Error,
     fidelity_sweep,
@@ -23,8 +23,7 @@ from cvsim.lab import (
     sample_circuit,
     scan_circuit,
 )
-from cvsim.lab.bosonic_backend import run_bosonic_circuit
-from cvsim.lab.fock_backend import batch_fock_circuit, run_fock_circuit
+from cvsim.lab.fock_backend import batch_fock_circuit
 from cvsim.lab.result import serialize
 
 app = FastAPI(title="cvsim Lab (Gaussian/Fock)", version="0.2.0")
@@ -68,7 +67,7 @@ def schema() -> dict[str, Any]:
     return assemble_schema()
 
 
-def _422(e: Exception) -> HTTPException:
+def _422(e: BaseException) -> HTTPException:
     """422 from a domain error: structured whitelist errors render the single
     shared message template from their {code, where, op, allowed} data (Q8)
     — byte-identical to the ir.py golden text (golden 422 tests lock it);
@@ -89,46 +88,20 @@ def _422(e: Exception) -> HTTPException:
 @app.post("/run")
 def run(body: dict[str, Any]) -> dict[str, Any]:
     try:
-        detail = body.pop("detail", None) if isinstance(body, dict) else None
-        circuit = load_circuit(body)
-        if circuit.backend == "fock":
-            # deterministic per circuit (seed field, default 0): same JSON
-            # → same run (incl. measured outcomes) — reproducible meters
-            return serialize(run_fock_circuit(circuit, np.random.default_rng(circuit.seed)), SCHEMA)
-        if circuit.backend == "bosonic":
-            return serialize(
-                run_bosonic_circuit(
-                    circuit,
-                    np.random.default_rng(circuit.seed),
-                    steps=(detail == "steps"),
-                ),
-                SCHEMA,
-            )
-        result = run_circuit(circuit)
-    except (CircuitV0Error, ValueError) as e:
+        circuit = load_circuit(body)  # detail is a LabCircuit extension field (ADR-0010 #4)
+        return serialize(run_circuit(circuit), SCHEMA)
+    except DOMAIN_ERRORS as e:
         # ValueError covers library-side guards (loss T range, wigner_grid,
         # np.linalg.LinAlgError is a ValueError subclass) → user-error 422.
         raise _422(e) from e
-    return serialize(result, SCHEMA)
-
 
 @app.post("/sample")
 def sample(body: dict[str, Any]) -> dict[str, Any]:
     """Measure once: explicit seed → true sampling of all measurement nodes."""
     try:
-        circuit = load_circuit(body)
-        if circuit.backend == "fock":
-            result = run_fock_circuit(circuit, np.random.default_rng(circuit.seed), sampled=True)
-        elif circuit.backend == "bosonic":
-            result = run_bosonic_circuit(circuit, np.random.default_rng(circuit.seed), sampled=True)
-        else:
-            result = sample_circuit(circuit, np.random.default_rng(circuit.seed))
-            result.seed = circuit.seed
-            result.sampled = True
-    except (CircuitV0Error, ValueError) as e:
+        return serialize(sample_circuit(load_circuit(body)), SCHEMA)
+    except DOMAIN_ERRORS as e:
         raise _422(e) from e
-    return serialize(result, SCHEMA)
-
 
 @app.post("/batch")
 def batch(body: dict[str, Any]) -> dict[str, Any]:
@@ -146,7 +119,7 @@ def batch(body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(shots, int) or isinstance(shots, bool) or not 1 <= shots <= 100_000:
             raise CircuitV0Error("shots must be an int in [1, 100000]")
         return batch_fock_circuit(circuit, shots, circuit.seed)
-    except (CircuitV0Error, ValueError) as e:
+    except DOMAIN_ERRORS as e:
         raise _422(e) from e
 
 
@@ -167,7 +140,7 @@ def scan(body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(sweep, dict):
             raise CircuitV0Error("sweep must be an object")
         return scan_circuit(circuit, sweep)
-    except (CircuitV0Error, ValueError) as e:
+    except DOMAIN_ERRORS as e:
         raise _422(e) from e
 
 
@@ -189,7 +162,7 @@ def fidelity(body: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(sweep, dict):
             raise CircuitV0Error("sweep must be an object")
         return fidelity_sweep(circuit, sweep, seed=circuit.seed, rounds=rounds)
-    except (CircuitV0Error, ValueError) as e:
+    except DOMAIN_ERRORS as e:
         raise _422(e) from e
 
 

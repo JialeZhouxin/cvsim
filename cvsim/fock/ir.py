@@ -114,9 +114,13 @@ def validate_ir(data: dict[str, Any]) -> None:
     if not isinstance(nmode, int) or isinstance(nmode, bool) or nmode < 1:
         raise ValueError(f"nmode must be an int >= 1, got {nmode!r}")
     for key in data:
-        if key in ("schema", "nmode", "ops", "cutoff", "initial") or key in EXTENSION_FIELDS:
+        if key in ("schema", "nmode", "ops", "cutoff", "initial") or key in (
+            "detail",
+        ) or key in EXTENSION_FIELDS:
             continue
         raise ValueError(f"unknown top-level field {key!r}")
+    if "detail" in data and data["detail"] not in (None, "steps"):
+        raise ValueError(f"detail must be None or 'steps', got {data['detail']!r}")
     cutoff = data.get("cutoff")
     if cutoff is not None:
         if isinstance(cutoff, int) and cutoff >= 1:
