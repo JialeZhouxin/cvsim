@@ -18,10 +18,6 @@ _SAMPLE_L = 8.0
 _SAMPLE_N = 513
 
 
-def _is_density(state: FockLike) -> bool:
-    return isinstance(state, FockDensity)
-
-
 def _require_1mode_homodyne(state: FockLike, mode: int) -> None:
     if mode != 0:
         raise IndexError("fock homodyne: single-mode only; mode must be 0")
@@ -42,11 +38,9 @@ def trace(state: FockDensity) -> float:
 
 
 def _dens_joint_pn(state: FockLike) -> np.ndarray:
-    """Joint P(n0,n1) for 2-mode dens, shape (N,N); 1-mode returns (N,)."""
-    assert isinstance(state, FockDensity)  # callers guard with _is_density
+    """Joint P(n0,n1) for 2-mode dens, shape (N,N)."""
+    assert isinstance(state, FockDensity)  # 2-mode branches only
     p = np.asarray(np.real(np.diag(state.rho)), dtype=float)
-    if state.nmode == 1:
-        return p
     N = state.cutoff
     return p.reshape(N, N)
 
@@ -272,11 +266,10 @@ def _x_eigen_amps(cutoff: int, outcome: float, phi: float) -> np.ndarray:
     evals, evecs = np.linalg.eigh(Xh)
     idx = int(np.argmin(np.abs(evals - float(outcome))))
     amps = evecs[:, idx].astype(complex)
-    # global phase: make first large component real-positive
+    # global phase: make first large component real-positive.
+    # eigh 返回正交归一向量，argmax 分量 |amp| ≥ 1/√N ≫ _EPS 恒真，分支已删。
     k = int(np.argmax(np.abs(amps)))
-    if abs(amps[k]) > _EPS:
-        amps = amps * np.exp(-1j * np.angle(amps[k]))
-    return amps
+    return amps * np.exp(-1j * np.angle(amps[k]))  # type: ignore[no-any-return]
 
 
 def homodyne_condition(

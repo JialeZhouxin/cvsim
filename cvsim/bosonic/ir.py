@@ -300,8 +300,7 @@ def validate_ir(data: dict[str, Any]) -> CircuitV1:
 
 
 def _encode(v: Any) -> Any:
-    if isinstance(v, ParamRef):
-        return {"$ref": v.source, "gain": v.gain}
+    # ParamRef 由 partition() 路由到 refs，_encode 仅收 fixed 值，无 ParamRef 分支。
     if isinstance(v, complex):
         return [v.real, v.imag]
     if isinstance(v, np.ndarray):
@@ -317,10 +316,11 @@ def _encode(v: Any) -> Any:
 
 def _decode(v: Any, kind: str) -> Any:
     if isinstance(v, dict):
+        # validate_ir._check_value 已拒绝无 $param/$ref 的 dict（可证：
+        # 198 行未知 dict 形态 raise），此处 dict 必经二选一。
         if "$param" in v:
             return v["$param"]
-        if "$ref" in v:
-            return ParamRef(v["$ref"], v.get("gain", 1.0))
+        return ParamRef(v["$ref"], v.get("gain", 1.0))
     if isinstance(v, list):
         if kind == "complex":
             return complex(v[0], v[1])
@@ -450,13 +450,9 @@ def ir_schema() -> dict[str, Any]:
     }
 
 def _json_defaults(defaults: dict[str, Any]) -> dict[str, Any]:
-    """JSON-native defaults: numpy floats/arrays out, plain scalars/lists in."""
-    out: dict[str, Any] = {}
-    for k, v in defaults.items():
-        if isinstance(v, np.generic):
-            out[k] = v.item()
-        elif isinstance(v, np.ndarray):
-            out[k] = v.tolist()
-        else:
-            out[k] = v
-    return out
+    """JSON-native defaults: plain scalars/lists in, plain scalars/lists out.
+
+    OP_META defaults 全为 Python 原生类型（numpy 2.x 的 np.pi 即 float），
+    np.generic/np.ndarray 分支不可达已删。若未来引入 numpy 默认值，此处复加。
+    """
+    return dict(defaults)
