@@ -53,6 +53,7 @@ README.html
 overview.md
 nul
 pytest-full.log
+lab_server*.log
 .control-height.png
 .pi-loop.json.lock
 .pi-subagents/
