@@ -198,10 +198,11 @@ function drawHeat(svg, data, color) {
   }
 }
 
-/** Joint theory grid + (optional) batch sample grid side by side. */
-function drawJointPair(body, batch) {
-  const jointSvg = document.querySelector("#fock-joint-svg");
-  const batchSvg = document.querySelector("#fock-batch-svg");
+/** Joint theory grid + (optional) batch sample grid side by side. dom 由
+    initFockPanel 传入（票4: 获取点单一只剩 dom 表，消灭裸查询双取）。 */
+function drawJointPair(body, batch, dom) {
+  const jointSvg = dom.jointSvg;
+  const batchSvg = dom.batchSvg;
   if (!jointSvg || !batchSvg) return;
   const accent = cssVar("--color-accent", "#2e63d1");
   const error = cssVar("--color-error", "#c33");
@@ -379,7 +380,7 @@ export function initFockPanel(root, hooks) {
       renderDist();
       dom.jointNote.hidden = !!body.joint;
       refreshJointSelects(body);
-      drawJointPair(body, lastBatch);
+      drawJointPair(body, lastBatch, dom);
       refreshGuard(body);
     },
     renderBatch(body) {
@@ -387,7 +388,7 @@ export function initFockPanel(root, hooks) {
       dom.batchSeed.textContent = `seed ${body.seed}`;
       renderMeas();
       renderDist();
-      if (lastResult) drawJointPair(lastResult, body);
+      if (lastResult) drawJointPair(lastResult, body, dom);
     },
   };
 }

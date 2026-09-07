@@ -426,7 +426,6 @@ export function initEditor(root, hooks) {
     palette: root.querySelector("#palette"),
     staff: root.querySelector("#staff"),
     json: root.querySelector("#json-input"),
-    runBtn: root.querySelector("#run-btn"),
     resetBtn: root.querySelector("#reset-btn"),
     undoBtn: root.querySelector("#undo-btn"),
     redoBtn: root.querySelector("#redo-btn"),
