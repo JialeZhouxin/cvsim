@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -14,20 +15,30 @@ client = TestClient(app)
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "cvsim" / "lab" / "static"
 
-_JS_KEYS = r"\b(?:schema|seed|nodes|id|op|params|r|modes|loss|T|mode|edges|view|"
-_JS_KEYS += r"wigner_mode|lim|n|ui|nmode|alpha|x)"
-
 
 def load_default_scene() -> dict:
-    """Parse the shipped DEFAULT_JSON out of app.js so the test exercises
-    exactly what the UI ships (single source of truth)."""
-    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    m = re.search(r"const DEFAULT_JSON = (\{.*?\});\n", js, re.S)
-    assert m, "DEFAULT_JSON not found in app.js"
-    literal = re.sub(rf"({_JS_KEYS})(?=\s*:)", r'"\1"', m.group(1))
-    # JS object literal → JSON: drop trailing commas
-    literal = re.sub(r",(\s*[}\]])", r"\1", literal)
-    return json.loads(literal)
+    """The shipped default scene (票3: 单一事实源 default_scene.js leaf).
+    经 node 子进程取值 —— pytest 第一次硬依赖 node；缺失/失败 = 明确红，
+    不静默 skip（ADR-0009 决策 4：不做 golden JSON 副本兜底）。"""
+    try:
+        proc = subprocess.run(
+            ["node", "--input-type=module", "-e",
+             'import { DEFAULT_SCENE } from "./default_scene.js";'
+             'console.log(JSON.stringify(DEFAULT_SCENE))'],
+            capture_output=True, text=True, cwd=STATIC_DIR,
+        )
+    except FileNotFoundError as e:
+        raise AssertionError(
+            "node 不可用 —— node 是前端测试链硬依赖"
+            "（CONTEXT.md 环境约定），不静默 skip。"
+        ) from e
+    if proc.returncode != 0:
+        raise AssertionError(
+            "node 取默认场景失败（node 是前端测试链硬依赖，"
+            "见 CONTEXT.md 环境约定）。"
+            f"stderr: {proc.stderr.strip()[:500]}"
+        )
+    return json.loads(proc.stdout.strip())
 
 
 def test_index_served():
