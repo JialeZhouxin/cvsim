@@ -9,6 +9,7 @@ import { setInitialSchema } from "./initial.js";
 import { setEditorSchema, deriveEditorTables } from "./editor.js";
 import { initFockPanel } from "./fock.js";
 import { createSeqGuard, requestLab, makeRefCountedBusy, REQUEST_KIND } from "./request.js";
+import { buildLut, validateWignerGrid, wignerScale, wignerT } from "./colormap.js";
 
 /* L5.5 默认场景：两个真空模 + 两个位移器（coherent 态两路）@ x=0 */
 const DEFAULT_JSON = {
@@ -25,30 +26,6 @@ const DEFAULT_JSON = {
   ui: {},
 };
 
-/* Diverging Wigner LUT: negative interference = blue/purple, W=0 = black,
-   positive peaks = orange/yellow/white. Interpolated to 256 in JS. */
-const LUT_ANCHORS = [
-  [15, 20, 75], [29, 25, 105], [48, 22, 125], [78, 25, 135],
-  [111, 29, 125], [111, 35, 100], [75, 24, 65], [24, 8, 28],
-  [0, 0, 0], [24, 7, 2], [70, 17, 3], [125, 31, 2],
-  [180, 60, 7], [224, 111, 22], [247, 177, 54], [255, 223, 105],
-  [255, 250, 210],
-];
-
-function buildLut() {
-  const lut = new Uint8Array(256 * 3);
-  const last = LUT_ANCHORS.length - 2;
-  for (let i = 0; i < 256; i++) {
-    // scale over len-1 so the final sample reaches the last anchor (f = 1)
-    const t = (i / 255) * (LUT_ANCHORS.length - 1);
-    const k = Math.min(Math.floor(t), last);
-    const f = t - k;
-    for (let c = 0; c < 3; c++) {
-      lut[i * 3 + c] = Math.round(LUT_ANCHORS[k][c] + f * (LUT_ANCHORS[k + 1][c] - LUT_ANCHORS[k][c]));
-    }
-  }
-  return lut;
-}
 const LUT = buildLut();
 
 const $ = (id) => document.getElementById(id);
@@ -130,21 +107,15 @@ function renderMatrix(table, rows, cols, head, cell) {
 }
 
 function drawHeatmap(W) {
-  if (!Array.isArray(W) || W.length < 2 || W.length > 512 ||
-      W.some((row) => !Array.isArray(row) || row.length !== W.length ||
-        row.some((v) => !Number.isFinite(v)))) {
-    throw new Error("Invalid Wigner grid");
-  }
+  validateWignerGrid(W); // 防御语义在 colormap leaf（票1），非法网格抛 Invalid Wigner grid
   const n = W.length;
   /* 离屏 n×n LUT → 主画布按显示尺寸 × dpr 重绘（无马赛克） */
   const off = document.createElement("canvas");
   off.width = n;
   off.height = n;
   const octx = off.getContext("2d");
-  let wmin = Infinity, wmax = -Infinity;
-  for (const row of W) for (const v of row) { if (v < wmin) wmin = v; if (v > wmax) wmax = v; }
   /* Symmetric scale anchors the physical zero at LUT midpoint (black). */
-  const scale = Math.max(Math.abs(wmin), Math.abs(wmax)) || 1;
+  const scale = wignerScale(W);
   /* #6: symmetric colorbar ticks (axisVal format, matching axes). */
   $("colorbar-max").textContent = axisVal(scale);
   $("colorbar-zero").textContent = "0";
@@ -152,7 +123,7 @@ function drawHeatmap(W) {
   const img = octx.createImageData(n, n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
-      const t = Math.min(255, Math.max(0, Math.round(((W[j][i] + scale) / (2 * scale)) * 255)));
+      const t = wignerT(W[j][i], scale);
       const o = (j * n + i) * 4;
       img.data[o] = LUT[t * 3];
       img.data[o + 1] = LUT[t * 3 + 1];

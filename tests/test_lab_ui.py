@@ -107,9 +107,13 @@ def test_offline_guard_no_external_urls():
 
 def test_lut_clamp_guard():
     """Regression: buildLut must clamp anchor index (was reading [16] →
-    undefined → top-level crash → blank page, no /run ever fired)."""
+    undefined → top-level crash → blank page, no /run ever fired).
+    票1 后 clamp 语义迁居 colormap leaf（ADR-0009），测试随知识走；
+    同时锁 app.js 仍从 leaf 取 LUT（消费边不断）。"""
+    cm = (STATIC_DIR / "colormap.js").read_text(encoding="utf-8")
+    assert "Math.min(Math.floor(t), last)" in cm
     js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    assert "Math.min(Math.floor(t), last)" in js
+    assert 'from "./colormap.js"' in js
 
 
 def test_default_scene_runs():
