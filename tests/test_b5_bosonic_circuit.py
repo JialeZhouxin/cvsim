@@ -253,3 +253,186 @@ class TestChannels:
         c.amplifier(0, G=1.5, nbar=0.0)
         st_circ = c.run()
         np.testing.assert_allclose(st_circ.components[0].V, st_naive.components[0].V, atol=1e-12)
+
+
+# ===========================================================================
+# Coverage supplement — builder/composition paths (2026-09-07)
+# ===========================================================================
+
+
+class TestComposition:
+    def test_iadd_merges_ops(self):
+        """__iadd__ appends ops; nmode must match."""
+        c1 = BosonicCircuit(1)
+        c1.squeeze(0, 0.5)
+        c2 = BosonicCircuit(1)
+        c2.displace(0, 0.1 + 0.2j)
+        c1 += c2
+        assert len(c1) == 2
+        # state equals sequential application
+        st_naive = g_displace(g_squeeze(BosonicState.vacuum(1), 0.5, 0), 0.1 + 0.2j, 0)
+        st = c1.run()
+        np.testing.assert_allclose(st.components[0].V, st_naive.components[0].V, atol=1e-12)
+        np.testing.assert_allclose(st.components[0].rbar, st_naive.components[0].rbar, atol=1e-12)
+
+    def test_iadd_nmode_mismatch(self):
+        """__iadd__ with different nmode raises ValueError."""
+        c1 = BosonicCircuit(1)
+        c2 = BosonicCircuit(2)
+        with pytest.raises(ValueError, match="nmode mismatch"):
+            c1 += c2
+
+    def test_add_returns_new_circuit(self):
+        """__add__ composes without mutating operands."""
+        c1 = BosonicCircuit(1)
+        c1.squeeze(0, 0.5)
+        c2 = BosonicCircuit(1)
+        c2.displace(0, 0.1)
+        c3 = c1 + c2
+        assert len(c3) == 2
+        assert len(c1) == 1  # unmutated
+        assert len(c2) == 1
+
+
+class TestInitialStateObject:
+    def test_initial_bosonic_state_object(self):
+        """__init__ accepts a BosonicState as initial (not just names)."""
+        st0 = BosonicState.vacuum(1)
+        c = BosonicCircuit(1, initial=st0)
+        c.squeeze(0, 0.5)
+        st = c.run()
+        # initial applied as start; squeezing adds to it
+        st_naive = g_squeeze(st0, 0.5, 0)
+        np.testing.assert_allclose(st.components[0].V, st_naive.components[0].V, atol=1e-12)
+
+    def test_initial_bad_type(self):
+        """__init__ with unsupported initial type raises TypeError."""
+        with pytest.raises(TypeError, match="initial must be"):
+            BosonicCircuit(1, initial=123)
+
+
+class TestInitValidation:
+    def test_nmode_zero_raises(self):
+        """nmode < 1 rejected at construction."""
+        with pytest.raises(ValueError, match="nmode must be >= 1"):
+            BosonicCircuit(0)
+
+
+class TestBuilderCoverage:
+    """Builders not yet exercised: phase/fourier/two_mode_squeeze/cx/
+    mach_zehnder/phase_noise + interferometer shape + gaussian_channel d."""
+
+    def _roundtrip(self, c: BosonicCircuit) -> None:
+        d = c.to_ir()
+        c2 = BosonicCircuit.from_ir(d)
+        assert c2.to_ir() == d
+        assert len(c2) == len(c)
+
+    def test_phase_builder(self):
+        c = BosonicCircuit(1)
+        c.displace(0, 0.3 + 0.0j)
+        c.phase(0, 0.5)
+        st = c.run()
+        self._roundtrip(c)
+        # phase(0.5) rotates rbar; on displaced vacuum V stays vacuum
+        r = st.components[0].rbar
+        expect = np.array([0.3 * np.sqrt(2) * np.cos(0.5), 0.3 * np.sqrt(2) * np.sin(0.5)])
+        np.testing.assert_allclose(r, expect, atol=1e-12)
+
+    def test_fourier_builder(self):
+        c = BosonicCircuit(1)
+        c.fourier(0)
+        st = c.run()
+        self._roundtrip(c)
+        # vacuum invariant under Fourier: still vacuum
+        np.testing.assert_allclose(st.components[0].V, 0.5 * np.eye(2), atol=1e-12)
+
+    def test_two_mode_squeeze_builder(self):
+        from cvsim.bosonic.gates import two_mode_squeeze as g_tms
+
+        c = BosonicCircuit(2)
+        c.two_mode_squeeze(0, 1, 0.5)
+        st = c.run()
+        self._roundtrip(c)
+        st_naive = g_tms(BosonicState.vacuum(2), 0.5, 0, 1)
+        np.testing.assert_allclose(st.components[0].V, st_naive.components[0].V, atol=1e-12)
+
+    def test_cx_builder(self):
+        from cvsim.bosonic.gates import cx as g_cx
+
+        c = BosonicCircuit(2)
+        c.cx(0, 1, 0.7)
+        st = c.run()
+        self._roundtrip(c)
+        st_naive = g_cx(BosonicState.vacuum(2), 0.7, 0, 1)
+        np.testing.assert_allclose(st.components[0].V, st_naive.components[0].V, atol=1e-12)
+
+    def test_mach_zehnder_builder(self):
+        from cvsim.bosonic.gates import mach_zehnder as g_mz
+
+        c = BosonicCircuit(2)
+        c.mach_zehnder(0, 1, np.pi / 5, 0.2)
+        st = c.run()
+        self._roundtrip(c)
+        st_naive = g_mz(BosonicState.vacuum(2), 0, 1, np.pi / 5, 0.2)
+        np.testing.assert_allclose(st.components[0].V, st_naive.components[0].V, atol=1e-12)
+
+    def test_phase_noise_builder(self):
+        from cvsim.bosonic.channels import phase_noise as ch_pn
+
+        c = BosonicCircuit(1)
+        c.phase_noise(0, sigma=0.1)
+        st = c.run()
+        self._roundtrip(c)
+        st_naive = ch_pn(BosonicState.vacuum(1), sigma=0.1)
+        np.testing.assert_allclose(st.components[0].V, st_naive.components[0].V, atol=1e-12)
+
+    def test_interferometer_shape_raises(self):
+        """U shape must match nmode×nmode."""
+        c = BosonicCircuit(2)
+        with pytest.raises(ValueError, match="incompatible"):
+            c.interferometer(np.eye(3))
+
+    def test_gaussian_channel_d_path(self):
+        """gaussian_channel with displacement d: d lands in rbar (X=I, Y=0)."""
+        X = np.eye(2)
+        Y = np.zeros((2, 2))
+        d = np.array([0.1, 0.2])
+        c = BosonicCircuit(1)
+        c.gaussian_channel(X, Y, d=d)
+        st = c.run()
+        self._roundtrip(c)
+        # X=I, Y=0: pure displacement d on vacuum
+        np.testing.assert_allclose(st.components[0].rbar, d, atol=1e-12)
+        np.testing.assert_allclose(st.components[0].V, 0.5 * np.eye(2), atol=1e-12)
+
+    def test_gaussian_channel_X_shape_raises(self):
+        c = BosonicCircuit(1)
+        with pytest.raises(ValueError, match="X must be"):
+            c.gaussian_channel(np.zeros((3, 3)), np.eye(2))
+
+    def test_gaussian_channel_Y_shape_raises(self):
+        c = BosonicCircuit(1)
+        with pytest.raises(ValueError, match="Y shape"):
+            c.gaussian_channel(np.eye(2), np.zeros((3, 3)))
+
+    def test_gaussian_channel_d_shape_raises(self):
+        c = BosonicCircuit(1)
+        with pytest.raises(ValueError, match="d must be"):
+            c.gaussian_channel(np.eye(2), np.zeros((2, 2)), d=np.zeros(3))
+
+
+class TestRepr:
+    def test_repr_lists_ops(self):
+        """__repr__ covers ndarray/symbolic/ref formatting branches."""
+        c = BosonicCircuit(2)
+        c.squeeze(0, 0.5)
+        c.phase(0, "theta")  # symbolic → ${theta}
+        c.displace(1, ParamRef("m", gain=0.5))  # ref → ${m}*0.5
+        c.interferometer(np.eye(2))  # ndarray → <ndarray (2, 2)>
+        r = repr(c)
+        assert r.startswith("BosonicCircuit(2)")
+        assert ".squeeze(0, r=0.5" in r
+        assert "theta=${theta}" in r
+        assert "m}*0.5" in r
+        assert "<ndarray (2, 2)>" in r

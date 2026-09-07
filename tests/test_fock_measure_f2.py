@@ -193,3 +193,193 @@ def test_pnr_sample_batch_density_2mode() -> None:
     assert out.shape == (600,)
     # marginal on mode 1 of TMSV: thermal n̄ = sinh² r
     assert abs(out.mean() - np.sinh(0.5) ** 2) < 0.2
+
+
+# -- coverage supplement (2026-09-07): guard/error/func branches ------------
+
+
+def _pure1(N=5, alpha=0.0):
+    return FockState.coherent(N, alpha)
+
+
+def _pure2(N=4):
+    amps = np.zeros((N, N), dtype=complex)
+    amps[0, 0] = 1.0
+    return FockState(amps=amps)
+
+
+def _dens1(N=5, alpha=0.0):
+    return FockDensity.from_pure(_pure1(N, alpha))
+
+
+def _dens2(N=4):
+    rho = np.zeros((N * N, N * N), dtype=complex)
+    rho[0, 0] = 1.0
+    return FockDensity(rho=rho, nmode=2)
+
+
+class TestModeGuards:
+    """index/value guards for pnrd_probs / mean_photon / pnr_condition."""
+
+    def test_pnrd_dens1_mode1_raises(self):
+        with pytest.raises(IndexError, match="nmode=1"):
+            pnrd_probs(_dens1(), mode=1)
+
+    def test_pnrd_dens2_mode2_raises(self):
+        with pytest.raises(IndexError, match="nmode=2"):
+            pnrd_probs(_dens2(), mode=2)
+
+    def test_pnrd_pure2_mode2_raises(self):
+        with pytest.raises(IndexError, match="nmode=2"):
+            pnrd_probs(_pure2(), mode=2)
+
+    def test_mean_photon_dens1_mode1_raises(self):
+        from cvsim.fock.observables import mean_photon
+
+        with pytest.raises(IndexError, match="nmode=1"):
+            mean_photon(_dens1(), mode=1)
+
+    def test_mean_photon_dens2_mode2_raises(self):
+        from cvsim.fock.observables import mean_photon
+
+        with pytest.raises(IndexError, match="nmode=2"):
+            mean_photon(_dens2(), mode=2)
+
+    def test_mean_photon_pure2_mode2_raises(self):
+        from cvsim.fock.observables import mean_photon
+
+        with pytest.raises(IndexError, match="nmode=2"):
+            mean_photon(_pure2(), mode=2)
+
+    def test_pnr_condition_pure1_mode1_raises(self):
+        with pytest.raises(IndexError, match="nmode=1"):
+            pnr_condition(_pure1(), mode=1)
+
+    def test_pnr_condition_pure2_mode2_raises(self):
+        with pytest.raises(IndexError, match="nmode=2"):
+            pnr_condition(_pure2(), mode=2)
+
+    def test_pnr_condition_pure2_zero_prob(self):
+        # |1,0⟩: mode0 n=0 has zero amplitude
+        st = FockState(amps=np.array([[0.0, 0.0], [1.0, 0.0]], dtype=complex))
+        with pytest.raises(ValueError, match="zero probability"):
+            pnr_condition(st, mode=0, n=0)
+
+    def test_pnr_condition_dens1_n_out_of_cutoff(self):
+        with pytest.raises(IndexError, match="cutoff"):
+            pnr_condition(_dens1(N=5), n=5)
+
+    def test_pnr_condition_dens1_mode1_raises(self):
+        with pytest.raises(IndexError, match="nmode=1"):
+            pnr_condition(_dens1(), mode=1)
+
+    def test_pnr_condition_dens1_zero_prob(self):
+        with pytest.raises(ValueError, match="zero probability"):
+            pnr_condition(_dens1(), n=3)  # vacuum has no n=3
+
+    def test_pnr_condition_dens2_mode2_raises(self):
+        with pytest.raises(IndexError, match="nmode=2"):
+            pnr_condition(_dens2(), mode=2)
+
+    def test_pnr_condition_dens2_zero_prob(self):
+        with pytest.raises(ValueError, match="zero probability"):
+            pnr_condition(_dens2(), mode=0, n=1)
+
+
+class TestPnrDensityPosterior:
+    def test_dens1_pnr_posterior_projective(self):
+        """1-mode density PNR posterior = |n⟩⟨n| (projective)."""
+        out = pnr_condition(_dens1(alpha=1.0), n=2)
+        assert isinstance(out, FockDensity)
+        rho = out.rho
+        assert abs(rho[2, 2] - 1.0) < 1e-12
+        assert abs(rho[2, :].sum() - 1.0) < 1e-12  # normalised
+
+
+class TestHeterodyneGuards:
+    def test_heterodyne_sample_dens1_mode1_raises(self):
+        with pytest.raises(IndexError, match="nmode=1"):
+            heterodyne_sample(_dens1(), mode=1)
+
+    def test_heterodyne_sample_pure1_mode1_raises(self):
+        with pytest.raises(IndexError, match="nmode=1"):
+            heterodyne_sample(_pure1(), mode=1)
+
+    def test_heterodyne_sample_n_grid_raises(self):
+        with pytest.raises(ValueError, match="n_grid"):
+            heterodyne_sample(_pure1(), n_grid=2)
+
+    def test_heterodyne_sample_zero_state(self):
+        with pytest.raises(ValueError, match="zero state"):
+            heterodyne_sample(FockState(amps=np.zeros(4)))
+
+    def test_heterodyne_condition_dens1_mode1_raises(self):
+        with pytest.raises(IndexError, match="nmode=1"):
+            heterodyne_condition(_dens1(), mode=1)
+
+    def test_heterodyne_condition_dens2_mode2_raises(self):
+        with pytest.raises(IndexError, match="nmode=2"):
+            heterodyne_condition(_dens2(), mode=2)
+
+    def test_heterodyne_condition_dens2_zero_prob(self):
+        with pytest.raises(ValueError, match="zero probability"):
+            heterodyne_condition(_dens2(), beta=10.0)
+
+    def test_heterodyne_condition_pure1_mode1_raises(self):
+        with pytest.raises(IndexError, match="nmode=1"):
+            heterodyne_condition(_pure1(), mode=1)
+
+    def test_heterodyne_condition_pure2_mode2_raises(self):
+        with pytest.raises(IndexError, match="nmode=2"):
+            heterodyne_condition(_pure2(), mode=2)
+
+    def test_heterodyne_condition_pure2_zero_prob(self):
+        with pytest.raises(ValueError, match="zero probability"):
+            heterodyne_condition(_pure2(), beta=10.0)
+
+
+class TestHeterodyneDensityPaths:
+    def test_heterodyne_sample_dens1_rng(self):
+        out = heterodyne_sample(_dens1(alpha=0.5), rng=np.random.default_rng(0))
+        assert isinstance(out, complex)
+
+    def test_heterodyne_sample_dens2_mode0(self):
+        out = heterodyne_sample(_dens2(), rng=np.random.default_rng(0))
+        assert isinstance(out, complex)
+
+    def test_heterodyne_sample_dens2_mode1(self):
+        out = heterodyne_sample(_dens2(), mode=1, rng=np.random.default_rng(0))
+        assert isinstance(out, complex)
+
+    def test_heterodyne_condition_dens1_returns_coherent(self):
+        """1-mode density posterior = |β⟩⟨β| (rank-1 POVM)."""
+        out = heterodyne_condition(_dens1(), beta=0.5)
+        assert isinstance(out, FockDensity)
+        assert out.nmode == 1
+
+    def test_heterodyne_sample_default_rng(self):
+        """rng=None path (internal default_rng())."""
+        out = heterodyne_sample(_pure1(alpha=0.5))
+        assert isinstance(out, complex)
+
+    def test_heterodyne_sample_both_modes_dens2(self):
+        """2-mode density marginal einsum branches (mode 0 and 1)."""
+        rng = np.random.default_rng(1)
+        out0 = heterodyne_sample(_dens2(), mode=0, rng=rng)
+        out1 = heterodyne_sample(_dens2(), mode=1, rng=rng)
+        assert isinstance(out0, complex) and isinstance(out1, complex)
+
+
+class TestRngDefaults:
+    """rng=None default branches (TRIVIAL)."""
+
+    def test_pnr_sample_default_rng(self):
+        n = pnr_sample(_pure1(alpha=1.0))
+        assert 0 <= n < 5
+
+    def test_pnr_sample_batch_default_rng(self):
+        from cvsim.fock import pnr_sample_batch
+
+        out = pnr_sample_batch(_pure1(alpha=1.0), size=7)
+        assert out.shape == (7,)
+        assert np.all(out >= 0)
