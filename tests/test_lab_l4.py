@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 import pytest
+from conftest import gaussian_rbar, gaussian_V
 from fastapi.testclient import TestClient
 
 from cvsim.gaussian import GaussianState, amplifier, beamsplitter, phase
@@ -50,8 +51,8 @@ def test_mz_equals_bs_phase_bs_ir():
     )
     a = run_circuit(load_circuit(mz))
     b = run_circuit(load_circuit(ref))
-    np.testing.assert_allclose(a.rbar, b.rbar, atol=1e-12)
-    np.testing.assert_allclose(a.V, b.V, atol=1e-12)
+    np.testing.assert_allclose(gaussian_rbar(a), gaussian_rbar(b), atol=1e-12)
+    np.testing.assert_allclose(gaussian_V(a), gaussian_V(b), atol=1e-12)
     assert a.meters == b.meters
 
 
@@ -63,8 +64,8 @@ def test_mz_matches_direct_gaussian_composition():
     st = beamsplitter(st, 0, 1, theta, 0.0)
     st = phase(st, phi, 0)
     st = beamsplitter(st, 0, 1, theta, 0.0)
-    np.testing.assert_allclose(res.V, st.V, atol=1e-12)
-    np.testing.assert_allclose(res.rbar, st.rbar, atol=1e-12)
+    np.testing.assert_allclose(gaussian_V(res), st.V, atol=1e-12)
+    np.testing.assert_allclose(gaussian_rbar(res), st.rbar, atol=1e-12)
 
 
 def test_mz_phi_defaults_zero():
@@ -73,7 +74,7 @@ def test_mz_phi_defaults_zero():
     st = GaussianState.tmsv(0.6)
     st = beamsplitter(st, 0, 1, 0.4, 0.0)
     st = beamsplitter(st, 0, 1, 0.4, 0.0)  # phi=0 → phase is identity
-    np.testing.assert_allclose(res.V, st.V, atol=1e-12)
+    np.testing.assert_allclose(gaussian_V(res), st.V, atol=1e-12)
 
 
 def test_mz_local_phase_preserves_logneg():
@@ -114,8 +115,8 @@ def test_amplifier_op_matches_direct():
     )
     res = run_circuit(load_circuit(data))
     st = amplifier(GaussianState.vacuum(1), 2.0, 0, 0.0)
-    np.testing.assert_allclose(res.rbar, st.rbar, atol=1e-12)
-    np.testing.assert_allclose(res.V, st.V, atol=1e-12)
+    np.testing.assert_allclose(gaussian_rbar(res), st.rbar, atol=1e-12)
+    np.testing.assert_allclose(gaussian_V(res), st.V, atol=1e-12)
 
 
 def test_amplifier_nbar_advanced_default_zero():
@@ -139,7 +140,7 @@ def test_amplifier_nbar_explicit_matches_direct():
     )
     res = run_circuit(load_circuit(data))
     st = amplifier(GaussianState.vacuum(1), 3.0, 0, 0.5)
-    np.testing.assert_allclose(res.V, st.V, atol=1e-12)
+    np.testing.assert_allclose(gaussian_V(res), st.V, atol=1e-12)
 
 
 def test_amplifier_422_g_lt_1():

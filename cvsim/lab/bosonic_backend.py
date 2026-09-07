@@ -1,8 +1,11 @@
 """Bosonic backend execution for the Lab workbench (B6).
 
-Extracted from ``lab/ir.py``. Bosonic run + Wigner/meters assembly. Imports
-shared types/helpers from ``cvsim.lab.ir`` (no circular import: ir.py does not
-import this module).
+Extracted from ``lab/ir.py``. Bosonic run + Wigner/meters assembly. Results
+are LabResult snapshots (ADR-0008) — the wigner slice and the
+measured-outcome collector are shared knowledge in ``cvsim.lab.result``
+(previously this module imported fock's private ``_fock_measured``
+cross-package; the function is representation-agnostic and now lives at the
+result layer).
 """
 
 from __future__ import annotations
@@ -21,8 +24,8 @@ from cvsim.bosonic import (
 from cvsim.bosonic import (
     purity as bosonic_purity,
 )
-from cvsim.lab.fock_backend import _fock_measured
-from cvsim.lab.ir import SCHEMA, CircuitV0Error, LabCircuit, View
+from cvsim.lab.ir import CircuitV0Error, LabCircuit, View
+from cvsim.lab.result import LabResult, _measured_from_results, _wigner_slice, check_meters
 from cvsim.wigner import wigner_grid
 
 
@@ -62,70 +65,22 @@ def _bosonic_single_wigner(
 def _bosonic_meters(state: BosonicState) -> dict[str, Any]:
     """Bosonic result meters: purity + per-mode/mean photon (B4/B1 closed forms)."""
     if state.nmode == 0 or not state.components:
-        return {"purity": None, "mean_photon": 0.0, "mean_photon_per_mode": []}
+        meters: dict[str, Any] = {"purity": None, "mean_photon": 0.0, "mean_photon_per_mode": []}
+        check_meters("bosonic", meters)
+        return meters
     modes = range(state.nmode)
     mean_list = [float(bosonic_mean_photon(state, i)) for i in modes]
     try:
         pur = float(bosonic_purity(state))
     except (ValueError, FloatingPointError, np.linalg.LinAlgError):
         pur = None
-    return {
+    meters = {
         "purity": pur,
         "mean_photon": float(sum(mean_list)),
         "mean_photon_per_mode": mean_list,
     }
-
-
-def run_bosonic_circuit(
-    circuit: LabCircuit, rng: np.random.Generator | None = None, *, steps: bool = False
-) -> dict[str, Any]:
-    """Bosonic /run + /sample shared path: from_ir → compile → run(rng).
-
-    Deterministic per circuit when rng is a seeded Generator (B6 aligns Fock
-    F7: seed field drives reproducibility). ``steps=True`` (detail="steps")
-    adds per-break-point intermediate snapshots for the GUI evolution view.
-    """
-    bc = BosonicCircuit.from_ir(circuit.raw)
-    if steps:
-        state, results, raw_steps = bc.compile().run_steps(rng=rng)
-    else:
-        out = bc.run(rng=rng)
-        if isinstance(out, tuple):
-            state, results = out
-        else:
-            state, results = out, {}
-    measured = _fock_measured(circuit.raw, results)
-    wmode = circuit.view.wigner_mode
-    if state.nmode > 0 and wmode >= state.nmode:
-        raise CircuitV0Error(f"view.wigner_mode {wmode} out of range (nmode={state.nmode})")
-    wigner = None
-    if state.nmode > 0:
-        wigner = _bosonic_single_wigner(state, wmode, circuit.view)
-    payload: dict[str, Any] = {
-        "schema": SCHEMA,
-        "backend": "bosonic",
-        "nmode": state.nmode,
-        "wigner": (
-            {"x": wigner[0][0].tolist(), "p": wigner[1][:, 0].tolist(), "W": wigner[2].tolist()}
-            if wigner is not None
-            else None
-        ),
-        "dist": {"mode": wmode, "probs": None},
-        "meters": _bosonic_meters(state),
-        "measured": measured,
-    }
-    if steps:
-        payload["steps"] = [
-            {
-                "step": i,
-                "op": op_name,
-                "nmode": s.nmode,
-                "meters": _bosonic_meters(s),
-                "wigner": _bosonic_wigner_payload(s, circuit.view),
-            }
-            for i, (op_name, s) in enumerate(raw_steps)
-        ]
-    return payload
+    check_meters("bosonic", meters)
+    return meters
 
 
 def _bosonic_wigner_payload(state: BosonicState, view: View) -> dict[str, Any] | None:
@@ -136,6 +91,59 @@ def _bosonic_wigner_payload(state: BosonicState, view: View) -> dict[str, Any] |
     if wmode >= state.nmode:
         return None
     w = _bosonic_single_wigner(state, wmode, view)
-    if w is None:
-        return None
-    return {"x": w[0][0].tolist(), "p": w[1][:, 0].tolist(), "W": w[2].tolist()}
+    return _wigner_slice(w)
+
+
+def run_bosonic_circuit(
+    circuit: LabCircuit,
+    rng: np.random.Generator | None = None,
+    *,
+    steps: bool = False,
+    sampled: bool = False,
+) -> LabResult:
+    """Bosonic /run + /sample shared path: from_ir → compile → run(rng).
+
+    Deterministic per circuit when rng is a seeded Generator (B6 aligns Fock
+    F7: seed field drives reproducibility). ``steps=True`` (detail="steps")
+    adds per-break-point intermediate snapshots for the GUI evolution view;
+    ``sampled=True`` (/sample path) carries the seed + sampled flag in the
+    LabResult contract instead of the server patching the payload dict.
+    """
+    bc = BosonicCircuit.from_ir(circuit.raw)
+    if steps:
+        state, results, raw_steps = bc.compile().run_steps(rng=rng)
+    else:
+        out = bc.run(rng=rng)
+        if isinstance(out, tuple):
+            state, results = out
+        else:
+            state, results = out, {}
+    measured = _measured_from_results(circuit.raw, results)
+    wmode = circuit.view.wigner_mode
+    if state.nmode > 0 and wmode >= state.nmode:
+        raise CircuitV0Error(f"view.wigner_mode {wmode} out of range (nmode={state.nmode})")
+    wigner = None
+    if state.nmode > 0:
+        wigner = _bosonic_single_wigner(state, wmode, circuit.view)
+    extensions: dict[str, Any] = {"dist": {"mode": wmode, "probs": None}}
+    if steps:
+        extensions["steps"] = [
+            {
+                "step": i,
+                "op": op_name,
+                "nmode": s.nmode,
+                "meters": _bosonic_meters(s),
+                "wigner": _bosonic_wigner_payload(s, circuit.view),
+            }
+            for i, (op_name, s) in enumerate(raw_steps)
+        ]
+    return LabResult(
+        backend="bosonic",
+        nmode=state.nmode,
+        wigner=_wigner_slice(wigner),
+        meters=_bosonic_meters(state),
+        measured=measured,
+        seed=circuit.seed if sampled else None,
+        sampled=sampled,
+        extensions=extensions,
+    )

@@ -1,0 +1,13 @@
+{
+ "backend": "fock",
+ "counts": {
+  "(0, 2)": 21,
+  "(2, 0)": 29
+ },
+ "measured_names": [
+  "n0",
+  "n1"
+ ],
+ "seed": 1,
+ "shots": 50
+}

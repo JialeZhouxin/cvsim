@@ -319,7 +319,9 @@ def test_backend_default_gaussian_regression():
     r = client.post("/run", json=data)
     assert r.status_code == 200
     body = r.json()
-    assert "backend" not in body  # gaussian payload unchanged
+    # Q4 (payload-unification): gaussian payload now self-identifies —
+    # the only intentional byte-level change vs pre-unification responses.
+    assert body["backend"] == "gaussian"
     assert body["nmode"] == 2
     assert len(body["V"]) == 4
     assert body["wigner"] is not None

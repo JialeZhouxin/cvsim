@@ -17,7 +17,6 @@ from fastapi.staticfiles import StaticFiles
 from cvsim.lab import (
     SCHEMA,
     CircuitV0Error,
-    RunResult,
     fidelity_sweep,
     load_circuit,
     run_circuit,
@@ -26,6 +25,7 @@ from cvsim.lab import (
 )
 from cvsim.lab.bosonic_backend import run_bosonic_circuit
 from cvsim.lab.fock_backend import batch_fock_circuit, run_fock_circuit
+from cvsim.lab.result import serialize
 
 app = FastAPI(title="cvsim Lab (Gaussian/Fock)", version="0.2.0")
 
@@ -54,6 +54,7 @@ def health() -> dict[str, Any]:
         cvsim_version = "unknown"
     return {"status": "ok", "schema": SCHEMA, "cvsim": cvsim_version}
 
+
 @app.get("/schema")
 def schema() -> dict[str, Any]:
     """Schema snapshot (single-source ticket 2): core ``ir_schema()`` data
@@ -65,34 +66,6 @@ def schema() -> dict[str, Any]:
     from cvsim.lab.schema import assemble_schema
 
     return assemble_schema()
-
-
-def _payload(
-    result: RunResult, *, seed: int | None = None, sampled: bool = False
-) -> dict[str, Any]:
-    if result.wigner is None:
-        wigner: Any = None  # singular conditional state: no finite Wigner
-    else:
-        X, P, W = result.wigner
-        wigner = {
-            "x": X[0].tolist(),
-            "p": P[:, 0].tolist(),
-            "W": W.tolist(),
-        }
-    payload: dict[str, Any] = {
-        "schema": SCHEMA,
-        "nmode": result.nmode,
-        "rbar": result.rbar.tolist(),
-        "V": result.V.tolist(),
-        "wigner": wigner,
-        "meters": result.meters,
-        "measured": result.measured,
-    }
-    if seed is not None:
-        payload["seed"] = seed
-    if sampled:
-        payload["sampled"] = True
-    return payload
 
 
 def _422(e: Exception) -> HTTPException:
@@ -112,6 +85,7 @@ def _422(e: Exception) -> HTTPException:
             return HTTPException(status_code=422, detail=detail)
     return HTTPException(status_code=422, detail=str(e))
 
+
 @app.post("/run")
 def run(body: dict[str, Any]) -> dict[str, Any]:
     try:
@@ -120,19 +94,22 @@ def run(body: dict[str, Any]) -> dict[str, Any]:
         if circuit.backend == "fock":
             # deterministic per circuit (seed field, default 0): same JSON
             # → same run (incl. measured outcomes) — reproducible meters
-            return run_fock_circuit(circuit, np.random.default_rng(circuit.seed))
+            return serialize(run_fock_circuit(circuit, np.random.default_rng(circuit.seed)), SCHEMA)
         if circuit.backend == "bosonic":
-            return run_bosonic_circuit(
-                circuit,
-                np.random.default_rng(circuit.seed),
-                steps=(detail == "steps"),
+            return serialize(
+                run_bosonic_circuit(
+                    circuit,
+                    np.random.default_rng(circuit.seed),
+                    steps=(detail == "steps"),
+                ),
+                SCHEMA,
             )
         result = run_circuit(circuit)
     except (CircuitV0Error, ValueError) as e:
         # ValueError covers library-side guards (loss T range, wigner_grid,
         # np.linalg.LinAlgError is a ValueError subclass) → user-error 422.
         raise _422(e) from e
-    return _payload(result)
+    return serialize(result, SCHEMA)
 
 
 @app.post("/sample")
@@ -141,19 +118,16 @@ def sample(body: dict[str, Any]) -> dict[str, Any]:
     try:
         circuit = load_circuit(body)
         if circuit.backend == "fock":
-            payload = run_fock_circuit(circuit, np.random.default_rng(circuit.seed))
-            payload["seed"] = circuit.seed
-            payload["sampled"] = True
-            return payload
-        if circuit.backend == "bosonic":
-            payload = run_bosonic_circuit(circuit, np.random.default_rng(circuit.seed))
-            payload["seed"] = circuit.seed
-            payload["sampled"] = True
-            return payload
-        result = sample_circuit(circuit, np.random.default_rng(circuit.seed))
+            result = run_fock_circuit(circuit, np.random.default_rng(circuit.seed), sampled=True)
+        elif circuit.backend == "bosonic":
+            result = run_bosonic_circuit(circuit, np.random.default_rng(circuit.seed), sampled=True)
+        else:
+            result = sample_circuit(circuit, np.random.default_rng(circuit.seed))
+            result.seed = circuit.seed
+            result.sampled = True
     except (CircuitV0Error, ValueError) as e:
         raise _422(e) from e
-    return _payload(result, seed=circuit.seed, sampled=True)
+    return serialize(result, SCHEMA)
 
 
 @app.post("/batch")

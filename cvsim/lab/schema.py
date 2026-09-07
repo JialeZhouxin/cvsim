@@ -27,6 +27,7 @@ from typing import Any
 from cvsim.bosonic import ir_schema as _bosonic_ir_schema
 from cvsim.fock import ir_schema as _fock_ir_schema
 from cvsim.gaussian import ir_schema as _gaussian_ir_schema
+from cvsim.lab.result import METER_CORE, METER_EXTENSIONS  # noqa: F401 — re-exported
 
 #: UI name per IR name where the two differ (Q3: IR names are canonical;
 #: the two measurement ops are the only renames in the current UI). The
@@ -100,9 +101,7 @@ def _derive_whitelist(backend: str) -> frozenset[str]:
 #: ``ir_schema()`` initial registry (ticket 1 data-driven table; ticket 4
 #: single declaration point — ``lab.ir._load_bosonic`` and
 #: ``initial.js`` (via /schema) read this, no hand-written mirror).
-BOSONIC_SOURCES: tuple[str, ...] = tuple(
-    _PKG_SCHEMAS["bosonic"]()["initial"]["sources"]
-)
+BOSONIC_SOURCES: tuple[str, ...] = tuple(_PKG_SCHEMAS["bosonic"]()["initial"]["sources"])
 
 #: Lab op whitelists (UI concept, ADR-0003 #3) — derived views over the
 #: core snapshots (ticket 4), equal to the pre-ticket hand-written sets
@@ -145,6 +144,7 @@ _EXTENSIONS: dict[str, Any] = {
     "rounds": [1, 100],
 }
 
+
 def assemble_schema() -> dict[str, Any]:
     """Assemble the ``/schema`` payload from the three core ``ir_schema()``
     snapshots + the derived Lab whitelists + Lab extension declarations.
@@ -161,9 +161,7 @@ def assemble_schema() -> dict[str, Any]:
     for backend in BACKENDS:
         for op_name in sorted(_WHITELISTS[backend]):
             meta = pkg_schemas[backend]["ops"][op_name]
-            entry = ops.setdefault(
-                op_name, {"backends": [], "meta": meta, "core_ranges": {}}
-            )
+            entry = ops.setdefault(op_name, {"backends": [], "meta": meta, "core_ranges": {}})
             entry["backends"].append(backend)
             for param, rng in pkg_schemas[backend]["core_ranges"].get(op_name, {}).items():
                 entry["core_ranges"][param] = rng
@@ -183,8 +181,15 @@ def assemble_schema() -> dict[str, Any]:
     return {
         "backends": list(BACKENDS),
         "ops": out_ops,
-        "initial": {
-            backend: pkg_schemas[backend]["initial"] for backend in BACKENDS
+        "initial": {backend: pkg_schemas[backend]["initial"] for backend in BACKENDS},
+        "meters": {
+            # meter support matrix (ADR-0008, lives in lab.result): what each
+            # representation can honestly compute. Embedded by reference —
+            # response-side knowledge stays in result.py. Rebuilt per call so
+            # callers cannot mutate the module constants. Frontend consumption
+            # is a follow-up ticket (R6): current缺键兜底 rendering stays.
+            "core": sorted(METER_CORE),
+            "extensions": {backend: sorted(ext) for backend, ext in METER_EXTENSIONS.items()},
         },
         "extensions": {
             # rebuild nested structures so callers cannot mutate the module
@@ -201,6 +206,7 @@ def assemble_schema() -> dict[str, Any]:
             "rounds": list(_EXTENSIONS["rounds"]),
         },
     }
+
 
 def schema_doc() -> str:
     """`/schema` response body: the assembled payload as a JSON string."""

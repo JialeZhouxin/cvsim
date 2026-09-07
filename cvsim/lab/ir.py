@@ -36,6 +36,7 @@ from cvsim.gaussian import (
 )
 from cvsim.gaussian.ir import SCHEMA as SCHEMA
 from cvsim.gaussian.ir import CircuitV1, validate_ir
+from cvsim.lab.result import LabResult
 from cvsim.lab.schema import (
     _EXTENSIONS,
     BOSONIC_SOURCES,
@@ -143,16 +144,6 @@ class LabCircuit:
     ui: dict[str, Any] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
     initial: list[int] | None = None
-
-
-@dataclass
-class RunResult:
-    nmode: int
-    rbar: np.ndarray
-    V: np.ndarray
-    wigner: tuple[np.ndarray, np.ndarray, np.ndarray] | None  # None: singular view
-    meters: dict[str, Any]
-    measured: list[dict[str, Any]]
 
 
 def _require(d: dict[str, Any], key: str, typ: type, where: str) -> Any:
@@ -296,15 +287,11 @@ def _parse_view(raw: Any) -> View:
     _vlim = _EXTENSIONS["view"]["lim_max"]
     _vmin = _EXTENSIONS["view"]["lim_min_exclusive"]
     if not isinstance(lim, (int, float)) or isinstance(lim, bool) or lim <= _vmin or lim > _vlim:
-        raise CircuitV0Error(
-            f"view.lim must be a positive number <= {int(_vlim)}"
-        )
+        raise CircuitV0Error(f"view.lim must be a positive number <= {int(_vlim)}")
     n = raw.get("n", 64)
     _vn = _EXTENSIONS["view"]["n"]
     if not isinstance(n, int) or isinstance(n, bool) or n < _vn[0] or n > _vn[1]:
-        raise CircuitV0Error(
-            f"view.n must be an int in [{_vn[0]}, {_vn[1]}]"
-        )
+        raise CircuitV0Error(f"view.n must be an int in [{_vn[0]}, {_vn[1]}]")
     jm = raw.get("joint_modes")
     if jm is not None and (
         not isinstance(jm, list)
@@ -360,8 +347,7 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
         if node.op not in LAB_WHITELIST:
             where = f"ops[{node.id or '?'}]"
             raise CircuitV0Error(
-                f"{where}: op {node.op!r} not in Lab whitelist: "
-                f"{sorted(LAB_WHITELIST)}",
+                f"{where}: op {node.op!r} not in Lab whitelist: {sorted(LAB_WHITELIST)}",
                 code="op_not_whitelisted",
                 where=where,
                 op=node.op,
@@ -426,8 +412,7 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
             nid = node.get("id") if isinstance(node, dict) else "?"
             where = f"ops[{nid or '?'}]"
             raise CircuitV0Error(
-                f"{where}: op {op!r} not in Bosonic Lab "
-                f"whitelist: {sorted(BOSONIC_WHITELIST)}",
+                f"{where}: op {op!r} not in Bosonic Lab whitelist: {sorted(BOSONIC_WHITELIST)}",
                 code="op_not_whitelisted",
                 where=where,
                 op=op,
@@ -444,14 +429,12 @@ def _load_bosonic(data: dict[str, Any], seed: int, view: View, ui: dict[str, Any
         # (golden tests lock it).
         _bosonic_sources = list(BOSONIC_SOURCES)
         if not isinstance(initial, list) or not all(
-            item is None or item in _bosonic_sources
-            for item in initial
+            item is None or item in _bosonic_sources for item in initial
         ):
             # 整数项 = Fock 语义的 initial 跨到了 bosonic（GUI 切换 bug 的典型
             # 现场），给出可诊断的提示而不是让用户猜白名单。
             if isinstance(initial, list) and all(
-                isinstance(item, int) and not isinstance(item, bool)
-                for item in initial
+                isinstance(item, int) and not isinstance(item, bool) for item in initial
             ):
                 raise CircuitV0Error(
                     "initial looks like Fock photon numbers (ints) but backend is "
@@ -528,7 +511,7 @@ def _apply_measure(
     raise CircuitV0Error(f"{where}: unsupported measurement op {op_name!r} in Lab")
 
 
-def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> RunResult:
+def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> LabResult:
     """Shared execution core: ordered ops → final GaussianState + result.
 
     Non-measurement ops are delegated to ``GaussianCircuit.from_ir().compile()``
@@ -615,12 +598,12 @@ def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> 
     return _build_result(state, circuit.view, measured)
 
 
-def run_circuit(circuit: LabCircuit) -> RunResult:
+def run_circuit(circuit: LabCircuit) -> LabResult:
     """Compile + run (mean path): ordered ops → result. Pure, no RNG."""
     return _execute(circuit, rng=None)
 
 
-def sample_circuit(circuit: LabCircuit, rng: np.random.Generator) -> RunResult:
+def sample_circuit(circuit: LabCircuit, rng: np.random.Generator) -> LabResult:
     """Compile + run with true sampling of every measurement node, in node
     order; each measurement conditions the state for the next one."""
     return _execute(circuit, rng=rng)

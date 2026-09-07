@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from conftest import gaussian_rbar, gaussian_V, wigner_result
 
 from cvsim.gaussian.ir import validate_ir
 from cvsim.lab import (
@@ -111,8 +112,8 @@ def test_translate_multi_source_vacuum_and_tmsv():
         )
     )
     assert res.nmode == 3
-    assert abs(res.V[1, 2]) > 0  # x1·x2 entangled (tmsv pair)
-    assert np.abs(res.V[0, 1:]).max() < 1e-12  # vacuum mode uncorrelated
+    assert abs(gaussian_V(res)[1, 2]) > 0  # x1·x2 entangled (tmsv pair)
+    assert np.abs(gaussian_V(res)[0, 1:]).max() < 1e-12  # vacuum mode uncorrelated
 
 
 def test_translate_seed_view_ui_passthrough_edges_dropped():
@@ -169,7 +170,7 @@ def test_v1_logical_index_semantics_after_heterodyne():
     res = run_circuit(load_circuit(data))
     assert res.nmode == 1
     # displace on logical 1 (the survivor) → rbar nonzero
-    assert np.abs(res.rbar).max() > 0.1
+    assert np.abs(gaussian_rbar(res)).max() > 0.1
 
 
 def test_reference_measured_mode_rejected():
@@ -197,7 +198,7 @@ def test_homodyne_translated_removes_mode():
     assert res.nmode == 1
     assert res.measured[0]["op"] == "measure_homodyne"
     # remaining mode regular → Wigner viewable
-    assert res.wigner is not None
+    assert wigner_result(res) is not None
 
 
 def test_v1_native_roundtrip_via_core():
@@ -225,8 +226,8 @@ def test_v1_native_roundtrip_via_core():
         ]
     )
     b = run_circuit(load_circuit(v0))
-    np.testing.assert_allclose(a.V, b.V, atol=1e-12)
-    np.testing.assert_allclose(a.rbar, b.rbar, atol=1e-12)
+    np.testing.assert_allclose(gaussian_V(a), gaussian_V(b), atol=1e-12)
+    np.testing.assert_allclose(gaussian_rbar(a), gaussian_rbar(b), atol=1e-12)
     assert a.meters["log_negativity"] == pytest.approx(b.meters["log_negativity"], abs=1e-12)
 
 

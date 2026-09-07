@@ -130,3 +130,40 @@ def assert_pure(state: GaussianState, msg: str = "") -> None:
     expected = 0.25**state.nmode
     actual = det_cov(state)
     np.testing.assert_allclose(actual, expected, atol=TOL, err_msg=msg)
+
+
+# ---------------------------------------------------------------------------
+# Lab result contract helpers (payload-unification, ADR-0008)
+# ---------------------------------------------------------------------------
+
+
+def gaussian_V(res) -> np.ndarray:
+    """Gaussian LabResult covariance matrix (xxpp) as an array.
+
+    Under the unified LabResult contract rbar/V ride in ``extensions``
+    (JSON-ready lists); this helper restores the array view runner-path tests
+    assert against — same shape ``serialize`` serves over the API.
+    """
+    return np.asarray(res.extensions["V"])
+
+
+def gaussian_rbar(res) -> np.ndarray:
+    """Gaussian LabResult mean vector as an array (see gaussian_V)."""
+    return np.asarray(res.extensions["rbar"])
+
+
+def wigner_result(res) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+    """LabResult wigner view as an (X, P, W) array triple (runner-path tests).
+
+    Under the unified contract ``res.wigner`` is the sliced ``{x, p, W}``
+    payload (or None); this restores the array view the pre-unification
+    RunResult exposed. Returns None for the honest-null (singular/empty) case.
+    """
+    w = res.wigner
+    if w is None:
+        return None
+    return (
+        np.asarray(w["x"]),
+        np.asarray(w["p"]),
+        np.asarray(w["W"]),
+    )

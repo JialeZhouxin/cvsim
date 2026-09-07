@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from conftest import gaussian_rbar, gaussian_V, wigner_result
 
 from cvsim.gaussian import (
     GaussianState,
@@ -142,8 +143,8 @@ def test_multi_source_vacuum_equiv_single_nmode():
     r1 = run_circuit(load_circuit(scene(True)))  # two vacuum sources
     r2 = run_circuit(load_circuit(scene(False)))  # single vacuum nmode=2
     assert r1.nmode == 2 and r2.nmode == 2
-    assert np.allclose(r1.rbar, r2.rbar)
-    assert np.allclose(r1.V, r2.V)
+    assert np.allclose(gaussian_rbar(r1), gaussian_rbar(r2))
+    assert np.allclose(gaussian_V(r1), gaussian_V(r2))
 
 
 def test_multi_source_tmsv_append_third_mode():
@@ -160,11 +161,13 @@ def test_multi_source_tmsv_append_third_mode():
     assert res.nmode == 3
     # xxpp split layout: rows = [x0,x1,x2,p0,p1,p2]
     # tmsv pair (modes 1,2) entangled: x1-x2 and p1-p2 cross terms nonzero
-    assert abs(res.V[1, 2]) > 0  # x1·x2
-    assert abs(res.V[4, 5]) > 0  # p1·p2
+    assert abs(gaussian_V(res)[1, 2]) > 0  # x1·x2
+    assert abs(gaussian_V(res)[4, 5]) > 0  # p1·p2
     # vacuum mode 0 uncorrelated with the pair: x0/p0 rows empty off-diagonal
-    assert np.abs(res.V[0, 1:]).max() < 1e-12  # x0 row
-    assert np.abs(np.concatenate([res.V[3, :3], res.V[3, 4:]])).max() < 1e-12  # p0 row
+    assert np.abs(gaussian_V(res)[0, 1:]).max() < 1e-12  # x0 row
+    assert (
+        np.abs(np.concatenate([gaussian_V(res)[3, :3], gaussian_V(res)[3, 4:]])).max() < 1e-12
+    )  # p0 row
 
 
 def test_mode_out_of_range():
@@ -192,8 +195,8 @@ def test_wigner_mode_out_of_range():
 def test_golden_tmsv_loss_bs_matches_hand_written():
     res = run_circuit(load_circuit(MAIN_SCENE))
     hand = _hand_main_scene()
-    np.testing.assert_allclose(res.V, hand.V, atol=1e-10)
-    np.testing.assert_allclose(res.rbar, hand.rbar, atol=1e-10)
+    np.testing.assert_allclose(gaussian_V(res), hand.V, atol=1e-10)
+    np.testing.assert_allclose(gaussian_rbar(res), hand.rbar, atol=1e-10)
     assert res.nmode == 2
     assert res.measured == []
 
@@ -224,8 +227,8 @@ def test_heterodyne_removes_mode():
     hand = GaussianState.tmsv(0.6)
     outcome = heterodyne_mean(hand, 0)
     hand = heterodyne_condition(hand, 0, outcome)
-    np.testing.assert_allclose(res.V, hand.V, atol=1e-10)
-    np.testing.assert_allclose(res.rbar, hand.rbar, atol=1e-10)
+    np.testing.assert_allclose(gaussian_V(res), hand.V, atol=1e-10)
+    np.testing.assert_allclose(gaussian_rbar(res), hand.rbar, atol=1e-10)
     assert len(res.measured) == 1
     assert res.measured[0]["op"] == "measure_heterodyne"
     assert res.measured[0]["mode"] == 0
@@ -250,8 +253,8 @@ def test_homodyne_removes_mode():
     hand = GaussianState.tmsv(0.6)
     o = homodyne_mean(hand, 0, 0.0)
     hand = homodyne_condition(hand, 0, 0.0, o).remove_mode(0)
-    np.testing.assert_allclose(res.V, hand.V, atol=1e-10)
-    np.testing.assert_allclose(res.rbar, hand.rbar, atol=1e-10)
+    np.testing.assert_allclose(gaussian_V(res), hand.V, atol=1e-10)
+    np.testing.assert_allclose(gaussian_rbar(res), hand.rbar, atol=1e-10)
     assert res.measured[0]["op"] == "measure_homodyne"
 
 
@@ -261,16 +264,17 @@ def test_wigner_matches_direct_partial_trace_grid():
     # wigner_mode=0 → partial_trace(keep=[0]) → mode-0 block (top-left 2×2)
     keep = GaussianState(V=hand.V[:2, :2], rbar=hand.rbar[:2])
     X, P, W = wigner_grid(keep, lim=5.0, n=64)
-    np.testing.assert_allclose(res.wigner[2], W, atol=1e-10)
-    np.testing.assert_allclose(res.wigner[0], X, atol=0.0)
-    np.testing.assert_allclose(res.wigner[1], P, atol=0.0)
+    wx, wp, wW = wigner_result(res)
+    np.testing.assert_allclose(wW, W, atol=1e-10)
+    np.testing.assert_allclose(wx, X[0], atol=0.0)
+    np.testing.assert_allclose(wp, P[:, 0], atol=0.0)
 
 
 def test_ui_and_edges_are_ignored_by_run():
     data = dict(MAIN_SCENE, ui={"pixels": {"s0": [1, 2]}}, edges=[{"from": "x", "to": "y"}])
     res = run_circuit(load_circuit(data))
     hand = _hand_main_scene()
-    np.testing.assert_allclose(res.V, hand.V, atol=1e-10)
+    np.testing.assert_allclose(gaussian_V(res), hand.V, atol=1e-10)
 
 
 def test_coherent_source_alpha_forms():
@@ -288,5 +292,5 @@ def test_coherent_source_alpha_forms():
         }
         res = run_circuit(load_circuit(data))
         hand = GaussianState.coherent(expected)
-        np.testing.assert_allclose(res.rbar, hand.rbar, atol=1e-10)
-        np.testing.assert_allclose(res.V, hand.V, atol=1e-10)
+        np.testing.assert_allclose(gaussian_rbar(res), hand.rbar, atol=1e-10)
+        np.testing.assert_allclose(gaussian_V(res), hand.V, atol=1e-10)

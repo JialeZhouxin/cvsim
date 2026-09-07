@@ -3,9 +3,10 @@
 Extracted from ``lab/ir.py`` to mirror ``fock_backend.py``/``bosonic_backend.py``:
 per-representation result-assembly glue (meters + Wigner view) lives in its
 own backend module. ir.py keeps the Gaussian execution dispatch (_execute);
-this module owns only state→RunResult assembly. Imports shared types from
-``cvsim.lab.ir`` (no circular import: ir.py does not module-import this file;
-_execute uses a function-local import to call _build_result).
+this module owns only state→LabResult assembly. Imports shared types from
+``cvsim.lab.ir`` / ``cvsim.lab.result`` (no circular import: neither module
+imports this file; _execute uses a function-local import to call
+_build_result).
 """
 
 from __future__ import annotations
@@ -22,7 +23,8 @@ from cvsim.gaussian import (
     partial_trace,
     purity,
 )
-from cvsim.lab.ir import CircuitV0Error, RunResult, View
+from cvsim.lab.ir import CircuitV0Error, View
+from cvsim.lab.result import LabResult, _wigner_slice, check_meters
 from cvsim.wigner import wigner_grid
 
 
@@ -46,28 +48,31 @@ def _meters(state: GaussianState, singular: bool) -> dict[str, Any]:
     if m >= 2:
         meters["log_negativity"] = safe(lambda: log_negativity(state, modes_A=[0]))
     meters["singular"] = singular
+    check_meters("gaussian", meters)
     return meters
 
 
-def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any]]) -> RunResult:
-    """Assemble RunResult: Wigner view + meters. A singular conditional state
+def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any]]) -> LabResult:
+    """Assemble LabResult: Wigner view + meters. A singular conditional state
     (homodyne-conditioned mode, det(2V)=0) has no finite Wigner: report
     wigner=None + meters.singular instead of fabricating data. All modes
     measured away (nmode==0) → empty result, no Wigner, honest zero meters."""
     if state.nmode == 0:
-        return RunResult(
+        meters: dict[str, Any] = {
+            "purity": None,
+            "mean_photon": 0.0,
+            "mean_photon_per_mode": [],
+            "log_negativity": None,
+            "singular": False,
+        }
+        check_meters("gaussian", meters)
+        return LabResult(
+            backend="gaussian",
             nmode=0,
-            rbar=np.zeros(0),
-            V=np.zeros((0, 0)),
             wigner=None,
-            meters={
-                "purity": None,
-                "mean_photon": 0.0,
-                "mean_photon_per_mode": [],
-                "log_negativity": None,
-                "singular": False,
-            },
+            meters=meters,
             measured=measured,
+            extensions={"rbar": np.zeros(0).tolist(), "V": np.zeros((0, 0)).tolist()},
         )
     if view.wigner_mode >= state.nmode:
         raise CircuitV0Error(
@@ -81,11 +86,11 @@ def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any
         wigner = (X, P, W)
     except (ValueError, FloatingPointError, np.linalg.LinAlgError):  # singular view
         singular = True
-    return RunResult(
+    return LabResult(
+        backend="gaussian",
         nmode=state.nmode,
-        rbar=state.rbar,
-        V=state.V,
-        wigner=wigner,
+        wigner=_wigner_slice(wigner),
         meters=_meters(state, singular),
         measured=measured,
+        extensions={"rbar": state.rbar.tolist(), "V": state.V.tolist()},
     )

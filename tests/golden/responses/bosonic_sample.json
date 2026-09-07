@@ -1,0 +1,25 @@
+{
+ "backend": "bosonic",
+ "dist": {
+  "mode": 0,
+  "probs": null
+ },
+ "measured": [
+  {
+   "mode": 0,
+   "name": "m0",
+   "op": "measure_homodyne",
+   "outcome": -1.528919214480597
+  }
+ ],
+ "meters": {
+  "mean_photon": 0.0,
+  "mean_photon_per_mode": [],
+  "purity": null
+ },
+ "nmode": 0,
+ "sampled": true,
+ "schema": "circuit_v1",
+ "seed": 3,
+ "wigner": null
+}

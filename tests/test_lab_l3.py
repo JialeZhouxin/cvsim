@@ -4,6 +4,7 @@ singular conditional-state handling (A5/A6)."""
 from __future__ import annotations
 
 import numpy as np
+from conftest import gaussian_rbar, gaussian_V, wigner_result
 
 from cvsim.lab import load_circuit, run_circuit, sample_circuit
 
@@ -69,8 +70,8 @@ def test_sample_same_seed_reproducible():
     r1 = sample_circuit(c, np.random.default_rng(42))
     r2 = sample_circuit(c, np.random.default_rng(42))
     assert r1.measured == r2.measured
-    np.testing.assert_allclose(r1.rbar, r2.rbar, atol=0.0)
-    np.testing.assert_allclose(r1.V, r2.V, atol=0.0)
+    np.testing.assert_allclose(gaussian_rbar(r1), gaussian_rbar(r2), atol=0.0)
+    np.testing.assert_allclose(gaussian_V(r1), gaussian_V(r2), atol=0.0)
 
 
 def test_sample_multi_measurement_chain():
@@ -88,7 +89,7 @@ def test_sample_multi_measurement_chain():
     assert isinstance(res.measured[0]["outcome"], float)
     assert isinstance(res.measured[1]["outcome"], list)
     assert res.nmode == 0  # both measured modes removed
-    assert res.wigner is None  # no mode left to view — honest empty result
+    assert wigner_result(res) is None  # no mode left to view — honest empty result
 
 
 def test_run_no_rng_deterministic():
@@ -97,11 +98,11 @@ def test_run_no_rng_deterministic():
     c = load_circuit(data)
     a = run_circuit(c)
     b = run_circuit(c)
-    np.testing.assert_allclose(a.V, b.V, atol=0.0)
+    np.testing.assert_allclose(gaussian_V(a), gaussian_V(b), atol=0.0)
     assert a.measured == b.measured
     sample_circuit(c, np.random.default_rng(1))  # must not affect run
     c2 = run_circuit(c)
-    np.testing.assert_allclose(c2.V, b.V, atol=0.0)
+    np.testing.assert_allclose(gaussian_V(c2), gaussian_V(b), atol=0.0)
 
 
 # --- S1d: singular conditional-state view -----------------------------------
@@ -116,7 +117,7 @@ def test_sample_homodyne_removed_mode_not_viewable():
     )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert res.nmode == 1
-    assert res.wigner is not None  # remaining mode is regular
+    assert wigner_result(res) is not None  # remaining mode is regular
     assert res.meters["singular"] is False
     assert res.meters["purity"] is not None
     assert isinstance(res.meters["mean_photon"], float)
@@ -129,8 +130,8 @@ def test_sample_homodyne_other_mode_wigner_ok():
         wigner_mode=0,
     )
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
-    assert res.wigner is not None
-    assert res.wigner[2].shape == (32, 32)
+    assert wigner_result(res) is not None
+    assert wigner_result(res)[2].shape == (32, 32)
     assert res.meters["singular"] is False
 
 
@@ -138,8 +139,8 @@ def test_sample_heterodyne_view_mode_valid():
     data = _circuit([TMSV, {"id": "h", "op": "heterodyne", "params": {}, "mode": 0}])
     res = sample_circuit(load_circuit(data), np.random.default_rng(7))
     assert res.nmode == 1
-    assert res.wigner is not None
-    assert res.wigner[2].shape == (32, 32)
+    assert wigner_result(res) is not None
+    assert wigner_result(res)[2].shape == (32, 32)
 
 
 def test_sample_heterodyne_conditioned_removes_mode_and_keeps_meters():

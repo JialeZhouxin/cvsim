@@ -2,8 +2,8 @@
 
 Extracted from ``lab/ir.py`` to keep ir.py focused on the Gaussian path +
 schema. Pure Fock run/sample/batch + meters/wigner/joint/leakage assembly.
-Imports shared types/helpers from ``cvsim.lab.ir`` (no circular import: ir.py
-does not import this module).
+Results are LabResult snapshots (ADR-0008); the wigner slice and the
+measured-outcome collector live in ``cvsim.lab.result`` (single point).
 """
 
 from __future__ import annotations
@@ -24,7 +24,8 @@ from cvsim.fock import (
 from cvsim.fock import (
     partial_trace as fock_partial_trace,
 )
-from cvsim.lab.ir import SCHEMA, CircuitV0Error, LabCircuit, View
+from cvsim.lab.ir import CircuitV0Error, LabCircuit, View
+from cvsim.lab.result import LabResult, _measured_from_results, _wigner_slice, check_meters
 from cvsim.wigner import wigner_grid
 
 #: Cap on the higher-cutoff comparison tensor for the leakage estimate
@@ -131,30 +132,15 @@ def _fock_joint(
         return None
 
 
-def _fock_measured(raw: dict[str, Any], results: dict[str, Any]) -> list[dict[str, Any]]:
-    """Measurement outcomes in node order (name-keyed results dict → list)."""
-    out: list[dict[str, Any]] = []
-    for node in raw.get("ops", []):
-        if not isinstance(node, dict) or not node.get("op", "").startswith("measure_"):
-            continue
-        params = node.get("params") or {}
-        name = params.get("name")
-        if name is None or name not in results:
-            continue
-        val = results[name]
-        if isinstance(val, complex):
-            val = [val.real, val.imag]
-        elif isinstance(val, np.generic):
-            val = val.item()
-        out.append({"op": node["op"], "mode": node["modes"][0], "name": name, "outcome": val})
-    return out
-
-
-def run_fock_circuit(circuit: LabCircuit, rng: np.random.Generator | None = None) -> dict[str, Any]:
+def run_fock_circuit(
+    circuit: LabCircuit, rng: np.random.Generator | None = None, *, sampled: bool = False
+) -> LabResult:
     """Fock /run + /sample shared path: FockCircuit.from_ir → run(rng).
 
     Deterministic per circuit when rng is None (seed field, default 0);
     every measurement node conditions the state (FockCircuit semantics).
+    ``sampled=True`` (/sample path) carries the seed + sampled flag in the
+    LabResult contract instead of the server patching the payload dict.
     """
     fc = FockCircuit.from_ir(circuit.raw)
     out = fc.run(rng=rng)
@@ -162,7 +148,7 @@ def run_fock_circuit(circuit: LabCircuit, rng: np.random.Generator | None = None
         state, results = out
     else:
         state, results = out, {}
-    measured = _fock_measured(circuit.raw, results)
+    measured = _measured_from_results(circuit.raw, results)
     wigner = _fock_wigner(state, circuit.view) if state.nmode > 0 else None
     dist_mode = circuit.view.wigner_mode
     if dist_mode >= state.nmode:
@@ -173,26 +159,27 @@ def run_fock_circuit(circuit: LabCircuit, rng: np.random.Generator | None = None
     cutoffs = (
         list(state.amps.shape) if isinstance(state, FockState) else [state.cutoff] * state.nmode
     )
-    return {
-        "schema": SCHEMA,
-        "backend": "fock",
-        "nmode": state.nmode,
-        "cutoffs": cutoffs,
-        "wigner": (
-            {"x": wigner[0][0].tolist(), "p": wigner[1][:, 0].tolist(), "W": wigner[2].tolist()}
-            if wigner is not None
-            else None
-        ),
-        "dist": {"mode": dist_mode, "probs": probs.tolist()},
-        "joint": joint,
-        "meters": {
-            "mean_photon": float(np.sum(mean_list)),
-            "mean_photon_per_mode": mean_list,
-            "purity": _fock_purity(state),
-            "leakage": _fock_leakage(circuit.raw, state),
-        },
-        "measured": measured,
+    meters = {
+        "mean_photon": float(np.sum(mean_list)),
+        "mean_photon_per_mode": mean_list,
+        "purity": _fock_purity(state),
+        "leakage": _fock_leakage(circuit.raw, state),
     }
+    check_meters("fock", meters)
+    return LabResult(
+        backend="fock",
+        nmode=state.nmode,
+        wigner=_wigner_slice(wigner),
+        meters=meters,
+        measured=measured,
+        seed=circuit.seed if sampled else None,
+        sampled=sampled,
+        extensions={
+            "cutoffs": cutoffs,
+            "dist": {"mode": dist_mode, "probs": probs.tolist()},
+            "joint": joint,
+        },
+    )
 
 
 def batch_fock_circuit(circuit: LabCircuit, shots: int, seed: int) -> dict[str, Any]:

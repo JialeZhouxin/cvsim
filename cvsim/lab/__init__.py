@@ -14,20 +14,20 @@ from cvsim.lab.ir import (
     SCHEMA,
     CircuitV0Error,
     LabCircuit,
-    RunResult,
     View,
     load_circuit,
     run_circuit,
     sample_circuit,
     translate_v0,
 )
+from cvsim.lab.result import LabResult
 from cvsim.lab.scan import fidelity_sweep, scan_circuit
 
 __all__ = [
     "SCHEMA",
     "CircuitV0Error",
     "LabCircuit",
-    "RunResult",
+    "LabResult",
     "View",
     "load_circuit",
     "run_circuit",
