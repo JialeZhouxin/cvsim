@@ -5,6 +5,7 @@
 "use strict";
 
 import { sourceModes } from "./ops.js";
+import { el, fmt } from "./svg_kit.js";
 
 /* ── pure logic ─────────────────────────────────────────── */
 
@@ -113,19 +114,6 @@ export function sampleSeries(distMode, batch) {
 }
 
 /* ── DOM wiring (browser only) ──────────────────────────── */
-
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-function el(tag, attrs) {
-  const e = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-  return e;
-}
-
-function fmt(x, digits = 5) {
-  if (typeof x !== "number" || !Number.isFinite(x)) return "—";
-  return x.toPrecision(digits);
-}
 
 function cssVar(name, fallback) {
   return (getComputedStyle(document.documentElement).getPropertyValue(name) || "").trim() || fallback;

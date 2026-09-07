@@ -11,6 +11,9 @@ import { initFockPanel } from "./fock.js";
 import { createSeqGuard, requestLab, makeRefCountedBusy, REQUEST_KIND } from "./request.js";
 import { buildLut, validateWignerGrid, wignerScale, wignerT } from "./colormap.js";
 import { finitePoints, plotDomain, makeScale, polylineSegments, svgPath } from "./curve.js";
+import { el, fmt, axisVal, outcomeText } from "./svg_kit.js"; // SVG_NS 留在 leaf 内（app.js 不直用）
+import { validateScanForm } from "./scan_form.js";
+import { initStepState, stepLabel, stepDesc, stepMeters } from "./steps_slider.js";
 import { DEFAULT_SCENE } from "./default_scene.js";
 
 /* L5.5 默认场景字面量已迁居 default_scene.js（票3 单一事实源，ADR-0009）
@@ -81,11 +84,6 @@ function reportError(e, fallback) {
 const validateSeed = (p) =>
   (Number.isInteger(p.seed) && p.seed >= 0) ? null : "seed 必须是非负整数";
 
-function fmt(x, digits = 5) {
-  if (typeof x !== "number" || !Number.isFinite(x)) return "—";
-  return x.toPrecision(digits);
-}
-
 function renderMatrix(table, rows, cols, head, cell) {
   let html = "<thead><tr><th></th>" + Array.from({ length: cols }, (_, c) => `<th class="mono">${head(c)}</th>`).join("") + "</tr></thead><tbody>";
   for (let r = 0; r < rows; r++) {
@@ -148,22 +146,8 @@ function drawHeatmap(W) {
    scaled up, so canvas strokes would blur/thicken). Solid 1px lines in
    ice-cyan (--color-axis, complementary to inferno), values in ink with a
    paper halo (paint-order: stroke) so they read on any heatmap region. */
-const SVG_NS = "http://www.w3.org/2000/svg";
 let lastLim = 5;
 let lastWigner = null; // latest W grid — ResizeObserver 重绘用（dpr）
-
-function el(tag, attrs) {
-  const e = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-  return e;
-}
-
-function axisVal(v) {
-  if (!Number.isFinite(v)) return "—";
-  let s = v.toPrecision(3);
-  if (s.includes(".")) s = s.replace(/\.?0+$/, "");
-  return s;
-}
 
 function drawAxes(lim) {
   lastLim = lim;
@@ -307,7 +291,8 @@ function renderBosonicSteps(steps) {
   const tag = $("bos-step-tag");
   const info = $("bos-step-info");
   const meters = $("bos-step-meters");
-  if (!Array.isArray(steps) || steps.length === 0) {
+  const st = initStepState(steps, slider.value); // 滑条模型出自 leaf（票C）
+  if (st.disabled) {
     slider.disabled = true;
     slider.max = 0;
     tag.textContent = "—";
@@ -316,19 +301,13 @@ function renderBosonicSteps(steps) {
     return;
   }
   slider.disabled = false;
-  slider.max = String(steps.length - 1);
-  // 保底：滑条已停在边界时选最后一步（最终态）
-  if (!Number.isFinite(Number(slider.value)) || Number(slider.value) >= steps.length) {
-    slider.value = String(steps.length - 1);
-  }
+  slider.max = String(st.max);
+  slider.value = String(st.value); // 保底已在 leaf 内（停在末尾选最后一步）
   const show = (k) => {
     const s = steps[Number(k)];
-    tag.textContent = `step ${k}/${steps.length - 1}`;
-    const opDesc = (op) => op.replace("measure_", "measure·").replace(/_/g, " ");
-    info.textContent = `${opDesc(s.op)} · nmode ${s.nmode}`;
-    const mp = s.meters && s.meters.mean_photon;
-    const pu = s.meters && s.meters.purity;
-    meters.textContent = `⟨n⟩ ${fmt(mp)}  ·  purity ${fmt(pu)}`;
+    tag.textContent = stepLabel(k, steps);
+    info.textContent = `${stepDesc(s.op)} · nmode ${s.nmode}`;
+    meters.textContent = stepMeters(s.meters, fmt);
     // Step slider drives Wigner evolution, not only text meters.
     if (s.wigner) drawWignerResult({ wigner: s.wigner });
   };
@@ -439,12 +418,7 @@ function showMeasurement(body) {
   mOutcomes.replaceChildren();
   for (const m of body.measured || []) {
     const li = document.createElement("li");
-    const out = Array.isArray(m.outcome)
-      ? `(${m.outcome.map((v) => Number(v).toFixed(4)).join(", ")})`
-      : (Number.isInteger(m.outcome) ? String(m.outcome) : Number(m.outcome).toFixed(4));
-    const phi = m.phi !== undefined ? ` φ=${Number(m.phi).toFixed(3)}` : "";
-    const nm = m.name !== undefined ? ` ${m.name}` : "";
-    li.textContent = `${m.op}${nm} · mode ${m.mode}${phi} → ${out}`;
+    li.textContent = outcomeText(m);
     mOutcomes.appendChild(li);
   }
   measurementPanel.hidden = false;
@@ -617,19 +591,12 @@ async function doScan() {
   const node = state.nodes.find((n) => n.id === scanNode.value);
   const param = scanParam.value;
   const d = node && OPS[node.op]?.params?.[param];
-  if (!node || !d || !Array.isArray(d.sweep)) {
-    setStatus("扫参：请先选择有可扫参数的节点", false);
-    return;
-  }
   const pmin = Number(scanMin.value);
   const pmax = Number(scanMax.value);
   const n = Number(scanN.value);
-  if (!Number.isFinite(pmin) || !Number.isFinite(pmax) || pmin >= pmax) {
-    setStatus("扫参：min 必须是有限数且 < max", false);
-    return;
-  }
-  if (!Number.isInteger(n) || n < 2 || n > 200) {
-    setStatus("扫参：n 必须是 2–200 的整数", false);
+  const msg = validateScanForm({ hasSweepParam: !!(node && d && Array.isArray(d.sweep)), min: pmin, max: pmax, n });
+  if (msg) {
+    setStatus(msg, false);
     return;
   }
   const k = Number(scanModesA.value) || 1;
