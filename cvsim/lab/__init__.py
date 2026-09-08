@@ -11,7 +11,7 @@ The three runner modules stay importable for direct consumers that need
 them, but server.py goes through dispatch — never around it.
 """
 
-from cvsim.lab.dispatch import run_circuit, sample_circuit
+from cvsim.lab.dispatch import batch_circuit, run_circuit, sample_circuit
 from cvsim.lab.ir import (
     SCHEMA,
     CircuitV0Error,
@@ -37,6 +37,7 @@ __all__ = [
     "load_circuit",
     "run_circuit",
     "sample_circuit",
+    "batch_circuit",
     "scan_circuit",
     "fidelity_sweep",
 ]

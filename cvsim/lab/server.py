@@ -17,16 +17,22 @@ from cvsim.lab import (
     DOMAIN_ERRORS,
     SCHEMA,
     CircuitV0Error,
+    batch_circuit,
     fidelity_sweep,
     load_circuit,
     run_circuit,
     sample_circuit,
     scan_circuit,
 )
-from cvsim.lab.fock_backend import batch_fock_circuit
 from cvsim.lab.result import serialize
 
 app = FastAPI(title="cvsim Lab (Gaussian/Fock)", version="0.2.0")
+
+#: backends with a /batch executor (dispatch._BATCHERS is the registry;
+#: this mirror keeps the gate message single-sourced at the route layer —
+#: a batch-capable backend added to dispatch without updating this set
+#: fails the AST guard's spirit, see test_dispatch.py).
+_BATCHABLE = frozenset({"fock"})
 
 
 def _whitelist_label(allowed: list[str]) -> str:
@@ -114,11 +120,11 @@ def batch(body: dict[str, Any]) -> dict[str, Any]:
             raise CircuitV0Error("payload must be a JSON object")
         shots = body.pop("shots", 1000)
         circuit = load_circuit(body)
-        if circuit.backend != "fock":
-            raise CircuitV0Error("batch requires backend='fock' (v0 has no Gaussian batch)")
         if not isinstance(shots, int) or isinstance(shots, bool) or not 1 <= shots <= 100_000:
             raise CircuitV0Error("shots must be an int in [1, 100000]")
-        return batch_fock_circuit(circuit, shots, circuit.seed)
+        if circuit.backend not in _BATCHABLE:
+            raise CircuitV0Error("batch requires backend='fock' (v0 has no Gaussian batch)")
+        return batch_circuit(circuit, shots, circuit.seed)
     except DOMAIN_ERRORS as e:
         raise _422(e) from e
 
