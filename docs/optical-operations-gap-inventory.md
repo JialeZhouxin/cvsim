@@ -94,7 +94,7 @@
 
 ### Top-4（值得优先）
 
-1. **Bosonic PNR 完整化** — B9 已补单模边际概率/采样；剩余缺口是 `pnr_condition` 与联合多模 PNR。PNR 是门控、掺 Er 纠错、HOM 层析基础；Fock 端继续作为 gold 锚。后续需先决定 PNR 后验表示，再扩展 Bosonic（**AD 模块边界：Fock 可精确，Bosonic 单模边际走生成函数**）。
+1. **Bosonic PNR 完整化** — ✅ 2026-09-08 基本落地（ADR-0012，任务 `09-08-pnr-condition-state-bridge`）：概率面 B9/B10 已交付；后验走根层态桥 `cvsim/bridge.py`（`bosonic_to_fock` + `pnr_condition_bosonic` / `pnr_sample_and_condition_bosonic`，后验表示 = fock，两步桥）。剩余缺口：m≥3 整态桥与 2 模混合分量（ADR-0012 future work）；电路内联合后验仍延期。
 2. **Cross-Kerr 双模门** `e^{iχ n₁n₂}` — 与单模 kerr 同族但双模，是量子逻辑门、纠缠生成、非高斯纠错方案的核心资源；补上可扩展 bosonic 的非高斯能力覆盖。
 3. **bosonic `squeezed` 态工厂** — 一致性缺口：gaussian/fock 都有，bosonic 缺失，补上可与 `from_gaussian` 对账（K=1 对齐测试）。
 4. **general-dyne 广义测量** — 连续变量测量的完整族（8 端口干涉仪），目前只覆盖 homodyne/heterodyne 两个端点，缺中间连续族。

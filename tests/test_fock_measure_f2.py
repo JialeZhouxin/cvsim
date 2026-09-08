@@ -383,3 +383,162 @@ class TestRngDefaults:
         out = pnr_sample_batch(_pure1(alpha=1.0), size=7)
         assert out.shape == (7,)
         assert np.all(out >= 0)
+
+# -- ADR-0012 AC-9: pnr_condition / pnrd_probs generalized to nmode ≤ 4 ------
+#
+# Convention (unchanged from the 2-mode paths, regression-locked):
+# - pure posterior: measured mode REMOVED (np.take on that axis), amps
+#   (k−1)-D of shape (N,)*(nmode−1), renormalized;
+# - density posterior: measured mode FROZEN at |n⟩ (projector masking),
+#   nmode preserved, trace renormalized to 1.
+
+def _pure3(N=4):
+    """Product pure state |1⟩⊗|2⟩⊗|0⟩."""
+    amps = np.zeros((N, N, N), dtype=complex)
+    amps[1, 2, 0] = 1.0
+    return FockState(amps=amps)
+
+def _entangled3(N=4):
+    """0.6|0,1,2⟩ + 0.8|1,0,2⟩ superposition (tests marginal/condition axes)."""
+    amps = np.zeros((N, N, N), dtype=complex)
+    amps[0, 1, 2] = 0.6
+    amps[1, 0, 2] = 0.8
+    return FockState(amps=amps)
+
+def _e(N, n):
+    out = np.zeros(N, dtype=complex)
+    out[n] = 1.0
+    return out
+
+def test_ac9_pnrd_probs_pure3_joint_and_marginal() -> None:
+    st = _entangled3(4)
+    joint = pnrd_probs(st)  # mode=None → (N,N,N) joint |c|²
+    assert joint.shape == (4, 4, 4)
+    expect = np.zeros((4, 4, 4))
+    expect[0, 1, 2] = 0.36
+    expect[1, 0, 2] = 0.64
+    np.testing.assert_allclose(joint, expect, atol=1e-14)
+    np.testing.assert_allclose(pnrd_probs(st, mode=0), expect.sum(axis=(1, 2)), atol=1e-14)
+    np.testing.assert_allclose(pnrd_probs(st, mode=1), expect.sum(axis=(0, 2)), atol=1e-14)
+    np.testing.assert_allclose(pnrd_probs(st, mode=2), expect.sum(axis=(0, 1)), atol=1e-14)
+
+def test_ac9_pnrd_probs_dens3_joint_and_marginal() -> None:
+    st = FockDensity.from_pure(_entangled3(4))
+    joint = pnrd_probs(st)  # diag(ρ) reshaped — independent of pure path
+    assert joint.shape == (4, 4, 4)
+    expect = np.zeros((4, 4, 4))
+    expect[0, 1, 2] = 0.36
+    expect[1, 0, 2] = 0.64
+    np.testing.assert_allclose(joint, expect, atol=1e-14)
+    np.testing.assert_allclose(pnrd_probs(st, mode=1), expect.sum(axis=(0, 2)), atol=1e-14)
+
+def test_ac9_pnr_condition_pure3_product_gold() -> None:
+    """|1⟩⊗|2⟩⊗|0⟩: condition mode j → tensor product of the other two."""
+    st = _pure3(4)
+    np.testing.assert_allclose(
+        pnr_condition(st, mode=0, n=1).amps, np.outer(_e(4, 2), _e(4, 0)), atol=1e-14
+    )
+    np.testing.assert_allclose(
+        pnr_condition(st, mode=1, n=2).amps, np.outer(_e(4, 1), _e(4, 0)), atol=1e-14
+    )
+    np.testing.assert_allclose(
+        pnr_condition(st, mode=2, n=0).amps, np.outer(_e(4, 1), _e(4, 2)), atol=1e-14
+    )
+
+def test_ac9_pnr_condition_pure3_entangled_gold() -> None:
+    """Condition mode0 n=0 of 0.6|0,1,2⟩+0.8|1,0,2⟩ → |1⟩⊗|2⟩;
+    mode1 n=0 slice keeps only |1,0,2⟩ → |1⟩⊗|2⟩ as well."""
+    st = _entangled3(4)
+    np.testing.assert_allclose(
+        pnr_condition(st, mode=0, n=0).amps, np.outer(_e(4, 1), _e(4, 2)), atol=1e-14
+    )
+    np.testing.assert_allclose(
+        pnr_condition(st, mode=1, n=0).amps, np.outer(_e(4, 1), _e(4, 2)), atol=1e-14
+    )
+
+def test_ac9_pnr_condition_dens3_projector_gold() -> None:
+    """3-mode density: posterior = A ρ A†/p, explicit kron projector gold;
+    measured mode stays frozen at |n⟩ (nmode preserved)."""
+    st = FockDensity.from_pure(_entangled3(4))
+    mode, n = 0, 0
+    out = pnr_condition(st, mode=mode, n=n)
+    N = 4
+    P = np.zeros((N, N))
+    P[n, n] = 1.0
+    A = np.kron(np.kron(P, np.eye(N)), np.eye(N))
+    p = float(np.real(np.trace(A @ st.rho @ A)))
+    gold = A @ st.rho @ A / p
+    np.testing.assert_allclose(out.rho, gold, atol=1e-14)
+    assert abs(np.trace(out.rho).real - 1.0) < 1e-12
+
+def test_ac9_pnr_condition_dens3_mixed_rho() -> None:
+    """Genuinely mixed 3-mode ρ with coherence: projection mode0→|0⟩ kills the
+    |111⟩ block and |000⟩⟨111| coherence; posterior = pure |000⟩⟨000|."""
+    N = 3
+    rho = np.zeros((N**3, N**3), dtype=complex)
+    i000 = 0
+    i111 = 9 + 3 + 1
+    rho[i000, i000] = 0.5
+    rho[i111, i111] = 0.5
+    rho[i000, i111] = 0.3
+    rho[i111, i000] = 0.3
+    st = FockDensity(rho=rho, nmode=3)
+    out = pnr_condition(st, mode=0, n=0)
+    expect = np.zeros((N**3, N**3), dtype=complex)
+    expect[i000, i000] = 1.0
+    np.testing.assert_allclose(out.rho, expect, atol=1e-14)
+
+def test_ac9_pnr_condition_pure4_sanity() -> None:
+    N = 2
+    amps = np.zeros((N, N, N, N), dtype=complex)
+    amps[0, 1, 0, 1] = 1.0  # |0,1,0,1⟩
+    st = FockState(amps=amps)
+    out = pnr_condition(st, mode=1, n=1)  # → |0,0,1⟩ (3-mode)
+    assert out.nmode == 3
+    expect = np.einsum("i,j,k->ijk", _e(2, 0), _e(2, 0), _e(2, 1))
+    np.testing.assert_allclose(out.amps, expect, atol=1e-14)
+
+def test_ac9_pnr_condition_dens4_sanity() -> None:
+    """Density conditioning keeps nmode (frozen mode): 4-mode → 4-mode."""
+    N = 2
+    amps = np.zeros((N, N, N, N), dtype=complex)
+    amps[0, 0, 1, 0] = 1.0  # |0,0,1,0⟩
+    st = FockDensity.from_pure(FockState(amps=amps))
+    out = pnr_condition(st, mode=2, n=1)
+    assert out.nmode == 4
+    expect = np.zeros((N**4, N**4), dtype=complex)
+    idx = 0 * 8 + 0 * 4 + 1 * 2 + 0
+    expect[idx, idx] = 1.0
+    np.testing.assert_allclose(out.rho, expect, atol=1e-14)
+    with pytest.raises(ValueError, match="zero probability"):
+        pnr_condition(st, mode=2, n=0)
+
+def test_ac9_pnr_condition_2mode_regression() -> None:
+    """2-mode paths bit-identical to the pre-ADR-0012 convention."""
+    amps = np.zeros((6, 6), dtype=complex)
+    amps[1, 2] = 0.6
+    amps[0, 3] = 0.8
+    st = FockState(amps=amps)
+    np.testing.assert_allclose(
+        pnr_condition(st, 0, 1).amps, FockState.fock(2, 6).amps, atol=1e-14
+    )
+    np.testing.assert_allclose(
+        pnr_condition(st, 1, 3).amps, FockState.fock(0, 6).amps, atol=1e-14
+    )
+
+def test_ac9_pnrd_and_condition_mode_out_of_range_raises() -> None:
+    st3 = _entangled3(4)
+    with pytest.raises(IndexError, match="nmode=3"):
+        pnrd_probs(st3, mode=3)
+    with pytest.raises(IndexError, match="nmode=3"):
+        pnr_condition(st3, mode=3, n=0)
+    d3 = FockDensity.from_pure(st3)
+    with pytest.raises(IndexError, match="nmode=3"):
+        pnrd_probs(d3, mode=3)
+    with pytest.raises(IndexError, match="nmode=3"):
+        pnr_condition(d3, mode=3, n=0)
+
+def test_ac9_pnr_condition_nmode5_raises() -> None:
+    # FockState ndim hard cap: 5-mode pure state cannot be constructed
+    with pytest.raises(ValueError, match="ndim"):
+        FockState(amps=np.zeros((2,) * 5, dtype=complex))

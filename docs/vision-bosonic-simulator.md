@@ -5,7 +5,7 @@
 > **Not:** An implementation changelog. When code and this doc disagree, **this doc wins for greenfield work**; tasks must implement the spec or explicitly amend this doc first.
 > **Sibling:** Gaussian story lives in [`vision-gaussian-simulator.md`](./vision-gaussian-simulator.md); Fock peer in [`vision-fock-simulator.md`](./vision-fock-simulator.md). Cross-representation rules owned by Gaussian vision §6 unless amended here.
 
-**Last updated:** 2026-09-02（Kerr 及单模 PNR 部分 amend：`kerr` 见 §1.3，PNR 见 §2.3）
+**Last updated:** 2026-09-08（ADR-0012 amend：PNR 条件化桥，见 §1.3 / §2.3）
 **Status:** Vision locked by grill (Q1–Q13, 2026-08-13); **B0–B7 done (2026-09-02)**；基线冻结 + 能力完备（门全集/通道/heterodyne+threshold/coherent 工厂/BOSONIC_PUBLIC 冻结）+ 组件工程 + 测量精度 + 调和对账 + BosonicCircuit DSL + GUI 三件套 + **B7 复中心内核/严格 Wigner 核** + **非高斯 `kerr` 门（分量展开，phaseB8）** + **单模 `pnr_probs`/`pnr_sample`（Phase 1）**；从真空出位置梳 GKP 仍为 non-goal（需 stabilizer 测量+反馈）
 **Codebase today:** `cvsim/bosonic` B1 生产面（state/cat/gkp/gates 11 门/channels 3/measure.py 三测量 + 单模 PNR/observables 矩；单模 homodyne 教学切，B3 换精确）
 
@@ -34,7 +34,7 @@ Gaussian's "production" claim rests on scale + precision (m→100, fast compile)
 | **Arbitrary non-Gaussian gates in component form** | 2026-09-02 amend: bosonic adds **`kerr`** (non-Gaussian, component expansion, phaseB8) — see note below. Other arbitrary non-Gaussian gates still excluded. Note: Kerr alone cannot produce a position-comb GKP from vacuum (needs stabilizer measurement + displacement feedback, Gaussian-dominated) → **from-vacuum GKP remains non-goal** (see docs/phase0-kerr-component-expansion.md + Boudreault arXiv:2507.09684) |
 | **Protocol library** (e.g. built-in GKP QEC rounds) | P1 locked: bricks in the library, protocols in tutorials / GUI scripts. Library must not grow into an error-correction framework |
 | **Multi-mode production-grade** | A1 locked: single-mode production anchor; architecture written for arbitrary m; dual-mode is an open question (K² blowup is real engineering, no scene driving it yet) |
-| **PNR condition/posterior** | `pnr_condition` and `pnr_sample_and_condition` remain deferred: a PNR posterior is generally non-Gaussian and cannot be represented exactly by finite Gaussian components. |
+| **PNR condition/posterior** | 2026-09-08 amend（ADR-0012）：PNR 后验改判为 **fock 表示、根层单向态桥** `cvsim/bridge.py::bosonic_to_fock` + `pnr_condition_bosonic` / `pnr_sample_and_condition_bosonic`（两步桥：整态桥 → fock 条件化）。bosonic 包内仍不实现 `pnr_condition`（有限高斯分量无法精确表示后验——原因不变），后验落 fock 侧；m≤2、无 renormalization、诚实报错边界详见 ADR-0012。 |
 | **AD (differentiable)** | Open question. Component-weight differentiability is heavy engineering; GKP teaching doesn't need it |
 | **Tensor networks / cloud / multi-user** | Inherits Fock stance, no re-litigation |
 
@@ -60,7 +60,8 @@ Gaussian's "production" claim rests on scale + precision (m→100, fast compile)
 
 - **Homodyne:** per-component affine + likelihood reweighting (teaching closed form, notes §5.2). B3 upgrades sampling to **exact edge distribution** (cross terms included, no "diagonal-peak pool" approximation — that is the teaching cut, explicitly not production). **Sampling strategy (A5, 2026-08-14): CDF grid inversion** — P(x) = Σ_k w_k p_k(x) 是复权重混合（无正概率权重，拒绝采样不可行）；网格 δx ≤ σ_min/5 自动定，uniform + searchsorted 反演，10³ shots 向量化；条件化 ρ_post = Σ_k [w_k p_k(x)] ρ_k / P(x) 同一核。
 - **Heterodyne / threshold:** threshold = outcome-only {0,1}, no state update; heterodyne **精确化（ADR-0007）**：2D Q-surface Q(β)=Σ_k w_k Q_k(β)（复中心解析延拓）+ 顺序 CDF 反演（x 边缘 → 条件 p），条件化同一核 w_k ∝ w_k·Q_k(β)，模删除语义不变。
-- **单模 PNR（Phase 1）:** `pnr_probs(state, mode=0, *, cutoff=30)` 返回目标 mode 前 `cutoff` 个 photon-number 边际概率，`pnr_sample(..., rng=None)` 在该有限数组内归一化后单次采样。复中心/复权重全分量求和后提取；多模输入不产生联合分布。`pnr_condition`、`pnr_sample_and_condition` 仍不提供。
+- **单模 PNR（Phase 1）:** `pnr_probs(state, mode=0, *, cutoff=30)` 返回目标 mode 前 `cutoff` 个 photon-number 边际概率，`pnr_sample(..., rng=None)` 在该有限数组内归一化后单次采样。复中心/复权重全分量求和后提取；多模输入不产生联合分布。
+- **PNR 条件化（ADR-0012，根层桥）:** 后验表示 = fock（单向整态切换）。API 落根层 `cvsim/bridge.py`：`bosonic_to_fock(state, *, cutoff) -> FockDensity`（分量核 = Bloch–Messiah-lite；复 r̄ 交叉分量经 B7 左右劈裂存活；单模混合分量走谱路线；无 renormalization，trace = 1 − tail）；`pnr_condition_bosonic(state, mode, n, *, cutoff)` 与 `pnr_sample_and_condition_bosonic(state, mode, *, cutoff, rng)` 均为「先桥后 fock 条件化」两步。m≥3、2 模混合分量、复 r̄×混合 → 诚实 `ValueError`（future work 见 ADR-0012）。bosonic 包内 `pnr_condition` 仍不提供（表示原因不变）。
 
 ---
 
@@ -250,3 +251,4 @@ Marker idea: `@pytest.mark.phaseB1` etc. — mirror Gaussian §9 / Fock §8.
 | 0.3.0 | 2026-09-02 | **GKP 2d 单模平方格 Z 基**（任务 09-02-gkp-2d-square-lattice，commit `c1cbeaa`）：`lattice="2d"` 从 (x,p) 网格峰+各向同性 V 重定义为单模位置梳（x=kΔ, p=0, V=½diag(ε,1/ε)）+ gkp1 交替相位 (−1)^k（Z 基，峰不动），与 1d X 基互补；交叉分量 Wigner 相位 `s=V·J·Δr`（B7 修正，对各向异性 V 才纯）；逻辑对账入口 `pure_fidelity`（`gkp_logical_overlap` 仅 X 基有效）。破坏性 2d 语义变更（0.x 预发布，公共 API 签名不变）；物理事实源 `docs/gkp-2d-square-lattice.md`。§9 gap 表同步 |
 | 0.4.0 | 2026-09-02 | **单模 Bosonic PNR 概率与采样**（任务 `09-02-add-missing-optical-ops` Phase 1）：新增 `pnr_probs`/`pnr_sample`，生成函数 + Cauchy 提取保留复中心/复权重，目标 mode 支持多模输入的单模 block；`pnr_condition`、联合多模 PNR 和后验电路仍非目标。 |
 | 0.5.0 | 2026-09-03 | **联合多模 Bosonic PNR**（任务 `09-03-bosonic-pnr-joint-multimode` Phase 2a）：`pnr_probs`/`pnr_sample` 增加 `modes` 参数（`None`=全模联合、`(…)`=子集、与 `mode=` 互斥）；2m×2m 块生成函数 `B=A+2Σc_jP_j` + 逐步 branch-anchored `√detVB`（K≥2 消除 ±1 翻转）+ 逐轴 FFT Cauchy 提取；核向量化（k≤2 平衡，>3 不承诺）。AC-1 TMSV/AC-2 cat⊗coherent/AC-3 cat⊗cat 复中心干涉 vs Fock gold 达 1.1e-16；`pnr_condition` 仍非目标。 |
+| 0.6.0 | 2026-09-08 | **PNR 条件化改判：根层 bosonic→fock 状态桥**（任务 `09-08-pnr-condition-state-bridge`，ADR-0012）：§1.3 非目标行改判 + §2.3 增桥语义。`cvsim/bridge.py` 新增 `bosonic_to_fock` / `pnr_condition_bosonic` / `pnr_sample_and_condition_bosonic`；分量核 Bloch–Messiah-lite（probe 钉死，PIN RESULT: OK），复 r̄ 交叉分量 B7 左右劈裂，单模混合谱路线，无 renormalization；m≤2，其余诚实 ValueError。fock 端 `pnr_condition` 同任务推广 nmode≤4。 |

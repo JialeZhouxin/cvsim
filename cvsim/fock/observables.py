@@ -88,35 +88,26 @@ def mean_photon(state: FockLike, mode: int | None = None) -> float:
 def pnrd_probs(state: FockLike, mode: int | None = None) -> np.ndarray:
     """Photon-number probabilities from |c|² or diag(ρ).
 
-    2-mode dens: mode=None → joint (N,N); mode=0|1 → marginal (N,).
+    nmode-mode (nmode ≤ 4) dens or pure: mode=None → joint ``(N,)*nmode``;
+    mode=j → marginal on mode j (sum over the other axes).
 
     Gaussian-state counterpart (joint P(n) via thewalrus):
     ``cvsim.gaussian.pnr_probs``.
     """
+    nm = state.nmode
+    if mode is not None and not 0 <= mode < nm:
+        raise IndexError(f"mode {mode} out of range for nmode={nm}")
     if isinstance(state, FockDensity):
-        if state.nmode == 1:
-            if mode is not None and mode != 0:
-                raise IndexError(f"mode {mode} out of range for nmode=1")
-            return np.asarray(np.real(np.diag(state.rho)), dtype=float)
-        p2 = _dens_joint_pn(state)
-        if mode is None:
-            return p2
-        if mode == 0:
-            return np.asarray(p2.sum(axis=1), dtype=float)
-        if mode == 1:
-            return np.asarray(p2.sum(axis=0), dtype=float)
-        raise IndexError(f"mode {mode} out of range for nmode=2")
-
-    p = np.abs(state.amps) ** 2
-    if state.nmode == 1:
-        return np.asarray(p, dtype=float)
+        p = np.asarray(np.real(np.diag(state.rho)), dtype=float).reshape(
+            (state.cutoff,) * nm
+        )
+    else:
+        p = np.abs(state.amps) ** 2
     if mode is None:
         return np.asarray(p, dtype=float)
-    if mode == 0:
-        return np.asarray(p.sum(axis=1), dtype=float)
-    if mode == 1:
-        return np.asarray(p.sum(axis=0), dtype=float)
-    raise IndexError(f"mode {mode} out of range for nmode=2")
+    return np.asarray(
+        p.sum(axis=tuple(ax for ax in range(nm) if ax != mode)), dtype=float
+    )
 
 
 def _expect_a_ops(state: FockLike) -> tuple[complex, float, complex]:
@@ -334,11 +325,14 @@ def pnr_sample_batch(
 def pnr_condition(state: FockLike, mode: int = 0, n: int = 0) -> FockState | FockDensity:
     """Posterior after photon-number outcome `n` on `mode` (Born rule).
 
+    Generalized to nmode ≤ 4 (ADR-0012 AC-9; 2-mode paths bit-identical):
+
     - 1-mode pure: posterior |n⟩ (projective, independent of prior).
     - 1-mode density: |n⟩⟨n|.
-    - 2-mode pure: remaining mode conditioned on ⟨n|: ψ'[k] ∝ ψ[n,k] (mode 0)
-      or ψ[k,n] (mode 1).
-    - 2-mode density: (P⊗I)ρ(P⊗I)†/p with P=|n⟩⟨n|.
+    - k-mode pure (k ≤ 4): remaining k−1 modes conditioned on ⟨n|:
+      ψ'[...] ∝ ψ with axis `mode` fixed at n (np.take on that axis).
+    - k-mode density: (P_mode ⊗ I) ρ (P_mode ⊗ I)†/p, P = |n⟩⟨n| —
+      row/col masking on the reshaped tensor.
     Outcome with zero probability → ValueError (honest, no silent renormalize).
     """
     if isinstance(state, FockDensity):
@@ -348,21 +342,21 @@ def pnr_condition(state: FockLike, mode: int = 0, n: int = 0) -> FockState | Foc
 
 def _pnr_condition_pure(state: FockState, mode: int, n: int) -> FockState:
     N = state.cutoff
+    nm = state.nmode
     if not 0 <= n < N:
         raise IndexError(f"n={n} out of range for cutoff={N}")
-    if state.nmode == 1:
-        if mode != 0:
-            raise IndexError(f"mode {mode} out of range for nmode=1")
+    if not 0 <= mode < nm:
+        raise IndexError(f"mode {mode} out of range for nmode={nm}")
+    if nm == 1:
         p = abs(state.amps[n]) ** 2
         if p <= _EPS:
             raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
         amps = np.zeros(N, dtype=complex)
         amps[n] = 1.0
         return FockState(amps=amps)
-    if mode not in (0, 1):
-        raise IndexError(f"mode {mode} out of range for nmode=2")
-    vec = state.amps[n, :].copy() if mode == 0 else state.amps[:, n].copy()
-    p = np.sum(abs(vec) ** 2)
+    # general nmode ≤ 4: slice out mode `mode` at outcome n, renormalize
+    vec = np.take(state.amps, n, axis=mode)
+    p = float(np.sum(np.abs(vec) ** 2))
     if p <= _EPS:
         raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
     return FockState(amps=vec / np.sqrt(p))
@@ -370,28 +364,34 @@ def _pnr_condition_pure(state: FockState, mode: int, n: int) -> FockState:
 
 def _pnr_condition_density(state: FockDensity, mode: int, n: int) -> FockDensity:
     N = state.cutoff
+    nm = state.nmode
     if not 0 <= n < N:
         raise IndexError(f"n={n} out of range for cutoff={N}")
-    if state.nmode == 1:
-        if mode != 0:
-            raise IndexError(f"mode {mode} out of range for nmode=1")
+    if not 0 <= mode < nm:
+        raise IndexError(f"mode {mode} out of range for nmode={nm}")
+    if nm == 1:
         p = np.real(state.rho[n, n])
         if p <= _EPS:
             raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
         rho = np.zeros((N, N), dtype=complex)
         rho[n, n] = 1.0
         return FockDensity(rho=rho, nmode=1)
-    if mode not in (0, 1):
-        raise IndexError(f"mode {mode} out of range for nmode=2")
-    P = np.zeros((N, N), dtype=complex)
-    P[n, n] = 1.0
-    eye = np.eye(N, dtype=complex)
-    A = np.kron(P, eye) if mode == 0 else np.kron(eye, P)
-    rho2 = A @ state.rho @ A.conj().T
-    p = np.real(np.trace(rho2))
+    # general nmode ≤ 4: (P_mode ⊗ I_rest) ρ (P_mode ⊗ I)† via masking on the
+    # reshaped tensor — zero every row/col whose mode-`mode` coordinate ≠ n.
+    # m_row aligns to the first nm axes (ket row index), m_col to the last nm
+    # axes (bra col index); both padded to 2nm-dim trailing shape.
+    shape = (N,) * nm
+    flat = state.rho.reshape(shape + shape)
+    keep = np.zeros(N, dtype=bool)
+    keep[n] = True
+    m_row = keep.reshape([N if ax == mode else 1 for ax in range(2 * nm)])
+    m_col = keep.reshape([N if ax == nm + mode else 1 for ax in range(2 * nm)])
+    proj = flat * m_row * m_col
+    rho2 = proj.reshape(N**nm, N**nm)
+    p = float(np.real(np.trace(rho2)))
     if p <= _EPS:
         raise ValueError(f"pnr_condition: outcome n={n} has zero probability")
-    return FockDensity(rho=rho2 / p, nmode=2)
+    return FockDensity(rho=rho2 / p, nmode=nm)
 
 
 def pnr_sample_and_condition(
