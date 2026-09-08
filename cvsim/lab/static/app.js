@@ -3,7 +3,7 @@
 
 import { initEditor, loadJson } from "./editor.js";
 import { OPS, sourceModes, toV1Json } from "./ops.js";
-import { publishSchema } from "./schema_store.js";
+import { meterKeys, publishSchema } from "./schema_store.js";
 import { deriveOps } from "./ops_schema.js";
 import { setInitialSchema } from "./initial.js";
 import { setEditorSchema, deriveEditorTables } from "./editor.js";
@@ -198,6 +198,35 @@ new ResizeObserver(() => {
 /* 容器尺寸变化（窗口/面板/fock 切换）→ 重算正方形画布 */
 new ResizeObserver(fitWignerFrame).observe(wignerBox);
 
+/* R6 (ADR-0008 决策 3): meter 行标签 — 值消费者 (meter VALUE 读取口) 与
+   渲染顺序的唯一前端声明处；键集来自 /schema meter 矩阵
+   (schema_store.meterKeys，后端事实源 cvsim/lab/result.py)。 */
+const METER_ROWS = {
+  purity: { value: "m-purity", label: "纯度" },
+  mean_photon: { value: "m-nbar", label: "平均光子数" },
+  mean_photon_per_mode: { value: "m-permode", label: "各模式 ⟨n⟩" },
+  log_negativity: { value: "m-logneg", label: "对数负度" },
+};
+
+/** meter 面板渲染 (gaussian/bosonic 共享)：矩阵定行可见性，值经 fmt
+   (缺键/None → 诚实 "—")。矩阵外静态行隐藏 (防御：HTML 漂移时可见)；
+   flag 型扩展键 (singular) 不占 meter 行 — 其专属消费者在
+   showMeasurement (m-singular-note)。 */
+function renderMetersPanel(backend, m) {
+  const keys = meterKeys(backend);
+  for (const [key, row] of Object.entries(METER_ROWS)) {
+    const tr = $(`m-row-${key}`);
+    if (!tr) continue; // HTML 漂移防御：矩阵键无静态行则跳过，不渲染
+    tr.hidden = !keys.has(key);
+    if (keys.has(key)) {
+      const val = m[key];
+      $(row.value).textContent = Array.isArray(val)
+        ? val.map((v) => fmt(v)).join(" ")
+        : fmt(val);
+    }
+  }
+}
+
 function render(result, mode) {
   /* #8: 新 run 使旧 scan 摘要失效——折叠摘要清空 */
   const scanSummary = $("scan-summary");
@@ -214,10 +243,7 @@ function render(result, mode) {
   drawWignerResult(result);
   $("rbar-block").hidden = false; // 均值表常驻侧列（有数据才显示）
 
-  const m = result.meters;
-  $("m-purity").textContent = fmt(m.purity);
-  $("m-nbar").textContent = fmt(m.mean_photon);
-  $("m-logneg").textContent = m.log_negativity === undefined ? "—" : fmt(m.log_negativity);
+  renderMetersPanel(result.backend, result.meters); // R6: 矩阵驱动（原隐式键缺席分派退役）
 
   $("nmode-tag").textContent = `nmode ${result.nmode}`;
   const nm = result.nmode;
@@ -273,14 +299,11 @@ function renderFock(result, mode) {
   fockPanel.renderResult(result);
 }
 
-/* B6: Bosonic 结果面板 — Wigner（复用）+ meters（purity/mean_photon）+
+/* B6: Bosonic 结果面板 — Wigner（复用）+ meters（矩阵驱动，R6）+
    分步执行滑条（/run?detail=steps 断点快照；fidelity 曲线走独立 Sweep 按钮）。 */
 function renderBosonic(result, mode) {
   drawWignerResult(result);
-  const m = result.meters || {};
-  $("m-purity").textContent = fmt(m.purity);
-  $("m-nbar").textContent = fmt(m.mean_photon);
-  $("m-logneg").textContent = "—"; // bosonic 无 log_negativity
+  renderMetersPanel(result.backend, result.meters || {}); // R6: 矩阵驱动（原 logneg 硬编码 "—" 退役）
   $("nmode-tag").textContent = `nmode ${result.nmode}`;
   renderModeSelect(result.nmode, mode);
   renderBosonicSteps(result.steps);
@@ -379,16 +402,19 @@ async function runBosonicFidelity() {
   });
 }
 
+/* R7 (ADR-0008 follow-up): per-backend 面板可见性表 — 后端差异知识单点
+   （NOTES.md 已知债务：backend 条件散布收口，方向 = per-backend 配置表）。
+   syncBackendPanels 唯一消费者；新后端 = 一行，不添 if。 */
+const BACKEND_PANELS = {
+  gaussian: { "scan-panel": true, "state-grid": true, "fock-panel": false, "fock-charts": false, "bosonic-panel": false, "meters-panel": true, "wigner-side": true },
+  fock: { "scan-panel": false, "state-grid": false, "fock-panel": true, "fock-charts": true, "bosonic-panel": false, "meters-panel": false, "wigner-side": false },
+  bosonic: { "scan-panel": false, "state-grid": false, "fock-panel": false, "fock-charts": false, "bosonic-panel": true, "meters-panel": true, "wigner-side": true },
+};
+
 function syncBackendPanels(backend) {
-  const fock = backend === "fock";
-  const bosonic = backend === "bosonic";
-  $("scan-panel").hidden = fock || bosonic; // bosonic 扫掠走 /fidelity（带 RNG）
-  $("state-grid").hidden = fock || bosonic; // bosonic 无单一 V 矩阵（K 分量）
-  $("fock-panel").hidden = !fock;
-  $("fock-charts").hidden = !fock; // PNR/joint 分布行
-  $("bosonic-panel").hidden = !bosonic;
-  $("meters-panel").hidden = false; // Fock 藏；gaussian/bosonic 常显
-  $("wigner-side").hidden = fock;    // Fock 藏（侧列全藏）；gaussian/bosonic 保留
+  const panels = BACKEND_PANELS[backend];
+  if (!panels) return; // 未知 backend：保持现状（schema 门已拦，防御不摸 DOM）
+  for (const [id, visible] of Object.entries(panels)) $(id).hidden = !visible;
   fitWignerFrame(); // side 显隐变化 → 重算正方形画布
 }
 
@@ -425,12 +451,15 @@ function showMeasurement(body) {
   measurementPanel.scrollIntoView({ block: "nearest" }); // panel sits below V table; bring it into view
 }
 
+/* R7: per-backend run 请求体扩展 — bosonic 一次拉全部分步快照
+   （断点中间态）；gaussian/fock 无扩展。知识单点（原三元式散在 doRun）。 */
+const RUN_BODY_EXTENSIONS = {
+  bosonic: { detail: "steps" },
+};
+
 async function doRun(circuitJson, seq) {
   const t0 = performance.now();
-  // B6: bosonic 一次拉全部分步快照（断点中间态）；gaussian/fock 忽略 detail
-  const payload = circuitJson.backend === "bosonic"
-    ? { ...circuitJson, detail: "steps" }
-    : circuitJson;
+  const payload = { ...circuitJson, ...(RUN_BODY_EXTENSIONS[circuitJson.backend] ?? {}) };
   await requestLab("/run", {
     payload, seq, guard: seqGuard,
     busy: busyRunSample,

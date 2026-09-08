@@ -28,4 +28,6 @@ Lab 三后端（gaussian/fock/bosonic）的响应组装是**双规约**：gaussi
 - 加新后端 = 填一张 LabResult + 矩阵行，响应形状知识单点。
 - 前端零改动兼容（键集只增不减，字节级差异 = gaussian 新增 backend 键）。
 - `RunResult` 是公开面移除——但消费者已核实仅 lab 内部，且 `cvsim.lab` 不在 api-stability 的 semver 承诺内（只锁核心三包）。
-- 前端按矩阵渲染 meter 行 = 后续独立小票，本决策不含。
+- 前端按矩阵渲染 meter 行 = 后续独立小票，本决策不含。（2026-09 已关单：
+  `schema_store.meterKeys` 唯一消费口 + `renderMetersPanel` 矩阵驱动渲染，
+  gaussian 隐式键缺席分派与 bosonic 硬编码 "—" 退役；补 mean_photon_per_mode 行）

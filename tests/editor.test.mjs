@@ -10,7 +10,7 @@ import {
 } from "../cvsim/lab/static/ops.js";
 // ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
 import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
-import { publishSchema, opsForBackend } from "../cvsim/lab/static/schema_store.js";
+import { publishSchema, opsForBackend, meterKeys } from "../cvsim/lab/static/schema_store.js";
 import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
 import { setInitialSchema } from "../cvsim/lab/static/initial.js";
 
@@ -34,6 +34,7 @@ const MOCK_SCHEMA = {
   })),
   initial: { gaussian: null, fock: { kind: "int", min: 0 }, bosonic: { kind: "enum", sources: ["gkp0", "gkp1", "gkp0_2d", "gkp1_2d"], vacuum: null } },
   extensions: { cutoff: [1, 30], view: { lim_max: 50, lim_min_exclusive: 0, n: [2, 512] }, sweep: { n: [2, 200] }, shots: [1, 100000], rounds: [1, 100] },
+  meters: { core: ["purity", "mean_photon", "mean_photon_per_mode"], extensions: { gaussian: ["log_negativity", "singular"], fock: ["leakage"], bosonic: [] } },
 };
 // palette derived publish happens in the F7 tests at file end (avoids polluting fallback-path tests).
 
@@ -1009,4 +1010,29 @@ test("ticket-4 F7: opsForBackend derived palette (fock has kerr/cz/cx/measure_pn
   assert.ok(!opsForBackend("gaussian").includes("kerr"));
   assert.ok(!opsForBackend("gaussian").includes("measure_pnr"));
   assert.ok(opsForBackend("bosonic").includes("measure_threshold"));
+});
+
+/* ── R6 (ADR-0008 决策 3): meterKeys — meter 支持矩阵前端唯一消费口 ── */
+test("R6: meterKeys = core ∪ extensions[backend]，逐后端与 result.py 矩阵一致", () => {
+  publishSchema(MOCK_SCHEMA, { ops: deriveOps(MOCK_SCHEMA), uiToOp: {}, uiToParam: {}, fockUiToParam: {} });
+  const g = meterKeys("gaussian");
+  assert.ok(g.has("purity") && g.has("mean_photon") && g.has("mean_photon_per_mode"));
+  assert.ok(g.has("log_negativity") && g.has("singular"));
+  const b = meterKeys("bosonic");
+  assert.ok(b.has("purity") && b.has("mean_photon"));
+  assert.ok(!b.has("log_negativity")); // bosonic 扩展行为空集 — 物理事实
+  assert.ok(!b.has("singular"));
+  const f = meterKeys("fock");
+  assert.ok(f.has("leakage"));
+  assert.ok(!f.has("log_negativity"));
+});
+
+test("R6: meterKeys fail-fast — meters 块缺失 / 缺 backend 扩展行 / 未知 backend 均 throw", () => {
+  const probe = (doc, backend = "bosonic") => {
+    publishSchema(doc, { ops: deriveOps(doc), uiToOp: {}, uiToParam: {}, fockUiToParam: {} });
+    try { return meterKeys(backend); } finally { publishSchema(MOCK_SCHEMA, { ops: deriveOps(MOCK_SCHEMA), uiToOp: {}, uiToParam: {}, fockUiToParam: {} }); }
+  };
+  assert.throws(() => probe({ ops: {} }), /未初始化/);
+  assert.throws(() => probe({ ops: {}, meters: { core: ["purity"] } }), /扩展行/);
+  assert.throws(() => meterKeys("nosuch"), /扩展行/); // 上一行 finally 己恢复 MOCK_SCHEMA
 });

@@ -92,9 +92,13 @@
           <table class="mat" id="rbar-table"><caption class="sr-only">各模式均值</caption></table>
         </div>
         <div class="meters" id="meters-panel">
-          <div class="meter"><span class="meter__label">纯度</span><span id="m-purity" class="meter__value mono">—</span></div>
-          <div class="meter"><span class="meter__label">平均光子数</span><span id="m-nbar" class="meter__value mono">—</span></div>
-          <div class="meter"><span class="meter__label">对数负度</span><span id="m-logneg" class="meter__value mono">—</span></div>
+          <!-- R6 (ADR-0008 决策 3): 行序/可见性由 /schema meter 矩阵驱动
+               (schema_store.meterKeys)。app.js renderMetersPanel 按键填值，
+               矩阵外键 honest "—"；core 键全部预置（含 mean_photon_per_mode）。 -->
+          <div class="meter" id="m-row-purity"><span class="meter__label">纯度</span><span id="m-purity" class="meter__value mono">—</span></div>
+          <div class="meter" id="m-row-mean_photon"><span class="meter__label">平均光子数</span><span id="m-nbar" class="meter__value mono">—</span></div>
+          <div class="meter" id="m-row-mean_photon_per_mode"><span class="meter__label">各模式 ⟨n⟩</span><span id="m-permode" class="meter__value mono">—</span></div>
+          <div class="meter" id="m-row-log_negativity"><span class="meter__label">对数负度</span><span id="m-logneg" class="meter__value mono">—</span></div>
         </div>
       </div>
     </div>

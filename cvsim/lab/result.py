@@ -60,6 +60,9 @@ METER_SUPPORT: dict[str, frozenset[str]] = {
 #: Public core keys of the LabResult contract (ADR-0008 decision 1). The
 #: gaussian legacy response gains ``backend`` here (Q4: every payload
 #: self-identifies; additive, tests updated in the same ticket).
+#: (R6 closed 2026-09: frontend consumes the /schema matrix via
+#: ``schema_store.meterKeys`` + ``renderMetersPanel`` — matrix-driven rows,
+#: missing-key/None renders honest "—", per-mode ⟨n⟩ row added.)
 LAB_RESULT_CORE_KEYS: frozenset[str] = frozenset(
     {"schema", "backend", "nmode", "wigner", "meters", "measured", "seed", "sampled"}
 )

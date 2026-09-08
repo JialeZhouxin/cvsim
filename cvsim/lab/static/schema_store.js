@@ -46,3 +46,21 @@ export function opsForBackend(backend) {
     (op) => Array.isArray(TABLES.ops[op].backends) && TABLES.ops[op].backends.includes(backend)
   );
 }
+
+/** R6（ADR-0008 决策 3）：backend 的 meter 键集 = core ∪ 该表示扩展行。
+    后端事实源在 cvsim/lab/result.py（METER_CORE / METER_EXTENSIONS），
+    随 /schema 单点下发（schema.py "meters" 块）；本函数是前端唯一消费口。
+    fail-fast：/schema 未拉到（offline 启动）直接 throw —— meters 键集是
+    声明过的物理事实，无镜像可回退，静默空集会误渲染成整排 "—"。 */
+export function meterKeys(backend) {
+  if (!DOC || !DOC.meters || !Array.isArray(DOC.meters.core)) {
+    throw new Error(
+      "meter 矩阵未初始化：/schema 拉取失败 — 禁止静默回退（frozen-graph）"
+    );
+  }
+  const ext = DOC.meters.extensions?.[backend];
+  if (!Array.isArray(ext)) {
+    throw new Error(`meter 矩阵无 backend ${backend} 扩展行 — /schema 载荷漂移`);
+  }
+  return new Set([...DOC.meters.core, ...ext]);
+}
