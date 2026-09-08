@@ -148,7 +148,9 @@ try {
   })()`);
   check("staff: default scene = 2 lanes (2 vacuum sources)", staff.rows === 2, JSON.stringify(staff));
   check("staff: 2 displace gates rendered", staff.gates === 2, String(staff.gates));
-  check("staff: 2 vacuum source labels", staff.srcLabels.length === 2 && staff.srcLabels.every((t) => t.startsWith("真空模")), JSON.stringify(staff.srcLabels));
+  /* ADR-0011: v1 无源概念 → 单个隐式 vacuum（id=vac0，nmode=全模式）盖全部谱行，
+     不再是 v0 时代的双显式源。 */
+  check("staff: 1 implicit vacuum source label", staff.srcLabels.length === 1 && staff.srcLabels.every((t) => t.startsWith("真空模")), JSON.stringify(staff.srcLabels));
   check("palette: tmsv+coherent hidden, vacuum present", staff.palette.includes("vacuum") && !staff.palette.includes("tmsv") && !staff.palette.includes("coherent"), JSON.stringify(staff.palette));
   check("JSON: graph→json sync intact (displace)", staff.jsonHasDisplace);
   check("grid: cell column rules rendered", staff.gridLines);
@@ -375,7 +377,7 @@ try {
   check("delete hit area ≥ 24×24", delHit.w >= 24 && delHit.h >= 24, JSON.stringify(delHit));
 
   /* 9. source click opens the param card (vacuum: no knobs, info shown) */
-  await click(ws, '.staff__source[data-src-id="v"]');
+  await click(ws, '.staff__source[data-src-id="vac0"]'); // 隐式 vacuum id（editor.js v1 桥接）
   await waitEval(ws, `document.querySelector(".gate-card")`);
   const srcCard = await evalJs(ws, `(() => {
     const c = document.querySelector(".gate-card");

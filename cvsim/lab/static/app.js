@@ -576,14 +576,16 @@ function drawScanCurve(body) {
   }
   scanNote.hidden = true;
   const { x0, x1, ylo, yhi } = plotDomain({ xs, ys, yPad: 0.1 });
-  const ymin = Math.min(...finite.map(([, y]) => y)); // 摘要行仍要数据域（非绘图域）
-  const ymax = Math.max(...finite.map(([, y]) => y));
-  /* #8: 折叠摘要一行结果（折叠后仍可见） */
-  const iMax = finite.findIndex(([, y]) => y === ymax);
+  const ymin = Math.min(...finite.map((p) => p.y)); // 摘要行仍要数据域（非绘图域）
+  const ymax = Math.max(...finite.map((p) => p.y));
+  /* #8: 折叠摘要一行结果（折叠后仍可见）。finitePoints 返回 {x,y} 对象
+     （同 fidelity 路径 pts），勿按 pair 数组解构 —— 探针 lab_scan_probe 曾
+     因此报 object is not iterable。 */
+  const iMax = finite.findIndex((p) => p.y === ymax);
   const sum = $("scan-summary");
   // OCR: finite 非空已提前 return，ymax 取自同一数组 → findIndex 必命中，无 else 分支
   sum.hidden = false;
-  sum.textContent = `E_N 最大 ${axisVal(ymax)} @ ${scanParam.value}=${axisVal(finite[iMax][0])}`;
+  sum.textContent = `E_N 最大 ${axisVal(ymax)} @ ${scanParam.value}=${axisVal(finite[iMax].x)}`;
   const { X, Y } = makeScale({ x0, x1, ylo, yhi, W, H, pad: { l: padL, r: padR, t: padT, b: padB } });
   const style = getComputedStyle(document.documentElement);
   const rule = style.getPropertyValue("--color-rule").trim();
