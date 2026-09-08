@@ -6,6 +6,9 @@
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -177,9 +180,6 @@ def test_top_level_verbs_reexport() -> None:
 # 3. ADR-0010 #8 结构守卫（AST，学 test_architecture.py）
 # ---------------------------------------------------------------------------
 
-import ast
-from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER_MODULES = ("gaussian_backend", "fock_backend", "bosonic_backend")
 
@@ -190,9 +190,11 @@ def _imports(path: Path) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             out.extend(a.name for a in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                out.extend(node.module if node.level == 0 else ".".join(["cvsim.lab"] + [node.module]))
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            if node.level == 0:
+                out.append(node.module)
+            else:
+                out.append(".".join(["cvsim.lab", node.module]))
     return out
 
 
@@ -216,10 +218,13 @@ def test_server_run_body_has_no_backend_branch() -> None:
                     for cmp_node in ast.walk(sub):
                         if isinstance(cmp_node, ast.Attribute) and cmp_node.attr == "backend":
                             names.add("backend")
-                        if isinstance(cmp_node, ast.Constant) and cmp_node.value in ("fock", "bosonic", "gaussian"):
+                        if isinstance(cmp_node, ast.Constant) and cmp_node.value in (
+                            "fock", "bosonic", "gaussian"
+                        ):
                             names.add("lit")
                     assert not {"backend", "lit"} <= names, (
-                        f"server.{node.name} branches on circuit.backend — dispatch owns routing (ADR-0010)"
+                        f"server.{node.name} branches on circuit.backend — "
+                        "dispatch owns routing (ADR-0010)"
                     )
 
 
@@ -227,7 +232,9 @@ def test_ir_has_no_gaussian_execution_knowledge() -> None:
     """ir.py 无 gaussian 执行知识（ADR-0010 #3：_execute 搬去
     gaussian_backend 后 ir.py 只管 load/translate/schema）。"""
     src = (ROOT / "cvsim" / "lab" / "ir.py").read_text(encoding="utf-8")
-    assert "GaussianState" not in src, "ir.py must not reference GaussianState (execution knowledge)"
+    assert "GaussianState" not in src, (
+        "ir.py must not reference GaussianState (execution knowledge)"
+    )
     assert "_apply_measure" not in src, "ir.py must not own _apply_measure"
     assert "homodyne_mean" not in src, "ir.py must not import gaussian measurement ops"
 

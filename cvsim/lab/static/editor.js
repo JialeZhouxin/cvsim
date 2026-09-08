@@ -648,11 +648,16 @@ export function initEditor(root, hooks) {
     }
   }
 
+  /* R7: per-backend 初始态输入配置表 — 差异知识单点（NOTES.md 债务收口）。
+     int = fock 光子数输入（cutoff 上限联动，syncFockInputValues）；
+     enum = bosonic 源名下拉（renderBosonicInitial）；null = 无 initial
+     字段（gaussian——卡片隐藏）。新后端加 initial 类型 = 添一行 + render* 分支。 */
+  const INITIAL_INPUT_KIND = { fock: "int", bosonic: "enum" };
+
   function renderFockControls() {
-    const fock = state.backend === "fock";
-    const bosonic = state.backend === "bosonic";
-    if (dom.addModeBtn) dom.addModeBtn.hidden = !fock;
-    if (fock === bosonic && !fock) { // neither
+    const kind = INITIAL_INPUT_KIND[state.backend];
+    if (dom.addModeBtn) dom.addModeBtn.hidden = kind !== "int"; // fock 独有加模按钮
+    if (!kind) { // 无 initial 字段（gaussian）：卡片隐藏
       if (dom.backendSelect) dom.backendSelect.value = state.backend;
       if (dom.initialCard) { dom.initialCard.hidden = true; dom.initialInputs.dataset.nmode = ""; dom.initialInputs.replaceChildren(); }
       return;
@@ -665,10 +670,10 @@ export function initEditor(root, hooks) {
     // 防止 bosonic 下残留 fock 数字输入框（模数不变早退 bug）。
     if (dom.initialInputs.dataset.nmode === initialCacheKey(state.backend, nm)) {
       // 同键仍需同步 fock 数字输入值（cutoff 变化等场景）
-      if (!bosonic) syncFockInputValues();
+      if (kind === "int") syncFockInputValues();
       return;
     }
-    if (bosonic) { renderBosonicInitial(nm); return; }
+    if (kind === "enum") { renderBosonicInitial(nm); return; }
     const cutoffs = state.cutoffs;
     const initial = state.initial;
     dom.initialInputs.dataset.nmode = initialCacheKey("fock", nm);

@@ -46,6 +46,7 @@ EXPECTED_ALL = {
     "load_circuit",
     "run_circuit",
     "sample_circuit",
+    "batch_circuit",  # /batch verb via dispatch (was fock_backend direct import)
     "scan_circuit",
     "fidelity_sweep",
 }
@@ -118,18 +119,20 @@ def test_ir_no_module_import_of_backends():
 
 
 def test_init_all_names():
-    """R2/ADR-0008: lab.__all__ frozen at exactly 11 public names (verbs only).
+    """R2/ADR-0008: lab.__all__ frozen public verb list (12 names).
 
     RunResult was removed with the unified LabResult contract; LabResult (the
-    response snapshot type) occupies its slot — still 11 names. ADR-0011
-    removed ``translate_v0`` (v0 read path retired).
+    response snapshot type) occupies its slot. ADR-0011 removed
+    ``translate_v0``. 2026-09: ``batch_circuit`` joined as the fourth verb —
+    /batch existed since R4 but its runner import bypassed dispatch
+    (ADR-0010 #8 AST guard was false-green, fixed with the same change).
     """
     import cvsim.lab as lab
 
     assert set(lab.__all__) == EXPECTED_ALL, (
         f"lab.__all__ drift: got {set(lab.__all__)} expected {EXPECTED_ALL}"
     )
-    assert len(lab.__all__) == 11
+    assert len(lab.__all__) == 12
     assert "RunResult" not in lab.__all__, "RunResult deleted (ADR-0008)"
     assert not hasattr(lab, "RunResult"), "RunResult must be gone from the public surface"
 
@@ -168,10 +171,10 @@ def test_runners_return_lab_result():
     import numpy as np
 
     from cvsim.lab.bosonic_backend import run_bosonic_circuit
+    from cvsim.lab.dispatch import run_circuit
     from cvsim.lab.fock_backend import run_fock_circuit
     from cvsim.lab.ir import load_circuit
     from cvsim.lab.result import LabResult
-    from cvsim.lab.dispatch import run_circuit
 
     g = run_circuit(
         load_circuit(
