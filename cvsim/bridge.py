@@ -360,8 +360,7 @@ def pnr_condition_bosonic(
     """
     rho = bosonic_to_fock(state, cutoff=cutoff)
     out = fock_pnr_condition(rho, mode, n)
-    if not isinstance(out, FockDensity):
-        raise TypeError("pnr_condition_bosonic: expected FockDensity from density input")
+    assert isinstance(out, FockDensity)  # density input -> density output by dispatch
     return out
 
 
@@ -381,6 +380,5 @@ def pnr_sample_and_condition_bosonic(
     rho = bosonic_to_fock(state, cutoff=cutoff)
     outcome = fock_pnr_sample(rho, mode, rng=rng)
     out = fock_pnr_condition(rho, mode, outcome)
-    if not isinstance(out, FockDensity):
-        raise TypeError("pnr_sample_and_condition_bosonic: expected FockDensity")
+    assert isinstance(out, FockDensity)  # density input -> density output by dispatch
     return outcome, out
