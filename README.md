@@ -48,6 +48,14 @@ fc.squeeze(mode=0, r=0.5)
 state = fc.run()
 ```
 
+Bosonic → Fock 态桥（PNR 条件化后验等，ADR-0012）：
+
+```python
+from cvsim.bridge import pnr_condition_bosonic
+
+rho = pnr_condition_bosonic(bosonic_state, mode=0, n=1, cutoff=30)  # FockDensity
+```
+
 ## 能力矩阵
 
 | 表示 | 初态 | 门 | 通道 | 测量 / 分析 |
@@ -83,7 +91,7 @@ cvsim/
 │   ├── symplectic.py   # 辛矩阵地基（G/B 共享）
 │   ├── wigner.py       # Wigner 函数
 │   ├── backend.py      # 统一后端接口
-│   ├── bridge.py       # 表示间观测桥
+│   ├── bridge.py       # 表示间观测桥 + bosonic→fock 态桥（ADR-0012）
 │   └── ...
 ├── tests/              # pytest 套件（1000+ 测试）
 ├── benchmarks/         # m=100 基准
