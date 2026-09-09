@@ -231,6 +231,7 @@ BOSONIC_PUBLIC = {
     "pnr_probs",
     "pnr_sample",
     "heterodyne_sample",
+    "heterodyne_sample_batch",  # ADR-0007 appendix: batch sampler (MINOR addition)
     "heterodyne_pdf",
     "heterodyne_condition",
     "heterodyne_sample_and_condition",

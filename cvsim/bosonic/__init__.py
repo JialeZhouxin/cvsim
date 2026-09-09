@@ -23,6 +23,7 @@ from cvsim.bosonic.measure import (
     heterodyne_pdf,
     heterodyne_sample,
     heterodyne_sample_and_condition,
+    heterodyne_sample_batch,
     homodyne_condition,
     homodyne_mean,
     homodyne_pdf,
@@ -76,6 +77,7 @@ __all__ = [
     "pnr_sample",
     "heterodyne_pdf",
     "heterodyne_sample",
+    "heterodyne_sample_batch",  # ADR-0007 appendix: batch sampler (MINOR addition)
     "heterodyne_condition",
     "heterodyne_sample_and_condition",
     "p_click",

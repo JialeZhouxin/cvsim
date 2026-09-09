@@ -46,6 +46,14 @@ from cvsim.bosonic.observables import (
 from cvsim.bosonic.state import BosonicState, Component
 
 _IM_TOL = 1e-8
+
+
+def _check_size(size: int) -> None:
+    """Batch size guard — mirror of gaussian.observables._check_size (ADR-0001:
+    rep packages cannot import each other, the 5-line guard is duplicated
+    with identical semantics)."""
+    if not isinstance(size, (int, np.integer)) or isinstance(size, bool) or size < 1:
+        raise ValueError(f"size must be a positive int, got {size!r}")
 _PNR_RADIUS = 0.95
 _LOG_MAX = float(np.log(np.finfo(float).max))
 _LOG_MIN = float(np.log(np.nextafter(0.0, 1.0)))
@@ -721,6 +729,73 @@ def heterodyne_condition(
     for comp, w in zip(kept, raw_w, strict=True):
         comp.w = w / s
     return BosonicState(components=kept)
+
+
+def heterodyne_sample_batch(
+    state: BosonicState,
+    mode: int = 0,
+    size: int = 1000,
+    *,
+    rng: np.random.Generator | None = None,
+    n_grid: int | None = None,
+    lim: float | None = None,
+) -> np.ndarray:
+    """Batch heterodyne outcomes (size,) complex — one grid build, N iid shots.
+
+    ADR-0007 appendix (batch extension): the Q surface and both CDFs depend
+    only on the state, so a multi-shot outcome-only draw amortises the
+    grid build over ``size`` shots instead of rebuilding per shot (the
+    single-shot sampler rebuilds; identical distribution, per-call cost).
+
+    Vectorised inversion (row-offset trick): the row-conditional CDF of the
+    sequential sampler decomposes into per-row masses + within-row cumsum,
+    so the target value ``row_base[i] + u₂·row_mass[i]`` is invertible on
+    one flattened cumsum — zero per-shot Python loop, bin-identical to the
+    sequential sampler (same two-stage (ix, ip) decomposition, no
+    approximation). Within-cell jitter as in the single-shot path.
+
+    Outcome-only, iid — per-shot conditioning changes the posterior state,
+    which invalidates grid reuse; use ``heterodyne_sample_and_condition``
+    for the circuit path. ``n_grid``/``lim`` force the grid exactly as in
+    ``heterodyne_pdf`` (both set or both None).
+    """
+    _check_size(size)
+    if rng is None:
+        rng = np.random.default_rng()
+    xs, ps, Q = heterodyne_pdf(state, mode, n_grid=n_grid, lim=lim)
+    dx = xs[1] - xs[0]
+    dp = ps[1] - ps[0]
+    # Flattened row-offset CDF: global cumsum of row-major Q. Entry
+    # F[i, j] = (mass of rows < i) + (mass of row i up to and incl. j).
+    F = np.cumsum(Q.ravel())
+    total = float(F[-1])
+    if not np.isfinite(total) or total <= _SIG_EPS:
+        raise ValueError("heterodyne_sample_batch: Q surface integrates to ~0")
+    row_mass = Q.sum(axis=1)  # (nx,)
+    # u₁ inverts the marginal x: cell boundaries of the flattened CDF at
+    # row starts; u₂ = target within-row mass → searchsorted on the same F.
+    u1 = rng.uniform(0.0, 1.0, size)
+    targets_x = u1 * total
+    ix = np.clip(np.searchsorted(F, targets_x, side="right"), 0, Q.size - 1) // ps.size
+    ix = np.clip(ix, 0, xs.size - 1)
+    # within-row: row_base[i] = flattened cumsum value just before row i
+    starts = np.concatenate(([0.0], F[ps.size - 1 :: ps.size][:-1]))
+    row_mass_safe = np.where(row_mass > _SIG_EPS, row_mass, 1.0)
+    u2 = rng.uniform(0.0, 1.0, size)
+    targets_p = starts[ix] + u2 * row_mass[ix]
+    flat_idx = np.clip(
+        np.searchsorted(F, targets_p, side="right"), 0, Q.size - 1
+    )
+    ip = flat_idx % ps.size
+    # zero-mass rows: searchsorted may land on the row start (j=0) — honest
+    # error instead of a fabricated draw (mirror of the single-shot guard)
+    zero_rows = row_mass[ix] <= _SIG_EPS
+    if np.any(zero_rows):
+        raise ValueError("heterodyne_sample_batch: conditional P(p|x) ~ 0 on a sampled row")
+    x = xs[ix] + (rng.uniform(0.0, 1.0, size) - 0.5) * dx
+    p = ps[ip] + (rng.uniform(0.0, 1.0, size) - 0.5) * dp
+    out: np.ndarray = (x + 1j * p) / np.sqrt(2.0)
+    return out
 
 
 def heterodyne_sample_and_condition(

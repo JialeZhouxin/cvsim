@@ -45,7 +45,7 @@ A regression test (`tests/test_public_api.py`) freezes that set. **Removing or r
 |---------|--------|
 | `GaussianCircuit` / `ParamRef` | L2–L4 DSL; op names in the IR are semi-stable; new measure ops may appear |
 | `circuit_v1` IR (ADR-0003) | **Stable core schema** (`cvsim.gaussian.ir`): top-level `schema/nmode/ops`, extension fields `view/seed/ui` ignored; ops 1:1 with `GaussianCircuit` builders; `id` optional; array order = execution order; measurement ops remove their mode |
-| Batch samplers | `homodyne_sample_batch`, `heterodyne_sample_batch`, `GaussianState.sample_quadratures` — vectorized, `size=10³` standard; outcome-only, iid, no per-shot conditioning |
+| Batch samplers | Gaussian: `homodyne_sample_batch`, `heterodyne_sample_batch`, `GaussianState.sample_quadratures`; Bosonic: `heterodyne_sample_batch` (ADR-0007 appendix, one grid build amortised over N iid shots) — vectorized, `size=10³` standard; outcome-only, iid, no per-shot conditioning |
 | `circuit_v0` IR (lab) | **Removed** (ADR-0011; previously retired-from-write in ADR-0003). Old v0 files no longer load — server rejects with `unsupported schema 'circuit_v0'; expected 'circuit_v1'`. Recovery path = `git revert` of the ADR-0011 commit. |
 | `cvsim.wigner` | Teaching grids; signature may gain kwargs |
 | `cvsim.fock` | Sibling rep; not the Phase 2 freeze focus (F2 exit freezes `__all__` in `test_public_api.py`) |
