@@ -6,7 +6,7 @@ import {
   OPS, OP_NAMES, TAU, paramsFromOp, opGroup,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
   sortNodes, removeMode, updateParam, updateMode, toV1Json,
-  cellOccupied, stateNmode,
+  cellOccupied, stateNmode, clampParam, visibleParams,
 } from "../cvsim/lab/static/ops.js";
 // ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
 import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
@@ -337,6 +337,30 @@ test("L5: stateFromJson — missing staff falls back to array index", () => {
   // round-trip: ui.x survives
   const rt = stateFromJson(toV1Json(state));
   assert.deepEqual(rt.state.nodes.map((n) => n.ui?.x), [0, 1]);
+});
+
+test("clampParam: 声明区间夹紧单点（updateParam 与参数卡片共用）", () => {
+  assert.equal(clampParam("loss", "T", 99), 1);       // 上界
+  assert.equal(clampParam("loss", "T", -5), 0.01);    // 下界
+  assert.equal(clampParam("loss", "T", 0.5), 0.5);    // 区间内不变
+  assert.equal(clampParam("squeeze", "r", "2"), 2);  // 字符串输入（number 框）
+  assert.equal(clampParam("loss", "nope", 1), null);  // 未知键 → 调用方拒绝
+  assert.equal(clampParam("loss", "T", NaN), null);   // NaN
+  assert.equal(clampParam("loss", "T", Infinity), null);
+  assert.equal(clampParam("nope", "T", 1), null);     // 未知 op
+});
+
+test("visibleParams: fock 隐藏 IR 丢弃的参数（与 toV1Json drop 表同源）", () => {
+  // fock squeeze 只有 r（phi 被 FOCK_UI_TO_V1_PARAM 置 null）
+  assert.deepEqual(Object.keys(visibleParams("squeeze", "gaussian")), ["r", "phi"]);
+  assert.deepEqual(Object.keys(visibleParams("squeeze", "fock")), ["r"]);
+  assert.deepEqual(Object.keys(visibleParams("squeeze", "bosonic")), ["r", "phi"]);
+  // fock loss 纯损耗，无热 nbar
+  assert.deepEqual(Object.keys(visibleParams("loss", "gaussian")), ["T", "nbar"]);
+  assert.deepEqual(Object.keys(visibleParams("loss", "fock")), ["T"]);
+  // 未受影响的后端 op 全量保留；未知 op 空表
+  assert.deepEqual(Object.keys(visibleParams("phase", "fock")), ["phi"]);
+  assert.deepEqual(Object.keys(visibleParams("nope", "fock")), []);
 });
 
 test("updateParam / updateMode", () => {

@@ -3,7 +3,7 @@
    DOM/DnD work lives only inside initStaff. */
 "use strict";
 
-import { OPS, cellOccupied, stateNmode } from "./ops.js";
+import { OPS, clampParam, cellOccupied, stateNmode, visibleParams } from "./ops.js";
 
 export const GATE_W = 72;   // px per x unit (gate cell width)
 export const ROW_H = 44;    // px per lane
@@ -291,10 +291,14 @@ export function initStaff(root, api) {
   function openCard(node) {
     closeCard();
     const layout = staffLayout(api.getState());
-    const meta = OPS[node.op];
-    if (!meta) return;
+    if (!OPS[node.op]) return;
     const g = layout.gates.find((x) => x.node.id === node.id);
     if (!g) return; // only gates have param cards (modes are plain labels)
+    /* `node` 是门块 click 时捕获的快照，而 onParam 不做 render（拖滑块时重建
+       DOM 会中断拖动）——闭包可比本次编辑旧，读 node.params 会把旋钮回退到
+       旧值。参数一律读新鲜 layout 里按 id 查回的 node（按值不按引用）。 */
+    node = g.node;
+    const meta = OPS[node.op];
     const left = MODE_W + g.x * GATE_W;
     const top = g.top * ROW_H;
     card = document.createElement("div");
@@ -312,7 +316,9 @@ export function initStaff(root, api) {
     const body = document.createElement("div");
     body.className = "gate-card__params";
     let any = false;
-    for (const [k, d] of Object.entries(meta.params)) {
+    /* 按 backend 过滤：fock 下 phi（squeeze）/ nbar（loss）不进 IR，画旋钮是
+       死控件——不显示（visibleParams 单点在 ops.js，与 toV1Json 的 drop 表同源）。 */
+    for (const [k, d] of Object.entries(visibleParams(node.op, api.getState().backend))) {
       if (d.advanced || d.string) continue; // nbar/nmode JSON-only; name id-managed (F7)
       any = true;
       const wrap = document.createElement("label");
@@ -344,8 +350,14 @@ export function initStaff(root, api) {
       num.step = d.step;
       num.value = node.params[k];
       const push = (v) => {
-        num.value = v;
-        api.onParam(node.id, k, Number(v));
+        // 夹紧单点在 ops.js（updateParam 同一函数）：手输越界值时控件显示
+        // 必须与写回 state 的值一致；number 超 min/max 时浏览器不自行夹紧。
+        const c = clampParam(node.op, k, v);
+        if (c === null) return;
+        // 双控件同步：range 拖动 → num 回写；num 手输 → range 回写。
+        range.value = c;
+        num.value = c;
+        api.onParam(node.id, k, c);
       };
       range.addEventListener("input", () => push(range.value));
       num.addEventListener("change", () => push(num.value));

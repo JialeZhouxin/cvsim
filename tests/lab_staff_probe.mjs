@@ -403,11 +403,106 @@ try {
   })()`);
   check("gate card: slider edit → JSON sync, card stays open", cardEdit.phi === 2.5 && cardEdit.cardStillOpen, JSON.stringify(cardEdit));
 
-  /* 10. sweepable card auto-syncs the scan panel target (synced in step 9) */
-  const scanSync = await evalJs(ws, `(() => ({
+  /* 9b. 参数卡片：闭包快照陈旧（回归锁）——onParam 不做 render（拖动中重建
+     DOM 会断拖动），门块 click 闭包可比本次编辑旧。关卡片再开必须读到新值。
+     number 手输 → range 同步；越界 → 双控件与 JSON 三者一致。 */
+  const cardStale = await evalJs(ws, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const open = async () => {
+      document.querySelector('.gate[data-id="p"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await sleep(250);
+    };
+    const row = () => [...document.querySelectorAll(".gate-card .param")][0];
+    const read = () => ({
+      range: row().querySelector('input[type=range]').value,
+      num: row().querySelector('input[type=number]').value,
+    });
+    const jphi = () => JSON.parse(document.getElementById("json-input").value)
+      .ops.find((n) => n.op === "phase").params.theta;
+    await open();
+    /* number 手输（change）→ range 必须回写 */
+    const num = row().querySelector('input[type=number]');
+    num.value = "1.7"; num.dispatchEvent(new Event("change", { bubbles: true }));
+    await sleep(250);
+    const synced = { ...read(), json: jphi() };
+    /* 关卡片 → 重开（其间无 render，旧实现此刻读回 2.5 旧值） */
+    document.getElementById("staff").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await sleep(250);
+    const closed = !document.querySelector(".gate-card");
+    await open();
+    const reopened = { ...read(), json: jphi() };
+    /* 越界（phase phi ∈ [0, 2π]）→ 夹紧到上界，双控件与 JSON 一致 */
+    const num2 = row().querySelector('input[type=number]');
+    num2.value = "99"; num2.dispatchEvent(new Event("change", { bubbles: true }));
+    await sleep(250);
+    const clamped = { ...read(), json: jphi() };
+    return { synced, closed, reopened, clamped };
+  })()`);
+  check("gate card: 关→开不读陈旧快照（闭包新鲜度回归锁）",
+    cardStale.closed === true &&
+    cardStale.reopened.range === "1.7" && cardStale.reopened.num === "1.7" &&
+    cardStale.reopened.json === 1.7,
+    JSON.stringify(cardStale.reopened));
+  check("gate card: number 手输 → range 同步",
+    cardStale.synced.range === "1.7" && cardStale.synced.num === "1.7" && cardStale.synced.json === 1.7,
+    JSON.stringify(cardStale.synced));
+  const tau = 2 * Math.PI;
+  /* range 的显示按 step=0.01 量化（"6.28"），num 保留全精度（6.283185…）——
+     同一夹紧值，仅文本表示不同；断言容差取 step。 */
+  check("gate card: 越界输入夹紧，双控件与 JSON 三者一致",
+    Math.abs(Number(cardStale.clamped.range) - tau) < 0.01 &&
+    Math.abs(Number(cardStale.clamped.num) - tau) < 1e-9 &&
+    Math.abs(cardStale.clamped.json - tau) < 1e-9,
+    JSON.stringify(cardStale.clamped));
+
+  /* 10. sweepable card auto-syncs the scan panel target (synced in step 9) */  const scanSync = await evalJs(ws, `(() => ({
     target: document.getElementById("scan-node").value,
   }))()`);
   check("scan sync: phase card targets scan node", scanSync.target === "p", JSON.stringify(scanSync));
+
+  /* 9c. per-backend 参数可见性：fock 下 squeeze.phi 不进 IR（drop 表置 null），
+     卡片不能画“转了不生效”的死旋钮；gaussian 不受影响（不误伤）。 */
+  await evalJs(ws, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const p = { schema: "circuit_v1", seed: 0, nmode: 1,
+      ops: [{ id: "sq", op: "squeeze", params: { r: 0.4, phi: 0 }, modes: [0] }],
+      view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: { staff: { sq: 0 } } };
+    const i = document.getElementById("json-input");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(i, JSON.stringify(p));
+    i.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(1200);
+    const sel = document.getElementById("backend-select");
+    sel.value = "fock";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  })()`);
+  await waitEval(ws, `(async () => {
+    while (!document.querySelector('.gate[data-id="sq"]')) await new Promise((r) => setTimeout(r, 100));
+    return true;
+  })()`);
+  const fockCard = await evalJs(ws, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    document.querySelector('.gate[data-id="sq"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    return { names: [...document.querySelectorAll(".gate-card .param .param__name")].map((e) => e.textContent),
+             payload: Object.keys(JSON.parse(document.getElementById("json-input").value).ops[0].params) };
+  })()`);
+  check("fock: squeeze 不显示死旋钮 phi（与 IR drop 表同源）",
+    JSON.stringify(fockCard.names) === JSON.stringify(["r"]) &&
+    JSON.stringify(fockCard.payload) === JSON.stringify(["r"]),
+    JSON.stringify(fockCard));
+  const gaussCard = await evalJs(ws, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const sel = document.getElementById("backend-select");
+    sel.value = "gaussian";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await sleep(600);
+    document.querySelector('.gate[data-id="sq"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    return [...document.querySelectorAll(".gate-card .param .param__name")].map((e) => e.textContent);
+  })()`);
+  check("gaussian: squeeze 仍显示 r + phi（per-backend 过滤未误伤）",
+    JSON.stringify(gaussCard) === JSON.stringify(["r", "phi"]), JSON.stringify(gaussCard));
 
   /* 11. ADR-0014: 删模级联（删 mode 0 → 其上的门消失、上方模上移、nmode 减一） */
   await evalJs(ws, `(async () => {

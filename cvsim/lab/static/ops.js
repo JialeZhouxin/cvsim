@@ -313,12 +313,37 @@ export function removeMode(nodes, mode) {
   return keep;
 }
 
+/** UI 可编辑参数（单点）：按 backend 过滤掉在 IR 表示里不存在的参数。
+    fock 的 drop 表（squeeze.phi / loss.nbar）里值为 null = 该参数在 fock IR
+    中被丢弃——卡片画旋钮会是“转了不生效”的谎。advanced/string 由调用方另行排除。 */
+export function visibleParams(op, backend) {
+  const meta = OPS[op];
+  if (!meta) return {};
+  const R = renames();
+  const drop = backend === "fock" ? R.fockUiToParam[R.uiToOp[op] || op] || {} : {};
+  const out = {};
+  for (const [k, d] of Object.entries(meta.params)) {
+    if (drop[k] === null) continue;
+    out[k] = d;
+  }
+  return out;
+}
+
+/** 参数值夹紧到声明区间（单点）：updateParam 与参数卡片控件共用，
+    否则手输越界值时控件显示与 state 不一致。 */
+export function clampParam(op, key, value) {
+  const d = OPS[op]?.params?.[key];
+  const v = Number(value);
+  if (!d || !Number.isFinite(v)) return null; // 未知键 / NaN → 调用方拒绝
+  return Math.min(Math.max(v, d.min), d.max);
+}
+
 export function updateParam(node, key, value) {
   const d = OPS[node.op]?.params?.[key];
   if (d?.string) return node; // F7: result names are id-managed, never slider-edited
-  const v = Number(value);
-  if (!d || !Number.isFinite(v)) return node; // OCR: unknown key / NaN rejected
-  return { ...node, params: { ...node.params, [key]: Math.min(Math.max(v, d.min), d.max) } };
+  const v = clampParam(node.op, key, value);
+  if (v === null) return node; // OCR: unknown key / NaN rejected
+  return { ...node, params: { ...node.params, [key]: v } };
 }
 
 export function updateMode(node, mode) {
