@@ -1,12 +1,12 @@
 /* 票3 — schema 运行时合并纯函数测试 (node --test, zero deps)。
    mergeSchema/deriveOps 消费票 2 `GET /schema` 载荷 (golden 子集手写)，
    产出新 OPS 表：backends/参数形状来自 schema，label/tip/刻度留守，
-   v0 源 (vacuum/tmsv/coherent) 原样保留。改名表从 uiName 派生。 */
+   ADR-0014: 三个源节点 op 已退役，schema 里的同名条目被忽略。 */
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  V0_SOURCES, BASE_OPS, deriveOps, deriveParamRenames,
+  BASE_OPS, deriveOps, deriveParamRenames,
 } from "../cvsim/lab/static/ops_schema.js";
 
 /* ── mock schema fixture：票 2 golden /schema 载荷的手写最小子集 ──
@@ -15,9 +15,6 @@ import {
 const MOCK_SCHEMA = {
   schema: "cvsim_lab_schema",
   ops: {
-    vacuum: { backends: ["gaussian"], meta: { arity: "one", value_kind: { nmode: "int" }, defaults: { nmode: 1 } } },
-    tmsv: { backends: ["gaussian"], meta: { arity: "one", value_kind: { r: "num" }, defaults: { r: 0.6 } } },
-    coherent: { backends: ["gaussian"], meta: { arity: "one", value_kind: { alpha: "cnum" }, defaults: { alpha: 1 } } },
     squeeze: {
       backends: ["gaussian", "fock", "bosonic"],
       meta: { arity: "one", value_kind: { r: "num", phi: "num" }, defaults: { r: 0.4, phi: 0 } },
@@ -75,14 +72,13 @@ test("deriveOps: label/tip/刻度/palette 标记留守 base", () => {
   assert.equal(ops.homodyne.measure, true);
 });
 
-test("deriveOps: v0 源 (vacuum/tmsv/coherent) 保留 + 结构事实 backends 补全（票 4）", () => {
+test("deriveOps: ADR-0014 — schema 里的退役源 op 被忽略，不进 OPS 表", () => {
   const ops = deriveOps(MOCK_SCHEMA);
-  for (const s of V0_SOURCES) {
-    assert.ok(ops[s], `${s} 保留`);
-    // 票 4：v0 源补 backends: ["gaussian"]（结构事实，非镜像）；
-    // 其余字段（label/tip/params/kind）与 BASE_OPS 原样相等。
-    assert.deepEqual(ops[s], { ...BASE_OPS[s], backends: ["gaussian"] });
-  }
+  assert.equal(ops.vacuum, undefined);
+  assert.equal(ops.tmsv, undefined);
+  assert.equal(ops.coherent, undefined);
+  // 幸存 op 的 backends 照常来自 schema
+  assert.deepEqual(ops.squeeze.backends, ["gaussian", "fock", "bosonic"]);
 });
 test("deriveOps: 不改 BASE_OPS（纯函数，返回新表）", () => {
   const before = JSON.stringify(BASE_OPS.phase);

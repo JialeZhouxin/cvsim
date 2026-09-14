@@ -125,6 +125,14 @@ export function vacuumDefault(backend) {
   return backend === "bosonic" ? null : 0;
 }
 
+/** per-mode 数组按**索引**删除一项（其余项顺次前移）——删模语义单点。
+    padTo/remapForBackend 只做截尾/补位，直接拿来删模会把被删模的值
+    留在原索引。null 直通（全真空省略语义不被破坏）。 */
+export function dropMode(arr, mode) {
+  if (!Array.isArray(arr)) return arr;
+  return [...arr.slice(0, mode), ...arr.slice(mode + 1)];
+}
+
 /** 初始态输入控件的渲染缓存键：backend + 模数。
     旧键只有模数 → 切换 backend 后模数不变，控件早退不刷新
     （bosonic 下残留 fock 数字输入框的伴生 bug）。 */

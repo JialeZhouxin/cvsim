@@ -17,16 +17,14 @@ import { OPS as BASE_OPS } from "./ops.js";
 //: BASE_OPS 再导出（测试消费 base 键集；不改 ops.js 导出面）。
 export { BASE_OPS };
 
-//: v0 源（UI 概念，schema 无此三键；载入旧 JSON 兼容，palette 纪律不变）。
-export const V0_SOURCES = Object.freeze(["vacuum", "tmsv", "coherent"]);
-
 //: schema 载荷单点在 schema_store.js（leaf）；此处只留派生纯函数。
 
 /** schema 载荷 → 合并后的 OPS 表（纯函数）。
     - schema 键 = IR 名；本表键 = UI 名（`uiName || op`，票 2 Q3 同名省略）。
     - IR 名在 schema 有而 base 无 → 忽略（Lab 白名单 fail-fast 已挡；
       前端只消费子集，UI 控件未建前不出托盘）。
-    - base 键在 schema 无（v0 源/未来 JSON-only op）→ 原样保留。 */
+    - base 键在 schema 无 → 原样保留 + 补 `backends: ["gaussian"]`
+      （当前无此键；未来 JSON-only op 落此默认）。 */
 export function deriveOps(schema) {
   if (!schema || typeof schema !== "object" || !schema.ops) {
     throw new TypeError("schema 载荷非法（缺 ops）");
@@ -36,11 +34,9 @@ export function deriveOps(schema) {
     irToUi[ir] = entry.uiName || ir;
   }
   const out = {};
-  // pass 1: base 条目全部保留（含 v0 源 + schema 未列的 JSON-only op）。
-  // 票 4：v0 源补 backends: ["gaussian"] —— 结构事实（v0 源仅在
-  // gaussian 工作台存在，frozen-graph 下无回退），非镜像；
-  // schema 未列的其它 base 键同样补 ["gaussian"]（当前无此类，
-  // 未来 JSON-only op 落此默认，UI 元数据行可覆盖）。
+  // pass 1: base 条目全部保留。schema 未列的 base 键补
+  // backends: ["gaussian"]（当前无此类，未来 JSON-only op 落此默认，
+  // UI 元数据行可覆盖）。
   for (const [ui, meta] of Object.entries(BASE_OPS)) {
     out[ui] = { ...meta, backends: ["gaussian"] };
   }

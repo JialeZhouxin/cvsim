@@ -3,23 +3,23 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  OPS, OP_NAMES, TAU, paramsFromOp, sourceModes, opGroup,
+  OPS, OP_NAMES, TAU, paramsFromOp, opGroup,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
-  sortNodes, sourceRows, removeSource, updateParam, updateMode, toV1Json,
+  sortNodes, removeMode, updateParam, updateMode, toV1Json,
   cellOccupied,
 } from "../cvsim/lab/static/ops.js";
 // ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
 import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
 import { publishSchema, opsForBackend, meterKeys } from "../cvsim/lab/static/schema_store.js";
 import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
-import { setInitialSchema } from "../cvsim/lab/static/initial.js";
+import { setInitialSchema, dropMode } from "../cvsim/lab/static/initial.js";
 
 // Minimal hand-written /schema payload (shape = ticket-2 golden; ops keys
 // are IR names; uiName present only where IR name differs). backends values
 // = ticket-4 derived whitelist (schema.py: core ir_schema - UI-hidden).
 const IR_BY_UI = { homodyne: "measure_homodyne", heterodyne: "measure_heterodyne" };
 const BACKENDS_BY_UI = {
-  vacuum: ["gaussian"], tmsv: ["gaussian"], coherent: ["gaussian"], mz: ["gaussian"],
+  mz: ["gaussian"],
   kerr: ["fock"], measure_pnr: ["fock"],
   interferometer: ["bosonic"], gaussian_channel: ["bosonic"], measure_threshold: ["bosonic"],
   fourier: ["gaussian", "bosonic"],
@@ -38,18 +38,16 @@ const MOCK_SCHEMA = {
 };
 // palette derived publish happens in the F7 tests at file end (avoids polluting fallback-path tests).
 
-const EXPECTED_OPS = ["vacuum", "tmsv", "coherent", "squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze", "kerr", "cz", "cx", "mach_zehnder", "phase_noise", "measure_pnr", "interferometer", "gaussian_channel", "measure_threshold"];
+const EXPECTED_OPS = ["squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze", "kerr", "cz", "cx", "mach_zehnder", "phase_noise", "measure_pnr", "interferometer", "gaussian_channel", "measure_threshold"];
 
-test("ops metadata: 23 ops (B6 +3 bosonic JSON-only / threshold) (tmsv/coherent kept for JSON compat, palette:false)", () => {
+test("ops metadata: 20 ops (ADR-0014: 三个源节点 op 已退役)", () => {
   assert.deepEqual([...OP_NAMES].sort(), [...EXPECTED_OPS].sort());
-  assert.equal(OPS.tmsv.palette, false); // legacy source: loadable, not in palette
-  assert.equal(OPS.coherent.palette, false); // L5.5: unified into vacuum + displace gate
+  assert.equal(OPS.vacuum, undefined);
+  assert.equal(OPS.tmsv, undefined);
+  assert.equal(OPS.coherent, undefined);
 });
 
-test("UX: opGroup — source/gate/channel/measure, palette:false → null", () => {
-  assert.equal(opGroup("vacuum"), "source");
-  assert.equal(opGroup("tmsv"), null); // palette:false
-  assert.equal(opGroup("coherent"), null); // palette:false
+test("UX: opGroup — gate/channel/measure, palette:false → null (ADR-0014: 无 source 组)", () => {
   assert.equal(opGroup("squeeze"), "gate");
   assert.equal(opGroup("phase"), "gate");
   assert.equal(opGroup("fourier"), "gate");
@@ -96,48 +94,42 @@ test("ops metadata: param ranges sane", () => {
   assert.equal(OPS.loss.params.T.min, 0.01);
   assert.equal(OPS.loss.params.T.max, 1);
   assert.equal(OPS.beamsplitter.params.theta.max, TAU);
-  assert.equal(OPS.tmsv.params.r.step <= 0.01, true);
-  assert.equal(OPS.vacuum.kind, "source");
-  assert.equal(OPS.vacuum.modes, 1);
-  assert.equal(OPS.vacuum.params.nmode.def, 1);
-  assert.ok(OPS.vacuum.params.nmode.advanced);
+  assert.equal(OPS.two_mode_squeeze.params.r.step <= 0.01, true);
+  assert.equal(OPS.squeeze.params.r.sweep[1], 2);
 });
 
 test("addNode appends with defaults + mode + x", () => {
   let nodes = [];
-  nodes = addNode(nodes, "vacuum");
-  assert.equal(nodes.length, 1);
-  assert.equal(nodes[0].op, "vacuum");
-  assert.equal(nodes[0].params.nmode, 1);
-  assert.equal(nodes[0].mode, undefined); // source: no mode field
   nodes = addNode(nodes, "loss");
-  assert.equal(nodes[1].mode, 0);
-  assert.equal(nodes[1].ui.x, 0); // first gate x=0
-  assert.ok(!("ui" in nodes[0])); // source carries no layout
+  assert.equal(nodes.length, 1);
+  assert.equal(nodes[0].op, "loss");
+  assert.equal(nodes[0].mode, 0);
+  assert.equal(nodes[0].ui.x, 0); // first gate x=0
   nodes = addNode(nodes, "beamsplitter");
-  assert.deepEqual(nodes[2].modes, [0, 1]);
-  assert.equal(nodes[2].ui.x, 1); // appended after loss
-  assert.deepEqual(nodes.map((n) => n.op), ["vacuum", "loss", "beamsplitter"]); // source first
+  assert.deepEqual(nodes[1].modes, [0, 1]);
+  assert.equal(nodes[1].ui.x, 1); // appended after loss
+  assert.deepEqual(nodes.map((n) => n.op), ["loss", "beamsplitter"]);
 });
 
-test("sourceModes: vacuum=1, coherent=1 (tmsv legacy=2)", () => {
-  let nodes = [];
-  nodes = addNode(nodes, "vacuum");
-  nodes = addNode(nodes, "coherent");
-  assert.equal(sourceModes(nodes), 2);
-  // legacy JSON vacuum with nmode>1
-  nodes = [{ id: "v", op: "vacuum", params: { nmode: 4 } }];
-  assert.equal(sourceModes(nodes), 4);
+/* ADR-0014: per-mode 数组按索引删除（padTo/remapForBackend 只做截尾/补位，
+   直接复用会把被删模的值留在原索引）。 */
+test("dropMode: 按索引删除，内容对齐（null 直通）", () => {
+  assert.deepEqual(dropMode([3, 5, 7], 1), [3, 7]);
+  assert.deepEqual(dropMode([3, 5, 7], 0), [5, 7]);
+  assert.deepEqual(dropMode([12, 15, 20], 1), [12, 20]);
+  assert.deepEqual(dropMode([null, "gkp0", "gkp1"], 1), [null, "gkp1"]);
+  assert.equal(dropMode(null, 0), null);       // 全真空省略语义
+  assert.deepEqual(dropMode([], 0), []);
 });
 
 test("removeNode incl. bounds", () => {
   let nodes = [];
-  for (const op of ["vacuum", "loss", "loss"]) nodes = addNode(nodes, op);
+  for (const op of ["loss", "loss", "loss"]) nodes = addNode(nodes, op);
   const [a, b, c] = nodes;
   assert.deepEqual(removeNode(nodes, b.id).map((n) => n.id), [a.id, c.id]);
 });
 
-test("L5: sortNodes — (x, mode) order, sources first", () => {
+test("L5: sortNodes — (x, mode) order", () => {
   const mk = (op, mode, x, modes) => {
     const n = { id: `${op}-${mode}-${x}`, op, params: paramsFromOp(op) };
     if (modes) n.modes = modes; else n.mode = mode;
@@ -154,14 +146,12 @@ test("L5: sortNodes — (x, mode) order, sources first", () => {
   // x order dominates mode order
   const far = mk("phase", 0, 9);
   assert.deepEqual(sortNodes([far, s1]).map((n) => n.id), [s1.id, far.id]);
-  // sources always leftmost, stable among themselves
-  const vac = { id: "v0", op: "vacuum", params: { nmode: 1 } };
-  const coh = { id: "c0", op: "coherent", params: { alpha: 1 } };
-  assert.deepEqual(sortNodes([s0, vac, coh]).map((n) => n.id), [vac.id, coh.id, s0.id]);
+  // stable among equal keys
+  assert.deepEqual(sortNodes([s0, s1]).map((n) => n.id), [s0.id, s1.id]);
 });
 
 test("L5.5: placeSingle — snaps x to nearest integer column (round)", () => {
-  let nodes = addNode([], "vacuum");
+  let nodes = [];
   nodes = placeSingle(nodes, "phase", 1, 2.5);
   assert.equal(nodes.find((n) => n.mode === 1).ui.x, 3); // round(2.5)
   nodes = placeSingle(nodes, "squeeze", 0, 0.4);
@@ -177,7 +167,6 @@ test("L5.5: placeSingle — snaps x to nearest integer column (round)", () => {
 
 test("L5.5: cellOccupied — single/two-mode cells, excludeId", () => {
   const nodes = [
-    { id: "v0", op: "vacuum", params: {} },
     { id: "p", op: "phase", params: { phi: 1 }, mode: 0, ui: { x: 1 } },
     { id: "bs", op: "beamsplitter", params: { theta: 0.5 }, modes: [0, 1], ui: { x: 2 } },
   ];
@@ -197,8 +186,9 @@ test("L5.5: cellOccupied — single/two-mode cells, excludeId", () => {
 });
 
 test("L5: completePlacing — two-mode two-step flow", () => {
-  let nodes = addNode([], "vacuum");
-  nodes = addNode(nodes, "vacuum"); // 2 modes
+  let nodes = [];
+  nodes = placeSingle(nodes, "loss", 0, 0);
+  nodes = placeSingle(nodes, "loss", 1, 0); // two modes occupied by gates
   const placing = { op: "beamsplitter", modeA: 0, x: 1.5 };
   const ok = completePlacing(nodes, placing, 1);
   assert.equal(ok.ok, true);
@@ -220,108 +210,96 @@ test("L5: completePlacing — two-mode two-step flow", () => {
 });
 
 test("L5: moveNodeX — reorders by new x, snaps round, guards NaN", () => {
-  let nodes = addNode([], "vacuum");
+  let nodes = [];
   nodes = placeSingle(nodes, "phase", 0, 1);
   nodes = placeSingle(nodes, "squeeze", 0, 2);
-  const [ph, sq] = nodes.slice(1);
+  const [ph, sq] = nodes;
   const moved = moveNodeX(nodes, sq.id, 0.4); // squeeze snaps to 0, now before phase
-  assert.deepEqual(moved.slice(1).map((n) => n.op), ["squeeze", "phase"]);
-  assert.equal(moved[1].ui.x, 0); // round(0.4)
+  assert.deepEqual(moved.map((n) => n.op), ["squeeze", "phase"]);
+  assert.equal(moved[0].ui.x, 0); // round(0.4)
   assert.equal(moveNodeX(nodes, sq.id, "x").length, nodes.length); // NaN rejected
   // same-column move keeps order
   const sameCol = moveNodeX(nodes, ph.id, 1.4);
-  assert.equal(sameCol[1].ui.x, 1);
+  assert.equal(sameCol[0].ui.x, 1);
 });
 
-test("L5: sourceRows — vacuum nmode lanes, coherent/tmsv legacy", () => {
-  const nodes = [
-    { id: "v1", op: "vacuum", params: { nmode: 2 } },
-    { id: "c", op: "coherent", params: { alpha: 1 } },
-    { id: "t", op: "tmsv", params: { r: 0.5 } }, // legacy JSON only
-  ];
-  const rows = sourceRows(nodes);
-  assert.deepEqual(rows.map((r) => [r.srcId, r.modeStart, r.modeEnd]), [
-    ["v1", 0, 2], ["c", 2, 3], ["t", 3, 5],
-  ]);
-  assert.equal(sourceModes(nodes), 5);
-});
-
-test("L5: staffLayout — reversed two-mode (modeB<modeA) spans correctly", async () => {
-  const { staffLayout } = await import("../cvsim/lab/static/staff.js");
-  const state = {
+test("L5: staffLayout — one row per mode, D1(b) labels", async () => {
+  const { staffLayout, modeLabel } = await import("../cvsim/lab/static/staff.js");
+  const base = {
     nodes: [
-      { id: "v0", op: "vacuum", params: {} },
-      { id: "v1", op: "vacuum", params: {} },
-      { id: "v2", op: "vacuum", params: {} },
       { id: "bs", op: "beamsplitter", params: { theta: 0.5 }, modes: [2, 0], ui: { x: 1 } },
     ],
-    view: {}, ui: {},
+    view: {}, ui: {}, backend: "gaussian", initial: null, nmode: 3,
   };
-  const { rows, gates } = staffLayout(state);
+  const { rows, gates, nmode } = staffLayout(base);
   assert.equal(rows.length, 3);
+  assert.equal(nmode, 3);
+  assert.deepEqual(rows.map((r) => r.mode), [0, 1, 2]);
+  assert.deepEqual(rows.map((r) => r.initial), ["mode 0 · 真空", "mode 1 · 真空", "mode 2 · 真空"]);
   assert.equal(gates.length, 1);
   assert.equal(gates[0].span, 3); // |2-0|+1
   assert.equal(gates[0].top, 0);
   assert.equal(gates[0].modeA, 2); // JSON order preserved
   assert.equal(gates[0].modeB, 0);
+  // 缺 nmode 字段 → 退化为 1 行（防御，不炸）
+  assert.equal(staffLayout({ nodes: [], view: {}, ui: {} }).rows.length, 1);
+  // modeLabel: fock 0/非 0、bosonic null/名、gaussian 恒真空
+  const fock = { backend: "fock", initial: [0, 3, null] };
+  assert.equal(modeLabel(fock, 0), "mode 0 · 真空");
+  assert.equal(modeLabel(fock, 1), "mode 1 · |3⟩");
+  assert.equal(modeLabel(fock, 2), "mode 2 · 真空"); // 非法值不撒谎
+  const bos = { backend: "bosonic", initial: [null, "gkp0"] };
+  assert.equal(modeLabel(bos, 0), "mode 0 · 真空");
+  assert.equal(modeLabel(bos, 1), "mode 1 · gkp0");
+  assert.equal(modeLabel(bos, 2), "mode 2 · 真空");
+  assert.equal(modeLabel({ backend: "gaussian", initial: [7] }, 0), "mode 0 · 真空");
 });
 
-test("L5: removeSource — cascades gates on its lanes only", () => {
+test("L5: removeMode — cascades gates on that mode only", () => {
   const nodes = [
-    { id: "v0", op: "vacuum", params: {} },                    // lane 0
-    { id: "v1", op: "vacuum", params: {} },                    // lane 1
     { id: "p0", op: "phase", params: { phi: 1 }, mode: 0, ui: { x: 1 } },
     { id: "p1", op: "squeeze", params: { r: 0.4 }, mode: 1, ui: { x: 1 } },
     { id: "bs", op: "beamsplitter", params: { theta: 0.5 }, modes: [0, 1], ui: { x: 2 } },
-    { id: "coh", op: "coherent", params: { alpha: 1 } },
     { id: "d", op: "displace", params: { alpha: 1 }, mode: 2, ui: { x: 3 } },
   ];
-  const { nodes: kept, removed } = removeSource(nodes, "v0");
-  assert.deepEqual(removed, ["v0", "p0", "bs"]); // gate on lane 0 + cross-lane two-mode
-  assert.deepEqual(kept.map((n) => n.id), ["v1", "p1", "coh", "d"]);
-  // unknown source: no-op
-  assert.equal(removeSource(nodes, "nope").nodes.length, nodes.length);
+  const kept = removeMode(nodes, 0);
+  // lane 0 上的单模门 + 跨 lane 的双模门级联删除；lane 2 的门上移
+  assert.deepEqual(kept.map((n) => n.id), ["p1", "d"]);
+  assert.equal(kept[0].mode, 0);           // 原 lane 1 → 0
+  assert.equal(kept[1].mode, 1);           // 原 lane 2 → 1
 });
 
-test("L5: removeSource — remaps surviving gates below the deleted row", () => {
-  // lanes: va=0, vb=1（删）, vc=2, vd(tmsv)=3..4；删后 vd 提供 2..3，下方门全部 -1
+test("L5: removeMode — remaps surviving gates above the deleted mode", () => {
   const nodes = [
-    { id: "va", op: "vacuum", params: {} },
-    { id: "vb", op: "vacuum", params: {} },
-    { id: "vc", op: "vacuum", params: {} },
-    { id: "vd", op: "tmsv", params: { r: 0.6 } },
     { id: "pa", op: "phase", params: { phi: 1 }, mode: 0, ui: { x: 1 } },
     { id: "pb", op: "squeeze", params: { r: 0.4 }, mode: 1, ui: { x: 1 } },
     { id: "pc", op: "phase", params: { phi: 2 }, mode: 2, ui: { x: 2 } },
     { id: "bs", op: "beamsplitter", params: { theta: 0.5 }, modes: [2, 3], ui: { x: 3 } },
     { id: "czg", op: "cz", params: {}, modes: [3, 4], ui: { x: 4 } },
   ];
-  const { nodes: kept, removed } = removeSource(nodes, "vb");
-  assert.deepEqual(removed, ["vb", "pb"]); // lane 1 上的门级联删除
+  const kept = removeMode(nodes, 1);
   const byId = Object.fromEntries(kept.map((n) => [n.id, n]));
-  assert.deepEqual(kept.map((n) => n.id), ["va", "vc", "vd", "pa", "pc", "bs", "czg"]);
-  assert.equal(byId.pa.mode, 0);           // 删除行上方不动
+  assert.deepEqual(kept.map((n) => n.id), ["pa", "pc", "bs", "czg"]);
+  assert.equal(byId.pa.mode, 0);           // 删除模上方不动
   assert.equal(byId.pc.mode, 1);           // 下方单模门 -1
   assert.deepEqual(byId.bs.modes, [1, 2]); // 下方双模门整体 -1
   assert.deepEqual(byId.czg.modes, [2, 3]);
-  assert.equal(sourceModes(kept), 4);      // nmode 5 → 4
 });
 
-test("L5: toV1Json — v1 payload, sources expanded, no ui.x on ops", () => {
-  let nodes = addNode([], "vacuum");
-  nodes = placeSingle(nodes, "phase", 0, 3.5);
-  nodes = addNode(nodes, "loss");
-  nodes = nodes.map((n) => (n.op === "loss" ? { ...n, mode: 1 } : n));
-  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+test("L5: toV1Json — v1 payload, nmode read from state, no ui.x on ops", () => {
+  let nodes = placeSingle([], "phase", 0, 3.5);
+  nodes = placeSingle(nodes, "loss", 1, 0);
+  const payload = toV1Json({ nmode: 2, nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
   assert.equal(payload.schema, "circuit_v1");
-  assert.equal(payload.nmode, 1); // vacuum(1) counts nmode
-  assert.deepEqual(payload.ops.map((o) => o.op), ["phase", "loss"]);
-  assert.deepEqual(payload.ops[0].params, { theta: Math.PI / 2 }); // phase phi → theta (placeSingle uses default param)
-  assert.deepEqual(payload.ops[1].modes, [1]); // mode → modes
+  assert.equal(payload.nmode, 2); // state.nmode 直读（ADR-0014）
+  // sortNodes: x asc，同 x 按 mode；loss@x0 先于 phase@x4
+  assert.deepEqual(payload.ops.map((o) => o.op), ["loss", "phase"]);
+  assert.deepEqual(payload.ops[1].params, { theta: Math.PI / 2 }); // phase phi → theta
+  assert.deepEqual(payload.ops[0].modes, [1]); // mode → modes
   assert.ok(!("ui" in payload.ops[0]) && !("edges" in payload));
-  assert.deepEqual(payload.ui, { staff: { n1: 4, n2: 5 } }); // staff layout in ui extension
+  assert.equal(typeof payload.ui.staff[payload.ops[0].id], "number"); // staff layout in ui extension
   const st = stateFromJson(payload);
-  assert.deepEqual(st.state.nodes.filter((n) => n.op !== "vacuum").map((n) => n.ui.x), [4, 5]);
+  assert.deepEqual(st.state.nodes.map((n) => n.ui.x), payload.ops.map((o) => payload.ui.staff[o.id]));
 });
 
 test("L5: stateFromJson — missing staff falls back to array index", () => {
@@ -338,7 +316,7 @@ test("L5: stateFromJson — missing staff falls back to array index", () => {
   };
   const { state, error } = stateFromJson(base);
   assert.equal(error, undefined);
-  assert.deepEqual(state.nodes.map((n) => n.ui?.x), [undefined, 0, 1]); // source layout-free
+  assert.deepEqual(state.nodes.map((n) => n.ui?.x), [0, 1]); // 无源节点（ADR-0014）
   // explicit ui.staff honored
   const withX = { ...base, ui: { staff: { a: 7, b: 3 } } };
   const { state: sx } = stateFromJson(withX);
@@ -346,7 +324,7 @@ test("L5: stateFromJson — missing staff falls back to array index", () => {
   assert.equal(sx.nodes.find((n) => n.id === "b").ui.x, 3);
   // round-trip: ui.x survives
   const rt = stateFromJson(toV1Json(state));
-  assert.deepEqual(rt.state.nodes.map((n) => n.ui?.x), [undefined, 0, 1]);
+  assert.deepEqual(rt.state.nodes.map((n) => n.ui?.x), [0, 1]);
 });
 
 test("updateParam / updateMode", () => {
@@ -373,13 +351,14 @@ test("OCR guards: clamp, unknown keys", () => {
 
 test("OCR guards: id collision after import, proto keys, dup ids", () => {
   const payload = toV1Json({
-    nodes: [{ id: "n0", op: "vacuum", params: {} }],
+    nmode: 1,
+    nodes: [{ id: "n0", op: "phase", params: { phi: 1 }, mode: 0 }],
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
     ui: {},
   });
   const { state } = stateFromJson(payload);
   const grown = addNode(state.nodes, "loss");
-  assert.equal(grown[1].id, "n0"); // vac0 does not occupy the n-prefix
+  assert.equal(grown[1].id, "n1"); // next free numeric id
   // __proto__ / constructor must not pass the whitelist
   assert.ok(stateFromJson({ schema: "circuit_v1", nmode: 1, ops: [{ id: "x", op: "__proto__", modes: [0], params: {} }] }).error);
   assert.ok(stateFromJson({ schema: "circuit_v1", nmode: 1, ops: [{ id: "x", op: "constructor", modes: [0], params: {} }] }).error);
@@ -395,30 +374,31 @@ test("OCR guards: id collision after import, proto keys, dup ids", () => {
 });
 
 test("toV1Json: circuit_v1 payload (ADR-0003)", () => {
-  let nodes = [];
-  nodes = addNode(nodes, "vacuum");
-  nodes = addNode(nodes, "loss");
-  nodes = nodes.map((n) => (n.id === nodes[1].id ? { ...n, mode: 1 } : n));
-  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  const nodes = placeSingle([], "loss", 1, 0);
+  const payload = toV1Json({ nmode: 2, nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
   assert.equal(payload.schema, "circuit_v1");
-  assert.equal(payload.nmode, 1);
+  assert.equal(payload.nmode, 2);
   assert.ok(!("edges" in payload));
   assert.deepEqual(payload.ops[0].op, "loss");
   assert.deepEqual(payload.ops[0].modes, [1]);
-  assert.equal(payload.ops.length, 1); // vacuum folded into nmode
+  assert.equal(payload.ops.length, 1);
+  // 防御：state 缺 nmode → 退化为 1（IR 要求 nmode >= 1）
+  assert.equal(toV1Json({ nodes: [], view: {}, ui: {} }).nmode, 1);
 });
 
-test("stateFromJson: valid payload round-trips", () => {
+test("stateFromJson: valid payload round-trips (nmode 一等字段)", () => {
   const payload = toV1Json({
-    nodes: addNode(addNode([], "vacuum"), "loss"),
+    nmode: 2,
+    nodes: placeSingle([], "loss", 0, 0),
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
     ui: {},
   });
   const { state, error } = stateFromJson(payload);
   assert.equal(error, undefined);
-  assert.equal(state.nodes.length, 2);
-  assert.equal(state.nodes[1].op, "loss");
-  assert.equal(state.nodes[0].params.nmode, 1); // v1 nmode → implicit vacuum source
+  assert.equal(state.nodes.length, 1);
+  assert.equal(state.nodes[0].op, "loss");
+  assert.equal(state.nmode, 2);            // payload.nmode → state.nmode
+  assert.equal(state.nodes.some((n) => n.op === "vacuum"), false); // 不再注入源节点
 });
 
 test("stateFromJson: rejects wrong schema / non-object (ADR-0011: v1 only)", () => {
@@ -444,7 +424,8 @@ test("L3: homodyne visible with phi default 0 / max TAU", () => {
 test("L3: toV1Json preserves top-level seed", () => {
   const payload = toV1Json({
     seed: 42,
-    nodes: addNode([], "vacuum"),
+    nmode: 1,
+    nodes: addNode([], "loss"),
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
     ui: {},
   });
@@ -465,13 +446,13 @@ test("L3: stateFromJson accepts seed + homodyne optional phi", () => {
   const { state, error } = stateFromJson(payload);
   assert.equal(error, undefined);
   assert.equal(state.seed, 7);
-  assert.equal(state.nodes[1].params.phi, 1.5);
-  assert.equal(state.nodes[2].params.phi, 0); // missing phi → default 0
+  assert.equal(state.nodes[0].params.phi, 1.5);
+  assert.equal(state.nodes[1].params.phi, 0); // missing phi → default 0
   // round-trip
   const rt = stateFromJson(toV1Json(state));
   assert.equal(rt.error, undefined);
   assert.equal(rt.state.seed, 7);
-  assert.equal(rt.state.nodes[1].params.phi, 1.5);
+  assert.equal(rt.state.nodes[0].params.phi, 1.5);
 });
 
 test("L3: stateFromJson rejects invalid seed", () => {
@@ -516,9 +497,7 @@ test("L4: amplifier + mz metadata", () => {
 });
 
 test("L4: sweep metadata — alpha excluded, real numerics included", () => {
-  assert.equal(OPS.coherent.params.alpha.sweep, undefined);
   assert.equal(OPS.displace.params.alpha.sweep, undefined);
-  assert.equal(OPS.vacuum.params.nmode.sweep, undefined); // structural, not sweepable
   assert.deepEqual(OPS.squeeze.params.r.sweep, [0, 2]);
   assert.deepEqual(OPS.loss.params.T.sweep, [0, 1]);
   assert.deepEqual(OPS.beamsplitter.params.theta.sweep, [0, Math.PI]);
@@ -539,8 +518,8 @@ test("L4: stateFromJson accepts amplifier/mz", () => {
   };
   const { state, error } = stateFromJson(payload);
   assert.equal(error, undefined);
-  assert.equal(state.nodes[1].params.nbar, 0); // advanced default filled
-  assert.equal(state.nodes[2].params.theta, 0.5);
+  assert.equal(state.nodes[0].params.nbar, 0); // advanced default filled
+  assert.equal(state.nodes[1].params.theta, 0.5);
   const rt = stateFromJson(toV1Json(state));
   assert.equal(rt.error, undefined);
   // missing required G freezes
@@ -564,11 +543,11 @@ test("fourier gate: palette-visible gate, JSON round-trip loadable", () => {
   };
   const { state, error } = stateFromJson(payload);
   assert.equal(error, undefined);
-  assert.equal(state.nodes[1].op, "fourier");
-  assert.equal(state.nodes[1].ui.x, 0);
+  assert.equal(state.nodes[0].op, "fourier");
+  assert.equal(state.nodes[0].ui.x, 0);
   const rt = stateFromJson(toV1Json(state)); // save → load round-trip
   assert.equal(rt.error, undefined);
-  assert.equal(rt.state.nodes[1].op, "fourier");
+  assert.equal(rt.state.nodes[0].op, "fourier");
 });
 
 test("undo/redo: push → undo → redo round-trips state references", () => {
@@ -607,11 +586,13 @@ test("undo/redo: new edit clears redo; clear() empties both; max caps history", 
 
 /* ── circuit_v1 (ADR-0003) ───────────────────────────────── */
 
-test("v1: toV1Json expands tmsv/coherent sources", () => {
-  let nodes = addNode([], "tmsv");
-  nodes = addNode(nodes, "coherent");
-  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
-  assert.equal(payload.nmode, 3); // tmsv 2 + coherent 1
+test("v1: toV1Json — nmode 由 state 决定，节点不再贡献模数", () => {
+  const nodes = [
+    { id: "t", op: "two_mode_squeeze", params: { r: 0.6 }, modes: [0, 1], ui: { x: 0 } },
+    { id: "d", op: "displace", params: { alpha: 1 }, mode: 2, ui: { x: 0 } },
+  ];
+  const payload = toV1Json({ nmode: 3, nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  assert.equal(payload.nmode, 3);
   assert.deepEqual(payload.ops.map((o) => o.op), ["two_mode_squeeze", "displace"]);
   assert.deepEqual(payload.ops[0].modes, [0, 1]);
   assert.deepEqual(payload.ops[1].modes, [2]);
@@ -620,16 +601,15 @@ test("v1: toV1Json expands tmsv/coherent sources", () => {
 
 test("v1: toV1Json maps measure ops + keeps measurement order", () => {
   const nodes = [
-    addNode([], "vacuum")[0],
-    { id: "n1", op: "homodyne", params: { phi: 1.2 }, mode: 0 },
-    { id: "n2", op: "heterodyne", params: {}, mode: 1 },
+    { id: "n1", op: "homodyne", params: { phi: 1.2 }, mode: 0, ui: { x: 0 } },
+    { id: "n2", op: "heterodyne", params: {}, mode: 1, ui: { x: 0 } },
   ];
-  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
+  const payload = toV1Json({ nmode: 2, nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} });
   assert.deepEqual(payload.ops.map((o) => o.op), ["measure_homodyne", "measure_heterodyne"]);
   assert.equal(payload.ops[0].params.phi, 1.2);
 });
 
-test("v1: stateFromJson inverts native v1 doc (implicit vacuum, op remap)", () => {
+test("v1: stateFromJson inverts native v1 doc (op remap, nmode 直读)", () => {
   const payload = {
     schema: "circuit_v1", nmode: 3, seed: 5,
     ops: [
@@ -642,13 +622,11 @@ test("v1: stateFromJson inverts native v1 doc (implicit vacuum, op remap)", () =
   const { state, error } = stateFromJson(payload);
   assert.equal(error, undefined);
   assert.equal(state.seed, 5);
-  assert.equal(state.nodes.length, 4); // vacuum source + 3 ops
-  assert.equal(state.nodes[0].op, "vacuum");
-  assert.equal(state.nodes[0].params.nmode, 3);
-  assert.equal(state.nodes[0].ui, undefined); // source layout-free
-  assert.deepEqual(state.nodes.map((n) => n.op), ["vacuum", "two_mode_squeeze", "heterodyne", "phase"]);
-  assert.deepEqual(state.nodes[3].params, { phi: 0.7 }); // theta → phi
-  assert.equal(state.nodes[2].mode, 1);
+  assert.equal(state.nodes.length, 3);      // 无源节点
+  assert.equal(state.nmode, 3);             // 模数来自 payload.nmode
+  assert.deepEqual(state.nodes.map((n) => n.op), ["two_mode_squeeze", "heterodyne", "phase"]);
+  assert.deepEqual(state.nodes[2].params, { phi: 0.7 }); // theta → phi
+  assert.equal(state.nodes[1].mode, 1);
   // round-trip back to v1 is stable
   const again = toV1Json(state);
   assert.equal(again.nmode, 3);
@@ -700,7 +678,7 @@ test("v1: displace array alpha round-trips (UI takes real part)", () => {
 /* ── F7: backend / initial / cutoff JSON sync ───────────── */
 
 test("F7: toV1Json — backend 缺省 gaussian（不写字段，旧文件字节不变）", () => {
-  const st = { seed: 0, nodes: addNode([], "vacuum"), view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "gaussian", initial: null, cutoffs: [10] };
+  const st = { seed: 0, nmode: 1, nodes: addNode([], "loss"), view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "gaussian", initial: null, cutoffs: [10] };
   const payload = toV1Json(st);
   assert.equal(payload.backend, undefined); // 缺省 gaussian = 旧 JSON 零破坏
   assert.equal(payload.initial, undefined);
@@ -715,7 +693,8 @@ test("F7: toV1Json — backend 缺省 gaussian（不写字段，旧文件字节�
 test("F7: toV1Json — initial 非全零才写；cutoff 均匀 int / 非均匀 list", () => {
   const base = {
     seed: 0,
-    nodes: addNode(addNode([], "vacuum"), "vacuum"),
+    nmode: 2,
+    nodes: [],
     view: { wigner_mode: 0, lim: 5.0, n: 64 },
     ui: {},
     backend: "fock",
@@ -734,18 +713,18 @@ test("F7: toV1Json — initial 非全零才写；cutoff 均匀 int / 非均匀 l
 
 test("F7: toV1Json — measure ops carry a result name (Fock IR requires it)", () => {
   const nodes = [
-    addNode([], "vacuum")[0],
-    { id: "n1", op: "homodyne", params: { phi: 1.2 }, mode: 0 },
-    { id: "n2", op: "heterodyne", params: {}, mode: 1 },
-    { id: "n3", op: "measure_pnr", params: { name: "" }, mode: 2 },
+    { id: "n1", op: "homodyne", params: { phi: 1.2 }, mode: 0, ui: { x: 0 } },
+    { id: "n2", op: "heterodyne", params: {}, mode: 1, ui: { x: 0 } },
+    { id: "n3", op: "measure_pnr", params: { name: "" }, mode: 2, ui: { x: 0 } },
   ];
-  const payload = toV1Json({ nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock" });
+  const payload = toV1Json({ nmode: 3, nodes, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock" });
   assert.equal(payload.ops[0].params.name, "n1"); // 未命名 → 节点 id
   assert.equal(payload.ops[1].params.name, "n2");
   assert.equal(payload.ops[2].params.name, "n3");
   // 显式载入的 name 保留
   const named = toV1Json({
-    nodes: [{ id: "n9", op: "measure_pnr", params: { name: "m_n" }, mode: 0 }],
+    nmode: 1,
+    nodes: [{ id: "n9", op: "measure_pnr", params: { name: "m_n" }, mode: 0, ui: { x: 0 } }],
     view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock",
   });
   assert.equal(named.ops[0].params.name, "m_n");
@@ -842,7 +821,7 @@ test("F7: v1 直载解析 backend/initial（无 backend 字段 → gaussian）",
 });
 
 test("F7: toV1Json — fock param mapping (loss T→eta 掉 nbar, squeeze 掉 phi)", () => {
-  const base = { view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, seed: 0 };
+  const base = { view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, seed: 0, nmode: 2 };
   const nodes = [
     { id: "n1", op: "loss", params: { T: 0.8, nbar: 0.1 }, mode: 0 },
     { id: "n2", op: "squeeze", params: { r: 0.4, phi: 1.2 }, mode: 1 },
@@ -942,9 +921,8 @@ test("initial.js: remapForBackend — 真空对应保留，非真空重置并计
 });
 
 test("B6/F7 回归: fock→bosonic 切换后 toV1Json 不再产出非法 initial（422 根因）", () => {
-  const nm2 = addNode(addNode([], "vacuum"), "vacuum");
-  // fock 状态：默认全 0（真空）+ 一个非零项
-  const fockState = { seed: 0, nodes: nm2, view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock", initial: [0, 3], cutoffs: [10, 10] };
+  // fock 状态：默认全 0（真空）+ 一个非零项（模数来自 nmode，无源节点）
+  const fockState = { seed: 0, nmode: 2, nodes: [], view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, backend: "fock", initial: [0, 3], cutoffs: [10, 10] };
   // 模拟 setBackend('bosonic') 的重映射（与 editor.js 同一来源）
   const st = { ...fockState, backend: "bosonic", initial: [null, null] };
   const payload = toV1Json(st);
@@ -971,9 +949,8 @@ test("B6/F7 回归: stateFromJson 对 fock 整数进 bosonic 报错（前端守�
 });
 
 test("ticket-4 F7/B6: backends derived (deriveOps); ops.js carries none", () => {
-  // v0 sources: structural fact -> gaussian (deriveOps pass 1)
+  // v0 sources 已退役（ADR-0014）→ pass 1 兜底仅剩 schema 内未知 op
   const d = deriveOps(MOCK_SCHEMA);
-  assert.deepEqual(d.vacuum.backends, ["gaussian"]);
   assert.deepEqual(d.mz.backends, ["gaussian"]);
   assert.deepEqual(d.kerr.backends, ["fock"]);
   assert.deepEqual(d.measure_pnr.backends, ["fock"]);

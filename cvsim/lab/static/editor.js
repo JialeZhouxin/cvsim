@@ -3,14 +3,15 @@
    inside initEditor. */
 "use strict";
 
-import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeNode, removeSource, sourceModes, toV1Json, updateParam } from "./ops.js";
-import { initialCacheKey, parseInitial, remapForBackend, vacuumDefault, bosonicSourceOptions } from "./initial.js";
+import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeMode, removeNode, toV1Json, updateParam } from "./ops.js";
+import { dropMode, initialCacheKey, parseInitial, remapForBackend, vacuumDefault, bosonicSourceOptions } from "./initial.js";
 import { opsForBackend, schemaTables } from "./schema_store.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
 const defaultState = () => ({
   seed: 0,
+  nmode: 1,            // ADR-0014: 模数唯一事实源（前端一等字段）
   nodes: [],
   view: { wigner_mode: 0, lim: 5.0, n: 64, joint_modes: null },
   ui: {},
@@ -169,7 +170,7 @@ function nextFreeV1Id(i, seenIds) {
 }
 
 /** circuit_v1 → graph model (inverse of toV1Json). v1 has no source
-    concept: an implicit vacuum source (nmode) is prepended; ops map 1:1
+    concept: the top-level `nmode` is the mode count (ADR-0014); ops map 1:1
     to UI nodes; phase ``theta`` maps back to the UI ``phi`` param.
     Core-only ops (cz/cx/interferometer/…) are rejected — same whitelist
     the backend load enforces. */
@@ -265,15 +266,6 @@ function stateFromV1(payload) {
     }
     nodes.push(node);
   }
-  // implicit vacuum source covering all modes (v1 has no source concept)
-  let vid = "vac0";
-  while (assigned.has(vid)) vid = "vac" + (Number(vid.slice(3)) + 1);
-  nodes.unshift({
-    id: vid,
-    op: "vacuum",
-    params: { nmode: payload.nmode },
-    ui: undefined,
-  });
   const rawView = payload.view && typeof payload.view === "object" ? payload.view : {};
   if (!Number.isInteger(rawView.wigner_mode) || rawView.wigner_mode < 0) {
     return { error: "view.wigner_mode 必须是非负整数" };
@@ -298,7 +290,7 @@ function stateFromV1(payload) {
   }
   const ext = parseExtensions(payload, payload.nmode);
   if (ext.error) return ext;
-  return { state: { seed, nodes, view, ui: {}, ...ext } };
+  return { state: { seed, nmode: payload.nmode, nodes, view, ui: {}, ...ext } };
 }
 
 /** Load entry: validate a saved JSON file into editor state (pure).
@@ -437,7 +429,7 @@ export function initEditor(root, hooks) {
     onMove: (id, x) => {
       const n = state.nodes.find((y) => y.id === id);
       const meta = n && OPS[n.op];
-      if (n && meta && meta.kind !== "source") {
+      if (n && meta) {
         const cells = meta.kind === "two"
           ? [[n.modes[0], x], [n.modes[1], x]]
           : [[n.mode, x]];
@@ -451,23 +443,29 @@ export function initEditor(root, hooks) {
       render();
     },
     onDelete: (id) => {
-      const n = state.nodes.find((y) => y.id === id);
-      if (n && OPS[n.op] && OPS[n.op].kind === "source") {
-        // 删源级联（removeSource）：至少留一个源；删后钳住 wigner_mode 防越界
-        const nSources = state.nodes.filter((y) => OPS[y.op].kind === "source").length;
-        if (nSources <= 1) {
-          hooks.onStatus("至少保留一个源节点", false);
-          return;
-        }
-        pushHistory();
-        const res = removeSource(state.nodes, id);
-        const nm = sourceModes(res.nodes);
-        state = { ...state, nodes: res.nodes,
-          view: { ...state.view, wigner_mode: Math.max(0, Math.min(state.view.wigner_mode, nm - 1)) } };
-      } else {
-        pushHistory();
-        state = { ...state, nodes: removeNode(state.nodes, id) };
+      pushHistory();
+      state = { ...state, nodes: removeNode(state.nodes, id) };
+      render();
+    },
+    /* ADR-0014: 逐模删除 — 级联删该模上的门 + 上方模索引下移。
+       per-mode 数组必须先按**索引**删除（dropMode），再补齐（padTo/remap 只做截尾/补位）。 */
+    onDeleteMode: (mode) => {
+      if (state.nmode <= 1) {
+        hooks.onStatus("至少保留一个模式", false);
+        return;
       }
+      pushHistory();
+      const nmode = state.nmode - 1;
+      const jm = state.view.joint_modes;
+      state = { ...state,
+        nodes: removeMode(state.nodes, mode),
+        nmode,
+        initial: remapForBackend(state.backend, state.backend,
+          dropMode(state.initial, mode), nmode).initial,
+        cutoffs: padTo(dropMode(state.cutoffs, mode), nmode, 10),
+        view: { ...state.view,
+          wigner_mode: Math.max(0, Math.min(state.view.wigner_mode, nmode - 1)),
+          joint_modes: Array.isArray(jm) && jm.some((m) => m >= nmode) ? null : jm } };
       render();
     },
     onParam: (id, key, value) => {
@@ -490,7 +488,6 @@ export function initEditor(root, hooks) {
   /* palette: DnD + click fallback, grouped by category（palette:false 的 op 不出托盘）。
      F7: per-backend 过滤 — OPS.backends 不含当前 backend 的 op 不出托盘。 */
   const PALETTE_GROUPS = [
-    ["source", "源"],
     ["gate", "门"],
     ["channel", "通道"],
     ["measure", "测量"],
@@ -518,7 +515,7 @@ export function initEditor(root, hooks) {
         card.title = OPS[op].tip || ""; // #3: hover 提示物理含义
         const tryAdd = () => {
           const meta = OPS[op];
-          if (meta.kind === "two" && sourceModes(state.nodes) < 2) {
+          if (meta.kind === "two" && state.nmode < 2) {
             hooks.onStatus("双模操作需要至少 2 个模式（先添加模式）", false);
             return;
           }
@@ -552,61 +549,39 @@ export function initEditor(root, hooks) {
   function setBackend(next) {
     if (next === state.backend) return;
     pushHistory();
-    let nodes = state.nodes;
     let view = state.view;
     let cutoffs = state.cutoffs;
+    // 模数与源无关（ADR-0014）：不再造源节点
     if (next === "fock") {
-      if (!nodes.some((n) => n.op === "vacuum")) {
-        let vid = "vac0";
-        for (let k = 1; nodes.some((n) => n.id === vid); k++) vid = "vac" + k;
-        nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
-      }
-      const nm = sourceModes(nodes);
+      const nm = state.nmode;
       cutoffs = padTo(cutoffs, nm, 10);
       if (nm >= 2 && !Array.isArray(view.joint_modes)) {
         view = { ...view, joint_modes: [0, 1] }; // HOM 剧本：joint 卡默认开
       }
-    } else if (next === "bosonic") {
-      if (!nodes.some((n) => n.op === "vacuum")) {
-        let vid = "vac0";
-        for (let k = 1; nodes.some((n) => n.id === vid); k++) vid = "vac" + k;
-        nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
-      }
     }
     // B6/F7: initial 跨后端语义重映射（单点在 initial.js）。真空对应项保留
     // （fock 0 ↔ bosonic null），非真空项重置 + UI 提示，永不静默截断。
-    const nm = sourceModes(nodes);
+    const nm = state.nmode;
     const remap = remapForBackend(state.backend, next, state.initial, nm);
     if (remap.reset > 0) {
       hooks.onStatus(`${remap.reset} 项初始态因后端切换被重置为真空`, false);
     }
-    state = { ...state, backend: next, nodes, view, initial: remap.initial, cutoffs };
+    state = { ...state, backend: next, view, initial: remap.initial, cutoffs };
     render();
   }
 
   function addMode() {
     pushHistory();
-    let nodes = state.nodes;
-    const vac = nodes.find((n) => n.op === "vacuum");
-    if (vac) {
-      nodes = nodes.map((n) => (n.id === vac.id
-        ? { ...n, params: { ...n.params, nmode: (n.params.nmode ?? 1) + 1 } }
-        : n));
-    } else {
-      let vid = "vac0";
-      for (let k = 1; nodes.some((n) => n.id === vid); k++) vid = "vac" + k;
-      nodes = [{ id: vid, op: "vacuum", params: { nmode: 1 } }, ...nodes];
-    }
-    const nm = sourceModes(nodes);
+    const nm = state.nmode + 1;
     // B6/F7: initial 补长也走单点重映射（from === to 同后端：原值保留 + 真空补位）
     const remap = remapForBackend(state.backend, state.backend, state.initial, nm);
-    state = { ...state, nodes,
+    state = { ...state, nmode: nm,
       initial: remap.initial, cutoffs: padTo(state.cutoffs, nm, 10) };
     render();
   }
 
   function setInitial(i, v) {
-    const nm = sourceModes(state.nodes);
+    const nm = state.nmode;
     const fill = vacuumDefault(state.backend);
     const next = Array(nm).fill(fill).map((_, k) =>
       (state.initial ? state.initial[k] : fill));
@@ -656,7 +631,7 @@ export function initEditor(root, hooks) {
 
   function renderFockControls() {
     const kind = INITIAL_INPUT_KIND[state.backend];
-    if (dom.addModeBtn) dom.addModeBtn.hidden = kind !== "int"; // fock 独有加模按钮
+    // ADR-0014: ＋模 恒可见（gaussian 无源节点后，这是唯一的加模入口）
     if (!kind) { // 无 initial 字段（gaussian）：卡片隐藏
       if (dom.backendSelect) dom.backendSelect.value = state.backend;
       if (dom.initialCard) { dom.initialCard.hidden = true; dom.initialInputs.dataset.nmode = ""; dom.initialInputs.replaceChildren(); }
@@ -665,7 +640,7 @@ export function initEditor(root, hooks) {
     if (dom.backendSelect) dom.backendSelect.value = state.backend;
     if (!dom.initialCard) return;
     dom.initialCard.hidden = false;
-    const nm = sourceModes(state.nodes);
+    const nm = state.nmode;
     // 缓存键含 backend（initialCacheKey）：切换后端必重建控件，
     // 防止 bosonic 下残留 fock 数字输入框（模数不变早退 bug）。
     if (dom.initialInputs.dataset.nmode === initialCacheKey(state.backend, nm)) {

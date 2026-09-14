@@ -3,34 +3,43 @@
    DOM/DnD work lives only inside initStaff. */
 "use strict";
 
-import { OPS, cellOccupied, sourceRows } from "./ops.js";
+import { OPS, cellOccupied } from "./ops.js";
 
 export const GATE_W = 72;   // px per x unit (gate cell width)
 export const ROW_H = 44;    // px per lane
-export const SRC_W = 132;   // px source column
+export const MODE_W = 132;  // px mode column
 
-/** Pure: state → staff geometry. rows: one per mode (lane), each tagged with
-    its source; gates: placed ops with span for two-mode crossing. */
-export function staffLayout(state) {
-  const rows = [];
-  for (const r of sourceRows(state.nodes)) {
-    for (let m = r.modeStart; m < r.modeEnd; m++) {
-      rows.push({
-        mode: m, srcId: r.srcId, srcOp: r.op, srcParams: r.params,
-        srcFirst: m === r.modeStart, srcLast: m === r.modeEnd - 1,
-      });
-    }
+/** Pure: one mode row's label — index + true initial state (ADR-0014 D1(b)).
+    gaussian has no `initial` field → always vacuum (definition). */
+export function modeLabel(state, mode) {
+  const init = Array.isArray(state.initial) ? state.initial[mode] : undefined;
+  if (state.backend === "fock") {
+    if (!Number.isInteger(init) || init === 0) return `mode ${mode} · 真空`;
+    return `mode ${mode} · |${init}⟩`;
   }
+  if (state.backend === "bosonic") {
+    if (typeof init !== "string" || !init) return `mode ${mode} · 真空`;
+    return `mode ${mode} · ${init}`;
+  }
+  return `mode ${mode} · 真空`; // gaussian：定义上恒真空
+}
+
+/** Pure: state → staff geometry. rows: one per mode; gates: placed ops with
+    span for two-mode crossing. */
+export function staffLayout(state) {
+  const nmode = Math.max(1, Number(state.nmode) || 1);
+  const rows = Array.from({ length: nmode },
+    (_, mode) => ({ mode, initial: modeLabel(state, mode) }));
   const gates = [];
   for (const n of state.nodes) {
     const meta = OPS[n.op];
-    if (!meta || meta.kind === "source") continue;
+    if (!meta) continue;
     const two = meta.kind === "two";
     const modeA = two ? n.modes[0] : n.mode;
     const modeB = two ? n.modes[1] : n.mode;
     gates.push({ node: n, two, modeA, modeB, span: Math.abs(modeB - modeA) + 1, top: Math.min(modeA, modeB), x: n.ui?.x ?? 0 });
   }
-  return { rows, gates, nmode: rows.length };
+  return { rows, gates, nmode };
 }
 
 /** DOM wiring (browser only). api: {getState, onPlace, onCompletePlacing,
@@ -68,6 +77,7 @@ export function initStaff(root, api) {
     closeCard();
     clearHover();
     const { rows, gates, nmode } = staffLayout(api.getState());
+    const deletable = nmode > 1;
     root.replaceChildren();
     root.className = "staff";
 
@@ -76,7 +86,7 @@ export function initStaff(root, api) {
     const maxX = gates.reduce((m, g) => Math.max(m, g.x), -1) + 1;
     /* L5.5: keep empty cells ahead of the last gate so drag-and-drop works
        beyond the current content (grid is the dragover target, not the staff) */
-    grid.style.width = `${SRC_W + Math.max(10, maxX + 4) * GATE_W}px`;
+    grid.style.width = `${MODE_W + Math.max(10, maxX + 4) * GATE_W}px`;
     grid.style.height = `${Math.max(1, nmode) * ROW_H}px`;
 
     /* lanes (one per mode) */
@@ -87,26 +97,21 @@ export function initStaff(root, api) {
 
       const src = document.createElement("div");
       const armed = placing && r.mode === placing.modeA;
-      src.className = `staff__source${r.srcFirst ? "" : " staff__source--cont"}${armed ? " staff__source--arm" : ""}`;
-      if (r.srcFirst) {
-        const label = document.createElement("span");
-        label.textContent = `${OPS[r.srcOp].label}${r.srcOp === "tmsv" ? `(r=${r.srcParams.r ?? 0.6})` : ""}${r.srcOp === "coherent" ? `(α=${r.srcParams.alpha ?? 1})` : ""}`;
-        const del = document.createElement("button");
-        del.type = "button";
-        del.className = "staff__source-del";
-        del.textContent = "×";
-        del.title = "删除源（连带删除其模上的门）";
-        del.addEventListener("click", (e) => {
-          e.stopPropagation();
-          api.onDelete(r.srcId);
-        });
-        src.append(label, del);
-        src.dataset.srcId = r.srcId;
-        src.addEventListener("click", () => {
-          const n = api.getState().nodes.find((x) => x.id === r.srcId);
-          if (n) openCard(n);
-        });
-      }
+      src.className = `staff__mode${armed ? " staff__mode--arm" : ""}`;
+      const label = document.createElement("span");
+      label.className = "staff__mode-label";
+      label.textContent = r.initial;
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "staff__mode-del";
+      del.textContent = "×";
+      del.disabled = !deletable;
+      del.title = deletable ? "删除该模（连带删除其上的门）" : "至少保留一个模式";
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        api.onDeleteMode(r.mode);
+      });
+      src.append(label, del);
       row.appendChild(src);
 
       const lane = document.createElement("div");
@@ -130,7 +135,7 @@ export function initStaff(root, api) {
       const el = document.createElement("div");
       el.className = `gate gate--${g.two ? "two" : "single"}`;
       el.dataset.id = g.node.id;
-      el.style.left = `${SRC_W + g.x * GATE_W}px`;
+      el.style.left = `${MODE_W + g.x * GATE_W}px`;
       el.style.top = `${g.top * ROW_H}px`;
       if (g.two) el.style.height = `${g.span * ROW_H}px`;
       const title = document.createElement("span");
@@ -167,7 +172,7 @@ export function initStaff(root, api) {
     if (placing) {
       const prev = document.createElement("div");
       prev.className = "gate gate--preview";
-      prev.style.left = `${SRC_W + placing.x * GATE_W}px`;
+      prev.style.left = `${MODE_W + placing.x * GATE_W}px`;
       prev.style.top = `${placing.modeA * ROW_H}px`;
       prev.textContent = `${OPS[placing.op].label} ?`;
       gatesEl.appendChild(prev);
@@ -187,7 +192,7 @@ export function initStaff(root, api) {
       const rowEl = e.target.closest(".staff__row");
       if (!rowEl) return;
       const gridRect = grid.getBoundingClientRect();
-      const x = Math.max(0, Math.round((e.clientX - gridRect.left - SRC_W) / GATE_W));
+      const x = Math.max(0, Math.round((e.clientX - gridRect.left - MODE_W) / GATE_W));
       const mode = Number(rowEl.dataset.mode);
       const drag = parseDrag(e);
       let op = null, moveId = null;
@@ -198,18 +203,18 @@ export function initStaff(root, api) {
       if (moveId) {
         const n = nodes.find((y) => y.id === moveId);
         const meta = n && OPS[n.op];
-        if (n && meta && meta.kind !== "source") {
+        if (n && meta) {
           const cells = meta.kind === "two" ? [[n.modes[0], x], [n.modes[1], x]] : [[n.mode, x]];
           conflict = cells.some(([m, cx]) => cellOccupied(nodes, m, cx, moveId));
         }
-      } else if (op && OPS[op].kind !== "source") {
+      } else if (op) {
         conflict = cellOccupied(nodes, mode, x);
       }
       const lane = rowEl.querySelector(".staff__lane");
       root.querySelectorAll(".staff__lane--hover, .staff__lane--conflict").forEach((el) => {
         el.classList.remove("staff__lane--hover", "staff__lane--conflict");
       });
-      const show = (moveId || (op && OPS[op].kind !== "source"));
+      const show = (moveId || op);
       if (!show) { clearHover(); return; }
       lane.classList.add(conflict ? "staff__lane--conflict" : "staff__lane--hover");
       hover = { mode, x, conflict };
@@ -220,7 +225,7 @@ export function initStaff(root, api) {
       }
       ghostEl.classList.toggle("gate--conflict", conflict);
       ghostEl.textContent = moveId ? "↔" : `${OPS[op].label} ?`;
-      ghostEl.style.left = `${SRC_W + x * GATE_W + 6}px`;   // centre on the cell
+      ghostEl.style.left = `${MODE_W + x * GATE_W + 6}px`;   // centre on the cell
       ghostEl.style.top = `${mode * ROW_H}px`;
     });
     grid.addEventListener("dragleave", (e) => {
@@ -232,7 +237,7 @@ export function initStaff(root, api) {
       const rowEl = e.target.closest(".staff__row");
       if (!rowEl) return;
       const mode = Number(rowEl.dataset.mode);
-      const x = (e.clientX - grid.getBoundingClientRect().left - SRC_W) / GATE_W;
+      const x = (e.clientX - grid.getBoundingClientRect().left - MODE_W) / GATE_W;
       const drag = parseDrag(e);
       if (drag?.kind === "move") {
         api.onMove(drag.id, x);
@@ -241,10 +246,6 @@ export function initStaff(root, api) {
       const op = drag?.kind === "op" ? drag.op : "";
       if (!Object.hasOwn(OPS, op) || OPS[op].palette === false) return;
       const meta = OPS[op];
-      if (meta.kind === "source") {
-        api.onStatus("源：请用托盘点击添加（源不参与拖放）", false);
-        return;
-      }
       if (meta.kind === "two") {
         placing = { op, modeA: mode, x };
         render();
@@ -282,7 +283,7 @@ export function initStaff(root, api) {
   });
   root.tabIndex = -1;
 
-  /* ── param card (click gate/source) ─────────────────── */
+  /* ── param card (click gate) ─────────────────── */
   let card = null;
   function closeCard() {
     if (card) { card.remove(); card = null; }
@@ -293,9 +294,9 @@ export function initStaff(root, api) {
     const meta = OPS[node.op];
     if (!meta) return;
     const g = layout.gates.find((x) => x.node.id === node.id);
-    const row = g ? null : layout.rows.find((r) => r.srcId === node.id);
-    const left = g ? SRC_W + g.x * GATE_W : 8;
-    const top = g ? g.top * ROW_H : row ? row.mode * ROW_H : 8;
+    if (!g) return; // only gates have param cards (modes are plain labels)
+    const left = MODE_W + g.x * GATE_W;
+    const top = g.top * ROW_H;
     card = document.createElement("div");
     card.className = "gate-card";
     card.style.left = `${Math.max(4, left - 74)}px`;
@@ -304,9 +305,7 @@ export function initStaff(root, api) {
 
     const head = document.createElement("div");
     head.className = "gate-card__head";
-    const modeInfo = g
-      ? (g.two ? `modes ${g.modeA}, ${g.modeB}` : `mode ${g.modeA}`)
-      : (meta.kind === "source" ? `+${node.op === "vacuum" ? (node.params?.nmode ?? 1) : meta.modes} 模` : "");
+    const modeInfo = g.two ? `modes ${g.modeA}, ${g.modeB}` : `mode ${g.modeA}`;
     head.textContent = `${meta.label} · ${modeInfo}`;
     card.appendChild(head);
 
@@ -369,7 +368,7 @@ export function initStaff(root, api) {
 
   /* blank click closes the card */
   root.addEventListener("click", (e) => {
-    if (e.target.closest(".gate-card") || e.target.closest(".gate") || e.target.closest(".staff__source")) return;
+    if (e.target.closest(".gate-card") || e.target.closest(".gate") || e.target.closest(".staff__mode")) return;
     closeCard();
   });
 

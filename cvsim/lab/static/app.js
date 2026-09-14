@@ -2,7 +2,7 @@
 "use strict";
 
 import { initEditor, loadJson } from "./editor.js";
-import { OPS, sourceModes, toV1Json } from "./ops.js";
+import { OPS, toV1Json } from "./ops.js";
 import { meterKeys, publishSchema } from "./schema_store.js";
 import { deriveOps } from "./ops_schema.js";
 import { setInitialSchema } from "./initial.js";
@@ -544,7 +544,7 @@ function applyScanDefaults() {
 }
 
 function refreshScanModesA() {
-  const nmode = sourceModes(editor.getState().nodes);
+  const nmode = editor.getState().nmode;
   const prev = scanModesA.value;
   scanModesA.replaceChildren();
   for (let k = 1; k <= nmode - 1; k++) {
@@ -556,7 +556,7 @@ function refreshScanModesA() {
   }
   if (!scanModesA.value && scanModesA.options.length) scanModesA.options[0].selected = true;
   scanNote.hidden = nmode >= 2;
-  if (nmode < 2) scanNote.textContent = "E_N 需要至少 2 个模式（先添加 TMSV 或多模源）";
+  if (nmode < 2) scanNote.textContent = "E_N 需要至少 2 个模式（先点「＋模」加一个）";
   scanBtn.disabled = nmode < 2 || !scanNode.options.length;
 }
 

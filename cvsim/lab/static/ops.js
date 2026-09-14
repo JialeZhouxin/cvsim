@@ -18,31 +18,6 @@ import { schemaTables } from "./schema_store.js";
 export const TAU = 2 * Math.PI;
 
 export const OPS = {
-  /* L5: 源重构 — tmsv 出托盘（palette:false，后端 IR 保留兼容，旧 JSON 仍可载入）;
-     纠缠由 vacuum + two_mode_squeeze 门构建。 */
-  vacuum: {
-    label: "真空模",
-    kind: "source",
-    modes: 1,
-    tip: "真空模：提供 nmode 个真空模式（零均值、单位协方差）",
-    params: { nmode: { min: 1, max: 16, step: 1, def: 1, advanced: true } },
-  },
-  tmsv: {
-    label: "TMSV",
-    kind: "source",
-    modes: 2,
-    palette: false,
-    tip: "TMSV：双模压缩真空，EPR 纠缠源（r 为压缩强度）",
-    params: { r: { min: -3, max: 3, step: 0.01, def: 0.6, sweep: [0, 2] } },
-  },
-  coherent: {
-    label: "相干态",
-    kind: "source",
-    modes: 1,
-    palette: false, // L5.5: 统一为 vacuum + displace 门表达，保留定义以载入旧 JSON
-    tip: "相干态：真空经位移 α 得到，经典振幅态",
-    params: { alpha: { min: -5, max: 5, step: 0.05, def: 1.0 } },
-  },
   squeeze: {
     label: "压缩",
     kind: "single",
@@ -198,12 +173,11 @@ export const OPS = {
   },
 };
 
-/** UX: palette grouping category — source / gate / channel / measure.
+/** UX: palette grouping category — gate / channel / measure.
     null = hidden from the palette (palette:false or unknown). */
 export function opGroup(op) {
   const m = OPS[op];
   if (!m || m.palette === false) return null;
-  if (m.kind === "source") return "source";
   if (m.channel) return "channel";
   if (m.measure) return "measure";
   return "gate";
@@ -219,28 +193,15 @@ export function paramsFromOp(op) {
   return out;
 }
 
-/** Source modes contributed so far (vacuum nmode / coherent=1; tmsv=2 legacy). */
-export function sourceModes(nodes) {
-  let total = 0;
-  for (const n of nodes) {
-    const meta = OPS[n.op];
-    if (!meta || meta.kind !== "source") continue;
-    total += n.op === "vacuum" ? (n.params.nmode ?? 1) : meta.modes;
-  }
-  return total;
-}
-
 /* ── L5 staff ordering ─────────────────────────────── */
-/** Horizontal x of a node (source = -Infinity: always leftmost). */
+/** Horizontal x of a node. */
 export function xOf(n) {
-  if (OPS[n.op]?.kind === "source") return -Infinity;
   return n.ui && Number.isFinite(n.ui.x) ? n.ui.x : 0;
 }
 
 /** Sort key within one x column: mode ascending (two-mode uses modes[0]). */
 export function modeKeyOf(n) {
   const meta = OPS[n.op];
-  if (meta?.kind === "source") return -Infinity;
   return meta?.kind === "two" ? n.modes[0] : n.mode;
 }
 
@@ -267,7 +228,7 @@ export function addNode(nodes, op) {
   if (OPS[op].kind === "single") node.mode = 0;
   if (OPS[op].kind === "two") node.modes = [0, 1];
   const maxX = nodes.reduce((m, n) => Math.max(m, n.ui?.x ?? -Infinity), -Infinity);
-  if (OPS[op].kind !== "source") node.ui = { x: Number.isFinite(maxX) ? maxX + 1 : 0 };
+  node.ui = { x: Number.isFinite(maxX) ? maxX + 1 : 0 };
   return sortNodes([...nodes, node]);
 }
 
@@ -275,15 +236,14 @@ export function removeNode(nodes, id) {
   return nodes.filter((n) => n.id !== id);
 }
 
-/** L5.5: true if a gate occupies the cell (mode, round(x)). Sources never
-    occupy cells. Two-mode gates lock both their lanes. excludeId lets a
-    moving gate ignore its own cells. */
+/** L5.5: true if a gate occupies the cell (mode, round(x)). Two-mode gates
+    lock both their lanes. excludeId lets a moving gate ignore its own cells. */
 export function cellOccupied(nodes, mode, x, excludeId = null) {
   const cx = Math.round(x);
   for (const n of nodes) {
     if (n.id === excludeId) continue;
     const meta = OPS[n.op];
-    if (!meta || meta.kind === "source") continue;
+    if (!meta) continue;
     if (Math.round(n.ui?.x ?? 0) !== cx) continue;
     if (meta.kind === "two") {
       if (n.modes[0] === mode || n.modes[1] === mode) return true;
@@ -334,45 +294,23 @@ export function moveNodeX(nodes, id, x) {
   return sortNodes(out);
 }
 
-/** Source → lane mapping. Each row: {srcId, op, modeStart, modeEnd, params}.
-    vacuum nmode>1 contributes n lanes (JSON-legacy); tmsv 2 lanes. */
-export function sourceRows(nodes) {
-  const rows = [];
-  let m = 0;
-  for (const n of nodes) {
-    const meta = OPS[n.op];
-    if (!meta || meta.kind !== "source") continue;
-    const k = n.op === "vacuum" && Number.isInteger(n.params?.nmode) ? n.params.nmode : meta.modes;
-    rows.push({ srcId: n.id, op: n.op, modeStart: m, modeEnd: m + k, params: n.params });
-    m += k;
-  }
-  return rows;
-}
-
-/** Delete a source + all gates acting on its lanes; surviving gates below
-    the deleted row shift up by k (lanes renumber). Returns {nodes, removed}. */
-export function removeSource(nodes, srcId) {
-  const row = sourceRows(nodes).find((r) => r.srcId === srcId);
-  if (!row) return { nodes, removed: [] };
-  const k = row.modeEnd - row.modeStart;
-  const removed = [srcId];
+/** Delete one mode: cascade-delete every gate on it (single-mode match /
+    either lane of a two-mode gate), shift lanes above it up by one.
+    Returns the new nodes array. */
+export function removeMode(nodes, mode) {
   const keep = [];
   for (const n of nodes) {
     const meta = OPS[n.op];
-    if (n.id === srcId) continue;
-    if (!meta || meta.kind === "source") { keep.push(n); continue; }
+    if (!meta) { keep.push(n); continue; }
     const hits = meta.kind === "two"
-      ? (n.modes[0] >= row.modeStart && n.modes[0] < row.modeEnd)
-        || (n.modes[1] >= row.modeStart && n.modes[1] < row.modeEnd)
-      : n.mode >= row.modeStart && n.mode < row.modeEnd;
-    if (hits) { removed.push(n.id); continue; }
-    // two-mode gates touching a deleted lane already died above, so every
-    // survivor is entirely below modeEnd → shift all its lanes up by k
+      ? n.modes[0] === mode || n.modes[1] === mode
+      : n.mode === mode;
+    if (hits) continue;
     keep.push(meta.kind === "two"
-      ? { ...n, modes: n.modes.map((m) => (m >= row.modeEnd ? m - k : m)) }
-      : { ...n, mode: n.mode >= row.modeEnd ? n.mode - k : n.mode });
+      ? { ...n, modes: n.modes.map((m) => (m > mode ? m - 1 : m)) }
+      : { ...n, mode: n.mode > mode ? n.mode - 1 : n.mode });
   }
-  return { nodes: keep, removed };
+  return keep;
 }
 
 export function updateParam(node, key, value) {
@@ -412,31 +350,13 @@ function renames() {
 }
 
 /** Build the circuit_v1 payload the backend consumes (schema from ADR-0003).
-    Sources are expanded (vacuum counts nmode; tmsv → two_mode_squeeze;
-    coherent → displace); array order = execution order; measured-mode
-    removal semantics live on the backend. */
+    Array order = execution order; measured-mode removal semantics live on
+    the backend. nmode is a first-class editor state field (ADR-0014). */
 export function toV1Json(state) {
   const ops = [];
   const staff = {}; // UI extension: gate layout columns (core ignores ui)
-  let nmode = 0;
+  const nmode = Math.max(1, Number(state.nmode) || 1);
   for (const n of state.nodes) {
-    const meta = OPS[n.op];
-    if (meta && meta.kind === "source") {
-      if (n.op === "vacuum") {
-        nmode += Math.max(1, Number(n.params.nmode) || 1);
-      } else if (n.op === "tmsv") {
-        ops.push({ id: n.id, op: "two_mode_squeeze",
-                   modes: [nmode, nmode + 1], params: { r: Number(n.params.r) || 0 } });
-        nmode += 2;
-      } else { // coherent → displace (L5.5: source replaced by gate expression)
-        const a = n.params.alpha;
-        const alpha = Array.isArray(a) ? a.map(Number)
-                                       : [Number(a) || 0, 0];
-        ops.push({ id: n.id, op: "displace", modes: [nmode], params: { alpha } });
-        nmode += 1;
-      }
-      continue;
-    }
     const R = renames();
     const out = { id: n.id, op: R.uiToOp[n.op] || n.op, params: {} };
     const pnames = state.backend === "fock"

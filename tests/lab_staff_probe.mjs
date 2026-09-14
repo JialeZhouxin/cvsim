@@ -140,18 +140,22 @@ try {
     return {
       rows: s.querySelectorAll(".staff__row").length,
       gates: s.querySelectorAll(".gate:not(.gate--preview):not(.gate--ghost)").length,
-      srcLabels: [...s.querySelectorAll(".staff__source")].map((e) => e.textContent).filter(Boolean),
+      modeLabels: [...s.querySelectorAll(".staff__mode-label")].map((e) => e.textContent),
+      delBtns: [...s.querySelectorAll(".staff__mode-del")].map((e) => e.disabled),
       palette: [...document.querySelectorAll(".palette__item")].map((e) => e.dataset.op),
       jsonHasDisplace: document.getElementById("json-input").value.includes('"op": "displace"'),
       gridLines: getComputedStyle(s.querySelector(".staff__row"), "::before").borderTopWidth !== "0px",
     };
   })()`);
-  check("staff: default scene = 2 lanes (2 vacuum sources)", staff.rows === 2, JSON.stringify(staff));
+  check("staff: default scene = 2 lanes", staff.rows === 2, JSON.stringify(staff));
   check("staff: 2 displace gates rendered", staff.gates === 2, String(staff.gates));
-  /* ADR-0011: v1 无源概念 → 单个隐式 vacuum（id=vac0，nmode=全模式）盖全部谱行，
-     不再是 v0 时代的双显式源。 */
-  check("staff: 1 implicit vacuum source label", staff.srcLabels.length === 1 && staff.srcLabels.every((t) => t.startsWith("真空模")), JSON.stringify(staff.srcLabels));
-  check("palette: tmsv+coherent hidden, vacuum present", staff.palette.includes("vacuum") && !staff.palette.includes("tmsv") && !staff.palette.includes("coherent"), JSON.stringify(staff.palette));
+  /* ADR-0014: 无源节点。每模一行，标签 = "mode N · <初始态>"（默认场景全真空）。 */
+  check("staff: 2 per-mode labels (mode 0/1 · 真空)",
+    JSON.stringify(staff.modeLabels) === JSON.stringify(["mode 0 · 真空", "mode 1 · 真空"]),
+    JSON.stringify(staff.modeLabels));
+  check("staff: 2 delete buttons, both enabled (nmode=2)",
+    JSON.stringify(staff.delBtns) === JSON.stringify([false, false]), JSON.stringify(staff.delBtns));
+  check("palette: 源节点 op 全部缺席", !staff.palette.includes("vacuum") && !staff.palette.includes("tmsv") && !staff.palette.includes("coherent"), JSON.stringify(staff.palette));
   check("JSON: graph→json sync intact (displace)", staff.jsonHasDisplace);
   check("grid: cell column rules rendered", staff.gridLines);
   /* covariance tables: split layout labels (x0,x1,…,p0,p1,…) + displaced
@@ -359,10 +363,11 @@ try {
     items: [...document.querySelectorAll(".palette__item")].map((c) => c.dataset.op),
     inGroup: [...document.querySelectorAll(".palette__group")].map((g) => g.querySelectorAll(".palette__item").length),
   }))()`);
-  check("palette: 4 groups 源/门/通道/测量, op order kept, palette:false hidden",
-    JSON.stringify(groups.titles) === JSON.stringify(["源", "门", "通道", "测量"]) &&
-    groups.items.length === 12 && !groups.items.includes("tmsv") && !groups.items.includes("coherent") &&
-    groups.inGroup[0] === 1 && groups.inGroup[1] === 7 && groups.inGroup[2] === 2 && groups.inGroup[3] === 2,
+  check("palette: 3 groups 门/通道/测量 (ADR-0014: 源组已退役), op order kept",
+    JSON.stringify(groups.titles) === JSON.stringify(["门", "通道", "测量"]) &&
+    groups.items.length === 11 && !groups.items.includes("vacuum") &&
+    !groups.items.includes("tmsv") && !groups.items.includes("coherent") &&
+    groups.inGroup[0] === 7 && groups.inGroup[1] === 2 && groups.inGroup[2] === 2,
     JSON.stringify(groups));
 
   /* 8c. Fitts: delete button ≥ 24px hit area (visual 18px circle drawn
@@ -376,17 +381,13 @@ try {
   })()`);
   check("delete hit area ≥ 24×24", delHit.w >= 24 && delHit.h >= 24, JSON.stringify(delHit));
 
-  /* 9. source click opens the param card (vacuum: no knobs, info shown) */
-  await click(ws, '.staff__source[data-src-id="vac0"]'); // 隐式 vacuum id（editor.js v1 桥接）
-  await waitEval(ws, `document.querySelector(".gate-card")`);
-  const srcCard = await evalJs(ws, `(() => {
-    const c = document.querySelector(".gate-card");
-    return {
-      head: c.querySelector(".gate-card__head").textContent,
-      none: !!c.querySelector(".gate-card__none"),
-    };
+  /* 9. ADR-0014 D2(i): 模标签是纯标签，点击不开卡片 */
+  const noCard = await evalJs(ws, `(async () => {
+    document.querySelector(".staff__mode").click();
+    await new Promise((r) => setTimeout(r, 200));
+    return !!document.querySelector(".gate-card");
   })()`);
-  check("source click: param card with vacuum info", /真空模/.test(srcCard.head) && srcCard.none, JSON.stringify(srcCard));
+  check("mode label click: 不开参数卡片 (D2(i))", noCard === false, String(noCard));
 
   /* 9. gate click opens param card; slider edit propagates to JSON */
   await click(ws, '.gate[data-id="p"]');
@@ -407,6 +408,66 @@ try {
     target: document.getElementById("scan-node").value,
   }))()`);
   check("scan sync: phase card targets scan node", scanSync.target === "p", JSON.stringify(scanSync));
+
+  /* 11. ADR-0014: 删模级联（删 mode 0 → 其上的门消失、上方模上移、nmode 减一） */
+  await evalJs(ws, `(async () => {
+    const payload = {
+      schema: "circuit_v1", seed: 0, nmode: 3,
+      ops: [
+        { id: "p", op: "phase", params: { theta: 1.2 }, modes: [0] },
+        { id: "s", op: "squeeze", params: { r: 0.4, phi: 0 }, modes: [1] },
+        { id: "d", op: "displace", params: { alpha: [1.0, 0.0] }, modes: [2] },
+      ],
+      view: { wigner_mode: 2, lim: 5.0, n: 64, joint_modes: [1, 2] },
+      ui: { staff: { p: 0, s: 0, d: 0 } },
+    };
+    const input = document.getElementById("json-input");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    setter.call(input, JSON.stringify(payload));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 600));
+    return true;
+  })()`);
+  const delMode = await evalJs(ws, `(async () => {
+    document.querySelectorAll(".staff__mode-del")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    const j = JSON.parse(document.getElementById("json-input").value);
+    const s = document.getElementById("staff");
+    return {
+      nmode: j.nmode,
+      ops: j.ops.map((n) => n.op),
+      modes: j.ops.map((n) => n.modes[0]),
+      labels: [...s.querySelectorAll(".staff__mode-label")].map((e) => e.textContent),
+      rows: s.querySelectorAll(".staff__row").length,
+      wignerMode: j.view.wigner_mode,
+      jointModes: j.view.joint_modes,
+    };
+  })()`);
+  check("delete mode: 级联删门 + 上方模上移 + nmode 3→2",
+    delMode.nmode === 2 &&
+    JSON.stringify(delMode.ops) === JSON.stringify(["squeeze", "displace"]) &&
+    JSON.stringify(delMode.modes) === JSON.stringify([0, 1]) &&
+    delMode.rows === 2,
+    JSON.stringify(delMode));
+  /* AC13: 越界的 view 字段被夹紧/清空，不留非法 nmode 引用 */
+  // joint_modes 越界 → 置 null；toV1Json 对 null 不写字段（= 回退默认 [0,1]）
+  check("delete mode: wigner_mode 夹紧到 nmode-1，joint_modes 越界被清",
+    delMode.wignerMode === 1 && delMode.jointModes === undefined,
+    JSON.stringify({ wignerMode: delMode.wignerMode, jointModes: delMode.jointModes }));
+
+  const delLast = await evalJs(ws, `(async () => {
+    document.querySelectorAll(".staff__mode-del")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    const del = document.querySelector(".staff__mode-del");
+    const disabled = del.disabled;
+    del.dispatchEvent(new MouseEvent("click", { bubbles: true })); // disabled → no-op
+    await new Promise((r) => setTimeout(r, 200));
+    return { nmode: JSON.parse(document.getElementById("json-input").value).nmode, disabled };
+  })()`);
+  check("delete mode: nmode=1 时按钮 disabled 且点击无效",
+    delLast.nmode === 1 && delLast.disabled === true,
+    JSON.stringify(delLast));
+
 
   console.log(`\n${checks.filter((c) => c.ok).length}/${checks.length} probes PASS`);
 } finally {

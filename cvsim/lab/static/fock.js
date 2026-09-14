@@ -4,7 +4,6 @@
    node --test; DOM work lives only inside initFockPanel. */
 "use strict";
 
-import { sourceModes } from "./ops.js";
 import { el, fmt } from "./svg_kit.js";
 
 /* ── pure logic ─────────────────────────────────────────── */
@@ -235,7 +234,7 @@ export function initFockPanel(root, hooks) {
   let lastBatch = null;  // latest /batch body
 
   function nmodeOfState() {
-    return Math.max(1, sourceModes(hooks.getState().nodes));
+    return Math.max(1, hooks.getState().nmode);
   }
 
   function cutoffsOfState(body) {
