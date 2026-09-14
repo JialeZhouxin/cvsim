@@ -82,13 +82,19 @@ Simulator vision §1.3 historically listed “GUI circuit editor = out of scope�
 
 Exceeding these counts requires amending this doc first.
 
-### 4.1 State factories（画布源节点 ≤3）
+### 4.1 State factories（**已退役，2026-09-14 / ADR-0014**）
 
-| ✅ v0 | ❌ defer |
+画布**无源节点**。模的初始态是 `state.initial` per-mode 数组（前端）+ IR 顶层
+`nmode` + `initial` 扩展字段。原源节点托盘项（`vacuum` / `coherent` / `tmsv`）
+全部删除，含这些 op 的旧 JSON 导入即报错。
+
+| 原 ✅ v0 | 现落点 |
 |-------|----------|
-| `vacuum` | `thermal` as source |
-| `coherent` | `displaced_squeezed` |
-| `tmsv`（**L5: JSON-only**，出托盘 `palette:false`，后端/IR 保留兼容；纠缠由 `two_mode_squeeze` 门构建） | explicit `product` node（多源 + 线拼接） |
+| `vacuum` | `state.nmode`（工具栏「＋模」）；gaussian 初态定义上恒真空 |
+| `coherent` | `displace` 门（L5.5 已统一） |
+| `tmsv` | `two_mode_squeeze` 门 |
+
+❌ 仍 defer：`thermal` / cat 源节点（cat = displace+Kerr(π/2) 协议教学路径）。
 
 ### 4.2 Gates（≤7）
 
@@ -136,7 +142,7 @@ Exceeding these counts requires amending this doc first.
 | Gates | `displace` `phase` `squeeze` `kerr` `beamsplitter` `two_mode_squeeze` `mach_zehnder` `cz` `cx` | `interferometer` / `apply_unitary`（矩阵编辑器 = 通用 IDE，反白名单教义） |
 | Channels | `loss` `amplifier` `phase_noise` | generic `(X,Y)` |
 | Measurements | `measure_pnr` `measure_homodyne` `measure_heterodyne` | — |
-| Sources | **无源节点托盘**（真空起手 + `initial` 数态初始态卡；`nmode` 由「＋模」按钮管理） | `thermal` / cat 源节点（cat = displace+Kerr(π/2) 协议教学路径） |
+| Sources | **无源节点托盘**（真空起手 + `initial` 数态初始态卡；`nmode` 由「＋模」按钮管理；左列每模一行标签 `mode N · <初始态>`，ADR-0014） | `thermal` / cat 源节点（cat = displace+Kerr(π/2) 协议教学路径） |
 
 Fock 结果面板：单模 Wigner（复用 `wigner_grid` Fock 分支）+ PNR 分布柱（`pnrd_probs`）+ joint 2 模 2D heatmap（≤30×30）+ Batch 1000 采样对照（双色叠画）+ 截断护栏（cutoff 1..30 + 泄漏仪表 >1% 黄 + cutoff>20 慢速提示）。v0 无 Fock scan 面板（`/scan`+fock → 422，P1）。
 
@@ -354,6 +360,7 @@ v0 不要求 WebSocket；防抖在前端做完再 POST。
 
 | Ver | Date | Note |
 |-----|------|------|
+| 0.1.8 | 2026-09-14 | **ADR-0014 退役源节点**：前端 `state.nmode` 成模数唯一事实源（`sourceModes` 退役）；`state.nodes` 永不含 source；`OPS.vacuum`/`tmsv`/`coherent` 删除，托盘 12 项 4 组 → 11 项 3 组；左列源区改「模行」（每模一行，标签 `mode N · <初始态>` 读 `state.initial[N]`，纯标签不可点）；行内 `×` 删模（级联删门 + 上方索引 −1 + per-mode 数组按索引删除）；core IR 与 `nmode` 输出字节不变。任务 `09-14-lab-frontend-retire-source-nodes` |
 | 0.1.7 | 2026-08-07 | **circuit_v1 收编锁（ADR-0003）**：核心正式 IR（顶层 nmode + ops、无源、全 op 集、统一 modes、命名 params、view/seed/ui 扩展字段）；Lab 迁 v1（save 写 v1、load 兼容 v0 翻译）；任务 `08-06-cvsim-phase3-serialize-ir` |
 | 0.1.0 | 2026-07-30 | Initial lock from grill-me: user A/电路图/Wigner 灵魂/本地 Web/双轨测量；adopt recommended whitelist & 12b slice |
 | 0.1.1 | 2026-08-06 | fourier 门补回托盘（白名单 §4.2 ✅ 对齐，后端早已支持）；undo/redo 撤销栈 landed（P1） |
