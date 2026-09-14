@@ -161,3 +161,28 @@ def test_a3_logneg_freeze():
     got = resp.json()["meters"]["log_negativity"]
     want = 2 * r / math.log(2)  # -log2(e^(-2r))
     assert abs(got - want) < 1e-3
+
+def test_default_scene_to_v1_byte_frozen():
+    """AC4 回归锁（ADR-0014）：默认场景经真实导入路径 (loadJson → toV1Json)
+    的导出字节恒定。前端唯一产出 circuit_v1 的路径，退役源节点不得改其输出
+    （core IR 零扰动）。"""
+    golden = (
+        '{"schema":"circuit_v1","nmode":2,"seed":0,"ops":['
+        '{"id":"d0","op":"displace","params":{"alpha":1},"modes":[0]},'
+        '{"id":"d1","op":"displace","params":{"alpha":1},"modes":[1]}],'
+        '"view":{"wigner_mode":0,"lim":5,"n":64},"ui":{"staff":{"d0":0,"d1":0}}}'
+    )
+    try:
+        proc = subprocess.run(
+            ["node", "--input-type=module", "-e",
+             'import { loadJson } from "./editor.js";'
+             'import { toV1Json } from "./ops.js";'
+             'import { DEFAULT_SCENE } from "./default_scene.js";'
+             'const r = loadJson(DEFAULT_SCENE);'
+             'console.log(r.error || JSON.stringify(toV1Json(r.state)))'],
+            capture_output=True, text=True, cwd=STATIC_DIR,
+        )
+    except FileNotFoundError as e:
+        raise AssertionError("node 不可用 —— node 是前端测试链硬依赖") from e
+    assert proc.returncode == 0, proc.stderr[:500]
+    assert proc.stdout.strip() == golden

@@ -352,10 +352,16 @@ function renames() {
 /** Build the circuit_v1 payload the backend consumes (schema from ADR-0003).
     Array order = execution order; measured-mode removal semantics live on
     the backend. nmode is a first-class editor state field (ADR-0014). */
+/** 模数读取单点（ADR-0014）：state.nmode 是唯一事实源；缺字段/非法值退化 1
+    （IR 要求 nmode >= 1）。ops.js 是 state 形状读取的既有家（toV1Json 同在此）。 */
+export function stateNmode(state) {
+  return Math.max(1, Number(state && state.nmode) || 1);
+}
+
 export function toV1Json(state) {
   const ops = [];
   const staff = {}; // UI extension: gate layout columns (core ignores ui)
-  const nmode = Math.max(1, Number(state.nmode) || 1);
+  const nmode = stateNmode(state);
   for (const n of state.nodes) {
     const R = renames();
     const out = { id: n.id, op: R.uiToOp[n.op] || n.op, params: {} };

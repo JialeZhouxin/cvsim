@@ -6,7 +6,7 @@ import {
   OPS, OP_NAMES, TAU, paramsFromOp, opGroup,
   addNode, removeNode, placeSingle, completePlacing, moveNodeX,
   sortNodes, removeMode, updateParam, updateMode, toV1Json,
-  cellOccupied,
+  cellOccupied, stateNmode,
 } from "../cvsim/lab/static/ops.js";
 // ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
 import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
@@ -109,6 +109,18 @@ test("addNode appends with defaults + mode + x", () => {
   assert.deepEqual(nodes[1].modes, [0, 1]);
   assert.equal(nodes[1].ui.x, 1); // appended after loss
   assert.deepEqual(nodes.map((n) => n.op), ["loss", "beamsplitter"]);
+});
+
+test("stateNmode: 模数读取单点，缺字段/非法值退化 1", () => {
+  assert.equal(stateNmode({ nmode: 3 }), 3);
+  assert.equal(stateNmode({ nmode: 1 }), 1);
+  assert.equal(stateNmode({ nmode: 0 }), 1);        // IR 要求 >= 1
+  assert.equal(stateNmode({ nmode: -2 }), 1);
+  assert.equal(stateNmode({ nmode: "4" }), 4);      // JSON 文本域来的字符串
+  assert.equal(stateNmode({ nmode: "x" }), 1);
+  assert.equal(stateNmode({}), 1);                  // 老 state 无字段
+  assert.equal(stateNmode({ nmode: 2.7 }), 2.7);    // 不四舍五入（上游保证整数）
+  assert.equal(stateNmode(null), 1);                // 防御
 });
 
 /* ADR-0014: per-mode 数组按索引删除（padTo/remapForBackend 只做截尾/补位，
@@ -235,7 +247,7 @@ test("L5: staffLayout — one row per mode, D1(b) labels", async () => {
   assert.equal(rows.length, 3);
   assert.equal(nmode, 3);
   assert.deepEqual(rows.map((r) => r.mode), [0, 1, 2]);
-  assert.deepEqual(rows.map((r) => r.initial), ["mode 0 · 真空", "mode 1 · 真空", "mode 2 · 真空"]);
+  assert.deepEqual(rows.map((r) => r.label), ["mode 0 · 真空", "mode 1 · 真空", "mode 2 · 真空"]);
   assert.equal(gates.length, 1);
   assert.equal(gates[0].span, 3); // |2-0|+1
   assert.equal(gates[0].top, 0);

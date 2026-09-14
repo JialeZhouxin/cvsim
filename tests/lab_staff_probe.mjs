@@ -450,10 +450,29 @@ try {
     delMode.rows === 2,
     JSON.stringify(delMode));
   /* AC13: 越界的 view 字段被夹紧/清空，不留非法 nmode 引用 */
-  // joint_modes 越界 → 置 null；toV1Json 对 null 不写字段（= 回退默认 [0,1]）
-  check("delete mode: wigner_mode 夹紧到 nmode-1，joint_modes 越界被清",
-    delMode.wignerMode === 1 && delMode.jointModes === undefined,
+  // joint_modes 是模索引：删 mode 0 → [1,2] 重编号为 [0,1]（不指向别的模）
+  check("delete mode: wigner_mode 夹紧到 nmode-1，joint_modes 重编号 [1,2]→[0,1]",
+    delMode.wignerMode === 1 &&
+    JSON.stringify(delMode.jointModes) === JSON.stringify([0, 1]),
     JSON.stringify({ wignerMode: delMode.wignerMode, jointModes: delMode.jointModes }));
+
+  /* AC13b: joint_modes 命中被删模 → 清空（对不再存在） */
+  await evalJs(ws, `(async () => {
+    const payload = { schema: "circuit_v1", seed: 0, nmode: 3, ops: [],
+      view: { wigner_mode: 0, lim: 5.0, n: 64, joint_modes: [0, 1] }, ui: {} };
+    const input = document.getElementById("json-input");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    setter.call(input, JSON.stringify(payload));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 600));
+    document.querySelectorAll(".staff__mode-del")[1].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    const j = JSON.parse(document.getElementById("json-input").value);
+    return { nmode: j.nmode, jointModes: j.view.joint_modes };
+  })()`).then((r) => {
+    check("delete mode: joint_modes 命中被删模 → 清空（回退默认 [0,1]）",
+      r.nmode === 2 && r.jointModes === undefined, JSON.stringify(r));
+  });
 
   const delLast = await evalJs(ws, `(async () => {
     document.querySelectorAll(".staff__mode-del")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -468,6 +487,50 @@ try {
     delLast.nmode === 1 && delLast.disabled === true,
     JSON.stringify(delLast));
 
+
+  /* 12. AC5: gaussian 下 ＋模 可用（无源后唯一加模入口），加模后 nmode +1 */
+  await evalJs(ws, `(async () => {
+    const payload = { schema: "circuit_v1", seed: 0, nmode: 2, ops: [],
+      view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {} };
+    const input = document.getElementById("json-input");
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+    setter.call(input, JSON.stringify(payload));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 600));
+    return true;
+  })()`);
+  const addModeBtn = await evalJs(ws, `(async () => {
+    const btn = document.getElementById("add-mode-btn");
+    const visible = btn.getClientRects().length > 0;
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    const j = JSON.parse(document.getElementById("json-input").value);
+    return {
+      visible,
+      nmode: j.nmode,
+      rows: document.querySelectorAll(".staff__row").length,
+      labels: document.querySelectorAll(".staff__mode-label").length,
+    };
+  })()`);
+  check("AC5: gaussian 下 ＋模 可见可用，加模后 nmode 2→3 + 3 行模标签",
+    addModeBtn.visible === true && addModeBtn.nmode === 3 &&
+    addModeBtn.rows === 3 && addModeBtn.labels === 3,
+    JSON.stringify(addModeBtn));
+
+  /* 13. AC7（UI 侧）: nmode=1 时删除入口禁用 + 中文 title 说明原因
+     （守卫的提示文案由 editor.js `onDeleteMode` 给出；UI 上按钮禁用先于点击） */
+  const refuse = await evalJs(ws, `(async () => {
+    document.querySelectorAll(".staff__mode-del")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    document.querySelectorAll(".staff__mode-del")[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 300));
+    const del = document.querySelector(".staff__mode-del");
+    return { nmode: JSON.parse(document.getElementById("json-input").value).nmode,
+             disabled: del.disabled, title: del.title };
+  })()`);
+  check("AC7: nmode=1 时删除按钮 disabled + 中文 title 说明原因",
+    refuse.nmode === 1 && refuse.disabled === true && /至少保留一个模式/.test(refuse.title),
+    JSON.stringify(refuse));
 
   console.log(`\n${checks.filter((c) => c.ok).length}/${checks.length} probes PASS`);
 } finally {

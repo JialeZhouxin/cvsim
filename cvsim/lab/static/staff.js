@@ -3,7 +3,7 @@
    DOM/DnD work lives only inside initStaff. */
 "use strict";
 
-import { OPS, cellOccupied } from "./ops.js";
+import { OPS, cellOccupied, stateNmode } from "./ops.js";
 
 export const GATE_W = 72;   // px per x unit (gate cell width)
 export const ROW_H = 44;    // px per lane
@@ -24,12 +24,12 @@ export function modeLabel(state, mode) {
   return `mode ${mode} · 真空`; // gaussian：定义上恒真空
 }
 
-/** Pure: state → staff geometry. rows: one per mode; gates: placed ops with
-    span for two-mode crossing. */
+/** Pure: state → staff geometry. rows: one per mode (`label` = D1(b) text,
+    not the raw initial value); gates: placed ops with span for two-mode crossing. */
 export function staffLayout(state) {
-  const nmode = Math.max(1, Number(state.nmode) || 1);
+  const nmode = stateNmode(state);
   const rows = Array.from({ length: nmode },
-    (_, mode) => ({ mode, initial: modeLabel(state, mode) }));
+    (_, mode) => ({ mode, label: modeLabel(state, mode) }));
   const gates = [];
   for (const n of state.nodes) {
     const meta = OPS[n.op];
@@ -43,7 +43,7 @@ export function staffLayout(state) {
 }
 
 /** DOM wiring (browser only). api: {getState, onPlace, onCompletePlacing,
-    onMove, onDelete, onParam, onPickSweep, onStatus}. */
+    onMove, onDelete, onDeleteMode, onParam, onPickSweep, onStatus}. */
 export function initStaff(root, api) {
   let placing = null; // {op, modeA, x} — two-mode "pick second lane" state
   let hover = null;   // {mode, x, conflict} — drag-over preview cell
@@ -87,7 +87,7 @@ export function initStaff(root, api) {
     /* L5.5: keep empty cells ahead of the last gate so drag-and-drop works
        beyond the current content (grid is the dragover target, not the staff) */
     grid.style.width = `${MODE_W + Math.max(10, maxX + 4) * GATE_W}px`;
-    grid.style.height = `${Math.max(1, nmode) * ROW_H}px`;
+    grid.style.height = `${nmode * ROW_H}px`;
 
     /* lanes (one per mode) */
     for (const r of rows) {
@@ -95,12 +95,12 @@ export function initStaff(root, api) {
       row.className = "staff__row";
       row.dataset.mode = String(r.mode);
 
-      const src = document.createElement("div");
+      const modeCol = document.createElement("div");
       const armed = placing && r.mode === placing.modeA;
-      src.className = `staff__mode${armed ? " staff__mode--arm" : ""}`;
+      modeCol.className = `staff__mode${armed ? " staff__mode--arm" : ""}`;
       const label = document.createElement("span");
       label.className = "staff__mode-label";
-      label.textContent = r.initial;
+      label.textContent = r.label;
       const del = document.createElement("button");
       del.type = "button";
       del.className = "staff__mode-del";
@@ -111,8 +111,8 @@ export function initStaff(root, api) {
         e.stopPropagation();
         api.onDeleteMode(r.mode);
       });
-      src.append(label, del);
-      row.appendChild(src);
+      modeCol.append(label, del);
+      row.appendChild(modeCol);
 
       const lane = document.createElement("div");
       lane.className = "staff__lane";

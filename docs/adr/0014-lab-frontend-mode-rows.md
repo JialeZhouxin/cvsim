@@ -42,7 +42,9 @@ Lab 前端（`cvsim/lab/static/`）自 v0 时代沿用「源节点」（source n
    的值留在原索引（已实测 `remapForBackend("fock","fock",[3,5],1)` → `[3]`，
    值 5 丢失）。
 6. **越界 view 字段**：删模后 `wigner_mode` 夹紧到 `nmode - 1`；`joint_modes`
-   任一索引 `>= nmode` → 置 `null`（回退默认 `[0,1]`）。
+   是**模索引**——命中被删模、或删后 `nmode < 2`（无对可指）→ 置 `null`（回退
+   默认 `[0,1]`）；否则 > `mode` 的索引整体 −1（不重编号就会**指向另一个模**，
+   静默错）。
 7. **重申核心 IR 恒无源**：本决策是**纯前端**变更，`cvsim/lab/ir.py` 零改动，
    circuit_v1 字节输出不变。IR 里加源节点属被否方案（见下）。
 

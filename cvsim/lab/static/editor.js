@@ -456,7 +456,12 @@ export function initEditor(root, hooks) {
       }
       pushHistory();
       const nmode = state.nmode - 1;
-      const jm = state.view.joint_modes;
+      // joint_modes 是**模索引**：命中被删模或删后 < 2 模（无对）→ 清空回退默认；
+      // 否则 > mode 的索引整体 −1（不重编号就会指向别的模）。
+      const jm0 = state.view.joint_modes;
+      const jointModes = !Array.isArray(jm0) || nmode < 2 || jm0.includes(mode)
+        ? null
+        : jm0.map((m) => (m > mode ? m - 1 : m));
       state = { ...state,
         nodes: removeMode(state.nodes, mode),
         nmode,
@@ -465,7 +470,7 @@ export function initEditor(root, hooks) {
         cutoffs: padTo(dropMode(state.cutoffs, mode), nmode, 10),
         view: { ...state.view,
           wigner_mode: Math.max(0, Math.min(state.view.wigner_mode, nmode - 1)),
-          joint_modes: Array.isArray(jm) && jm.some((m) => m >= nmode) ? null : jm } };
+          joint_modes: jointModes } };
       render();
     },
     onParam: (id, key, value) => {
