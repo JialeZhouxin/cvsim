@@ -13,6 +13,9 @@
 
 from __future__ import annotations
 
+import math
+from math import factorial
+
 import numpy as np
 import pytest
 
@@ -84,9 +87,6 @@ def test_squeeze_gate_phi_zero_matches_default() -> None:
 
 def test_squeeze_gate_phi_zero_matches_old_gold() -> None:
     """φ=0 的振幅与解析式 ``c_{2n} = √sech r (−1)^n √((2n)!)/(2^n n!) tanh^n r`` 对齐。"""
-    import math
-    from math import factorial
-
     N, r = 40, 0.6
     out = squeeze(FockState.vacuum(N), r).amps
     kk = np.arange(N // 2)
