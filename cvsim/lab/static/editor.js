@@ -113,11 +113,17 @@ export function deriveEditorTables(schema) {
   const fockV1ToUiParam = {
     loss: { T: "eta", nbar: null },
   };
+  // /schema 的 cutoff 是 **{min,max} 对象**（schema.py ``_EXTENSIONS``，
+  // test_lab_schema.py 锁定），而 editor 内部要 [min,max] 二元组
+  // （``cutMax = tables().cutoff[1]``）。不归一化 → cutMax=undefined →
+  // 任何带显式 cutoff 的 fock JSON 都被拒。
+  const cutExt = ext.cutoff ?? { min: 1, max: 30 };
+  const cutoff = Array.isArray(cutExt) ? cutExt : [cutExt.min, cutExt.max];
   return {
     viewN: ext.view?.n ?? [2, 512],
     viewLimMax: ext.view?.lim_max ?? 50,
     viewLimMinExcl: ext.view?.lim_min_exclusive ?? 0,
-    cutoff: ext.cutoff ?? [1, 30],
+    cutoff,
     shots: ext.shots ?? [0, 100000],
     irToUi,
     v1ToUiParam,

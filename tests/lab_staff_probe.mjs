@@ -516,6 +516,36 @@ try {
   check("fock: loss 仍只显示 T（nbar 不进 IR，过滤仍生效）",
     JSON.stringify(fockLoss) === JSON.stringify(["T"]), JSON.stringify(fockLoss));
 
+  /* 9d. cutoff 边界归一化回归锁：/schema 发 {min,max} 对象，editor 内部
+     用 [min,max]——曾不归一化，导致带显式 cutoff 的 fock JSON 全被拒
+     （报 [1, undefined]）。探针是唯一能覆盖“schema 注入 + 载入”整链的地方。 */
+  const cutLoad = await evalJs(ws, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const load = async (cutoff) => {
+      const p = { schema: "circuit_v1", backend: "fock", seed: 0, nmode: 1, cutoff,
+        ops: [{ id: "sq", op: "squeeze", params: { r: 0.4, phi: 0 }, modes: [0] }],
+        view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: { staff: { sq: 0 } } };
+      const i = document.getElementById("json-input");
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(i, JSON.stringify(p));
+      i.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(1200);
+      return { status: document.getElementById("status").textContent,
+               hasGate: !!document.querySelector('.gate[data-id="sq"]'),
+               emitted: JSON.parse(document.getElementById("json-input").value).cutoff };
+    };
+    const inRange = await load(25);
+    const boundary = await load(30);
+    /* 越界：图**冻结**在上一份合法状态（editor.js 既有语义：graph stays at
+       lastGood；textarea 保留用户文本，故 emitted 仍是 99——不是“被应用”）。
+       关键证据是报错文案里是 [1, 30] 而非 [1, undefined]（即归一化生效）。 */
+    const over = await load(99);
+    return { inRange, boundary, over };
+  })()`);
+  check("fock: 显式 cutoff 载入成功（/{min,max} → [min,max] 归一化）+ 越界仍被拦",
+    cutLoad.inRange.hasGate === true && cutLoad.inRange.emitted === 25 &&
+    cutLoad.boundary.hasGate === true && cutLoad.boundary.emitted === 30 &&
+    /cutoff 必须在 \[1, 30\]/.test(cutLoad.over.status),
+    JSON.stringify(cutLoad));
   /* 回 gaussian 前先重载 squeeze 场景（上一步换成了 loss 场景，sq 门已不存在） */
   await evalJs(ws, `(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

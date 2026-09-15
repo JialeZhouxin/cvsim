@@ -11,7 +11,7 @@ import {
 // ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
 import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
 import { publishSchema, opsForBackend, meterKeys } from "../cvsim/lab/static/schema_store.js";
-import { stateFromJson, loadJson, createHistory } from "../cvsim/lab/static/editor.js";
+import { stateFromJson, loadJson, createHistory, deriveEditorTables } from "../cvsim/lab/static/editor.js";
 import { setInitialSchema, dropMode } from "../cvsim/lab/static/initial.js";
 
 // Minimal hand-written /schema payload (shape = ticket-2 golden; ops keys
@@ -527,6 +527,20 @@ test("gaussian/bosonic: squeeze 缺 phi 仍冻结（缺省许可未外溢）", (
     assert.ok(error, `backend=${backend}: 应冻结，却放行了`);
     assert.ok(error.includes("phi"), `backend=${backend}: 报错应指向 phi，得到 ${error}`);
   }
+});
+
+/* /schema 的 cutoff 是 {min,max} 对象（schema.py ``_EXTENSIONS``，
+   test_lab_schema.py 锁定），editor 内部要 [min,max] 二元组
+   （``cutMax = tables().cutoff[1]``）。曾不归一化 → cutMax=undefined →
+   带显式 cutoff 的 fock JSON 全被拒。纯函数，不碰全局。 */
+test("deriveEditorTables: cutoff {min,max} 归一化为 [min,max]", () => {
+  const t = deriveEditorTables({ ops: {}, extensions: { cutoff: { min: 1, max: 30 } } });
+  assert.deepEqual(t.cutoff, [1, 30]);
+  // 数组形式（旧形/回退常量）仍接受
+  assert.deepEqual(
+    deriveEditorTables({ ops: {}, extensions: { cutoff: [2, 12] } }).cutoff, [2, 12]);
+  // 完全缺省 → 回退常量
+  assert.deepEqual(deriveEditorTables({ ops: {}, extensions: {} }).cutoff, [1, 30]);
 });
 
 test("L3: stateFromJson rejects invalid seed", () => {
