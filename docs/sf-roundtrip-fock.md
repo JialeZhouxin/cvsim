@@ -9,7 +9,7 @@ Fock 基互操作：cvsim `cvsim.fock` ↔ Strawberry Fields **fock backend**。
 | 门/态 | SF（fock backend） | cvsim fock | 对应关系 |
 |--------|--------------------|------------|----------|
 | 位移 | `Dgate(r, phi)` = D(r e^{iφ}) | `displace(state, alpha)` | alpha = r e^{iφ} |
-| 挤压 | `Sgate(r, phi)` = S(r e^{iφ}) | `squeeze(state, r, phi)`（phi = 压缩幅角/ξ 相位） | 约定同向（均以 ξ = r e^{iφ} 定义）；**SF 0.23 未逐位实证**——BS 行已有已知符号翻转，对照前请按下方流程自行核验 |
+| 挤压 | `Sgate(r, phi)` = S(r e^{iφ}) | `squeeze(state, r, phi)`（phi = 压缩幅角/ξ 相位） | **同 phi，直接对应**（SF 0.23.0 实证 maxdiff 1.5e-11，见下） |
 | 分束器 | `BSgate(θ, φ)` | `beamsplitter(state, θ, φ)` | **cvsim(θ,φ) = SF(−θ,−φ)** |
 | 双模挤压 | `S2gate(r, phi)` | `two_mode_squeeze(state, r)`（实 r） | SF phi=0 |
 | 相位 | `Rgate(φ)` = exp(iφa†a) | `phase(state, θ)` | θ=φ |
@@ -22,6 +22,15 @@ Fock 基互操作：cvsim `cvsim.fock` ↔ Strawberry Fields **fock backend**。
 **BS 映射（实证）**：cvsim `beamsplitter(θ,φ)` ≡ SF `BSgate(−θ,−φ)` — SF 0.23 fock
 backend 实际符号约定与文档公式相反，全张量逐位实证 max|Δ|=1.1e-16（+θ,+φ 则差 1.39）。
 对照时 cvsim 侧参数**取负**。
+
+**挤压映射（实证，2026-09-15 补）**：cvsim fock `squeeze(r,φ)` ≡ SF `Sgate(r,φ)` ——
+**同 r 同 φ**，不需要任何换算。SF 0.23.0（thewalrus 0.22.0，cutoff 50）单态实证
+maxdiff `1.6e-17`；全链路 2 模剧本（S+D+D+BS+K，cutoff 45，密度矩阵转置展平后逐位）
+maxdiff `1.5e-11`。反例排除：`Sgate(r,φ/2)` 差 4.1e-02、`Sgate(r,2φ)` 差 8.0e-02。
+
+这一致性说明 cvsim fock 选用的**幅度相约定（ξ = r·e^{iφ}）与 SF 同源**。注意这与
+cvsim 内部 gaussian/bosonic 的 `phi`（协方差旋转角，即 `R(φ)S R(−φ)`）**仍差 2 倍** ——
+两件事不矛盾：SF 的 `Sgate(r,phi)` 也是幅度相，所以 fock↔SF 同 φ，而 fock↔gaussian 差 2 倍。
 
 ## 密度矩阵导出格式（F6 退出判据 3）
 
@@ -100,6 +109,11 @@ np.testing.assert_allclose(rho_cv, rho_sf, atol=1e-9)   # 复数逐位（相对�
 - **版本锁**：golden npz metadata 内嵌 SF/thewalrus/scipy/numpy 版本 + 生成日期；测试只读
   npz、不 import SF，SF 漂移不影响套件。
 - **BS 符号**：见上表 — cvsim 侧参数取负（含 chain 中 BS(0.8,0.4) → `beamsplitter(-0.8,-0.4)`）。
+- **挤压 phi**：同 phi 直接对应（与 BS 的符号陷阱不同）；实测见上「挤压映射」。
+- **SF 安装**（2026-09-15 实证，Windows）：`uv venv %TEMP%/sfenv` 会取到 CPython
+  3.10 —— SF 0.23 在该版本正常（`strawberryfields==0.23.0` / `thewalrus==0.22.0` /
+  `scipy==1.15.3` / `setuptools==80.10.2`）。import 前仍须 `si.simps = si.simpson` shim
+  （scipy 1.15 已删 `simps`）。pkg_resources 弃用告警来自 `strawberryfields.apps`，无害。
 
 ## 重新生成 golden
 
