@@ -111,6 +111,11 @@ def test_fock_phi_is_double_the_gaussian_covariance_angle(phi: float) -> None:
     若本测试失败 = 有人把 fock 的 phi 语义改成 gaussian 约定。那是破坏性
     变更：``tests/test_b9_bosonic_pnr.py`` 的 gold 对拍（fock 0.8 vs
     gaussian 0.4）会跟着失效，必须走独立任务 + 迁移说明。
+
+    **覆盖边界**：本哨兵只走 ``FockState.squeezed``（态工厂）—— 若有人只把
+    新增的 circuit/gates 路径改成 gaussian 约定而工厂不动，本测试仍绿。
+    新路径由 ``test_squeeze_u_phi_matches_state_factory`` 兵住（该变异会把
+    残差从 4.9e-10 推到 8.2e-02 → FAIL）。两者合并覆盖完整。
     """
     from cvsim.fock.circuit import annihilation
     from cvsim.gaussian.gates import squeeze as gaussian_squeeze
@@ -128,7 +133,7 @@ def test_fock_phi_is_double_the_gaussian_covariance_angle(phi: float) -> None:
                          [f((x @ p + p @ x) / 2), f(p @ p)]])
 
     g = gaussian_squeeze(GaussianState.vacuum(1), R, 0, phi)
-    gauss_cov = np.asarray(g.cov if hasattr(g, "cov") else g.V)
+    gauss_cov = np.asarray(g.V)
 
     # fock(2φ) ≡ gaussian(φ)
     np.testing.assert_allclose(fock_cov(2 * phi), gauss_cov, atol=1e-10)
@@ -184,6 +189,24 @@ def test_from_ir_without_phi_uses_default() -> None:
     np.testing.assert_array_equal(
         from_ir(base).run().amps, from_ir(with_phi).run().amps
     )
+
+# -- 序列化不变量 -----------------------------------------------------------
+
+def test_to_ir_always_carries_phi_zero() -> None:
+    """``FockCircuit.squeeze(0, r)`` 的 ``to_ir()`` 恒带 ``phi: 0.0``。
+
+    补 phi 前只写 ``r``（字节不变量已变，数值不变）。这里把新形态钉住，
+    并确认三后端序列化形状一致（gaussian/bosonic 一直这么写）。
+    """
+    c = FockCircuit(1, cutoff=6)
+    c.squeeze(0, r=R)
+    sq = c.to_ir()["ops"][0]
+    assert sq["op"] == "squeeze"
+    assert sq["params"] == {"r": R, "phi": 0.0}
+    # 显式传 0 与不传等价（同字节）
+    c2 = FockCircuit(1, cutoff=6)
+    c2.squeeze(0, r=R, phi=0.0)
+    assert c2.to_ir()["ops"][0]["params"] == sq["params"]
 
 # -- 相位在物理上真的变了（防止"存了参但没用"） ----------------------------
 
