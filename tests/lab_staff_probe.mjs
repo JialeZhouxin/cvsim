@@ -460,8 +460,9 @@ try {
   }))()`);
   check("scan sync: phase card targets scan node", scanSync.target === "p", JSON.stringify(scanSync));
 
-  /* 9c. per-backend 参数可见性：fock 下 squeeze.phi 不进 IR（drop 表置 null），
-     卡片不能画“转了不生效”的死旋钮；gaussian 不受影响（不误伤）。 */
+  /* 9c. per-backend 参数可见性：fock 的 squeeze 自 09-14-fock-squeeze-phi 起
+     已带 phi（与 FockState.squeezed 同约定）——卡片必须显示 r+phi 且 phi 写进
+     payload；gaussian 不受影响。可见性仍由 IR 驱动（loss.nbar 仍隐藏）。 */
   await evalJs(ws, `(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const p = { schema: "circuit_v1", seed: 0, nmode: 1,
@@ -484,19 +485,56 @@ try {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     document.querySelector('.gate[data-id="sq"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await sleep(300);
+    const row = [...document.querySelectorAll(".gate-card .param")]
+      .find((r) => r.querySelector(".param__name").textContent === "phi");
+    if (row) {
+      const rg = row.querySelector('input[type=range]');
+      rg.value = "1.1"; rg.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(250);
+    }
     return { names: [...document.querySelectorAll(".gate-card .param .param__name")].map((e) => e.textContent),
-             payload: Object.keys(JSON.parse(document.getElementById("json-input").value).ops[0].params) };
+             payload: JSON.parse(document.getElementById("json-input").value).ops[0].params };
   })()`);
-  check("fock: squeeze 不显示死旋钮 phi（与 IR drop 表同源）",
-    JSON.stringify(fockCard.names) === JSON.stringify(["r"]) &&
-    JSON.stringify(fockCard.payload) === JSON.stringify(["r"]),
+  check("fock: squeeze 显示 r + phi，且 phi 写进 payload",
+    JSON.stringify(fockCard.names) === JSON.stringify(["r", "phi"]) &&
+    Math.abs(fockCard.payload.phi - 1.1) < 1e-9,
     JSON.stringify(fockCard));
-  const gaussCard = await evalJs(ws, `(async () => {
+  /* fock 下 loss.nbar 仍不进 IR —— 可见性过滤没被顺手拆掉 */
+  const fockLoss = await evalJs(ws, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const p = { schema: "circuit_v1", backend: "fock", seed: 0, nmode: 1, cutoff: 10,
+      ops: [{ id: "ls", op: "loss", params: { eta: 0.8 }, modes: [0] }],
+      view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: { staff: { ls: 0 } } };
+    const i = document.getElementById("json-input");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(i, JSON.stringify(p));
+    i.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(1200);
+    document.querySelector('.gate[data-id="ls"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await sleep(300);
+    return [...document.querySelectorAll(".gate-card .param .param__name")].map((e) => e.textContent);
+  })()`);
+  check("fock: loss 仍只显示 T（nbar 不进 IR，过滤仍生效）",
+    JSON.stringify(fockLoss) === JSON.stringify(["T"]), JSON.stringify(fockLoss));
+
+  /* 回 gaussian 前先重载 squeeze 场景（上一步换成了 loss 场景，sq 门已不存在） */
+  await evalJs(ws, `(async () => {
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const sel = document.getElementById("backend-select");
     sel.value = "gaussian";
     sel.dispatchEvent(new Event("change", { bubbles: true }));
-    await sleep(600);
+    await sleep(400);
+    const p = { schema: "circuit_v1", seed: 0, nmode: 1,
+      ops: [{ id: "sq", op: "squeeze", params: { r: 0.4, phi: 0 }, modes: [0] }],
+      view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: { staff: { sq: 0 } } };
+    const i = document.getElementById("json-input");
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(i, JSON.stringify(p));
+    i.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(1200);
+    return true;
+  })()`);
+  await waitEval(ws, `document.querySelector('.gate[data-id="sq"]')`);
+  const gaussCard = await evalJs(ws, `(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     document.querySelector('.gate[data-id="sq"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await sleep(300);
     return [...document.querySelectorAll(".gate-card .param .param__name")].map((e) => e.textContent);

@@ -101,20 +101,17 @@ export function deriveEditorTables(schema) {
   }
   // UI键→IR名 查找表（pnames 消费形；与回退常量同形）。schema 无参数级
   // uiName 字段：phase theta↔phi 规则定案于 spec；其余同名直译（无键）。
-  // fock 表示级差异（loss T→eta/nbar 丢、squeeze phi 丢）schema 单份 meta
-  // 表达不了（meta = 首白名单包 = gaussian 视角）——镜像 fock ir_schema
-  // 表示级事实，常量保留（票3 PRD「2 张保留」；票4 或 schema 扩 per-backend
-  // meta 时再收编）。
   // 两张表（票3）：v1ToUiParam = UI键→IR名 改名（phase theta↔phi 规则
   // 定案于 spec；同名直译无键）。fockV1ToUiParam = fock 表示级差异
-  // （loss T→eta/nbar 丢、squeeze phi 丢）——schema 单份 meta 表达不了
-  // （meta = 首白名单包 = gaussian 视角），镜像 fock ir_schema 表示级
-  // 事实，常量保留（票3 PRD「2 张保留」；票4 或 schema 扩 per-backend
-  // meta 时再收编）。gaussian 路径只读前者（drops 不得外溢）。
+  // （loss T→eta/nbar 丢）——schema 单份 meta 表达不了（meta = 首白名单包
+  // = gaussian 视角），镜像 fock ir_schema 表示级事实，常量保留（票3
+  // PRD「2 张保留」；票4 或 schema 扩 per-backend meta 时再收编）。
+  // gaussian 路径只读前者（drops 不得外溢）。
+  // 注：squeeze.phi 曾经也丢（fock 仅实 r），09-14-fock-squeeze-phi 已补——
+  // 现在 fock IR 带 phi（与 FockState.squeezed 同约定）。
   const v1ToUiParam = schema.ops.phase ? { phase: { phi: "theta" } } : {};
   const fockV1ToUiParam = {
     loss: { T: "eta", nbar: null },
-    squeeze: { phi: null },
   };
   return {
     viewN: ext.view?.n ?? [2, 512],
@@ -133,7 +130,7 @@ export function deriveEditorTables(schema) {
 const V1_TO_UI_PARAM = { phase: { phi: "theta" } };
 //: Fock IR param → UI param (inverse of FOCK_UI_TO_V1_PARAM in ops.js;
 //  key = UI param, value = fock IR param).
-const FOCK_V1_TO_UI_PARAM = { loss: { T: "eta", nbar: null }, squeeze: { phi: null } };
+const FOCK_V1_TO_UI_PARAM = { loss: { T: "eta", nbar: null } };
 
 function tables() {
   if (EDITOR_DERIVED) return EDITOR_DERIVED;
@@ -229,9 +226,12 @@ function stateFromV1(payload) {
       // phase: IR speaks theta, UI speaks phi
       const irKey = pnames[k] !== undefined ? pnames[k] : k;
       // fock drop-table (null value): param absent from the fock IR
-      // (loss nbar / squeeze phi) — optional with base default
+      // (loss nbar) — optional with base default
       const droppedOnFock = isFock && pnames[k] === null;
       const v = droppedOnFock ? undefined : params[irKey];
+      // fock 作用域的可选参数：存量档案不带 squeeze.phi（fock 曾只吃实 r，
+      // phi 进过 drop 表），必填会让它们 422。**只对 fock 生效** —— 
+      // gaussian/bosonic 的 phi 仍必填（不改这两个后端的契约）。
       const optionalOnFock = (isFock && uiOp === "squeeze" && k === "phi") || droppedOnFock;
       if (d.advanced || d.optional || optionalOnFock) {
         if (d.string) {

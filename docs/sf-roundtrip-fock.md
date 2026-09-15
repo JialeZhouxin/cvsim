@@ -9,7 +9,7 @@ Fock 基互操作：cvsim `cvsim.fock` ↔ Strawberry Fields **fock backend**。
 | 门/态 | SF（fock backend） | cvsim fock | 对应关系 |
 |--------|--------------------|------------|----------|
 | 位移 | `Dgate(r, phi)` = D(r e^{iφ}) | `displace(state, alpha)` | alpha = r e^{iφ} |
-| 挤压 | `Sgate(r, phi)` = S(r e^{iφ}) | `squeeze(state, r)`（实 r） | SF phi=0 |
+| 挤压 | `Sgate(r, phi)` = S(r e^{iφ}) | `squeeze(state, r, phi)`（phi = 压缩幅角/ξ 相位） | 约定同向（均以 ξ = r e^{iφ} 定义）；**SF 0.23 未逐位实证**——BS 行已有已知符号翻转，对照前请按下方流程自行核验 |
 | 分束器 | `BSgate(θ, φ)` | `beamsplitter(state, θ, φ)` | **cvsim(θ,φ) = SF(−θ,−φ)** |
 | 双模挤压 | `S2gate(r, phi)` | `two_mode_squeeze(state, r)`（实 r） | SF phi=0 |
 | 相位 | `Rgate(φ)` = exp(iφa†a) | `phase(state, θ)` | θ=φ |

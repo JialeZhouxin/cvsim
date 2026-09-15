@@ -53,10 +53,17 @@ def _diag_phase_pure(state: FockState, phases: np.ndarray, mode: int = 0) -> Foc
     return FockState(amps=state.amps * phases[None, :])
 
 
-def _squeeze_U(N: int, r: float) -> np.ndarray:
+def _squeeze_U(N: int, r: float, phi: float = 0.0) -> np.ndarray:
+    """Single-mode squeeze unitary, shape (N, N).
+
+    ``U(r, phi) = exp(½ (conj(xi)·a² − xi·a†²))`` with ``xi = r·e^{i·phi}``
+    — same convention as :meth:`FockState.squeezed` (amplitude phase), NOT
+    ``gaussian.gates.squeeze`` (covariance rotation, differs by 2×).
+    """
     a = annihilation(N)
     ad = a.conj().T
-    G = 0.5 * r * (a @ a - ad @ ad)
+    xi = r * np.exp(1j * float(phi))
+    G = 0.5 * (np.conj(xi) * (a @ a) - xi * (ad @ ad))
     return np.asarray(expm(G))
 
 
@@ -68,16 +75,18 @@ def _displace_U(N: int, alpha: complex) -> np.ndarray:
     return np.asarray(expm(G))
 
 
-def squeeze(state: FockLike1, r: float, mode: int = 0) -> FockLike1:
-    """Single-mode squeeze S(r) = exp(½ r (a² − a†²)) for real r.
+def squeeze(state: FockLike1, r: float, mode: int = 0, phi: float = 0.0) -> FockLike1:
+    """Single-mode squeeze ``S(r, phi)`` — ``phi`` is the amplitude phase
+    (same convention as ``FockState.squeezed``; ``phi=0`` reproduces the
+    real-r form exactly).
 
     FockDensity: ρ' = U ρ U† (1-mode only; mode must be 0).
     """
     if isinstance(state, FockDensity):
         if state.nmode != 1 or mode != 0:
             raise IndexError("FockDensity gates: 1-mode only; mode must be 0")
-        return _apply_U_density(state, _squeeze_U(state.cutoff, r))
-    return _apply_1mode_U_pure(state, _squeeze_U(state.cutoff, r), mode)
+        return _apply_U_density(state, _squeeze_U(state.cutoff, r, phi))
+    return _apply_1mode_U_pure(state, _squeeze_U(state.cutoff, r, phi), mode)
 
 
 def phase(state: FockLike1, theta: float, mode: int = 0) -> FockLike1:

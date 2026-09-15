@@ -5,7 +5,7 @@
    （golden meta 无 params 键，锁定 descope 不加键；本分支为未来
    激活点，见 deriveOps pass2 注释）。改名表：
    deriveParamRenames 同为纯函数 + 测试（激活点同上）；运行时改名
-   表（表示级差异 loss T→eta / squeeze phi drop）按票 3 锁定决策
+   表（表示级差异 loss T→eta drop）按票 3 锁定决策
    保留在 deriveEditorTables（editor.js）。BASE_OPS 再导出供测试对照。
 
    纯函数（收 schema 参数返回新表，不改 BASE_OPS），node --test 注入 mock

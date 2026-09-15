@@ -59,7 +59,7 @@ The Gaussian simulator's "production" claim rests on scale + precision (m→100,
 
 ### 2.2 Quadrature / phase conventions
 
-- Follows Gaussian vision §2 (ħ=1, xxpp) — same conventions module; Fock gates use the same `phase` convention (displace `α`, squeeze `r`, BS `θ/φ`).
+- Follows Gaussian vision §2 (ħ=1, xxpp) — same conventions module; Fock gates use the same `phase` convention (displace `α`, squeeze `r/phi`, BS `θ/φ`). Note: fock `squeeze` `phi` is the **squeezing-amplitude phase** (`ξ = r·e^{iφ}`), which differs from gaussian/bosonic `phi` (covariance rotation angle) by a factor of 2.
 - `annihilation` matrix in `cvsim/fock/gates.py` is the reference for a/a†.
 
 ### 2.3 Cutoff semantics

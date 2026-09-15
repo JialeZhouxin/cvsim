@@ -87,10 +87,19 @@ def _kerr_diag(N: int, chi: float) -> np.ndarray:
     return np.diag(np.exp(1j * chi * np.arange(N) ** 2))
 
 
-def _squeeze_U(N: int, r: float) -> np.ndarray:
+def _squeeze_U(N: int, r: float, phi: float = 0.0) -> np.ndarray:
+    """Single-mode squeeze unitary, shape (N, N).
+
+    ``U(r, phi) = exp(½ (conj(xi)·a² − xi·a†²))`` with ``xi = r·e^{i·phi}``.
+    Same convention as :meth:`FockState.squeezed` (phi is the amplitude
+    phase: ``c_{2n} ∝ (e^{i·phi}·tanh r)^n``) — NOT the covariance-rotation
+    angle used by ``gaussian.gates.squeeze`` (that one's angle differs by a
+    factor of 2). ``phi=0`` is bit-identical to the old real-r form.
+    """
     a = annihilation(N)
     ad = a.conj().T
-    return np.asarray(expm(0.5 * r * (a @ a - ad @ ad)))
+    xi = r * np.exp(1j * float(phi))
+    return np.asarray(expm(0.5 * (np.conj(xi) * (a @ a) - xi * (ad @ ad))))
 
 
 def _displace_U(N: int, alpha: complex) -> np.ndarray:
@@ -140,7 +149,7 @@ def _mz_U(N: int, theta: float, phi: float) -> np.ndarray:
 def _factor1(op_name: str, N: int, fixed: dict[str, Any]) -> np.ndarray:
     """Single-mode (N,N) unitary factor for a merged op."""
     if op_name == "squeeze":
-        return _squeeze_U(N, float(fixed["r"]))
+        return _squeeze_U(N, float(fixed["r"]), float(fixed.get("phi", 0.0)))
     if op_name == "displace":
         return _displace_U(N, complex(fixed["alpha"]))
     if op_name == "phase":
@@ -300,8 +309,8 @@ class FockCircuit:
 
     # -- builder: single-mode gates ---------------------------------------
 
-    def squeeze(self, mode: int, r: float | str = 0.0) -> FockCircuit:
-        self._ops.append(self._partition("squeeze", [mode], r=r))
+    def squeeze(self, mode: int, r: float | str = 0.0, phi: float | str = 0.0) -> FockCircuit:
+        self._ops.append(self._partition("squeeze", [mode], r=r, phi=phi))
         return self
 
     def displace(self, mode: int, alpha: complex | str | ParamRef = 0.0) -> FockCircuit:

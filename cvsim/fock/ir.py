@@ -48,7 +48,7 @@ class OpMeta:
 
 
 OP_META: dict[str, OpMeta] = {
-    "squeeze": OpMeta("one", {"r": "num"}, {"r": 0.0}),
+    "squeeze": OpMeta("one", {"r": "num", "phi": "num"}, {"r": 0.0, "phi": 0.0}),
     "displace": OpMeta("one", {"alpha": "complex"}, {"alpha": 0.0}),
     "phase": OpMeta("one", {"theta": "num"}, {"theta": 0.0}),
     "kerr": OpMeta("one", {"chi": "num"}, {"chi": 0.0}),
@@ -201,7 +201,7 @@ def _build_op(circuit: FockCircuit, op: str, modes: tuple[int, ...], kw: dict[st
     m0 = modes[0] if modes else 0
     m1 = modes[1] if len(modes) > 1 else m0
     if op == "squeeze":
-        circuit.squeeze(m0, r=kw["r"])
+        circuit.squeeze(m0, r=kw["r"], phi=kw["phi"])
     elif op == "displace":
         circuit.displace(m0, alpha=kw["alpha"])
     elif op == "phase":

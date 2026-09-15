@@ -54,17 +54,22 @@ def _annihilation(xp: Any, N: int) -> np.ndarray:
     return cast(np.ndarray, xp.diag(xp.sqrt(xp.arange(1.0, N)), 1).astype(complex))
 
 
-def squeeze_u(backend: str, N: int, r: float) -> np.ndarray:
-    """Single-mode squeeze unitary S(r) = exp(½r(a² − a†²)), shape (N, N).
+def squeeze_u(backend: str, N: int, r: float, phi: float = 0.0) -> np.ndarray:
+    """Single-mode squeeze unitary, shape (N, N).
+
+    ``U(r, phi) = exp(½ (conj(xi)·a² − xi·a†²))`` with ``xi = r·e^{i·phi}``
+    — same convention as ``FockState.squeezed`` (amplitude phase), NOT
+    ``gaussian.gates.squeeze`` (covariance rotation, differs by 2×).
 
     numpy backend reuses the source of truth ``gates._squeeze_U``;
-    jax mirrors the same formula on jnp (differentiable in r).
+    jax mirrors the same formula on jnp (differentiable in r and phi).
     """
     xp = _get_xp(backend)
     if xp is np:
-        return _squeeze_U(N, r)
+        return _squeeze_U(N, r, phi)
     a = _annihilation(xp, N)
-    return _expm(xp, 0.5 * r * (a @ a - a.conj().T @ a.conj().T))
+    xi = r * xp.exp(1j * phi)
+    return _expm(xp, 0.5 * (xp.conj(xi) * (a @ a) - xi * (a.conj().T @ a.conj().T)))
 
 
 def bs_u(backend: str, N: int, theta: float, phi: float = 0.0) -> np.ndarray:

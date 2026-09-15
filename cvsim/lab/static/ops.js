@@ -21,9 +21,11 @@ export const OPS = {
   squeeze: {
     label: "压缩",
     kind: "single",
-    tip: "压缩：挤压正交涨落（r<0 压缩 x，r>0 压缩 p），产生低于真空噪声的涨落",
+    tip: "压缩：挤压正交涨落（r<0 压缩 x，r>0 压缩 p）；phi 是压缩角度 —— fock 与 gaussian 的 phi 约定差 2 倍（见 docs/lab-interaction.md）",
     params: {
       r: { min: -3, max: 3, step: 0.01, def: 0.4, sweep: [0, 2] },
+      // 不标 optional：gaussian/bosonic 的 phi 仍必填（契约不变）。fock 侧的
+      // 缺省许可只对 fock 生效，见 editor.js::stateFromV1 的 optionalOnFock。
       phi: { min: 0, max: TAU, step: 0.01, def: 0 },
     },
   },
@@ -314,7 +316,7 @@ export function removeMode(nodes, mode) {
 }
 
 /** UI 可编辑参数（单点）：按 backend 过滤掉在 IR 表示里不存在的参数。
-    fock 的 drop 表（squeeze.phi / loss.nbar）里值为 null = 该参数在 fock IR
+    fock 的 drop 表（loss.nbar）里值为 null = 该参数在 fock IR
     中被丢弃——卡片画旋钮会是“转了不生效”的谎。advanced/string 由调用方另行排除。 */
 export function visibleParams(op, backend) {
   const meta = OPS[op];
@@ -360,12 +362,13 @@ const UI_TO_V1_OP = {
 };
 //: v1 IR param name for phase is ``theta`` (core builder 1:1, ADR-0003 #3).
 const UI_TO_V1_PARAM = { phase: { phi: "theta" } };
-//: Fock IR param mapping (fock core speaks eta for loss; squeeze has only r).
+//: Fock IR param mapping (fock core speaks eta for loss).
 //  keyed by v1 op name; null value = param dropped on the fock path.
 //  票3 保留：表示级事实（fock 参数集与 gaussian 不同），非镜像。
 const FOCK_UI_TO_V1_PARAM = {
   loss: { T: "eta", nbar: null }, // fock loss is pure (no thermal nbar)
-  squeeze: { phi: null },          // fock squeeze has only r
+  // squeeze.phi：自 09-14-fock-squeeze-phi 起 fock IR 已带 phi（与 FockState.squeezed
+  // 同约定——振幅相），不再丢弃。
 };
 //: 生效改名表（schema 注入后派生；未注入回退常量）。
 function renames() {
@@ -395,7 +398,7 @@ export function toV1Json(state) {
       : (R.uiToParam[out.op] || {});
     for (const [k, v] of Object.entries(n.params)) {
       const pk = pnames[k];
-      if (pk === null) continue; // fock: param absent from the fock IR (loss nbar / squeeze phi)
+      if (pk === null) continue; // fock: param absent from the fock IR (loss nbar)
       out.params[pk !== undefined ? pk : k] = v;
     }
     // F7: v1 measure ops carry a result name (Fock IR requires it; Gaussian

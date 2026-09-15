@@ -158,10 +158,10 @@ def test_bosonic_ir_schema_json_roundtrip():
 def test_three_backends_declared_ops_subset_consistency():
     """Shared param names carry the same value kind across packages.
 
-    Packages are independent (ADR-0001) and may legitimately differ:
+    packages are independent (ADR-0001) and may legitimately differ:
     arity (gaussian amplifier/phase_noise accept [] = all modes, fock is
     per-mode), param sets (fock loss is ``eta``-only, gaussian/bosonic loss
-    carries ``T`` + ``nbar``), squeeze phi, fock-only kraus/kerr/apply_*.
+    carries ``T`` + ``nbar``), fock-only kraus/kerr/apply_*.
     Only same-named params must agree in kind — this is the data-level
     seam ticket 2 merges over.
     """

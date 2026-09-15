@@ -316,7 +316,7 @@ export function initStaff(root, api) {
     const body = document.createElement("div");
     body.className = "gate-card__params";
     let any = false;
-    /* 按 backend 过滤：fock 下 phi（squeeze）/ nbar（loss）不进 IR，画旋钮是
+    /* 按 backend 过滤：fock 下 nbar（loss）不进 IR，画旋钮是
        死控件——不显示（visibleParams 单点在 ops.js，与 toV1Json 的 drop 表同源）。 */
     for (const [k, d] of Object.entries(visibleParams(node.op, api.getState().backend))) {
       if (d.advanced || d.string) continue; // nbar/nmode JSON-only; name id-managed (F7)

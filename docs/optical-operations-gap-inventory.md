@@ -12,13 +12,22 @@
 - `✅`=已实现；`🟡`=部分/近似；`❌`=未实现。
 - 跨表示差异本质：gaussian 仅闭环高斯流形；fock 可承载任意态但受 cutoff 截断；bosonic 以分量叠加承载非高斯态，但受表示限制。
 
+### `phi` 约定分歧（fock vs gaussian/bosonic）—— **landmine**
+
+fock `phi` 是**压缩幅角**：`ξ = r·e^{iφ}`，压缩算符 `U = exp(½(conj(ξ)·a² − ξ·a†²))`，
+`FockState.squeezed` 的 `c_{2n} ∝ (e^{iφ}·tanh r)^n`。
+gaussian/bosonic `phi` 是**协方差旋转角**（`gaussian.gates.squeeze` = `R(φ)·S(r)·R(−φ)`）。
+
+→ **两者差 2 倍**：`FockState.squeezed(φ=0.8)` 与 gaussian `φ=0.4` 同物理态（maxdiff 6.7e-16）。
+已由 `tests/test_fock_squeeze_phi.py` 哨兵锁死；统一 = 破坏性变更（改已提交 gold `tests/test_b9_bosonic_pnr.py`），独立任务。
+
 ---
 
 ## 1. 高斯门（三表示基本都有）
 
 | 门 | gaussian | fock | bosonic | 备注 |
 |---|---|---|---|---|
-| `squeeze(r[, phi])` | ✅ | ✅ | ✅ | gaussian/bosonic 的 squeeze 带 `phi`；fock 仅实 r |
+| `squeeze(r[, phi])` | ✅ | ✅ | ✅ | 三表示均带 `phi`（fock 09-14 补齐；**约定分歧**：fock `phi` 是压缩幅角 `ξ=r·e^{iφ}`，gaussian/bosonic 是协方差旋转角 —— 差 2 倍，见下） |
 | `displace(alpha)` | ✅ | ✅ | ✅ | 纯相空间平移 |
 | `phase(theta)` | ✅ | ✅ | ✅ | |
 | `beamsplitter(theta, phi)` | ✅ | ✅ | ✅ | |

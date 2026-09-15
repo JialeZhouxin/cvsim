@@ -351,11 +351,11 @@ test("clampParam: 声明区间夹紧单点（updateParam 与参数卡片共用�
 });
 
 test("visibleParams: fock 隐藏 IR 丢弃的参数（与 toV1Json drop 表同源）", () => {
-  // fock squeeze 只有 r（phi 被 FOCK_UI_TO_V1_PARAM 置 null）
+  // 09-14-fock-squeeze-phi：fock 的 squeeze 已带 phi（与 FockState.squeezed 同约定），三后端一致
   assert.deepEqual(Object.keys(visibleParams("squeeze", "gaussian")), ["r", "phi"]);
-  assert.deepEqual(Object.keys(visibleParams("squeeze", "fock")), ["r"]);
+  assert.deepEqual(Object.keys(visibleParams("squeeze", "fock")), ["r", "phi"]);
   assert.deepEqual(Object.keys(visibleParams("squeeze", "bosonic")), ["r", "phi"]);
-  // fock loss 纯损耗，无热 nbar
+  // fock loss 纯损耗，无热 nbar（drop 表仍生效）
   assert.deepEqual(Object.keys(visibleParams("loss", "gaussian")), ["T", "nbar"]);
   assert.deepEqual(Object.keys(visibleParams("loss", "fock")), ["T"]);
   // 未受影响的后端 op 全量保留；未知 op 空表
@@ -489,6 +489,44 @@ test("L3: stateFromJson accepts seed + homodyne optional phi", () => {
   assert.equal(rt.error, undefined);
   assert.equal(rt.state.seed, 7);
   assert.equal(rt.state.nodes[0].params.phi, 1.5);
+});
+
+/* 存量档案回归锁：fock squeeze 的 phi 曾进 drop 表（后端当时只吃实 r），
+   所以旧存盘文件**不带 phi**。09-14-fock-squeeze-phi 补 phi 后若标必填，
+   这些文件全部 422。缺省许可**只对 fock 生效**（editor.js 的 optionalOnFock），
+   gaussian/bosonic 的 phi 仍必填——本测试把两侧都锁住。 */
+test("存量 fock 档案（squeeze 无 phi）仍能载入 —— 缺省许可限 fock", () => {
+  const payload = {
+    schema: "circuit_v1", backend: "fock", nmode: 1, cutoff: 10,
+    ops: [{ id: "s", op: "squeeze", params: { r: 0.4 }, modes: [0] }],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  const { state, error } = stateFromJson(payload);
+  assert.equal(error, undefined);
+  const sq = state.nodes.find((n) => n.op === "squeeze");
+  assert.equal(sq.params.r, 0.4);
+  assert.equal(sq.params.phi, 0); // 缺省 0 —— 不是报错
+  // 非数值（缺省许可只免“缺省”，不免“胡写”）：fock 也按 NaN → 默认 0 收敛
+  const bad = stateFromJson({
+    ...payload, ops: [{ id: "s", op: "squeeze", params: { r: 0.4, phi: "x" }, modes: [0] }],
+  });
+  assert.equal(bad.error, undefined);
+  assert.equal(bad.state.nodes[0].params.phi, 0);
+});
+
+/* 超范围护栏：缺省许可**不得**外溢到 gaussian/bosonic —— AC6「gaussian 行为不变」。
+   这两个后端的 phi 一直必填（旧行为：缺 phi → 冻结图 + 报错）。 */
+test("gaussian/bosonic: squeeze 缺 phi 仍冻结（缺省许可未外溢）", () => {
+  const payload = {
+    schema: "circuit_v1", nmode: 1,
+    ops: [{ id: "s", op: "squeeze", params: { r: 0.4 }, modes: [0] }],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  for (const backend of [undefined, "gaussian", "bosonic"]) {
+    const { error } = stateFromJson(backend ? { ...payload, backend } : payload);
+    assert.ok(error, `backend=${backend}: 应冻结，却放行了`);
+    assert.ok(error.includes("phi"), `backend=${backend}: 报错应指向 phi，得到 ${error}`);
+  }
 });
 
 test("L3: stateFromJson rejects invalid seed", () => {
@@ -856,7 +894,7 @@ test("F7: v1 直载解析 backend/initial（无 backend 字段 → gaussian）",
   assert.ok(bad.error);
 });
 
-test("F7: toV1Json — fock param mapping (loss T→eta 掉 nbar, squeeze 掉 phi)", () => {
+test("F7: toV1Json — fock param mapping (loss T→eta 掉 nbar, squeeze 带 phi)", () => {
   const base = { view: { wigner_mode: 0, lim: 5.0, n: 64 }, ui: {}, seed: 0, nmode: 2 };
   const nodes = [
     { id: "n1", op: "loss", params: { T: 0.8, nbar: 0.1 }, mode: 0 },
@@ -865,7 +903,8 @@ test("F7: toV1Json — fock param mapping (loss T→eta 掉 nbar, squeeze 掉 ph
   ];
   const f = toV1Json({ ...base, backend: "fock", nodes, initial: null, cutoffs: [] });
   assert.deepEqual(f.ops[0].params, { eta: 0.8 }); // nbar dropped (fock loss is pure)
-  assert.deepEqual(f.ops[1].params, { r: 0.4 });   // phi dropped (fock squeeze has only r)
+  // 09-14-fock-squeeze-phi：fock IR 已带 phi（与 FockState.squeezed 同约定），不再丢
+  assert.deepEqual(f.ops[1].params, { r: 0.4, phi: 1.2 });
   assert.deepEqual(f.ops[2].params, { theta: 0.7 }); // phase theta shared
   // gaussian 路径字节不变
   const g = toV1Json({ ...base, backend: "gaussian", nodes, initial: null, cutoffs: [] });
@@ -873,7 +912,7 @@ test("F7: toV1Json — fock param mapping (loss T→eta 掉 nbar, squeeze 掉 ph
   assert.deepEqual(g.ops[1].params, { r: 0.4, phi: 1.2 });
 });
 
-test("F7: stateFromV1 — fock 载入（loss eta→T、squeeze 无 phi、name 保留）+ round-trip", () => {
+test("F7: stateFromV1 — fock 载入（loss eta→T、squeeze 带 phi、name 保留）+ round-trip", () => {
   const payload = {
     schema: "circuit_v1", backend: "fock", nmode: 2, seed: 0,
     ops: [
@@ -890,7 +929,7 @@ test("F7: stateFromV1 — fock 载入（loss eta→T、squeeze 无 phi、name �
   assert.equal(loss.params.nbar, 0); // advanced default
   const sq = state.nodes.find((n) => n.op === "squeeze");
   assert.equal(sq.params.r, 0.4);
-  assert.equal(sq.params.phi, 0); // fock 路径 phi optional → default
+  assert.equal(sq.params.phi, 0); // payload 未给 phi → default 0（带 phi 见 test_fock_squeeze_phi.py）
   const pnr = state.nodes.find((n) => n.op === "measure_pnr");
   assert.equal(pnr.params.name, "m_n"); // 显式 name 保留
   // round-trip: save → load 一致（eta 往返）

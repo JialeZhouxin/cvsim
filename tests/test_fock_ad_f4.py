@@ -38,6 +38,20 @@ def test_squeeze_u_identity(backend: str):
     np.testing.assert_allclose(U, squeeze_u("numpy", 6, 0.4), atol=1e-12)
     np.testing.assert_allclose(U, fock.gates._squeeze_U(6, 0.4), atol=1e-12)
 
+@pytest.mark.parametrize("phi", [0.0, 0.3, 1.1])
+def test_squeeze_u_phi_identity(backend: str, phi: float):
+    """phi 也走两条后端：jax 镜像 == numpy == gates 真源（AC7）。"""
+    U = np.asarray(squeeze_u(backend, 6, 0.4, phi))
+    np.testing.assert_allclose(U, squeeze_u("numpy", 6, 0.4, phi), atol=1e-12)
+    np.testing.assert_allclose(U, fock.gates._squeeze_U(6, 0.4, phi), atol=1e-12)
+
+def test_squeeze_u_phi_zero_is_unchanged(backend: str):
+    """phi 默认 0，旧调用点（不传 phi）行为逐位不变。"""
+    np.testing.assert_array_equal(
+        np.asarray(squeeze_u(backend, 8, 0.5)),
+        np.asarray(squeeze_u(backend, 8, 0.5, 0.0)),
+    )
+
 
 def test_bs_u_identity(backend: str):
     """jax path == numpy path; numpy path matches gates.beamsplitter on |1,0⟩."""

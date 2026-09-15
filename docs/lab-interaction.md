@@ -104,9 +104,13 @@
 | **拧参数** | 卡片内滑块（`input[type=range]`） | 实时写回 state + JSON + 电路图（右栏防抖刷新） |
 | **模标签** | 不可点击（纯标签） | 初始态只在右侧「初始态」卡编辑（ADR-0014 D2(i)） |
 | **高级参数** | — | `nbar` 等标 `advanced` 的参数**只在 JSON 里改**，卡片不显示 |
-| **表示层不存在的参数** | — | 该后端 IR 里被丢弃的参数（如 fock 的 squeeze.phi、loss.nbar）卡片**不显示**——画了也会“转了不生效”。过滤表与 `toV1Json` 的 drop 表同源（`ops.js::visibleParams`） |
+| **表示层不存在的参数** | — | 该后端 IR 里被丢弃的参数（如 fock 的 loss.nbar）卡片**不显示**——画了也会“转了不生效”。过滤表与 `toV1Json` 的 drop 表同源（`ops.js::visibleParams`） |
 
 参数卡片点击门块外部自动关闭；卡片本身点击不穿透。
+
+**压缩的 `phi` 约定（fock 与 gaussian 不同，2026-09-14）**：fock 后端的 `squeeze.phi` 是**压缩幅角**（`ξ = r·e^{iφ}`）；gaussian/bosonic 的 `phi` 是**相空间旋转角**。两者**差 2 倍**：fock `phi=0.8` ≡ gaussian `phi=0.4`。不要假设两个后端同角即同态（压缩门悬停提示里也标了这一点）。
+
+**JSON 里缺省的可选参数**：`squeeze.phi` **仅对 fock** 缺省（fock 曾只吃实 r，旧存盘文件不带 phi），gaussian/bosonic 的 `phi` 仍必填。
 
 **参数控件的值一致性**：同一参数的滑块与数字框双向同步；手输越界值按声明区间夹紧（`clampParam` 单点，与写回 state 同一函数），因此三处（range / number / JSON）永远显示同一个值。
 

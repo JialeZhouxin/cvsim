@@ -371,8 +371,8 @@ def test_measure_heterodyne_fock_conditions_and_keeps_state():
 
 
 def test_fock_loss_and_squeeze_run():
-    """UI-shaped fock path: loss speaks eta, squeeze has only r (ops.js maps
-    T→eta and drops nbar/phi before sending — guard the backend contract)."""
+    """UI-shaped fock path: loss speaks eta, squeeze omits phi (optional,
+    defaults 0) — guard the backend contract."""
     data = {
         "schema": "circuit_v1",
         "backend": "fock",
