@@ -1,3 +1,6 @@
+uv run python -m cvsim.lab可拉起后端 FastAPI 和前端静态页 http://127.0.0.1:8000 。
+Edge headless 已能用（C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe）
+ 
 <!-- TRELLIS:START -->
 # Trellis Instructions
 
