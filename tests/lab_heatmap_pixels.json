@@ -1,0 +1,66 @@
+{
+  "displace@dpr1": {
+    "wigner": "409c7ca0d423c697",
+    "colorbar": "3cf6bb7098af2bf4",
+    "wignerSize": [
+      303,
+      303
+    ],
+    "wignerClient": [
+      303,
+      303
+    ],
+    "colorbarSize": [
+      8,
+      128
+    ]
+  },
+  "squeeze@dpr1": {
+    "wigner": "e24513d79294737a",
+    "colorbar": "3cf6bb7098af2bf4",
+    "wignerSize": [
+      297,
+      297
+    ],
+    "wignerClient": [
+      297,
+      297
+    ],
+    "colorbarSize": [
+      8,
+      128
+    ]
+  },
+  "displace@dpr2": {
+    "wigner": "a7375374cbbb8027",
+    "colorbar": "3cf6bb7098af2bf4",
+    "wignerSize": [
+      606,
+      606
+    ],
+    "wignerClient": [
+      303,
+      303
+    ],
+    "colorbarSize": [
+      8,
+      128
+    ]
+  },
+  "squeeze@dpr2": {
+    "wigner": "05f63cc13e3ed210",
+    "colorbar": "3cf6bb7098af2bf4",
+    "wignerSize": [
+      594,
+      594
+    ],
+    "wignerClient": [
+      297,
+      297
+    ],
+    "colorbarSize": [
+      8,
+      128
+    ]
+  }
+}

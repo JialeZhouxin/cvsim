@@ -383,3 +383,64 @@ def test_wigner_breakpoint_query_is_a_singleton():
     assert "window.matchMedia" not in fit, "fitWignerFrame 内仍有 matchMedia 调用"
     assert "WIDE_QUERY.matches" in fit
     assert js.count("window.matchMedia") == 1, "matchMedia 应只有单例那一处"
+
+
+# ── C2 (09-17-lab-heatmap-redraw-cache) 源码级契约 ──────────────────────────
+
+
+def test_heatmap_cache_key_covers_grid_not_size():
+    """R1: 离屏缓存键必须含 W **引用**与 n。
+
+    键若只用数组引用会漏 dpr 变化；若做深比较则每次都是"新网格"（无效）。
+    实测 dpr 1→2 时目标位图 303² → 606²，源位图仍是 64²。
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    for name in ("offCanvas", "offCtx", "offWRef", "offN"):
+        assert f"let {name}" in js, f"缓存状态 {name} 缺失"
+    draw = js.split("function drawHeatmap(W)", 1)[1]
+    assert "offWRef === W" in draw, "缓存键未用 W 引用比较（须为引用，非深比较）"
+    assert "offN === n" in draw, "缓存键未含 n"
+
+
+def test_canvas_size_guard_and_static_colorbar():
+    """R3 同值不同赋值；R4 静态色带只画一次（且清空处复位）。
+
+    colorbar 内容只依赖常量 LUT——实测 4 场景 × 2 dpr 的 toDataURL 哈希完全
+    相同，故可只画一次。但 drawWignerResult 的 singular 分支会 clearRect，
+    那里必须把标志复位，否则奇异态之后再无正常态色带。
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "if (canvas.width !== pw) canvas.width = pw;" in js
+    assert "if (canvas.height !== ph) canvas.height = ph;" in js
+    assert "if (!colorbarDrawn)" in js, "色带未改为一次性绘制"
+    singular = js.split("if (!result.wigner)", 1)[1].split("} else {", 1)[0]
+    assert "colorbarDrawn = false" in singular, (
+        "singular 分支 clearRect 后必须复位 colorbarDrawn，否则色带永久留白"
+    )
+
+
+def test_r6_kept_high_smoothing():
+    """R6 实测否决降到 "medium"：4 场景 × 2 dpr 的像素哈希全部改变。
+
+    父任务明令"改视觉即越界"，故保留 "high"。本断言防止有人"顺手"降质。
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert 'ctx.imageSmoothingQuality = "high";' in js
+
+
+def test_fock_heat_rects_reused_not_rebuilt():
+    """R7: joint 热图 rect 复用（原每格 6 次 setAttribute × 900 格）。
+
+    复用必须按 SVG 分键：jointSvg 与 batchSvg 是两个不同 SVG，且采样侧可能
+    不画。形状变化须重建（x/y 写死），故缓存须同时记 rows/cols/color。
+    """
+    js = (STATIC_DIR / "fock.js").read_text(encoding="utf-8")
+    assert "const HEAT_CACHE = new WeakMap()" in js, "缺少按 SVG 分键的 rect 缓存"
+    heat = js.split("function drawHeat(svg, data, color)", 1)[1].split("\n}\n", 1)[0]
+    assert "cached.rows === rows" in heat and "cached.cols === cols" in heat, (
+        "形状变化时必须重建 rect（x/y 按格坐标写死）"
+    )
+    assert "cached.color === color" in heat, "颜色变化时必须重建 rect"
+    assert "getAttribute(\"fill-opacity\") !== want" in heat, (
+        "透明度未变时应跳过 DOM 写入"
+    )
