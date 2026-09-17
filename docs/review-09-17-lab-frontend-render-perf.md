@@ -66,7 +66,7 @@
 | §2.1 cutoff 滑条全量 render | ✅ 已落地（C1） | 走 `syncChrome()`；**但必须定点补模行标签**——`modeLabel` 内嵌 `initial`，而 `clampInitial` 夹到 `cutoff-1` |
 | §2.2 参数滑条强制布局 + 3 select 重建 | ✅ 已落地（C1） | 实测 4 次 input：`rect=8/computedStyle=4/matchMedia=4` → 全 **0** |
 | §2.3 热图全量重算 | ✅ 已落地（C2） | 修法 5 处中 1/2/4 已做；**3 只做了 canvas RO**（3 个 fit RO 归 C4）；**5 实测否决** |
-| §2.4 `dragover` 读写交错 | ⬜ 待做（C3） | 独立任务 |
+| §2.4 `dragover` 读写交错 | ✅ 已落地（C3） | 方案 (a)；实测 rect **2→1**/事件、qsa **1→0**/事件；ghost 几何逐位一致 |
 | §2.5 bosonic 分步滑条 | ⚠ 部分（C2） | 离屏缓存已落地；**rAF 节流未做**（见该节批注） |
 | §3.1 删除 `fitWignerFrame` | ✅ 已落地（C4） | 方案 A 成功；6 条几何不变量全绿；**gap 无需补偿**、窄屏**不能用 `aspect-ratio`**（见该节批注） |
 | §3.2/§3.3/§3.4 离屏 canvas / 尺寸赋值 / 遍历合一 | ✅ 已落地（C2） | 像素门逐字一致 |
@@ -358,6 +358,35 @@ grid.addEventListener("dragover", (e) => {
    不触发 layout/paint。
 
 **验证断言**: 连续 10 次 `dragover` 事件，`getBoundingClientRect` 调用次数 ≤ 1（缓存后）。
+
+> **✅ 已落地（C3 R1–R4，2026-09-17）**：修法 1–4 **全部落地**，
+> 几何缓存采用**方案 (a)**（缓存 grid 相对 root 内容区偏移）。
+> **探针计数器实测**（10 次 dragover，走托盘卡片真实 `dragstart`）：
+>
+> | 指标 | 改动前 | 改动后 |
+> | --- | --- | --- |
+> | `getBoundingClientRect` / 事件 | **2.0** | **1.0** |
+> | `querySelectorAll` / 事件 | **1.0** | **0.0** |
+>
+> **修法 1 的"失效点"实测不存在**：缓存值 = `gridRect.left - rootRect.left
+> + root.scrollLeft`，公式里每次都重新减去当前 `scrollLeft`，
+> 故与滚动位置无关 —— 实测 `scrollLeft=40` 时重算 delta 仍为 **0**。
+> window resize 也不改变该**内部**偏移。故 `dragstart` 之后无需任何失效逻辑。
+>
+> **修法 4 的几何未变**：ghost 改 `transform` + `left/top` 归零后，
+> rect 相对 grid 仍是 `relLeft 210` / `relTop 6` / 60×32 —— **逐位一致**，
+> `.gate { margin-top: 6px }` 的偏移关系未被破坏（`transform` 是绘制后位移）。
+> 未加 `will-change`（父任务 Out of Scope：不引入额外层）。
+>
+> **本节锚点已过期**：`staff.js:189/194/214-216/228-229` 是改动前行号；
+> 另 `clearHover()` 内**还有第二处**同款 `querySelectorAll`（`staff.js:71`），
+> 本节未提及 —— 两处都已改为 `prevLane` 引用。
+>
+> 守卫：4 条源码级断言（`test_dragover_reads_layout_at_most_once_and_never_queries_all`
+> 等，均验证过改动前为红）；行为守卫 `lab_staff_probe.mjs` **40/40 PASS**。
+> 一处连带修正：该探针原先用 `ghost.style.left` 判位置（R4 后恒为 `0px`），
+> 已改为读**实测几何**并新增一条 R4 断言 —— 属表示耦合，非行为回归
+> （同次运行放置列号 `placedX` 仍为 8）。
 
 ---
 
