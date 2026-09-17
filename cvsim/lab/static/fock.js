@@ -115,18 +115,30 @@ export function sampleSeries(distMode, batch) {
 
 /* ── DOM wiring (browser only) ──────────────────────────── */
 
-function cssVar(name, fallback) {
-  return (getComputedStyle(document.documentElement).getPropertyValue(name) || "").trim() || fallback;
+/* C5 R4: 一次 getComputedStyle 读全部需要的变量。
+   原先 cssVar() 每次调用都重新取 document.documentElement 的 computed style，
+   drawBars 调 4 次、drawJointPair 调 2 次 = 每帧 6 次样式解析入口。
+   返回原始值（未 trim 的空串由调用处的 `|| fallback` 兜底）。
+   缓存假设：项目无主题切换 UI，tokens.css 是静态 :root —— 若将来加了主题切换，
+   必须让本函数的调用点重新读取（别把它提到模块顶层）。 */
+function readThemeVars(names) {
+  const cs = getComputedStyle(document.documentElement);
+  const out = {};
+  for (const n of names) out[n] = (cs.getPropertyValue(n) || "").trim();
+  return out;
 }
 
 /** Grouped bars: theory (accent) + sample (error) side by side. */
 function drawBars(svg, bars) {
   const W = 320, H = 150, padL = 34, padR = 8, padT = 8, padB = 18;
   const vmax = Math.max(1e-12, ...bars.map((b) => Math.max(b.theory, b.sample)));
-  const accent = cssVar("--color-accent", "#2e63d1");
-  const error = cssVar("--color-error", "#c33");
-  const rule = cssVar("--color-rule", "#ccc");
-  const ink = cssVar("--color-ink", "#333");
+  /* C5 R4: 4 次 getComputedStyle → 1 次 */
+  const { "--color-accent": accent0, "--color-error": error0, "--color-rule": rule0, "--color-ink": ink0 } =
+    readThemeVars(["--color-accent", "--color-error", "--color-rule", "--color-ink"]);
+  const accent = accent0 || "#2e63d1";
+  const error = error0 || "#c33";
+  const rule = rule0 || "#ccc";
+  const ink = ink0 || "#333";
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.replaceChildren();
   // y 轴：0/0.5/1 网格线 + 数值刻度
@@ -224,8 +236,11 @@ function drawJointPair(body, batch, dom) {
   const jointSvg = dom.jointSvg;
   const batchSvg = dom.batchSvg;
   if (!jointSvg || !batchSvg) return;
-  const accent = cssVar("--color-accent", "#2e63d1");
-  const error = cssVar("--color-error", "#c33");
+  /* C5 R4: 2 次 getComputedStyle → 1 次 */
+  const { "--color-accent": accent0, "--color-error": error0 } =
+    readThemeVars(["--color-accent", "--color-error"]);
+  const accent = accent0 || "#2e63d1";
+  const error = error0 || "#c33";
   const joint = body.joint;
   if (!joint || !Array.isArray(joint.grid) || !joint.grid.length) {
     jointSvg.replaceChildren();

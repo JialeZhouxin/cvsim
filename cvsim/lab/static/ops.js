@@ -390,8 +390,12 @@ export function toV1Json(state) {
   const ops = [];
   const staff = {}; // UI extension: gate layout columns (core ignores ui)
   const nmode = stateNmode(state);
+  /* C5 R1: renames() 提出循环。它读模块级 schemaTables()，在一次 toV1Json 调用内
+     不会变（schema 注入是启动期一次），原先每个节点都重算一次 —— 与 §3.6 同源。
+     注：不能提到模块顶层 —— schema 注入发生在 import 之后（schema_store 的
+     setSchemaTables），顶层取值会拿到注入前的回退常量。 */
+  const R = renames();
   for (const n of state.nodes) {
-    const R = renames();
     const out = { id: n.id, op: R.uiToOp[n.op] || n.op, params: {} };
     const pnames = state.backend === "fock"
       ? { ...(R.uiToParam[out.op] || {}), ...(R.fockUiToParam[out.op] || {}) }

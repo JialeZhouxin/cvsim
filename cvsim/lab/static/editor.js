@@ -394,23 +394,31 @@ export function initEditor(root, hooks) {
     hooks.onRun(circuitJson);
   }
 
-  function renderJson() {
+  /* C5 R2: 接收**已算好的** doc，而不是自己再算一次。原先 syncChrome() 与 onParam()
+     都在同一次 mutation 里调 toV1Json 两次（renderJson 一次、emit 一次），而
+     toV1Json 会遍历全部节点并重建 ops 数组。把参数改成必填后，"同一次 mutation
+     算两遍"在结构上不可能再发生——两个调用点都必须显式提供同一个对象。
+     形态差异仍保持：这里 stringify 成 2 空格缩进字符串给 #json-input，
+     emit 传的是**对象**本身（hooks.onRun 的契约）。 */
+  function renderJson(doc) {
     suppress = true;
-    dom.json.value = JSON.stringify(toV1Json(state), null, 2);
+    dom.json.value = JSON.stringify(doc, null, 2);
     suppress = false;
   }
 
   /** 非 staff / 非 palette 的副作用集合：JSON 文本、fock 控件、onState 钩子、
       undo/redo 按钮态、debounced emit。`render()` 与滑条/视图的轻量路径共用它，
       故「轻量路径漏了某个副作用」在结构上不可能发生——新增副作用只需改这一处。
-      注意 undo/redo 的 disabled 也在这里（lab_undo_probe.mjs 直接断言该状态）。 */
+      注意 undo/redo 的 disabled 也在这里（lab_undo_probe.mjs 直接断言该状态）。
+      C5 R2: toV1Json 只算一次，JSON 文本与 emit 共用同一个 doc 对象。 */
   function syncChrome() {
-    renderJson();
+    const doc = toV1Json(state);
+    renderJson(doc);
     renderFockControls();
     hooks.onState(state);
     if (dom.undoBtn) dom.undoBtn.disabled = !hist.canUndo();
     if (dom.redoBtn) dom.redoBtn.disabled = !hist.canRedo();
-    if (!suppressEmit) emit(toV1Json(state));
+    if (!suppressEmit) emit(doc);
   }
 
   function render() {
@@ -489,9 +497,17 @@ export function initEditor(root, hooks) {
     onParam: (id, key, value) => {
       pushHistory(); // one entry per slider step; createHistory(50) caps growth (ponytail: coalesce consecutive slider drags when the history gets noisy)
       state = { ...state, nodes: state.nodes.map((x) => (x.id === id ? updateParam(x, key, value) : x)) };
-      renderJson();
+      /* C5 R2: 同一次 mutation 只算一次 toV1Json（原先 renderJson + emit 各算一次）。
+         本路径有意**不**改走 syncChrome()：那样会顺带改动本路径的副作用集合
+         （新增 renderFockControls 与 undo/redo disabled 的写入），而 C5 的范围只是
+         「同一状态算两遍」。副作用集合与改动前逐项一致，只少算一次 doc。
+         （已知且**未改动**：本路径不写 undo/redo 的 disabled —— 实测拖参数滑条后
+         undo 按钮会保持 disabled。该缺陷**改动前就存在**，属「轻量路径漏写副作用」
+         的另一类问题，记录在 review §9.1，需独立任务，不在 C5 范围内。） */
+      const doc = toV1Json(state);
+      renderJson(doc);
       hooks.onState(state);
-      emit(toV1Json(state));
+      emit(doc);
     },
     onPickSweep: (id) => hooks.onPickSweep?.(id),
     onStatus: (msg, ok) => hooks.onStatus(msg, ok),
