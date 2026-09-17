@@ -332,14 +332,23 @@ try {
     el.dispatchEvent(new DragEvent("dragstart", { dataTransfer: dtStart, bubbles: true }));
     const dt = new DataTransfer();
     lane.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: r.top + 10 }));
-    const ghostX = document.querySelector(".gate--ghost")?.style.left || "";
+    /* C3 R4: ghost 位移改走 transform，故不得再读 style.left 判位置——
+       改读**实测几何**（相对 grid 的偏移），这对 left/top 与 transform 两种
+       表示都成立。同时单独断言 transform 表示（R4 的契约本身）。 */
+    const ghostEl = document.querySelector(".gate--ghost");
+    const gRect = ghostEl && ghostEl.getBoundingClientRect();
+    const gridRect = grid.getBoundingClientRect();
+    const ghostDX = gRect ? gRect.left - gridRect.left : null;
+    const ghostTransform = ghostEl ? (ghostEl.style.transform || "(none)") : "";
     lane.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true, clientX: cx, clientY: r.top + 10 }));
     await new Promise((r2) => setTimeout(r2, 120));
     const j = JSON.parse(g("json-input").value);
     const n = j.ops.find((x) => x.op === "squeeze");
-    return { gridW, ghostX, placedX: n ? (j.ui?.staff || {})[n.id] : null };
+    return { gridW, ghostDX, ghostTransform, placedX: n ? (j.ui?.staff || {})[n.id] : null };
   })()`);
-  check("far empty column: drop at x=8 works, grid ≥ 10 cols", farCol.gridW >= 132 + 10 * 72 && farCol.placedX === 8 && Math.round((parseFloat(farCol.ghostX) - 132) / 72) === 8, JSON.stringify(farCol));
+  check("far empty column: drop at x=8 works, grid ≥ 10 cols", farCol.gridW >= 132 + 10 * 72 && farCol.placedX === 8 && Math.round((farCol.ghostDX - 132 - 6) / 72) === 8, JSON.stringify(farCol));
+  /* C3 R4: ghost 必须用 transform 位移，且 left/top 归零（不再逐帧写 left/top） */
+  check("ghost positioned via transform, left/top pinned to 0 (C3 R4)", /^translate\(/.test(farCol.ghostTransform), JSON.stringify({ transform: farCol.ghostTransform, ghostDX: farCol.ghostDX }));
 
   /* 7. legacy JSON without ui.x loads and renders as grid columns */
   const legacy = await evalJs(ws, `(async () => {

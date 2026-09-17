@@ -612,4 +612,106 @@ def test_health_does_not_gate_editor_boot():
     )
 
 
+# ── C3 (09-17-lab-drag-layout-thrash) 源码级契约 ────────────────────────────
+
+
+def test_dragover_reads_layout_at_most_once_and_never_queries_all():
+    """R1 + R3: `dragover` 内不得重复读布局、不得全树查询。
+
+    实测（探针计数器，10 次 dragover）：
+    | | 改动前 | 改动后 |
+    | --- | --- | --- |
+    | `getBoundingClientRect` / 事件 | **2** | **1** |
+    | `querySelectorAll` / 事件 | **1** | **0** |
+
+    改法：grid 相对 root 内容区的偏移在 dragstart 缓存一次；高亮轨道用
+    `prevLane` 引用替代 `querySelectorAll(".staff__lane--hover, ...")`。
+    """
+    js = (STATIC_DIR / "staff.js").read_text(encoding="utf-8")
+    body = js.split('grid.addEventListener("dragover", (e) => {', 1)[1] \
+              .split('grid.addEventListener("dragleave"', 1)[0]
+    # strip comments first: the explanatory comment in dragover legitimately
+    # *mentions* querySelectorAll ("原为 querySelectorAll 全树查询").
+    code = "\n".join(ln for ln in body.split("\n")
+                     if not ln.strip().startswith(("/*", "*", "//")))
+    assert "querySelectorAll" not in code, "dragover 内不得再全树查询（R3）"
+    # exactly one UNCONDITIONAL read (root); the grid read must survive only as
+    # the `geom ?` fallback for the case where no dragstart ran (e.g. a
+    # synthetic dragover) — measured 1 read/event on the real drag path.
+    assert body.count("root.getBoundingClientRect()") == 1, (
+        f"dragover 内应只剩 1 次 root.getBoundingClientRect()，"
+        f"实际 {body.count('root.getBoundingClientRect()')} 次"
+    )
+    grid_reads = [ln.strip() for ln in code.split("\n") if "grid.getBoundingClientRect()" in ln]
+    assert len(grid_reads) == 1 and "geom" in body, (
+        f"grid.getBoundingClientRect() 必须只作为 geom 缺失时的兜底分支，实际：{grid_reads}"
+    )
+    # the cached path must be used
+    assert "geom" in body and "gridOffsetLeft" in body, "未使用缓存的列原点"
+    # prevLane must be assigned and cleaned
+    assert "prevLane = lane" in body, "prevLane 未记录当前高亮轨道"
+    assert "function cacheGeom()" in js, "缺少几何缓存函数"
+    assert "gridOffsetLeft" in js and "root.scrollLeft" in js, (
+        "缓存须排除 root 滚动（公式含 scrollLeft 补偿）"
+    )
+
+
+def test_prev_lane_is_cleared_in_clear_hover():
+    """R3 的耦合前提：`render()` 会 `replaceChildren()` 使 `prevLane` 游离。
+
+    `render()` 开头调 `clearHover()`，故把置空放进 `clearHover()` 内部 ——
+    单点覆盖 render / dragleave / drop 三处调用方。若漏置空，
+    下次 `dragover` 会操作游离节点（无视觉效果，但错误地被"清理"）。
+    """
+    js = (STATIC_DIR / "staff.js").read_text(encoding="utf-8")
+    ch = js.split("function clearHover() {", 1)[1].split("\n  }\n", 1)[0]
+    assert "prevLane" in ch, "clearHover 未清理 prevLane（render 后残留游离节点）"
+    assert "prevLane = null" in ch, "prevLane 未置空"
+    assert 'classList.remove("staff__lane--hover"' in ch or "classList.remove" in ch
+
+
+def test_auto_scroll_is_raf_deduped():
+    """R2: 自动滚动一帧最多滚一次。
+
+    实测（20 次同帧 dragover，`--window-size=1440,900`）：
+    上/下边缘带 `scrollTop` 只动 **14px**（未去重会是 20×14 = **280px**）；
+    中带**不动**（`noScroll: true`）。
+    """
+    js = (STATIC_DIR / "staff.js").read_text(encoding="utf-8")
+    assert "requestAnimationFrame" in js, "自动滚动未进 rAF"
+    assert "function scheduleAutoScroll(" in js, "缺少去重的滚动调度"
+    assert "scrollRaf" in js, "缺少 rAF 句柄去重"
+    assert "cancelAnimationFrame" in js, "缺少取消（中带须停止挂起的滚动）"
+    # the rAF body must apply exactly one step, and the step size stays 14
+    assert "scrollDir" in js
+    sched = js.split("function scheduleAutoScroll(dir) {", 1)[1].split("\n  }\n", 1)[0]
+    assert "if (scrollRaf) return;" in sched, "未去重（同帧多次调用会重复排帧）"
+    assert "root.scrollTop += scrollDir" in sched, "rAF 内应只应用一次位移"
+    dragover = js.split('grid.addEventListener("dragover", (e) => {', 1)[1] \
+                 .split('grid.addEventListener("dragleave"', 1)[0]
+    assert "scheduleAutoScroll(-14)" in dragover and "scheduleAutoScroll(14)" in dragover, (
+        "滚动量 ±14 须保持（视觉行为不变）"
+    )
+    assert "clearAutoScroll()" in dragover, "中带未取消挂起的滚动"
+
+
+def test_ghost_uses_transform_with_zeroed_offsets():
+    """R4: ghost 位移走 `transform`，`left`/`top` 归零。
+
+    实测：改后 ghost rect 相对 grid 与改动前**逐位一致**
+    （`relLeft 210` / `relTop 6`，60×32），故 `.gate { margin-top: 6px }`
+    的偏移关系未被破坏 —— `transform` 是绘制后位移，不改变 margin 参与的盒位置。
+    """
+    js = (STATIC_DIR / "staff.js").read_text(encoding="utf-8")
+    assert 'ghostEl.style.transform = `translate(' in js, "ghost 未用 transform 位移"
+    assert 'ghostEl.style.left = "0"' in js, "ghost 的 left 未归零"
+    assert 'ghostEl.style.top = "0"' in js, "ghost 的 top 未归零"
+    # the old absolute-px writes must be gone
+    assert "ghostEl.style.left = `${MODE_W" not in js, "旧的 left 逐帧写入仍在"
+    assert "ghostEl.style.top = `${mode" not in js, "旧的 top 逐帧写入仍在"
+    # no will-change (parent Out of Scope: 不引入额外层)
+    assert "will-change" not in js, "不得引入 will-change（父任务 Out of Scope）"
+
+
+
 
