@@ -9,7 +9,7 @@ import { setInitialSchema } from "./initial.js";
 import { setEditorSchema, deriveEditorTables } from "./editor.js";
 import { initFockPanel } from "./fock.js";
 import { createSeqGuard, requestLab, makeRefCountedBusy, REQUEST_KIND } from "./request.js";
-import { buildLut, validateWignerGrid, wignerScale, wignerT } from "./colormap.js";
+import { buildLut, inspectWignerGrid, wignerT } from "./colormap.js";
 import { finitePoints, plotDomain, makeScale, polylineSegments, svgPath } from "./curve.js";
 import { el, fmt, axisVal, outcomeText } from "./svg_kit.js"; // SVG_NS 留在 leaf 内（app.js 不直用）
 import { validateScanForm } from "./scan_form.js";
@@ -114,16 +114,48 @@ function renderMatrix(table, rows, cols, head, cell) {
   table.innerHTML = html + "</tbody>";
 }
 
+/* 离屏缓存的单例状态（C2 R1）。缓存的是 **n×n 源位图**，不是目标 canvas：
+   目标尺寸随容器变，源位图只随 W 网格变。
+   cacheW 存 **W 的引用**（后端每次 /run 返回新数组对象 → 引用比较即"网格已换"），
+   canvas.width/height 存像素尺寸（含 dpr）——dpr 变化时目标尺寸变、源位图不变，
+   但仍须重算，因为 drawImage 的上采样目标变了。
+   陷阱：只按 W 引用做键会漏掉 dpr，故键 = (W 引用, n)。 */
+let offCanvas = null;
+let offCtx = null;
+let offWRef = null;   // 缓存对应的 W 引用
+let offN = 0;         // 缓存对应的 n（W.length）
+let colorbarDrawn = false; // C2 R4: 静态色带是否已画（清空处须复位）
+
 function drawHeatmap(W) {
-  validateWignerGrid(W); // 防御语义在 colormap leaf（票1），非法网格抛 Invalid Wigner grid
+  /* C2 R2：校验 + 求尺度融为一次遍历（原先是两次 n² 扫描 + 逐格映射共三次） */
+  const { scale } = inspectWignerGrid(W); // 非法网格抛 Invalid Wigner grid
   const n = W.length;
   /* 离屏 n×n LUT → 主画布按显示尺寸 × dpr 重绘（无马赛克） */
-  const off = document.createElement("canvas");
-  off.width = n;
-  off.height = n;
-  const octx = off.getContext("2d");
+  if (offWRef === W && offN === n && offCanvas) {
+    // 同一网格重绘（RO / dpr 路径）：源位图复用，只重做上采样
+  } else {
+    if (!offCanvas) {
+      offCanvas = document.createElement("canvas");
+      offCtx = offCanvas.getContext("2d");
+    }
+    offCanvas.width = n;
+    offCanvas.height = n;
+    const img = offCtx.createImageData(n, n);
+    for (let j = 0; j < n; j++) {
+      for (let i = 0; i < n; i++) {
+        const t = wignerT(W[j][i], scale);
+        const o = (j * n + i) * 4;
+        img.data[o] = LUT[t * 3];
+        img.data[o + 1] = LUT[t * 3 + 1];
+        img.data[o + 2] = LUT[t * 3 + 2];
+        img.data[o + 3] = 255;
+      }
+    }
+    offCtx.putImageData(img, 0, 0);
+    offWRef = W;
+    offN = n;
+  }
   /* Symmetric scale anchors the physical zero at LUT midpoint (black). */
-  const scale = wignerScale(W);
   /* #6: symmetric colorbar ticks (axisVal format, matching axes). */
   $("colorbar-max").textContent = axisVal(scale);
   $("colorbar-zero").textContent = "0";
@@ -131,37 +163,35 @@ function drawHeatmap(W) {
   /* 标签写完才 fit：标签宽度决定 colorbar 列宽，frame 的可用宽随之变（见 fitWignerFrame
      调用点契约）。此处是唯一「标签刚定、画布像素未定」的窗口。 */
   fitWignerFrame();
-  const img = octx.createImageData(n, n);
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      const t = wignerT(W[j][i], scale);
-      const o = (j * n + i) * 4;
-      img.data[o] = LUT[t * 3];
-      img.data[o + 1] = LUT[t * 3 + 1];
-      img.data[o + 2] = LUT[t * 3 + 2];
-      img.data[o + 3] = 255;
-    }
-  }
-  octx.putImageData(img, 0, 0);
   /* 热图铺满 plot：宽高分别按 clientWidth/clientHeight × dpr（不再假设正方形） */
   const cw = Math.max(64, Math.round(canvas.clientWidth || 256));
   const ch = Math.max(64, Math.round(canvas.clientHeight || 256));
   const dpr = window.devicePixelRatio || 1;
   const pw = Math.min(1024, Math.round(cw * dpr));
   const ph = Math.min(1024, Math.round(ch * dpr));
-  canvas.width = pw;
-  canvas.height = ph;
+  /* C2 R3：同值赋值也会重置位图与上下文状态，故加守卫省掉这次无谓重置。
+     赋值后的 clearRect 仍保留——下面 clearRect 与 drawImage 覆盖整块画布。 */
+  if (canvas.width !== pw) canvas.width = pw;
+  if (canvas.height !== ph) canvas.height = ph;
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, pw, ph);
   ctx.imageSmoothingEnabled = true;
+  /* C2 R6：实测否决降到 "medium"。n=64 源位图 → 303² 目标（dpr1）/ 606²（dpr2）
+     是 4.7×/9.5× 上采样，4 个场景 × 2 个 dpr 的 toDataURL 哈希**全部改变**
+     （如 displace@dpr1 409c7ca0→95390307）。属"改视觉即越界"（parent Out of
+     Scope），故保留 "high"。证据：tests/lab_heatmap_pixels.json 对拍。 */
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(off, 0, 0, pw, ph);
-  /* colorbar */
-  const cb = colorbar.getContext("2d");
-  for (let k = 0; k < 128; k++) {
-    const t = Math.round((k / 127) * 255);
-    cb.fillStyle = `rgb(${LUT[t * 3]},${LUT[t * 3 + 1]},${LUT[t * 3 + 2]})`;
-    cb.fillRect(0, 127 - k, 8, 1);
+  ctx.drawImage(offCanvas, 0, 0, pw, ph);
+  /* colorbar（C2 R4：内容只依赖常量 LUT，与 W / 尺寸 / dpr 全无关
+     —— 实测 4 个场景 × 2 个 dpr 的 toDataURL 哈希完全相同，故只画一次） */
+  if (!colorbarDrawn) {
+    const cb = colorbar.getContext("2d");
+    for (let k = 0; k < 128; k++) {
+      const t = Math.round((k / 127) * 255);
+      cb.fillStyle = `rgb(${LUT[t * 3]},${LUT[t * 3 + 1]},${LUT[t * 3 + 2]})`;
+      cb.fillRect(0, 127 - k, 8, 1);
+    }
+    colorbarDrawn = true;
   }
 }
 
@@ -213,9 +243,19 @@ function drawAxes(lim) {
   }
 }
 
+/* C2 R5: canvas RO 回调合并到一帧一次。RO 在一个批次里可能投递多条（拖窗口时
+   宽度/高度各一次），每条都跑 drawHeatmap + drawAxes 会重复上采样与重建 SVG。
+   rafPending 去重：一帧只跑一次，且读到的是**最新**的 lastWigner / lastLim。 */
+let wignerRafPending = false;
+
 new ResizeObserver(() => {
-  if (lastWigner) drawHeatmap(lastWigner.W);
-  drawAxes(lastLim);
+  if (wignerRafPending) return;
+  wignerRafPending = true;
+  requestAnimationFrame(() => {
+    wignerRafPending = false;
+    if (lastWigner) drawHeatmap(lastWigner.W);
+    drawAxes(lastLim);
+  });
 }).observe(canvas);
 
 /* 容器尺寸变化（窗口/面板/fock 切换）→ 重算正方形画布 */
@@ -299,6 +339,7 @@ function drawWignerResult(result) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const cb = colorbar.getContext("2d");
     cb.clearRect(0, 0, 8, 128);
+    colorbarDrawn = false; // C2 R4: 已清空 → 下次 drawHeatmap 必须重画静态色带
     $("colorbar-max").textContent = "—";
     $("colorbar-zero").textContent = "—";
     $("colorbar-min").textContent = "—";
@@ -392,14 +433,24 @@ function drawFidSvg(xs, ys) {
   const { X, Y } = makeScale({ x0, x1, ylo: y0, yhi: y1, W, H, pad });
   const path = svgPath(pts, X, Y);
   const cy = Y(0);
-  const dots = pts.map((p) =>
-    `<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3"/>`).join("");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.innerHTML =
-    `<line x1="0" y1="${cy}" x2="${W}" y2="${cy}" class="bosonic__grid-line"/>
-     <path d="${path}" fill="none" class="bosonic__line"/>${dots}` +
-    `<text x="${pad.l}" y="${H - 6}" class="bosonic__label">loss 透射率 T</text>` +
-    `<text x="8" y="${pad.t}" class="bosonic__label">F</text>`;
+  /* C2 R8：改用 replaceChildren + el()（原先拼 innerHTML 字符串后整段解析）。
+     class 名与元素顺序保持逐字一致（style.css 的 .bosonic__grid-line /
+     .bosonic__line / .bosonic__label 依赖它们）。用 textContent 而非 innerHTML
+     填文本，中文标签不再经 HTML 解析。 */
+  const kids = [
+    el("line", { x1: 0, y1: cy, x2: W, y2: cy, class: "bosonic__grid-line" }),
+    el("path", { d: path, fill: "none", class: "bosonic__line" }),
+  ];
+  for (const p of pts) {
+    kids.push(el("circle", { cx: X(p.x).toFixed(1), cy: Y(p.y).toFixed(1), r: 3 }));
+  }
+  const tX = el("text", { x: pad.l, y: H - 6, class: "bosonic__label" });
+  tX.textContent = "loss 透射率 T";
+  const tY = el("text", { x: 8, y: pad.t, class: "bosonic__label" });
+  tY.textContent = "F";
+  kids.push(tX, tY);
+  svg.replaceChildren(...kids);
   note.textContent = `fidelity vs loss T · ${pts.length} 点 · rounds 平均（同 seed 三个投点色块为随机相位）`;
   note.hidden = false;
 }

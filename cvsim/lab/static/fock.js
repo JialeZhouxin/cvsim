@@ -171,18 +171,50 @@ function drawBars(svg, bars) {
   }
 }
 
-/** Cell heatmap: one 1×1 rect per cell, opacity ∝ value/max. */
+/** Cell heatmap: one 1×1 rect per cell, opacity ∝ value/max.
+
+    C2 R7: rect 节点按 SVG 复用（原先每次全量 replaceChildren + 每格 6 次
+    setAttribute）。上限来自后端 cutoff 上界 30（schema.py:139），故最大
+    30×30 = 900 格 → 每次重绘 5400 次 setAttribute。
+    复用规则：形状（rows/cols）或颜色变 → 重建；仅透明度变 → 只改
+    fill-opacity，且**值未变则跳过**。形状变化必须重建，因为 rect 的
+    x/y 按格坐标写死。
+    缓存挂在 svg 上（WeakMap），故 jointSvg / batchSvg 各自独立，
+    且 SVG 被移除时缓存自动回收。 */
+const HEAT_CACHE = new WeakMap();
+
 function drawHeat(svg, data, color) {
   const { rows, cols, cells } = data;
   svg.setAttribute("viewBox", `0 0 ${cols} ${rows}`);
-  svg.replaceChildren();
   const vmax = Math.max(1e-12, ...cells.map((c) => Math.max(c.theory, c.sample)));
-  for (const c of cells) {
-    const v = Math.max(0, c.theory);
-    svg.append(el("rect", {
-      x: c.j, y: c.i, width: 1, height: 1, fill: color,
-      "fill-opacity": v <= 0 ? "0" : Math.max(0.06, v / vmax).toFixed(3),
-    }));
+  const cached = HEAT_CACHE.get(svg);
+  const sameShape = cached && cached.rows === rows && cached.cols === cols
+    && cached.color === color && cached.rects.length === cells.length;
+  let rects;
+  if (sameShape) {
+    rects = cached.rects;
+  } else {
+    svg.replaceChildren();
+    rects = new Array(cells.length);
+    const frag = document.createDocumentFragment();
+    for (let k = 0; k < cells.length; k++) {
+      const c = cells[k];
+      const r = el("rect", {
+        x: c.j, y: c.i, width: 1, height: 1, fill: color, "fill-opacity": "0",
+      });
+      rects[k] = r;
+      frag.appendChild(r);
+    }
+    svg.appendChild(frag);
+    HEAT_CACHE.set(svg, { rows, cols, color, rects });
+  }
+  /* 只改透明度；值未变则不动 DOM（避免无谓的样式失效重算） */
+  for (let k = 0; k < cells.length; k++) {
+    const v = Math.max(0, cells[k].theory);
+    const want = v <= 0 ? "0" : Math.max(0.06, v / vmax).toFixed(3);
+    if (rects[k].getAttribute("fill-opacity") !== want) {
+      rects[k].setAttribute("fill-opacity", want);
+    }
   }
 }
 

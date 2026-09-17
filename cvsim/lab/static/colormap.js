@@ -47,6 +47,29 @@ export function wignerScale(W) {
   return Math.max(Math.abs(wmin), Math.abs(wmax)) || 1;
 }
 
+/** 一次遍历完成「校验 + 求尺度」（C2 R2）：原 drawHeatmap 先 validateWignerGrid(W)
+    再 wignerScale(W)，两次 n² 扫描。语义与逐条调用等价——非法网格同样抛
+    Error("Invalid Wigner grid")（含同样的判定顺序与维度范围），合法网格返回同一
+    scale（含全零网格兜底 1）。
+    app.js 消费 { scale }；保留 validateWignerGrid / wignerScale 导出不动
+    （既有测试与其它消费者不受影响）。 */
+export function inspectWignerGrid(W) {
+  if (!Array.isArray(W) || W.length < 2 || W.length > 512) {
+    throw new Error("Invalid Wigner grid");
+  }
+  let wmin = Infinity, wmax = -Infinity;
+  const n = W.length;
+  for (const row of W) {
+    if (!Array.isArray(row) || row.length !== n) throw new Error("Invalid Wigner grid");
+    for (const v of row) {
+      if (!Number.isFinite(v)) throw new Error("Invalid Wigner grid");
+      if (v < wmin) wmin = v;
+      if (v > wmax) wmax = v;
+    }
+  }
+  return { scale: Math.max(Math.abs(wmin), Math.abs(wmax)) || 1 };
+}
+
 /** W 值 → 0..255 的 LUT 索引（原 drawHeatmap 内联映射）：v=+scale→255、
     −scale→0、0→中点；越界裁剪。 */
 export function wignerT(v, scale) {
