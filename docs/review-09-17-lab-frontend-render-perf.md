@@ -75,7 +75,7 @@ dom.cutoffSlider?.addEventListener("input", () => {
 gate 参数卡片弹掉，这是与性能同源的行为耦合。
 
 **修法**（对齐 `setInitial` 先例）: cutoff 变化只影响 `cutoffs`/`initial` 字段，
-不改变 staff 几何与托盘内容。改为
+不改变 staff **树结构**与托盘内容。改为
 
 ```js
 state = { ...state, ...patch };
@@ -87,7 +87,23 @@ emit(toV1Json(state));
 即 `setCircuit` 不复用 `render()`；若担心 `renderFockControls` 里的
 `syncFockInputValues()`（`editor.js:694-704`）遗漏，单独调它。
 
+> **⚠ 落地时的实测修正（C1）**：上面「不改变 staff 几何」只说对一半。
+> `modeLabel`（`staff.js:14-25`）把 `state.initial` 的光子数**渲进模行标签**
+> （`mode m · |n⟩`），而 `clampInitial`（`fock.js:85-92`）把 initial 夹到
+> `cutoff - 1` —— 故拖 fock cutoff **会改标签**。实测：
+> `cutoff 10, initial [5] → "mode 0 · |5⟩"`；`cutoff 3 → initial 夹成 [2] → "mode 0 · |2⟩"`。
+> 若照上面这样"整个跳过 staff 更新"，屏幕会停在陈旧的 `|5⟩`。
+> 落地实现：不重建 staff 树，但定点补标签（`staff.syncLabels()`，只改
+> `.staff__mode-label` 的 `textContent`）。
+>
+> 另外，`render()` 的副作用实际有 **8** 项（上面列了 6 项，漏了 undo/redo 按钮的
+> `disabled`，`editor.js:409-410`）——而 `setInitial`（`editor.js:601-612`）与
+> `onParam`（`editor.js:489-495`）各自**手抄了同一串**。落地时抽成单一函数
+> `syncChrome()`，使"轻量路径漏掉某个副作用"在结构上不可能发生。
+
 **验证断言**: 拖 cutoff 滑条时 `staff.render()` 与 `renderPalette()` 的调用次数为 0。
+（已落地为 `tests/lab_interaction_probe.mjs` 检查 6：用 DOM 节点**身份**而非调用
+计数——`replaceChildren()` 会销毁被标记节点，节点存活即证明从未重建。）
 
 ---
 
@@ -131,18 +147,32 @@ wignerFrame.style.height = s + "px";                               // 57  写
 
 序列是 **写 `hidden` ×7 → 读 layout（强制同步 reflow）→ 写 style**，一次滑条
 input 完成一整个 layout thrash 周期。额外的代价：`window.matchMedia()`
-（`app.js:53`）每次调用都**新建一个 `MediaQueryList` 对象**，而它有 8 个调用点
-（`app.js:127/216/221/222/260/265/284/446`）。
+（`app.js:53`）每次调用都**新建一个 `MediaQueryList` 对象**。该调用在文件内
+**只有 1 处**（即 `fitWignerFrame` 内部那一次），但它被 `fitWignerFrame` 的
+**8 个调用点**反复触发（`app.js:127/216/221/222/260/265/284/446`，其中 3 个是
+`ResizeObserver` 回调）。
+
+> 勘误（C1 落地时实测）：本节初稿把 `app.js:127/216/221/222/260/265/284/446`
+> 写成「`matchMedia` 的 8 个调用点」。实测 `git show HEAD:cvsim/lab/static/app.js`
+> 全文件 `matchMedia` 计数 = **1**；那 8 行是 `fitWignerFrame()` 的调用点。
+> 结论（每次滑条都新建 MQL 对象）不变，但修法退化为**单点提升**，非 8 处替换。
 
 **修法**:
-1. `onParam` 路径不做 `refreshScanNodes()`——加脏键（`nodes` 引用 + `backend` 未变则
+1. `onParam` 路径不做 `refreshScanNodes()`——加脏键（节点身份 + `nmode` 未变则
    早退），或把 `onState` 拆成 `onNodesChanged` / `onBackendChanged` 两个钩子；
-2. `syncBackendPanels` 在 backend 未变时整体早退（含末尾的 `fitWignerFrame()`）；
-3. `fitWignerFrame` 里的 `matchMedia` 提升为模块级单例（`addEventListener("change", fitWignerFrame)`
-   替代每次查询）。
+   ⚠ 脏键**不能用 `state.nodes` 数组引用**：`onParam` 用 `state.nodes.map(...)`
+   重构数组，而 `map` 无论元素是否变化都返回新数组 → 引用比较**永不命中**，
+   写成引用比较等于没改（实测）；
+2. `syncBackendPanels` 在 backend 未变时整体早退（含末尾的 `fitWignerFrame()`），
+   **但首次调用必须放行**（`init()` 也要靠它做首屏面板显隐）；
+3. `fitWignerFrame` 里的 `matchMedia` 提升为模块级单例（1 处，非 8 处）。
+   **不需要** `addEventListener("change", ...)`：`MediaQueryList.matches` 是
+   **活属性**，每次读取都按当前 viewport 求值，故缓存对象不等于缓存结果——
+   语义与改动前逐字一致。
 
 **验证断言**: 拖参数滑条时 `getBoundingClientRect` / `getComputedStyle` / `matchMedia`
-调用次数为 0。
+调用次数为 0。（已落地为 `tests/lab_interaction_probe.mjs` 检查 1；改动前实测
+`rect=8 computedStyle=4 matchMedia=4`，改动后全 0。）
 
 ---
 
@@ -354,6 +384,10 @@ if (dom.palette.dataset.backend === state.backend) return;
 dom.palette.dataset.backend = state.backend;
 ```
 
+> **✅ 已落地（C1 / `09-17-lab-interaction-path-rerender` R6）**，与上面写法逐字一致。
+> 落定时核过：托盘是**无状态纯列表**（无输入框、无焦点值），故早退无需补写副作用
+> ——即与 `initialInputs` 先例不同，这里不需要"早退前先补一次"的那一步。
+
 ### §3.9 【P1-14】`setView` → 全量 `render()`
 
 **位置**: `editor.js:745-748`；调用点 `app.js:784-787`（mode select 的 `change`）。
@@ -367,6 +401,12 @@ setView: (patch) => {
 
 切换 Wigner mode 时，staff 几何与托盘内容都不变。应走
 `renderJson() + onState + emit`。
+
+> **✅ 已落地（C1 R4）**，改走 `syncChrome()`（即 `renderJson` + `renderFockControls`
+> + `onState` + undo/redo 按钮态 + `emit`）。注意 `renderFockControls()` **必须**保留
+> 在这条路径上：它同步 joint-modes 选择与 fock 数字输入，故 `joint_modes` 的改动
+> （`app.js:706` `setJointModes` → `setView`）靠它落地。探针检查 5/6 锁定
+> staff + palette 不再重建。
 
 ### §3.10 【P1-15】joint 热图每格一个 `<rect>`，每次 render 全量重建
 
