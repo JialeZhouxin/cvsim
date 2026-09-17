@@ -24,14 +24,42 @@
 > 截断尾部**。故状态与"与原判断不符的修正"必须前置，不能只写在各节的批注里。
 > 每条详细证据仍在对应小节（以引用块附加，原 `file:line` 锚点未删）。
 >
-> **截断边界（C4 落地后实测，文档 39358 字节）**：窗口内 = §0–§3.12 + §5；
-> 窗口外 = **§4（P2 全部 5 条）+ §6 + §7 + §8**。
+> **截断规则（不必记精确边界 —— 它会随本表变大而前移）**：
+> 窗口只有前 32768 **字节**，而本表本身在窗口内，故**每次往本表加内容，边界都会往前移**。
+> 因此**不要依赖"某节一定在窗口内"**。当前实测（文档 ~47KB）：
+> 窗口内 ≈ §0 + §1 + §2 + §3.1–§3.7；**§3.8 之后全部在窗口外**
+> （含 §4 P2 全部 5 条、§5 勿回退表、§6、§7、§8、§9）。
+> 复测方法：`.scratch/trunc-where.mjs`（按字节切片并列出窗口内标题）。
+> **结论：凡下游任务需要的依据，要么前置到本表，要么写进该任务自己的
+> `prd.md` / `implement.md`。**
 > 因此 **C6 的实施依据不在本文**，而在它自己的
 > `.trellis/tasks/09-17-lab-css-a11y-misc/prd.md`（8.4KB）与 `implement.md`（6.5KB）
 > ——那两份独立完整地记录了 §4.1–§4.5 的代码锚点、修法与 AC，不依赖本文注入。
 > 同理 C3 依据 `09-17-lab-drag-layout-thrash/`，C5 依据 `09-17-lab-redundant-work-cleanup/`。
 > §7（量化方案）在截断外，其方向由 C0 任务
 > `09-17-lab-perf-probe-baseline` 独立承载。
+> **§9（实施中新发现的 4 个问题）也在截断外**：其中 §9.1（拖参数滑条后 undo 按钮
+> 保持 disabled）是**真实缺陷且改动前就存在**，需独立任务处理。
+>
+> **⚠ §5「已经做对的（勿回退）」原表已落到截断窗口外**。
+> 因该表是父任务 AC4 的「勿回退」清单、且 C6/C3 尚未做完，故**要点前置如下**
+> （原表连同 `file:line` 锚点仍在本文 §5，未删）：
+>
+> | 机制 | 为什么不能回退 |
+> | --- | --- |
+> | seq guard + 引用计数 busy（`request.js` / `app.js`） | 过期请求静默丢弃、busy 计数不串台（曾修控件卡死） |
+> | run debounce 120ms（`app.js`） | 参数拖动只在停手后发一次请求——**这层已经对了**，卡顿来自它之外的同步 DOM 工作 |
+> | 拖拽期抑制 emit（`editor.js`） | 拖动中不逐帧发请求，drop/取消后单次 |
+> | **`onParam` 不调 `staff.render()`** | 有意为之——重建 DOM 会中断 range 拖动（C5 因此没把 `onParam` 改走 `syncChrome()`） |
+> | 用引用比较的不可变历史（`editor.js`） | 每步 O(1)，无深拷贝 |
+> | `.wigner__side` 用 `max-width` 而非 `minmax` 轨道 | `minmax` 会把轨道钉到 max，内容窄时仍挤压缩 frame；由 `test_wigner_side_column_is_width_capped` 锁定 |
+> | 零外部资源 | 本地工作台硬约束 |
+> | 无 `backdrop-filter` / 无 `filter` / 无非合成动画 | 无整层重绘源；`transition` 只作用于 `background-color`/`color`/`transform`/`opacity` |
+>
+> **另有反向约束**（父任务 AC6）：**不得**引入 `contain` / `content-visibility`
+> —— 隐藏面板已由 `[hidden] { display: none !important }` +
+> `.fold:not([open]) > * { display: none }` 做到零布局成本。
+> 该约束已由 `test_wigner_frame_sizing_is_css_only` 反向断言。
 
 | 条目 | 状态 | 一句话结论 |
 | --- | --- | --- |
@@ -42,7 +70,9 @@
 | §2.5 bosonic 分步滑条 | ⚠ 部分（C2） | 离屏缓存已落地；**rAF 节流未做**（见该节批注） |
 | §3.1 删除 `fitWignerFrame` | ✅ 已落地（C4） | 方案 A 成功；6 条几何不变量全绿；**gap 无需补偿**、窄屏**不能用 `aspect-ratio`**（见该节批注） |
 | §3.2/§3.3/§3.4 离屏 canvas / 尺寸赋值 / 遍历合一 | ✅ 已落地（C2） | 像素门逐字一致 |
-| §3.5/§3.6/§3.7/§3.11/§3.12 重复劳动 | ⬜ 待做（C5） | §3.11 已被 C2 顺带吃掉；§3.5 的 `fitWignerFrame` 行随 C4 消失 |
+| §3.5/§3.6/§3.7 重复劳动 | ✅ 已落地（C5） | R4 只对 `fock.js` 有实际工作（`app.js` 两处本来就只读一次）；R1 陷阱是**不能提到模块顶层**；R2 覆盖 `setInitial`（C1 已改走 `syncChrome`） |
+| §3.11 `drawFidSvg` 去 `innerHTML` | ✅ 已落地（C2 R8） | C5 的 R5 应记为「已由 C2 承载」，未重复实现 |
+| §3.12 `drawAxes` 节点复用 | ⬜ 未做（C2 R9 显式跳过） | 实测 20 个元素、属性几乎全随 `w`/`h`/`lim` 变 → 收益不足；C5 R6 沿用该结论 |
 | §3.8 `renderPalette` 全量重建 | ✅ 已落地（C1） | C5 的 R3 应记为「已由 C1 承载」 |
 | §3.9 `setView` 全量 render | ✅ 已落地（C1） | 走 `syncChrome()` |
 | §3.10 joint 热图 rect | ✅ 已落地（C2） | WeakMap 按 SVG 分键；双向守卫 |
@@ -458,6 +488,19 @@ for (let k = 0; k < 128; k++) {
 或在 `MatchMedia("(prefers-color-scheme)")` / 主题变更时缓存失效。项目已有
 `--color-*` 主题层（`tokens.css`），缓存是安全的。
 
+> **✅ 已落地（C5 R4，2026-09-17）**：`fock.js` 的 `cssVar()` 已换成
+> `readThemeVars(names)`（单次 `getComputedStyle`），`drawBars` 4 次 + `drawJointPair`
+> 2 次 → 各 1 次。回退色原样保留。
+> **与原表两处不符（实测）**：
+> 1. `app.js:177`（`drawAxes`）与 `app.js:618`（`drawScanCurve`）**各自本来就只有
+>    一次** `getComputedStyle`（先取 `style` 对象，再对它多次 `getPropertyValue`）
+>    —— 本来就没有可合并的重复，C5 未改这两处。
+> 2. 表里 `~~app.js:48~~` 那行随 C4 删除整个 `fitWignerFrame` 而消失。
+>
+> **注**：`readThemeVars` **不跨调用缓存**（每次绘制重新读一次 computed style），
+> 故不存在主题切换失效问题。唯一的陷阱是**别把它提到模块顶层**——已加断言守卫。
+> 守卫：`test_fock_theme_vars_read_in_one_pass`（验证过改动前为红）。
+
 ### §3.6 【P1-11】`toV1Json` 在节点循环内调用 `renames()`
 
 **位置**: `ops.js:389-414`，关键行 `ops.js:394`
@@ -473,6 +516,14 @@ for (const n of state.nodes) {
 （`{...s.uiToOp, ...}`）。节点数为 k 时做 k 次。应提到循环外（每次 `toV1Json`
 一次）。
 
+> **✅ 已落地（C5 R1，2026-09-17）**：`const R = renames();` 已提到
+> `for (const n of state.nodes)` 之外。
+> **唯一陷阱（规划未提）**：**不能**提到模块顶层 —— schema 注入发生在
+> **import 之后**（`schema_store.js` 的 `setSchemaTables` 在启动期 `/schema` 到达时
+> 调用），顶层取值会拿到**注入前的回退常量**（`UI_TO_V1_OP` 等），
+> 于是 schema 驱动的改名全部失效。已加断言守卫这一条。
+> 守卫：`test_renames_hoisted_out_of_node_loop`（验证过改动前为红）。
+
 ### §3.7 【P1-12】单次 mutation 序列里 `toV1Json` 被调两次
 
 **位置**: `editor.js:399`（`renderJson`）与 `editor.js:411`（`emit`）——`render()` 内；
@@ -480,6 +531,27 @@ for (const n of state.nodes) {
 `renderJson()` + `emit()` 各算一次。
 
 `toV1Json` 是 O(节点数) 的对象构造 + 字符串化。修法：算一次，两处共用。
+
+> **✅ 已落地（C5 R2，2026-09-17）**：`renderJson(doc)` 改为接收**已算好的** doc
+> （参数变必填），`syncChrome()` 与 `onParam()` 各自只算一次并共用同一对象。
+> "算两遍"现在**结构上不可能**（无默认参数可退）。
+> **形态差异保持**：`renderJson` 仍 `JSON.stringify(doc, null, 2)`（2 空格缩进字符串
+> 给 `#json-input`）；`emit(doc)` 传的仍是**对象**本身（`hooks.onRun` 契约）。
+>
+> **修正本节的锚点**：`setInitial` **不在**未修之列 —— C1 已把它改走 `syncChrome()`
+> （`editor.js:632-633` 的 `if (!staff.syncLabels()) render(); else syncChrome();`），
+> 故 R2 的改动自动覆盖它。本节原文 `editor.js:601-603` 是 C1 之前的行号。
+> 同理 `editor.js:484-486`（`onParam`）的 `renderJson()` 是**不带参数**的旧形态。
+>
+> **字节冻结（AC2）**：改动前经真实导入路径落盘 4 个 payload 的基线，
+> 改后 **4/4 逐字节相同**。长期守卫是既有 golden
+> `test_default_scene_to_v1_byte_frozen`；本次新增
+> `test_one_to_v1_json_per_mutation`（验证过改动前为红）。
+>
+> **诚实边界**：实测 `Performance.getMetrics` 60 次合成 input 为
+> `ScriptDuration 0.0083s`（≈0.14ms/次）——量级太小、噪声主导，
+> **不足以证明收益**；该数字不是 A/B 对比。R2 的确定性收益（少一次全节点遍历）
+> 由源码断言守卫，真正的量化属 C0 任务。
 
 ### §3.8 【P1-13】`renderPalette()` 每次 `render()` 全量重建
 
@@ -717,7 +789,71 @@ Node ≥22 原生 `fetch` + `WebSocket`、headless Edge（
 
 ---
 
+## §9 实施期间发现的新问题（不在原 22 条内）
+
+> 这些是**落地 C1–C6 过程中实测发现**的，原文 22 条审查未涵盖。
+> 按父任务"不把非本任务问题捆进来"的约束，均**未在本批次修复**，单列于此。
+
+### §9.1 【缺陷】拖参数滑条改状态，但 `undo` 按钮保持 disabled
+
+**位置**: `editor.js` 的 `onParam`（`renderJson / onState / emit` 三个副作用）。
+
+`onParam` 调 `pushHistory()`（历史栈**确实**入栈了），但**从不写**
+`undoBtn.disabled` —— 该写入只在 `syncChrome()` 里（`editor.js:419-420`）。
+若按钮初始为 disabled，则**整个会话里它都不会变可用**。
+
+**实测**（headless Edge，`.scratch/undo-param-check.mjs`）：
+
+```
+initial undo disabled: true
+drag: 1 -> -5 (changed=true)
+undo disabled: true -> true        ← 状态变了，按钮没更新
+json length: 472 -> 473            ← 确实改了状态
+undo click: button disabled, cannot click
+```
+
+**影响**：用户拖完参数滑条后无法用按钮撤销（Ctrl+Z 仍可用，
+因为 `undo()` 直接调 `render()`，不依赖按钮态）。
+
+**这是改动前就有的缺陷**：`git show HEAD:...editor.js` 与 C1 之前的版本
+（`cb08669^`）的 `onParam` 都没有 disabled 写入。**非本批次引入**。
+
+**为何未修**：修它属于"轻量路径漏写一个副作用"——正是 C1 的 `syncChrome()`
+要结构性地消灭的那一类。但 `onParam` 有意不走 `syncChrome()`（C1 明确保留：
+它会重建 fock 控件，拖动期间重建 DOM 会中断 range 拖动）。故正确修法是
+**在 `onParam` 内补两行 disabled 写入**，并评估"拖动期间每步都写"
+（60–120 次/秒的属性写）是否可接受 —— 需要单独判断与测试，
+不宜捆进 C5（C5 范围是"同一状态算两遍"）。建议独立任务。
+
+### §9.2 【基础设施】浏览器探针的持久 profile 会让改动**假红或假绿**
+
+7 个浏览器探针中，`lab_staff_probe.mjs` 与 `lab_undo_probe.mjs` 原先没清
+HTTP 缓存，而它们用**持久** `--user-data-dir`。给 `colormap.js` 新增导出后，
+它们取到旧模块 → boot 抛 `SyntaxError: ... does not provide an export named
+'inspectWignerGrid'` → 调色板不渲染 → `CDP timeout: Runtime.evaluate`。
+
+**假绿更危险**：若改的是**行为**而非导出签名，旧代码会被静默测过。
+已在 C2 修复（两者补 `Network.clearBrowserCache` + `Page.reload`），
+7 个探针现全部清缓存。
+
+### §9.3 【稳定性】探针紧邻启动会在 `waitHttp(/health)` 超时
+
+`lab_undo_probe.mjs` 紧随前一探针运行时，曾在 `waitHttp` 超时（exit 1），
+紧接重跑即 11/11 PASS。原因是端口/CPU 争用（uvicorn 未就绪），**非代码回归**。
+`waitHttp` 的 60s 超时在负载高时可能不足；建议探针间留间隔或加就绪重试。
+
+### §9.4 【缺口】窄屏（`<80rem`）几何无自动守卫
+
+所有浏览器探针都用 ≥1100 视口，故 `<80rem` 的单列分支**没有任何探针覆盖**。
+C4 改动该分支（`container-type: inline-size` + `max(64px, 100cqw)`）时，
+只能手工对拍 1100/900 两档（结果与改前逐位相同），**未纳入 CI 门**。
+建议补一条窄屏几何断言。
+
+---
+
 *审查日期: 2026-09-17*
 *基线提交: `c583d78`*
 *方法: 静态审查（无实测 profile）*
 *本次未改任何代码*
+*落地批次: C1 `cb08669`–`0b0146e` / C2 `9a05fc2`–`6d547bc` +
+`371a9e1` / C4 `5eeddb5` + `8e7eeab`*
