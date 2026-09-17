@@ -517,3 +517,99 @@ def test_fock_theme_vars_read_in_one_pass():
         )
 
 
+# ── C6 (09-17-lab-css-a11y-misc) 源码级契约 ─────────────────────────────────
+
+
+def test_scrollbar_rule_stays_universal_not_root():
+    """R1 **实测否决** → 反向约束：滚动条规则必须留在 `*`，不得改 `:root`。
+
+    原计划的理由是「`scrollbar-width` / `scrollbar-color` 都是可继承属性」。
+    实测（Edge 153）**只有 `scrollbar-color` 可继承**；`:root { scrollbar-width:
+    thin }` 只让 `<html>` 算得 `thin`，`<body>` 与所有后代回落 `auto`
+    → 每个滚动容器滚动条从 12px 槽变 17px 槽，**5/5 容器外观全变**。
+
+    这是「改视觉即越界」的直接违反，故保留 `*`。
+    守卫方式与 C4 的 `container-type` 反向断言同型：断言那个"看起来更优雅的
+    改法"**没有被重新引入**。
+    证据：`.scratch/c6-gutter-{before,after}.json`、`.scratch/c6-ab.mjs`。
+    """
+    css = (STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    # the universal rule must be present
+    assert "* {\n  scrollbar-width: thin;" in css, (
+        "滚动条规则被移出 `*` —— 实测会让 5/5 容器滚动条变宽（见 docstring）"
+    )
+    assert "scrollbar-color: var(--color-rule) transparent;" in css
+    # and the rejected variant must NOT be reintroduced
+    assert ":root {\n  scrollbar-width: thin;" not in css, (
+        "`scrollbar-width` 不可继承，不得挂在 `:root` 上"
+    )
+    # WebKit pseudo-element rules preserved verbatim
+    for sel in ("::-webkit-scrollbar {", "::-webkit-scrollbar-track {",
+                "::-webkit-scrollbar-thumb {", "::-webkit-scrollbar-thumb:hover {",
+                "::-webkit-scrollbar-corner {"):
+        assert sel in css, f"WebKit 滚动条规则 {sel} 被误删"
+
+
+def test_staff_is_not_a_live_region():
+    """R2: `#staff` 不得是 live region；`#status` 必须**仍是**。
+
+    `#staff` 子树任何编辑都走 `replaceChildren()`，对 live region 反复整树
+    重建会让 a11y 树反复 diff 并产生播报噪音。正确的播报口是 `#status`
+    （`setStatus` 写它，`role="status"` + `aria-live="polite"`）。
+    """
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    staff_line = next(ln for ln in html.split("\n") if 'id="staff"' in ln)
+    assert "aria-live" not in staff_line, "#staff 仍是 live region"
+    assert 'aria-label="五线谱电路编辑区"' in staff_line, "aria-label 被误删"
+    assert 'class="staff"' in staff_line, "class 被误删"
+    # #status must keep BOTH role and aria-live
+    status_line = next(ln for ln in html.split("\n") if 'id="status"' in ln)
+    assert 'role="status"' in status_line, "#status 丢了 role=status"
+    assert 'aria-live="polite"' in status_line, "#status 丢了 aria-live（唯一播报口）"
+
+
+def test_scroll_into_view_runs_in_animation_frame():
+    """R3: 两处 `scrollIntoView` 都必须在 rAF 内。
+
+    `scrollIntoView` 紧跟 DOM 写入会强制同步布局（前面的 `hidden = false`
+    或绘制已让布局失效）。延后一帧不影响"滚到可见"的目的。
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert js.count("scrollIntoView(") == 2, "应恰好两处 scrollIntoView"
+    assert js.count("requestAnimationFrame(() => measurementPanel.scrollIntoView(") == 1
+    assert js.count("requestAnimationFrame(() => scanSvg.scrollIntoView(") == 1
+    # no bare (unwrapped) call remains
+    for ln in js.split("\n"):
+        if "scrollIntoView(" in ln:
+            assert "requestAnimationFrame" in ln, f"仍有裸 scrollIntoView 调用：{ln.strip()}"
+
+
+def test_health_does_not_gate_editor_boot():
+    """R4: `/health` 不得阻塞 `schemaOk` 分支（门控只有 `/schema`）。
+
+    `/health` 只填页眉版本号，与门控正交；串行 await 会让首个
+    `editor.render()` 多等一个 RTT。**不**断言耗时改进 —— 本地
+    `127.0.0.1` 上收益不可测（审查 §8），AC 只要求门控行为不变。
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    init = js.split("async function init() {", 1)[1]
+    assert 'await (await fetch("/health"))' not in init, "`/health` 仍在阻塞 await"
+    assert 'await fetch("/health")' not in init, "`/health` 仍在阻塞 await"
+    assert 'fetch("/health")' in init, "`/health` 调用被误删（版本号仍须填）"
+    assert "version-tag" in init, "版本号写入被误删"
+    # /schema must still be the awaited gate, and the failure branch must survive
+    assert 'await (await fetch("/schema")).json()' in init, "/schema 门控被改"
+    assert "schemaOk = true" in init
+    assert "后端 schema 不可用" in init, "/schema 失败的红条被删"
+    for bid in ("run-btn", "sample-btn", "scan-btn", "save-btn", "fidelity-btn", "bos-fidelity-btn"):
+        assert f'"{bid}"' in init, f"失败禁用清单缺 {bid}"
+    # ordering: /health must not sit between the /schema gate and editor.render()
+    health_at = init.index('fetch("/health")')
+    render_at = init.index("editor.render()")
+    gate_at = init.index("if (schemaOk) {")
+    assert health_at < gate_at or health_at > render_at, (
+        "`/health` 仍夹在门控与 editor.render() 之间"
+    )
+
+
+
