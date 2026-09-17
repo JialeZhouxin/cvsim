@@ -218,6 +218,31 @@ canvas 的 `clientWidth` 变 → canvas 的 RO 回调再全算一遍。等于每
 
 **验证断言**: 同 `W` 连续两次 `drawHeatmap`，`createImageData` 调用次数为 1。
 
+> **✅ 落地结果（C2 / `09-17-lab-heatmap-redraw-cache`），逐条实测**：
+> 1. ✅ 已落地。缓存键 = **(W 引用, n)** —— 必须含 n，否则漏掉 dpr 变化
+>    （实测 dpr 1→2 时目标位图 303² → 606²，源位图仍是 64²）。缓存的是 n×n 源位图，
+>    不是目标位图（目标尺寸随容器变）。
+> 2. ✅ 已落地（`if (canvas.width !== pw)` 守卫）。附带说明：同值赋值的危害不止性能
+>    —— 它会清空位图，任何依赖该副作用的代码都会在加守卫后暴露。本项目
+>    `clearRect` + `drawImage` 覆盖整块画布，故无影响（像素门逐字一致即证据）。
+> 3. ⚠ **部分落地**：只有 **canvas 的 RO** 按本项合并到一帧一次
+>    （`wignerRafPending` 去重）。`wignerBox` / colorbar / side 那 3 个 fit RO **未动**
+>    —— 按 parent 消解规则它们归 C4（`09-17-lab-remove-fitwignerframe`）整体删除，
+>    此处合并会白做。
+> 4. ✅ 已落地为 `colormap.js` 的新导出 `inspectWignerGrid(W)`；抛错语义与原
+>    `validateWignerGrid` 逐字一致（测试逐条对拍），旧导出保留未删（探针仍在用）。
+> 5. ❌ **实测否决**：改 `"medium"` 后 4 个用例（2 场景 × 2 dpr）的 toDataURL 哈希
+>    **全部改变**（displace@dpr1 `409c7ca0` → `95390307` 等），可见差异成立。
+>    父任务 Out of Scope 明令"改视觉即越界"，故**保留 `"high"`**，并加
+>    `test_r6_kept_high_smoothing` 守卫。注：原文估"n=64 → 1024 是 16×"，
+>    实测是 4.7×（dpr1）/ 9.5×（dpr2），量级不同但结论一致。
+>
+> **像素门**：`tests/lab_heatmap_pixel_probe.mjs` + 改动前录制的
+> `tests/lab_heatmap_pixels.json`。基线**先于改动**取得，故"逐字一致"不是事后自证。
+> 附带发现：colorbar 哈希在 4 个用例里完全相同（`3cf6bb7098af2bf4`）——直接证明
+> 色带与 W / 尺寸 / dpr 全无关，故 R4 只需画一次（但 `drawWignerResult` 的 singular
+> 分支会 `clearRect`，那里必须复位标志，否则色带永久留白）。
+
 ---
 
 ### §2.4 【P0-4】`dragover` 每事件强制布局 + 全子树查询
@@ -273,6 +298,16 @@ slider.oninput = () => show(slider.value);                // 365
 速率高于显示帧率，未节流。同样受益于 §2.3 的离屏缓存。
 
 **修法**: `oninput` 内用 rAF 节流（只保留最新 `k`）+ 复用离屏缓存。
+
+> **⚠ 部分落地（C2）**：离屏缓存已落地（§2.3），故滑块快速拖动时热图重算的成本
+> 已大幅下降。但 **rAF 节流未做** —— 节流的正确性要求"末次事件不能被丢弃，
+> 停手后显示的 step 必须与滑条值一致"，而 `show(k)` 除画布外还写 tag / info /
+> meters 三处文案；把整条 `show()` 塞进 rAF 会引入"文案滞后于滑条"的新问题，
+> 需要把"文案写入"与"重绘"拆开才能安全节流。该拆分超出 C2 范围（本任务聚焦
+> 重绘成本），故显式留待后续任务。
+> **当前状态：`slider.oninput = () => show(slider.value)` 仍逐事件执行**，
+> 收益只来自缓存命中（不再重复 `createImageData` 与逐格 LUT 映射）。
+> `lab_bosonic_probe.mjs` 的"slider to step 0 updates tag"仍 PASS，即文案同步未受影响。
 
 ---
 
@@ -433,17 +468,48 @@ for (const c of cells) {
 **注**: `drawBars`（`fock.js:123-172`）每根柱 2 个 `<rect>` + 可选 `<text>`，
 最多 30 柱 = ~60–90 元素，同样每次重建，但规模小于热图。
 
+> **✅ 已落地（C2 R7）**：rect 复用改为 **WeakMap 按 SVG 分键**
+> （`jointSvg` / `batchSvg` 各一份缓存），键含 `rows` / `cols` / `color`。
+> 形状或颜色变 → 重建（rect 的 x/y 按格坐标写死，复用会错位）；仅透明度变 →
+> 只改 `fill-opacity`，且**值未变则跳过写入**。上限 900 格来自后端
+> `schema.py:139` 的 cutoff 上界 30，非前端常量。
+> **双向守卫**：`tests/lab_heatmap_rect_probe.mjs` 同时验证"必须复用"与
+> **"形状变化必须失效"**——永不失效的缓存比没有缓存更糟。
+> 实测：cutoff 10 → 100 rect（`viewBox="0 0 10 10"`），cutoff 25 → 重建为 625 rect
+> （`viewBox="0 0 25 25"`，旧节点未存活），同形状重渲染 → 节点保留。
+> `drawBars` 未动（规模小，且柱数上限 30 由 `histBars` 自身控制）。
+
 ### §3.11 【P1-16】`drawFidSvg` 用 `svg.innerHTML`
 
 **位置**: `app.js:392-396`。在 SVG 命名空间元素上写 `innerHTML` 会走 HTML 解析器
 路径（外来内容），比 `replaceChildren` + `el()` 慢，且与项目其余 SVG 绘制风格
 （`svg_kit.el`）不一致。
 
+> **✅ 已落地（C2 R8）**：改 `replaceChildren` + `el()`，文本用 `textContent`
+> （中文标签不再经 HTML 解析）。class 名与元素顺序保持逐字一致，`style.css` 的
+> `.bosonic__grid-line` / `.bosonic__line` / `.bosonic__label` 依赖它们；
+> `lab_bosonic_probe.mjs` 的 fidelity 曲线断言仍 PASS。
+
 ### §3.12 【P1-17】`drawAxes` 每次全量重建 ~15 个元素
 
 **位置**: `app.js:169-208`：`svg.replaceChildren()`（`175`）+ 2 条主线 + 5 条刻度线
 + 8 个 `<text>` ≈ 15 个元素，每个经 `el()` 逐属性 `setAttribute`。
 低优先（每次 resize/热图重绘才走），但可复用节点只改属性。
+
+> **⏭ 显式跳过（C2 R9），理由已记录**：实测元素数 = **20**（浏览器实测
+> `#axis-svg` 子节点：12 个 `<line>` + 8 个 `<text>`，见下方勘误；原文估"~15"，
+> 量级正确）。跳过因为：
+> (1) 属性**几乎全部随 `w`/`h`/`lim` 变**——中线坐标依赖 `w`/`h`，刻度位置依赖
+> `w`/`h`，文字内容依赖 `lim`，没有"值未变可跳过"的部分；
+> (2) R5 已把 canvas RO 合并到一帧一次，resize 风暴下不再重复；
+> (3) 规模远小于同任务已处理的 joint 热图（900 rect × 6 attr）；
+> (4) 替代方案（单个 `<path>` 画刻度线，20 → ~8 元素）**会改动 DOM 结构**，
+> 而 `lab_wigner_layout_probe.mjs` 的命中测试与 `axis-svg` 层叠关系依赖当前结构。
+> 故不做；若将来确需，应作为独立任务并重跑几何探针。
+>
+> 勘误：落地过程中一度写成"~24 个元素（5×2 刻度线 + 4×2 文字）",实测为
+> 20 —— 刻度线是 5 条 x + 5 条 y = **10 条**（中线另计 2 条 = 12），文字是
+> 4 个 x + 4 个 y = **8 个**（原点无标签）。
 
 ---
 
