@@ -23,6 +23,15 @@
 > `context_injection.max_file_bytes`（32768）注入上限，下游任务读到的版本会**按字节
 > 截断尾部**。故状态与"与原判断不符的修正"必须前置，不能只写在各节的批注里。
 > 每条详细证据仍在对应小节（以引用块附加，原 `file:line` 锚点未删）。
+>
+> **截断边界（C4 落地后实测，文档 39358 字节）**：窗口内 = §0–§3.12 + §5；
+> 窗口外 = **§4（P2 全部 5 条）+ §6 + §7 + §8**。
+> 因此 **C6 的实施依据不在本文**，而在它自己的
+> `.trellis/tasks/09-17-lab-css-a11y-misc/prd.md`（8.4KB）与 `implement.md`（6.5KB）
+> ——那两份独立完整地记录了 §4.1–§4.5 的代码锚点、修法与 AC，不依赖本文注入。
+> 同理 C3 依据 `09-17-lab-drag-layout-thrash/`，C5 依据 `09-17-lab-redundant-work-cleanup/`。
+> §7（量化方案）在截断外，其方向由 C0 任务
+> `09-17-lab-perf-probe-baseline` 独立承载。
 
 | 条目 | 状态 | 一句话结论 |
 | --- | --- | --- |
@@ -31,9 +40,9 @@
 | §2.3 热图全量重算 | ✅ 已落地（C2） | 修法 5 处中 1/2/4 已做；**3 只做了 canvas RO**（3 个 fit RO 归 C4）；**5 实测否决** |
 | §2.4 `dragover` 读写交错 | ⬜ 待做（C3） | 独立任务 |
 | §2.5 bosonic 分步滑条 | ⚠ 部分（C2） | 离屏缓存已落地；**rAF 节流未做**（见该节批注） |
-| §3.1 删除 `fitWignerFrame` | ⬜ 待做（C4） | 唯一可能合法失败的任务 |
+| §3.1 删除 `fitWignerFrame` | ✅ 已落地（C4） | 方案 A 成功；6 条几何不变量全绿；**gap 无需补偿**、窄屏**不能用 `aspect-ratio`**（见该节批注） |
 | §3.2/§3.3/§3.4 离屏 canvas / 尺寸赋值 / 遍历合一 | ✅ 已落地（C2） | 像素门逐字一致 |
-| §3.5/§3.6/§3.7/§3.11/§3.12 重复劳动 | ⬜ 待做（C5） | §3.11 已被 C2 顺带吃掉（见该节） |
+| §3.5/§3.6/§3.7/§3.11/§3.12 重复劳动 | ⬜ 待做（C5） | §3.11 已被 C2 顺带吃掉；§3.5 的 `fitWignerFrame` 行随 C4 消失 |
 | §3.8 `renderPalette` 全量重建 | ✅ 已落地（C1） | C5 的 R3 应记为「已由 C1 承载」 |
 | §3.9 `setView` 全量 render | ✅ 已落地（C1） | 走 `syncChrome()` |
 | §3.10 joint 热图 rect | ✅ 已落地（C2） | WeakMap 按 SVG 分键；双向守卫 |
@@ -374,6 +383,36 @@ slider.oninput = () => show(slider.value);                // 365
 
 这是收益最大的一条：删掉一整类问题，而不是优化它。
 
+> **✅ 已落地（C4 / `09-17-lab-remove-fitwignerframe`），方案 A 成功**：
+> 在 `1fr` 轨道上加查询容器 `.wigner__fit`（`container-type` 窄屏 `inline-size` /
+> 宽屏 `size` + `align-self: stretch`），frame 用 `max(64px, 100cqw)` /
+> `max(64px, min(100cqw, 100cqh))`。**未采用固定 colorbar 列的退路**——`auto` 列保留，
+> 故不变量 3 原样有效，6 条几何不变量全绿且**未放宽任何断言**。
+>
+> **原文两处判断被实测修正**：
+> 1. **gap 归属**：`availW` 与 `1fr` 轨道宽**逐位相等**（1440：`334.72 − 12 = 322.72`
+>    = 轨道宽 = frame 宽；`frame.left == box.left`；`.wigner` 无 padding/border），
+>    故**不需要** `calc(100cqw - gap)` 补偿。
+> 2. **窄屏不能用 `aspect-ratio`**：原文建议 `<80rem` 用 `width: 100%; aspect-ratio: 1`。
+>    落地改用 `container-type: inline-size` + `height: max(64px, 100cqw)`。原因：
+>    `aspect-ratio` 遇双 definite 尺寸会失效（原实现绕开它的理由），且窄屏需要
+>    64px 下限参与方形计算——`aspect-ratio` 与 `max()` 组合会产出非正方形。
+>
+> **落地时探针抓到的真实缺陷（目测不可辨）**：首轮只写
+> `max(64px, min(100cqw, 100cqh))`，探针报 fock@1280 `frame=57.25 expect=64 (err -6.75)`。
+> 根因：frame 从 grid item 变成 **flex item**，默认 `flex-shrink: 1` 在列宽 < 64px 时
+> 把它压回 57.25，**使 64px 钳位失效**。修法 `flex: none`。该 6.75px 恰好压进 12px gap。
+>
+> **几何对拍**：5 视口 × 19 字段 diff，**4/5 逐位相同**；1920 差 **0.19px**
+> ——旧 JS 用整数 `clientHeight`(513)，CSS 解析真实 512.81，**改后更准**。
+>
+> **顺带退役**：C1 的 `test_wigner_breakpoint_query_is_a_singleton`——`WIDE_QUERY` 是
+> `fitWignerFrame` 的唯一消费者，函数删除后它失去对象（断点判断改由 CSS `@media`
+> 承担，JS 侧再无 `matchMedia`）。这不是回退 C1 R5：其目的以更强方式消失。
+>
+> **已知边界**：窄屏（`<80rem`）**无自动探针覆盖**（所有浏览器探针都用 ≥1100 视口）；
+> 本任务手工对拍了 1100/900 但未纳入 CI 门。
+
 ### §3.2 【P1-7】colorbar 每次重画 128 次 `fillRect` + 字符串拼接
 
 **位置**: `app.js:154-159`
@@ -408,7 +447,7 @@ for (let k = 0; k < 128; k++) {
 | 位置 | 次数 | 说明 |
 |------|------|------|
 | `app.js:177`（`drawAxes`） | 1/次 | 取 `--color-axis` `--color-paper`（`178-180`） |
-| `app.js:48`（`fitWignerFrame`） | 1/次调用 | 只为取 `gap`——可改读 CSS 变量常量 |
+| ~~`app.js:48`（`fitWignerFrame`）~~ | ~~1/次调用~~ | **已消失（C4）**：整个函数被删除，这行 `getComputedStyle` 随之不存在 |
 | `app.js:618`（`drawScanCurve`） | 1/次 | 取 `--color-rule` `--color-ink` `--color-accent`（`619-621`） |
 | `fock.js:118-120`（`cssVar`） | — | `drawBars` 调 **4 次**（`fock.js:126-129`），`drawJointPair` 调 **2 次**（`195-196`） |
 
