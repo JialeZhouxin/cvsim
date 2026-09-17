@@ -115,6 +115,12 @@ try {
     }
   };
   await send(ws, "Runtime.enable");
+  /* Cache discipline (same reason as lab_staff_probe): the persistent
+     `--user-data-dir` can serve stale modules, which would make this probe test
+     code that is not in the working tree. */
+  await send(ws, "Network.enable");
+  await send(ws, "Network.clearBrowserCache");
+  await send(ws, "Page.reload");
   await evalJs(ws, `(async () => { while (!document.querySelectorAll("#palette [data-op]").length) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
 
   /* default scene: vacuum×2 + displace×2 → 2 gates; history empty.

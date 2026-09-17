@@ -129,6 +129,14 @@ try {
     }
   };
   await send(ws, "Runtime.enable");
+  /* Cache discipline: `--user-data-dir` persists between runs, so a stale cached
+     module (e.g. colormap.js from before a new export was added) would be served
+     and the probe would silently test OLD code — observed as a boot-time
+     "does not provide an export named ..." SyntaxError and a palette that never
+     renders. Clear the cache and reload so the probe always tests the working tree. */
+  await send(ws, "Network.enable");
+  await send(ws, "Network.clearBrowserCache");
+  await send(ws, "Page.reload");
   await evalJs(ws, `(async () => { while (!document.getElementById("staff")) await new Promise((r) => setTimeout(r, 50)); return true; })()`);
 
   // 票3: init() awaits /schema before first render — wait for palette
