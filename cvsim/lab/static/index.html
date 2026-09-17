@@ -56,7 +56,10 @@
       </div>
     </div>
     <p class="hint">拖动器件到轨道放置；水平位置 = 时序；双模器件拖到第一条轨道后点击第二条轨道。</p>
-    <div id="staff" class="staff" aria-live="polite" aria-label="五线谱电路编辑区"></div>
+    <!-- C6 R2: 移除 aria-live="polite"。#staff 子树任何编辑都走 replaceChildren()
+         （staff.js），对 live region 反复整树重建会让 a11y 树反复 diff 并产生播报
+         噪音。正确的播报口是 #status（role="status" aria-live="polite"），保留。 -->
+    <div id="staff" class="staff" aria-label="五线谱电路编辑区"></div>
     <div id="initial-card" class="initial-card" hidden aria-label="初始态">
       <h2 class="initial-card__title">初始态 <span class="hint">每模初始态（Fock 数态 / Bosonic GKP 源；缺省真空）</span></h2>
       <div id="initial-inputs" class="initial-card__inputs"></div>

@@ -500,7 +500,10 @@ function showMeasurement(body) {
     mOutcomes.appendChild(li);
   }
   measurementPanel.hidden = false;
-  measurementPanel.scrollIntoView({ block: "nearest" }); // panel sits below V table; bring it into view
+  /* C6 R3: 进 rAF —— panel sits below V table; bring it into view。
+     scrollIntoView 紧跟 DOM 写入会强制同步布局（前面的 hidden=false 已让布局失效）；
+     延后一帧不影响"滚到可见"的目的。 */
+  requestAnimationFrame(() => measurementPanel.scrollIntoView({ block: "nearest" }));
 }
 
 /* R7: per-backend run 请求体扩展 — bosonic 一次拉全部分步快照
@@ -717,7 +720,9 @@ async function doScan() {
     busy: busyScan,
     onOk: (body) => {
       drawScanCurve(body);
-      scanSvg.scrollIntoView({ block: "nearest" }); // 曲线可能在折叠面板下方——滚到可见
+      /* C6 R3: 进 rAF —— 曲线可能在折叠面板下方，滚到可见。
+         drawScanCurve 刚写完 DOM，同步 scrollIntoView 会强制布局。 */
+      requestAnimationFrame(() => scanSvg.scrollIntoView({ block: "nearest" }));
       setStatus(`scan ok · ${body.ys.length} 点 · ${(performance.now() - t0).toFixed(0)} ms`);
     },
     onError: (e) => reportError(e, "扫描失败"),
@@ -856,10 +861,13 @@ async function init() {
   } catch {
     setStatus("后端 schema 不可用：/schema 拉取失败 — 请检查服务是否启动", false);
   }
-  try {
-    const h = await (await fetch("/health")).json();
-    $("version-tag").textContent = "cvsim " + h.cvsim + " · " + h.schema;
-  } catch { /* offline header keeps the — */ }
+  /* C6 R4: /health **不 await** —— 它只填页眉版本号，与门控（schemaOk）正交。
+     原先串行 await 会让首个 editor.render() 多等一个 RTT。
+     /schema 仍是唯一门控；/health 失败只影响版本号（占位符保持 "—"）。 */
+  void fetch("/health")
+    .then((r) => r.json())
+    .then((h) => { $("version-tag").textContent = "cvsim " + h.cvsim + " · " + h.schema; })
+    .catch(() => { /* offline header keeps the — */ });
   if (schemaOk) {
     syncBackendPanels(editor.getState().backend);
     editor.render();
