@@ -426,3 +426,94 @@ def test_fock_heat_rects_reused_not_rebuilt():
     assert "getAttribute(\"fill-opacity\") !== want" in heat, (
         "透明度未变时应跳过 DOM 写入"
     )
+
+
+# ── C5 (09-17-lab-redundant-work-cleanup) 源码级契约 ────────────────────────
+
+
+def test_renames_hoisted_out_of_node_loop():
+    """R1: renames() 必须在节点循环**外**调用一次。
+
+    它读模块级 schemaTables()，在一次 toV1Json 调用内不会变，原先每个节点
+    重算一次（与 §3.6 同源）。注意**不能**提到模块顶层：schema 注入发生在
+    import 之后，顶层取值会拿到注入前的回退常量。
+    """
+    js = (STATIC_DIR / "ops.js").read_text(encoding="utf-8")
+    assert "export function toV1Json(state) {" in js
+    # scope to the loop itself: from the `for` up to the `outDoc` assembly that
+    # follows it (the body has nested braces, so `\n}\n` would cut it short)
+    tail = js.split("export function toV1Json(state) {", 1)[1]
+    before_loop, after_loop = tail.split("for (const n of state.nodes) {", 1)
+    loop_body = after_loop.split("const outDoc = {", 1)[0]
+    assert "const R = renames();" in before_loop, "renames() 未提到循环外"
+    assert "renames()" not in loop_body, "renames() 仍在节点循环内重复调用"
+    # must not be hoisted to module scope: schema is injected after import, so a
+    # top-level read would capture the pre-injection fallback constants.
+    # Check only *top-level* lines (zero indentation) that actually CALL it —
+    # the `function renames()` declaration is itself top-level, and other
+    # functions such as visibleParams() legitimately call it inside their body.
+    top_level_calls = [
+        ln for ln in js.split("\n")
+        if ln and not ln.startswith((" ", "\t"))
+        and "renames()" in ln and "function renames()" not in ln
+    ]
+    assert not top_level_calls, (
+        f"renames() 不得在模块顶层调用 —— schema 注入在 import 之后，"
+        f"顶层取值会拿到注入前的回退常量：{top_level_calls}"
+    )
+
+
+def test_one_to_v1_json_per_mutation():
+    """R2: 同一次 mutation 只算一次 toV1Json。
+
+    原先 syncChrome()（renderJson + emit）与 onParam()（renderJson + emit）
+    都在同一次状态变更里调两次，而 toV1Json 会遍历全部节点重建 ops 数组。
+    修法是让 renderJson(doc) 接收**已算好的** doc（参数必填），
+    使"算两遍"在结构上不可能发生。
+    """
+    js = (STATIC_DIR / "editor.js").read_text(encoding="utf-8")
+    assert "function renderJson(doc) {" in js, "renderJson 必须接收已算好的 doc"
+    assert "JSON.stringify(doc, null, 2)" in js, "JSON 文本仍须 2 空格缩进"
+    # renderJson must no longer compute the doc itself
+    rj = js.split("function renderJson(doc) {", 1)[1].split("\n  }\n", 1)[0]
+    assert "toV1Json(" not in rj, "renderJson 不得自己再算一遍 toV1Json"
+
+    sc = js.split("function syncChrome() {", 1)[1].split("\n  }\n", 1)[0]
+    assert sc.count("toV1Json(") == 1, "syncChrome 内 toV1Json 必须只出现一次"
+    assert "const doc = toV1Json(state);" in sc
+    assert "renderJson(doc)" in sc, "renderJson 应复用同一个 doc"
+    assert "emit(doc)" in sc, "emit 应复用同一个 doc 对象"
+
+    op = js.split("onParam: (id, key, value) => {", 1)[1].split("\n    },", 1)[0]
+    assert op.count("toV1Json(") == 1, "onParam 内 toV1Json 必须只出现一次"
+    assert "emit(doc)" in op and "renderJson(doc)" in op
+
+
+def test_fock_theme_vars_read_in_one_pass():
+    """R4: fock 的 CSS 变量批量读取。
+
+    原先 `cssVar()` 每读一个变量都调一次 `getComputedStyle(document.documentElement)`：
+    `drawBars` 4 次 + `drawJointPair` 2 次 = 每帧 6 次样式解析入口。
+    改为 `readThemeVars(names)` 单次读取。缓存假设已记在函数注释里：
+    项目无主题切换 UI（tokens.css 静态 :root），故不得把它提到模块顶层。
+    """
+    js = (STATIC_DIR / "fock.js").read_text(encoding="utf-8")
+    assert "function readThemeVars(names)" in js, "缺少批量读取函数"
+    assert "function cssVar(" not in js, "旧 cssVar 应已被 readThemeVars 取代"
+    # exactly one getComputedStyle, inside readThemeVars
+    assert js.count("getComputedStyle(") == 1, "getComputedStyle 应只剩 readThemeVars 内那一处"
+    rtv = js.split("function readThemeVars(names) {", 1)[1].split("\n}\n", 1)[0]
+    assert "getComputedStyle(document.documentElement)" in rtv
+    # both draw paths must go through the batched reader
+    assert js.count("readThemeVars(") == 3, "两个调用点 + 定义处 = 3 次命中"
+    # fallbacks preserved verbatim
+    for fb in ('"#2e63d1"', '"#c33"', '"#ccc"', '"#333"'):
+        assert fb in js, f"缺回退色 {fb}"
+    # pure-function exports must be untouched (可测性未破坏)
+    for name in ("histBars", "reshapeCounts", "marginalOf", "overlayHeat", "leakInfo",
+                 "slowCutoff", "clampInitial", "batchMeasRows"):
+        assert f"export function {name}" in js or f"export const {name}" in js, (
+            f"纯函数导出 {name} 被破坏"
+        )
+
+
