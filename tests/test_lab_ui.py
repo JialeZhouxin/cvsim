@@ -312,3 +312,74 @@ def test_default_scene_to_v1_byte_frozen():
         raise AssertionError("node 不可用 —— node 是前端测试链硬依赖") from e
     assert proc.returncode == 0, proc.stderr[:500]
     assert proc.stdout.strip() == golden
+
+
+# ── C1 (09-17-lab-interaction-path-rerender) 源码级契约 ─────────────────────
+# 这些是**廉价 grep**：几何 / DOM 身份那一半在 lab_interaction_probe.mjs
+# （需 uvicorn + Edge）。这里锁「结构性前提」，使无 Edge 的 CI 也能守住回归。
+
+
+def test_interaction_light_paths_reuse_sync_chrome():
+    """轻量路径必须复用 `syncChrome()`，不得各自手抄副作用序列。
+
+    改动前 `render()`、`setInitial()`、`onParam()` **三处各抄一遍**同一串
+    副作用（renderJson / onState / emit）。手抄副本正是"轻量路径漏掉某个
+    副作用"的成因——例如 undo/redo 的 disabled 若漏掉，撤销按钮会永久禁用
+    （lab_undo_probe.mjs 直接断言该状态）。
+    """
+    js = (STATIC_DIR / "editor.js").read_text(encoding="utf-8")
+    assert "function syncChrome()" in js, "syncChrome() 单一副作用点缺失"
+    # render() 必须由三段组成，而不是再列一遍副作用
+    render_body = js.split("function render() {", 1)[1].split("\n  }\n", 1)[0]
+    assert "staff.render()" in render_body
+    assert "renderPalette()" in render_body
+    assert "syncChrome()" in render_body
+    for fn in ("setView", "setCircuit"):
+        body = js.split(f"{fn}: (patch) => {{", 1)[1].split("\n    },", 1)[0]
+        assert "syncChrome()" in body, f"{fn} 未走轻量路径"
+
+
+def test_staff_labels_resync_on_cutoff_path():
+    """R1 的正确性前提（实测证伪原计划）。
+
+    `modeLabel` 把 `state.initial` 的光子数渲进模行标签（`mode m · |n⟩`），
+    而 `clampInitial` 把 initial 夹到 `cutoff - 1` —— 故拖 fock cutoff 会改标签。
+    轻量路径**必须**补标签，否则屏幕停在旧值（实测 |5⟩ → |2⟩）。
+    """
+    js = (STATIC_DIR / "editor.js").read_text(encoding="utf-8")
+    assert "staff.syncLabels()" in js, "轻量路径没有补模行标签 → 拖 cutoff 会留陈旧标签"
+    staff = (STATIC_DIR / "staff.js").read_text(encoding="utf-8")
+    assert "function syncLabels()" in staff
+    assert "syncLabels," in staff, "syncLabels 未从 initStaff 导出"
+    # 结构变化的兜底：patch 触及结构键时仍须走完整 render
+    assert '"nodes" in patch' in js, "setCircuit 缺少结构键防御"
+
+
+def test_scan_dirty_key_is_node_identity_not_array_ref():
+    """R2 的正确性前提（实测证伪原计划）。
+
+    `onParam` 用 `state.nodes.map(...)` 重构数组，map 无论元素是否变化都返回
+    **新数组** → 用 `nodes` 引用当脏键**永不命中**，规划中的修复会是静默空操作。
+    故脏键必须是节点身份（id/op）而非数组引用。
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert "function scanNodeListKey()" in js, "脏键函数缺失"
+    body = js.split("function scanNodeListKey() {", 1)[1].split("\n}\n", 1)[0]
+    assert "${n.id}:${n.op}" in body, "脏键未取节点身份（id/op）"
+    assert "state.nodes ===" not in body and "nodes === lastScanKey" not in body, (
+        "脏键不能用 nodes 数组引用：map() 恒返回新数组，永不命中"
+    )
+
+
+def test_wigner_breakpoint_query_is_a_singleton():
+    """R5: 断点查询是常量，只建一次。
+
+    改动前 `fitWignerFrame()` 每次调用都 `window.matchMedia(...)`，每次分配新
+    MediaQueryList；滑条路径上 fit 每步都跑（实测 4 次 input = 4 次 matchMedia）。
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    assert 'const WIDE_QUERY = window.matchMedia("(min-width: 80rem)")' in js
+    fit = js.split("function fitWignerFrame()", 1)[1].split("\n}\n", 1)[0]
+    assert "window.matchMedia" not in fit, "fitWignerFrame 内仍有 matchMedia 调用"
+    assert "WIDE_QUERY.matches" in fit
+    assert js.count("window.matchMedia") == 1, "matchMedia 应只有单例那一处"
