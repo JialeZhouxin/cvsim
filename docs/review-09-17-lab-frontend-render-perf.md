@@ -9,11 +9,14 @@
 工作区改动**，现已经由 `d997fa4` 落盘；`docs` 提交 `ae3a1dc` 是当前 HEAD。
 本文所有 `file:line` 锚点对应**已提交的 `ae3a1dc`（工作区内容与审查时一致）**。
 **日期**: 2026-09-17
-**方法**: 静态代码审查（读-写交错、强制同步布局、重复计算、DOM 重建范围）
-**未做**: 未跑浏览器 profile、未跑 CDP `Performance` 域计数。本文所有结论是**源码级推理**，
-每条都给了 `file:line` 证据与可验证的断言，但**没有实测毫秒数**。§7 给出量化方案。
+**方法**: 静态代码审查（读-写交错、强制同步布局、重复计算、DOM 重建范围）+
+**实测**（C0 起补 CDP `Performance` 域计数，见 §7；§1 的引用块有摘要）
+**未做**: ~~未跑浏览器 profile、未跑 CDP `Performance` 域计数~~ —— **C0 已补 `Performance`
+域计数**（`LayoutCount` / `RecalcStyleCount` / `LayoutDuration` / `RecalcStyleDuration`）。
+**仍未做** flame chart / CPU profile。原文各条的 `file:line` 证据与可验证断言保留，
+定性判断现已用实测数字校准（§1 / §2.1 / §2.2 / §2.4 / §7）。
 
-**本次未改任何代码。**
+**本次未改任何代码**（本审查本身；后续 C1–C6 的实施改动见 §0 状态表）。
 
 ---
 
@@ -26,8 +29,8 @@
 >
 > **截断规则（不必记精确边界 —— 它会随本表变大而前移）**：
 > 窗口只有前 32768 **字节**，而本表本身在窗口内，故**每次往本表加内容，边界都会往前移**。
-> 因此**不要依赖"某节一定在窗口内"**。当前实测（文档 ~47KB）：
-> 窗口内 ≈ §0 + §1 + §2 + §3.1–§3.7；**§3.8 之后全部在窗口外**
+> 因此**不要依赖"某节一定在窗口内"**。当前实测（文档 ~62KB，已含 C0 回填）：
+> 窗口内 ≈ §0 + §1 + §2（含 §2.1–§2.5）+ §3 前段；**§4 起（byte 44657）全部在窗口外**
 > （含 §4 P2 全部 5 条、§5 勿回退表、§6、§7、§8、§9）。
 > 复测方法：`.scratch/trunc-where.mjs`（按字节切片并列出窗口内标题）。
 > **结论：凡下游任务需要的依据，要么前置到本表，要么写进该任务自己的
@@ -36,8 +39,8 @@
 > `.trellis/tasks/09-17-lab-css-a11y-misc/prd.md`（8.4KB）与 `implement.md`（6.5KB）
 > ——那两份独立完整地记录了 §4.1–§4.5 的代码锚点、修法与 AC，不依赖本文注入。
 > 同理 C3 依据 `09-17-lab-drag-layout-thrash/`，C5 依据 `09-17-lab-redundant-work-cleanup/`。
-> §7（量化方案）在截断外，其方向由 C0 任务
-> `09-17-lab-perf-probe-baseline` 独立承载。
+> **§7（量化方案）现在已在截断外**，故其**实测数字已前置到 §1 的引用块**
+> （三场景 `LayoutCount` 基线→落地后）；复现命令 `node tests/lab_render_perf_probe.mjs`。
 > **§9（实施中新发现的 4 个问题）也在截断外**：其中 §9.1（拖参数滑条后 undo 按钮
 > 保持 disabled）是**真实缺陷且改动前就存在**，需独立任务处理。
 >
@@ -81,6 +84,25 @@
 | §4.3 `scrollIntoView` 进 rAF | ✅ 已落地（C6） | 两处都在 rAF 内；`lab_scan_probe` 守卫 |
 | §4.4 `init()` 串行 `await` | ✅ 已落地（C6） | `/health` 不再 await。**行为级 A/B**：CDP 扣住 `/health`，改动前 15s 不 boot，改动后 541ms boot |
 | §4.5 不加 `contain`/`content-visibility` | ✅ 已核验（C6） | 零命中；`container-type` 不算 |
+| §7 量化验证方案 | ✅ **已执行（C0）** | 新增 `tests/lab_render_perf_probe.mjs`；三场景实测：S1 `LayoutCount` **93→64**、S2 **268→90**、S3 **14→13**；3 次采样计数完全一致 |
+
+> **实测摘要（C0，替代上表原定性判断）**——完整表与复现命令见 §7，
+> 三场景均已前置到对应小节（§2.1 / §2.2 / §2.4）：
+>
+> | 场景 | `LayoutCount` 基线 → 落地后 | 变化 | `RecalcStyleDuration` |
+> | --- | ---: | ---: | ---: |
+> | S1 cutoff 滑条（100 步 `input`） | 93 → 64 | −31.2% | 0.0340 s → 0.0173 s（−49.2%） |
+> | S2 参数滑条（100 步 `input`） | 268 → 90 | **−66.4%** | 0.0647 s → 0.0031 s（**−95.2%**） |
+> | S3 `dragover`（20 次） | 14 → 13 | −7.1% | 0.0048 s → 0.0038 s（−22.2%） |
+>
+> **S2 降幅最大**，印证 §2.2「`onState` 强制布局是最贵的一条」。
+> **S3 降幅小不代表性**：浏览器对同帧 `dragover` 会合并布局，
+> 故其收益主要体现为**每次事件少 1 次强制布局读**（rect 2→1）与
+> **消除全树查询**（qsa 1→0）——核心证据是 §2.4 的探针计数器，不是本表。
+> **复现性**：`--runs=3` 的 `LayoutCount` 三次完全一致（64/64/64、90/90/90、13/13/13）；
+> 仅 `*Duration` 有毫秒级抖动，报告同时给 `_min`/`_max`，**不取最小值冒充**。
+> **诚实边界**：同机同视口相对对拍，非跨机绝对值；"频率 ~60–120/s"仍是事件模型推算；
+> 未做 flame chart。
 
 **与原判断不符的三处修正（最重要）**：
 
@@ -110,6 +132,21 @@
 | P0-5 | bosonic 分步滑条 → 每 input 全量 `drawHeatmap` + `drawAxes` | 高于帧率 | 同 P0-3 |
 | P1 | `fitWignerFrame` 是抖动的**结构根因**，7 个调用点 × 每次 style recalc + rect 读 | 全渲染路径 | 应结构性删除（§3.6） |
 | P2 | `*{scrollbar-*}`、`aria-live` 挂在每编辑重建的 `#staff`、colorbar 静态像素重画 | — | 低 |
+
+> **实测列（✅ C0，`tests/lab_render_perf_probe.mjs`，3 次采样，基线 `c583d78`
+> 的 `static/` vs 落地后）**：上表的"触发频率"是**事件模型推算**，
+> 下表是**实测累计代价**（100 步滑条 / 20 次 dragover）。完整表与复现命令见 **§7**。
+>
+> | 场景 | `LayoutCount` 基线 → 落地后 | `RecalcStyleDuration` |
+> | --- | --- | --- |
+> | S1 cutoff 滑条（100 步）→ §2.1 | **93 → 64**（−31.2%） | 0.0340 s → 0.0173 s（−49.2%） |
+> | S2 参数滑条（100 步）→ §2.2 | **268 → 90**（−66.4%） | 0.0647 s → 0.0031 s（−95.2%） |
+> | S3 dragover（20 次）→ §2.4 | **14 → 13**（−7.1%） | 0.0048 s → 0.0038 s（−22.2%） |
+>
+> S2 降幅最大，印证 §2.2 的判断（`onState` 的强制布局是三条路径里最贵的）。
+> S3 的收益主要体现为**每次事件少 1 次强制布局读 + 消除全树查询**，
+> 在 `Performance` 计数上不显眼（浏览器对同帧 `dragover` 会合并布局）——
+> 其核心证据是 §2.4 的探针计数器（rect **2→1**、qsa **1→0**）。
 
 **最关键的一条**：P0-1 与 P0-2 都源于同一个结构性事实——`editor.js render()`
 （`editor.js:403-412`）是一个**无差别全量重渲染**函数，任何状态变化都走它，而
@@ -152,6 +189,22 @@ dom.cutoffSlider?.addEventListener("input", () => {
 滑条 `input` 在拖动时约 60–120 次/秒。此外 `staff.render()` 开头 `closeCard()`
 （`staff.js:77`）会**顺手关掉打开的参数卡片**——即拖动 cutoff 会把用户正在看的
 gate 参数卡片弹掉，这是与性能同源的行为耦合。
+
+**验证断言**: 连续 100 次 `input`，修复后 `LayoutCount` 增量显著低于基线。
+
+> **✅ 已落地（C1）** —— 本条目由 `09-17-lab-interaction-path-rerender` 承接。
+>
+> **实测（C0，`tests/lab_render_perf_probe.mjs`，100 步真实 `input`，3 次采样）**：
+>
+> | 指标 | 基线（`c583d78` 的 `static/`） | 落地后 | 变化 |
+> | --- | ---: | ---: | ---: |
+> | `LayoutCount` | **93** | **64** | **−31.2%** |
+> | `RecalcStyleCount` | 97.7 | 70 | −28.3% |
+> | `LayoutDuration` | 0.0460 s | 0.0307 s | −33.2% |
+> | `RecalcStyleDuration` | 0.0340 s | 0.0173 s | −49.2% |
+>
+> 上表「滑条 `input` 在拖动时约 60–120 次/秒」是事件模型推算；
+> 上表实测的是**每 100 次 `input` 的累计代价**。完整表与复现命令见 §7。
 
 **修法**（对齐 `setInitial` 先例）: cutoff 变化只影响 `cutoffs`/`initial` 字段，
 不改变 staff **树结构**与托盘内容。改为
@@ -252,6 +305,21 @@ input 完成一整个 layout thrash 周期。额外的代价：`window.matchMedi
 **验证断言**: 拖参数滑条时 `getBoundingClientRect` / `getComputedStyle` / `matchMedia`
 调用次数为 0。（已落地为 `tests/lab_interaction_probe.mjs` 检查 1；改动前实测
 `rect=8 computedStyle=4 matchMedia=4`，改动后全 0。）
+
+> **✅ 已落地（C1）** —— 本条目由 `09-17-lab-interaction-path-rerender` 承接。
+>
+> **实测（C0，`tests/lab_render_perf_probe.mjs`，100 步真实 `input`，3 次采样）**
+> —— 这是三条路径里**降幅最大**的一条，印证了本条"最贵"的判断：
+>
+> | 指标 | 基线（`c583d78` 的 `static/`） | 落地后 | 变化 |
+> | --- | ---: | ---: | ---: |
+> | `LayoutCount` | **268** | **90** | **−66.4%** |
+> | `RecalcStyleCount` | 179.7 | 90 | −49.9% |
+> | `LayoutDuration` | 0.0754 s | 0.0187 s | −75.2% |
+> | `RecalcStyleDuration` | 0.0647 s | 0.0031 s | **−95.2%** |
+>
+> `RecalcStyleDuration` 几乎归零（0.0647 s → 0.0031 s），因为 `fitWignerFrame`
+> 的强制样式重算已被结构性删除（§3.6 / C4）。完整表与复现命令见 §7。
 
 ---
 
@@ -844,12 +912,12 @@ measurementPanel.scrollIntoView({ block: "nearest" });   // 立即读布局
 
 ---
 
-## §7 量化验证方案（**尚未执行**）
+## §7 量化验证方案（**✅ 已执行** —— C0，2026-09-17）
 
 `tests/lab_wigner_layout_probe.mjs:40-80` 已有可直接复用的零依赖骨架：
 Node ≥22 原生 `fetch` + `WebSocket`、headless Edge（
 `C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`）、CDP `send()` /
-`evalJs()`。建议新增 `tests/lab_render_perf_probe.mjs`：
+`evalJs()`。已按此骨架新增 **`tests/lab_render_perf_probe.mjs`**：
 
 1. `Performance.enable` + `Performance.getMetrics`，读 `LayoutCount` /
    `RecalcStyleCount` / `LayoutDuration` / `RecalcStyleDuration`；
@@ -858,16 +926,81 @@ Node ≥22 原生 `fetch` + `WebSocket`、headless Edge（
 3. 断言：修复后 `LayoutCount` 增量显著低于基线（建议先跑基线，把**实测值**写回本文，
    替换 §1 的定性判断）。
 
-**注意**（诚实边界）: 本文未跑该 probe，因此 §2 的"频率 ~60–120/s"是事件模型推算
-（`input` / `dragover` 的浏览器派发速率），**不是实测**。§2 各条的"验证断言"是
-可直接写进 probe 的判据。
+### 复现命令
+
+```bash
+node tests/lab_render_perf_probe.mjs                          # 采集，打印 JSON，退出码 0
+node tests/lab_render_perf_probe.mjs --runs=3 --out=f.json    # 多次采样（报 min/max）
+node tests/lab_render_perf_probe.mjs --compare=baseline.json  # 与基线对拍
+```
+
+### 环境验证（C0.1，动手前先做）
+
+原计划的**最大不确定项**是 `Input.dispatchMouseEvent` 能否驱动 HTML5 DnD。
+**实测结论：可以**（`.scratch/c0-env-verify.mjs` 环境验证）：
+
+| 问题 | 实测 | 结论 |
+| --- | --- | --- |
+| 鼠标 press+move 能否触发 `dragstart`/`dragenter`/`dragover` | `dragstart 1`、`dragenter 7`、`dragover 2`，且**真的放下了一个门**（`ops.length` 3→放置成功） | ✅ 真实管线可用 |
+| `Input.dispatchDragEvent` 专用 API | `dragenter` +2（`dragover` +0） | ✅ 可用，但鼠标路径已足够 |
+| 真实输入能否驱动 range 滑条 `input` | `input` +6、`change` +1、value 1→1.7 | ✅ 可用 |
+
+故 **S1/S2/S3 全部走真实输入管线**（`isTrusted === true`），**无需**退到
+`evalJs` 合成事件 —— 报告里的数字是真实管线代价，不是"事件处理代价"。
+
+### 实测基线 vs 落地后（同机、同视口 1440×900、各 3 次采样）
+
+**基线**：`HEAD = 6ab2fe7` 但 `cvsim/lab/static/` 检出 `c583d78` 的版本
+（`staticDirty: true`，8 个文件）。**落地后**：`HEAD = 6ab2fe7` 全绿、
+`staticDirty: false`。探针会记录 `staticDirty` 字段，避免把数字归错 revision。
+
+| 场景 | 指标 | 基线 | 落地后 | 变化 |
+| --- | --- | ---: | ---: | ---: |
+| S1 cutoff 滑条（100 步） | `LayoutCount` | **93** | **64** | **−31.2%** |
+| | `RecalcStyleCount` | 97.7 | 70 | −28.3% |
+| | `LayoutDuration` | 0.0460 s | 0.0307 s | −33.2% |
+| | `RecalcStyleDuration` | 0.0340 s | 0.0173 s | −49.2% |
+| S2 参数滑条（100 步） | `LayoutCount` | **268** | **90** | **−66.4%** |
+| | `RecalcStyleCount` | 179.7 | 90 | −49.9% |
+| | `LayoutDuration` | 0.0754 s | 0.0187 s | −75.2% |
+| | `RecalcStyleDuration` | 0.0647 s | 0.0031 s | −95.2% |
+| S3 dragover（20 次） | `LayoutCount` | **14** | **13** | **−7.1%** |
+| | `RecalcStyleCount` | 31.0 | 26 | −16.1% |
+| | `LayoutDuration` | 0.0035 s | 0.0031 s | −10.2% |
+| | `RecalcStyleDuration` | 0.0048 s | 0.0038 s | −22.2% |
+
+**可复现性（AC2）**：`--runs=3` 三次采样的 `LayoutCount` **完全一致**
+（S1 64/64/64、S2 90/90/90、S3 13/13/13）；`RecalcStyleCount` 亦一致。
+只有 `*Duration` 有毫秒级抖动（如 S1 `LayoutDuration` 0.0279–0.0297 s），
+故报告里对多次采样同时给出 `_min` / `_max`，**不取最小值冒充**。
+
+**S3 为何只降 7%**：`dragover` 的 `LayoutCount` 本来就低（14 次事件只 14 次布局，
+约 0.7 次/事件）—— 因为浏览器对同一帧内的多次 `dragover` 会合并布局。
+C3 的实际收益是**每次事件少 1 次强制布局读**（`getBoundingClientRect` 2→1）
+与**消除全树查询**（1→0），这些在 `Performance` 计数上不如 S2 显眼。
+S3 的核心证据是探针计数器（见 §2.4），不是这张表。
+
+**S2 为何降幅最大**（−66% 布局 / −95% 样式重算）：确认了 §2.2 的判断 ——
+参数滑条每次都经 `onState` 触发 `refreshScanNodes` + `fitWignerFrame` 强制布局。
+这是三条路径里最贵的一条，也是本次收益最大的修复。
+
+**诚实边界**：
+- "频率 ~60–120/s"仍是事件模型推算（本次测的是**每 N 次事件的累计代价**，
+  不是事件速率本身）；
+- 这是**同机同视口**的相对对拍，不是跨机绝对性能；
+- S3 的收益主要体现为强制布局次数（§2.4 探针计数器），本表不足以体现；
+- 未做 flame chart / CPU profile（父任务 Out of Scope）。
 
 ---
 
 ## §8 未覆盖 / 未验证
 
-- **未做浏览器 profile**：无 flame chart、无 `Performance` 域计数、无 React-DevTools
-  类渲染耗时归因。所有代价排序基于 DOM 操作数 × 事件频率的推理。
+- **未做浏览器 profile（flame chart / CPU profile）**：无 flame chart、无 React-DevTools
+  类渲染耗时归因。~~无 `Performance` 域计数~~ —— **✅ C0 已补上 `Performance` 域计数**
+  （`LayoutCount` / `RecalcStyleCount` / `LayoutDuration` / `RecalcStyleDuration`，
+  见 §7）。**仍未做** flame chart 与 CPU profile：§7 的计数能回答"多少次布局"，
+  不能回答"时间花在哪一行"。原始代价排序基于 DOM 操作数 × 事件频率的推理，
+  现已用 §7 的实测数字校准（S2 降幅最大，与推理一致）。
 - **未验证 `ResizeObserver` 循环告警**：`wignerBox` 的 RO（`app.js:216`）回调写
   frame 尺寸，理论上可能改变 `wignerBox` 的 border-box 触发再入
   （"ResizeObserver loop completed with undelivered notifications"）。
