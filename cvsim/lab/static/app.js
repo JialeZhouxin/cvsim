@@ -43,6 +43,12 @@ const wignerColorbar = document.querySelector(".wigner__colorbar");
    nmode 1→2 侧列 155 → 186.34 时 frame 恒定 354.06 而列宽只有 322.72，与 colorbar
    重叠 3224px²。两种都不会被 .wigner 自身的 ResizeObserver 救回（它的 border-box
    没变，变的是内部 1fr 轨道宽度）。 */
+
+/* C1 R5: 断点查询是**常量**——viewport 宽度在一次查询里不会变，故只建一次。
+   原先每次 fit 都调 matchMedia（每次分配新 MediaQueryList 对象）；滑条路径上
+   fit 每步都跑，实测 4 次 input = 4 次 matchMedia。 */
+const WIDE_QUERY = window.matchMedia("(min-width: 80rem)");
+
 function fitWignerFrame() {
   if (!wignerBox || !wignerFrame || !wignerColorbar) return;
   const gap = parseFloat(getComputedStyle(wignerBox).gap || "16");
@@ -50,7 +56,7 @@ function fitWignerFrame() {
     - wignerBox.getBoundingClientRect().left - gap;
   const h = wignerBox.clientHeight;
   /* 单列（<80rem）页面流：高度无约束 → 画布 = 列宽；三列：min(宽, 高) */
-  const s = window.matchMedia("(min-width: 80rem)").matches
+  const s = WIDE_QUERY.matches
     ? Math.max(64, Math.min(availW, h))
     : Math.max(64, availW);
   wignerFrame.style.width = s + "px";
@@ -439,9 +445,17 @@ const BACKEND_PANELS = {
   bosonic: { "scan-panel": false, "state-grid": false, "fock-panel": false, "fock-charts": false, "bosonic-panel": true, "meters-panel": true, "wigner-side": true },
 };
 
+/* C1 R3: 后端未变则面板可见性不可能变，故早退——但首次调用必须放行。
+   调用点有两个：hooks.onState（每次 render 都跑）与 init() 首次同步。
+   首屏时 lastPanelsBackend 还是 null（没有前值可比），故首次必然放行；
+   若改成只看「与 state.backend 是否相同」，首屏面板就不会显隐。 */
+let lastPanelsBackend = null;
+
 function syncBackendPanels(backend) {
   const panels = BACKEND_PANELS[backend];
   if (!panels) return; // 未知 backend：保持现状（schema 门已拦，防御不摸 DOM）
+  if (backend === lastPanelsBackend) return; // 后端未变 → hidden 已是目标态
+  lastPanelsBackend = backend;
   for (const [id, visible] of Object.entries(panels)) $(id).hidden = !visible;
   fitWignerFrame(); // side 显隐变化 → 重算正方形画布
 }
@@ -526,7 +540,27 @@ function scheduleRun(circuitJson) {
 }
 
 /* ── scan panel (L4, F-LAB-SCAN) ──────────────────────── */
+/* C1 R2: 脏键 = 「可 sweep 节点身份集合」+ nmode，**不是 nodes 数组引用**。
+   引用比较不可能命中：onParam 用 state.nodes.map(...) 重构数组，map 无论元素
+   是否变化都返回新数组，故每次滑条事件都是新引用 → 永不早退（实测：代码看似
+   改了、行为完全没变）。这里只取列表真正依赖的东西——哪些节点可 sweep 即
+   其 (id, op)，参数**值**不进列表。故拖滑条（id/op 不变）命中早退，
+   增删节点 / 改 op / 增删模（都在键里）则重建。 */
+let lastScanKey = null;
+
+function scanNodeListKey() {
+  const st = editor.getState();
+  const sig = st.nodes
+    .filter((n) => Object.values(OPS[n.op]?.params || {}).some((d) => Array.isArray(d.sweep)))
+    .map((n) => `${n.id}:${n.op}`)
+    .join(",");
+  return `${st.nmode}|${sig}`;
+}
+
 function refreshScanNodes() {
+  const key = scanNodeListKey();
+  if (key === lastScanKey) return; // 列表输入未变 → <option> 已是目标态
+  lastScanKey = key;
   const nodes = editor.getState().nodes.filter((n) =>
     Object.values(OPS[n.op]?.params || {}).some((d) => Array.isArray(d.sweep)));
   const prev = scanNode.value;

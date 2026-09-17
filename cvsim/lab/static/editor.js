@@ -400,15 +400,23 @@ export function initEditor(root, hooks) {
     suppress = false;
   }
 
-  function render() {
-    staff.render();
-    renderPalette();
+  /** 非 staff / 非 palette 的副作用集合：JSON 文本、fock 控件、onState 钩子、
+      undo/redo 按钮态、debounced emit。`render()` 与滑条/视图的轻量路径共用它，
+      故「轻量路径漏了某个副作用」在结构上不可能发生——新增副作用只需改这一处。
+      注意 undo/redo 的 disabled 也在这里（lab_undo_probe.mjs 直接断言该状态）。 */
+  function syncChrome() {
     renderJson();
     renderFockControls();
     hooks.onState(state);
     if (dom.undoBtn) dom.undoBtn.disabled = !hist.canUndo();
     if (dom.redoBtn) dom.redoBtn.disabled = !hist.canRedo();
     if (!suppressEmit) emit(toV1Json(state));
+  }
+
+  function render() {
+    staff.render();
+    renderPalette();
+    syncChrome();
   }
 
   const staff = initStaff(dom.staff, {
@@ -502,7 +510,15 @@ export function initEditor(root, hooks) {
     ["channel", "通道"],
     ["measure", "测量"],
   ];
+  /* C1 R6: 托盘内容只由 backend 决定（opsForBackend(state.backend)），故后端未变
+     则重建是纯浪费——实测 setView / cutoff 滑条路径上托盘每次都被整个重建。
+     键写成 dataset 而非闭包变量：托盘 DOM 与键同源，若外部换掉 #palette 内容，
+     键不会撒谎。**不是裸早退**：与 renderFockControls 的同名先例（editor.js
+     `initialInputs.dataset.nmode`）一样，先确认没有需要补的副作用才发现可以退。
+     这里托盘是无状态纯列表（无输入框、无焦点值），故无需补写——已逐项确认。 */
   function renderPalette() {
+    if (dom.palette.dataset.backend === state.backend) return;
+    dom.palette.dataset.backend = state.backend;
     dom.palette.replaceChildren();
     for (const [gid, title] of PALETTE_GROUPS) {
       const ops = opsForBackend(state.backend).filter((op) => opGroup(op) === gid);
@@ -598,9 +614,9 @@ export function initEditor(root, hooks) {
     next[i] = v;
     pushHistory();
     state = { ...state, initial: next };
-    renderJson();
-    hooks.onState(state);
-    emit(toV1Json(state));
+    // 初始态也进模行标签（`mode m · |v⟩`），故同样定点补标签而非重建 staff
+    if (!staff.syncLabels()) render();
+    else syncChrome();
   }
 
   /* B6: bosonic 初始态 = 每模 GKP 源选择（真空/gkp0/gkp1/2d；选项表在 initial.js） */
@@ -743,14 +759,23 @@ export function initEditor(root, hooks) {
   return {
     getState: () => state,
     setView: (patch) => {
+      // 只影响 view（wigner_mode / joint_modes / lim / n）：staff 几何与托盘与
+      // view 无关，故跳过两次全量重建——只走 syncChrome（其中 renderFockControls
+      // 会同步 joint 选择与数字输入，故 joint_modes 也在这条路径上正确落地）。
       state = { ...state, view: { ...state.view, ...patch } };
-      render(); // syncs JSON textarea + staff + emits debounced run
+      syncChrome();
     },
     setCircuit: (patch) => {
-      // F7: cutoff/initial patches from the Fock guard panel
+      // F7: cutoff/initial patches from the Fock guard panel.
+      // 这条路径只改 cutoffs / initial，不改 nodes/nmode → staff 树无需重建；
+      // 但 modeLabel 内嵌 initial 的光子数（clampInitial 把 initial 夹到
+      // cutoff-1），故标签必须定点补写，否则屏幕停在旧值。
       pushHistory();
       state = { ...state, ...patch };
-      render();
+      // 防御：patch 若触及结构键，轻量路径不再成立（门几何 / 托盘都可能变）
+      const structural = "nodes" in patch || "nmode" in patch || "backend" in patch;
+      if (structural || !staff.syncLabels()) render(); // 结构变了 → 完整重建
+      else syncChrome();
     },
     setState: (next) => {
       // Load success: replace whole state, freeze, re-render (auto-run via emit)

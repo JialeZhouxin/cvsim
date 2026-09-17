@@ -384,5 +384,22 @@ export function initStaff(root, api) {
     closeCard();
   });
 
-  return { render, isPlacing: () => placing !== null, setDragPayload };
+  /** 轻量标签同步：只改模行标签文本，不重建 staff 树、不动 DOM 结构。
+      fock 下 modeLabel 把 state.initial 的光子数渲进标签（`mode m · |n⟩`），
+      而 clampInitial 会把 initial 夹到 cutoff-1 —— 故拖 cutoff / 改初始态这条
+      路径**必须**补标签，否则屏幕停在旧值。
+      行数不符 = 结构已变（增删模），返回 false 让调用方走完整 render()。 */
+  function syncLabels() {
+    const { rows } = staffLayout(api.getState());
+    const labels = root.querySelectorAll(".staff__row .staff__mode-label");
+    if (labels.length !== rows.length) return false;
+    for (let i = 0; i < rows.length; i++) {
+      const row = labels[i].closest(".staff__row");
+      if (!row || row.dataset.mode !== String(rows[i].mode)) return false;
+      if (labels[i].textContent !== rows[i].label) labels[i].textContent = rows[i].label;
+    }
+    return true;
+  }
+
+  return { render, syncLabels, isPlacing: () => placing !== null, setDragPayload };
 }
