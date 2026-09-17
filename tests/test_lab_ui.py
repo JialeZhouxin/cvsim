@@ -127,6 +127,132 @@ def test_lut_clamp_guard():
     assert 'from "./colormap.js"' in js
 
 
+def test_wigner_frame_fit_contract():
+    """Wigner frame sizing contract (regression lock).
+
+    `fitWignerFrame()` used `wignerColorbar.offsetLeft`, whose reference frame is
+    the element's offsetParent — BODY here, because `.wigner` is not positioned.
+    The measured width therefore included the whole page's left offset, so the
+    frame was sized far wider than its own grid column and covered the colourbar
+    and the parameter side panel.
+
+    Two invariants, both cheap greps (the geometric half lives in
+    tests/lab_wigner_layout_probe.mjs, which needs uvicorn + Edge):
+      1. the width must come from a getBoundingClientRect() difference;
+      2. it must be measured from `.wigner`, not from the page.
+    """
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    fit = js.split("function fitWignerFrame()", 1)
+    assert len(fit) == 2, "fitWignerFrame() not found in app.js"
+    body = fit[1].split("\n}\n", 1)[0]
+    assert "offsetLeft" not in body, (
+        "fitWignerFrame must not use offsetLeft: its reference frame is the "
+        "offsetParent (BODY), not .wigner — use getBoundingClientRect() deltas"
+    )
+    assert "wignerColorbar.getBoundingClientRect().left" in body
+    assert "wignerBox.getBoundingClientRect().left" in body
+
+
+def test_wigner_fit_runs_after_colorbar_labels():
+    """Call-site contract (a): colourbar tick labels decide the colourbar column
+    width (an `auto` grid track), so `fitWignerFrame()` must run after the labels
+    are written inside `drawHeatmap` and before the canvas pixel size is read.
+
+    With the wrong order the frame is sized from the *previous* circuit's labels:
+    measured slack went to 0 / -6 / -12 / -18px as labels widened, i.e. the frame
+    ate the 12px gap and overlapped the colourbar. The page's ResizeObserver
+    self-heals this a frame later, so a purely geometric probe cannot catch it —
+    hence this source-order assertion."""
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    draw = js.split("function drawHeatmap(W)", 1)
+    assert len(draw) == 2, "drawHeatmap() not found in app.js"
+    body = draw[1]
+    i_labels = body.find('$("colorbar-min").textContent')
+    i_fit = body.find("fitWignerFrame()")
+    i_canvas = body.find("canvas.clientWidth")
+    assert i_labels != -1 and i_fit != -1 and i_canvas != -1, (
+        "drawHeatmap must write colourbar labels, call fitWignerFrame(), and size "
+        "the canvas from canvas.clientWidth"
+    )
+    assert i_labels < i_fit < i_canvas, (
+        f"fitWignerFrame() must sit between the colourbar label writes and the "
+        f"canvas sizing (labels@{i_labels} fit@{i_fit} canvas@{i_canvas})"
+    )
+
+
+def test_wigner_fit_runs_after_side_panel_render():
+    """Call-site contract (b): the side panel (meters / r̄ table) is the other
+    input to `availW` — nmode 1→2 widens it 155 → 186.34px at 1440, shrinking
+    availW by 31.34px. `render()` must therefore fit the frame *after* the last
+    call that touches those tables.
+
+    Measured with the fit hoisted too early: frame stayed 354.06px while the
+    column was already 322.72px → 3224px² of colourbar overlap, and `.wigner`'s own
+    ResizeObserver never fired because its border-box is unchanged (only the inner
+    `1fr` track narrows). That makes this stale state permanent, not self-healing."""
+    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
+    body = js.split("function render(result, mode)", 1)
+    assert len(body) == 2, "render() not found in app.js"
+    # scope to the render() body only — other functions also call fitWignerFrame()
+    body = body[1].split("/** Shared Wigner draw", 1)[0]
+    # gaussian path: the fits inside the fock/bosonic branches come earlier in the
+    # source, so anchor on the gaussian path's own trailing render call.
+    i_mode = body.find("renderModeSelect(nm, mode);")
+    assert i_mode != -1, "render() must call renderModeSelect(nm, mode)"
+    gaussian_tail = body[i_mode:]
+    assert "fitWignerFrame();" in gaussian_tail, (
+        "render() must fit the frame after the gaussian path's last render call "
+        "(renderModeSelect), because that path renders the side panel"
+    )
+    # every backend path must reach a fit: 3 render paths, one fit each
+    assert body.count("fitWignerFrame();") == 3, (
+        "each render path (gaussian / bosonic / fock) must fit the frame; "
+        f"found {body.count('fitWignerFrame();')}"
+    )
+
+
+def test_wigner_side_column_is_width_capped():
+    """The third `.wigner` track is `auto` (content-sized), so the side column's
+    width is subtracted from the `1fr` frame track. The "各模式 ⟨n⟩" meter prints
+    one 4-decimal group per mode, so without a cap the column grows with nmode and
+    crushes the frame: at 1440 folded, nmode 4 → side 350.4 / frame 158.7;
+    nmode 8 → side 509.1 / frame 64, where 64 is the `max(64, …)` floor, so the
+    frame covered the colourbar by 2304px² and `.result` overflowed (774/727).
+
+    The cap must be `max-width` on the item, *not* `minmax(0, 12rem)` on the track:
+    once `.wigner__side` is a scroll container a `minmax` max pins the track to
+    12rem even when the content is narrow — measured on fock, whose narrow side
+    content kept occupying 192px and pushed the frame back into the 64px clamp."""
+    css = (STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    side = css.split(".wigner__side {", 1)
+    assert len(side) == 2, ".wigner__side rule not found in style.css"
+    block = side[1].split("}", 1)[0]
+    assert "max-width:" in block, (
+        ".wigner__side needs a max-width cap — without it the auto track sizes to "
+        "the 各模式 ⟨n⟩ value and crushes the 1fr Wigner frame track"
+    )
+    assert "overflow-y: auto" in block, (
+        ".wigner__side needs overflow-y: auto: the capped value wraps to more lines "
+        "as nmode grows (2/4/8 → 1/4/8 lines), and the overflow would otherwise "
+        "inflate the .wigner row and push .result past its column (measured 834/727)"
+    )
+    # strip comments first: the rules' own comments name the rejected alternatives
+    import re
+    decls = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    wigner = decls.split(".wigner {", 1)[1].split("}", 1)[0]
+    assert "minmax(0, 12rem)" not in wigner, (
+        "cap the side item with max-width, not the grid track: a minmax max pins "
+        "the track to 12rem even for narrow content (fock), re-crushing the frame"
+    )
+    # `overflow-wrap` is the tempting-but-wrong fix: it changes min-content, not
+    # max-content, and the value already breaks at its spaces
+    meter = decls.split(".meter__value {", 1)[1].split("}", 1)[0]
+    assert "overflow-wrap" not in meter, (
+        "overflow-wrap on .meter__value does not cap the auto track — measured "
+        "byte-identical geometry at every nmode; the cap is what fixes it"
+    )
+
+
 def test_default_scene_runs():
     """The exact scene shipped in app.js must be a valid circuit (A9-adjacent)."""
     payload = load_default_scene()

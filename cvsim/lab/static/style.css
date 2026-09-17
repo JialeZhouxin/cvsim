@@ -311,6 +311,17 @@ body {
   flex: 1;
   min-height: 0;
   display: grid;
+  /* 第三列（参数侧列）必须有宽度上限：auto 轨道按内容 max-content 定尺寸，
+     而「各模式 ⟨n⟩」的值串随 nmode 线性变长，会把 1fr 热图轨道一路挤到 0。
+     实测 1440 折叠默认视图：nmode 2 → 侧列 186.3 / 热图 322.7；nmode 4 → 350.4 / 158.7；
+     nmode 8 → 509.1 / 64，且 64 是 max(64, …) 钳位下限，frame 因此盖住 colorbar
+     2304px²，同时 result 列 774/727 触发 scan_probe 守卫。
+     只给 .meter__value 加 overflow-wrap 无效——它改 min-content，不改 max-content，
+     值本就在空格处换行，缺的是「允许换行」的宽度上限（实测逐位相同）。
+     上限加在 .wigner__side 的 max-width 上，不写成 minmax(0, 12rem) 轨道：
+     侧列一旦 overflow-y 变滚动容器，轨道会被钉到 max（实测 fock 侧列内容很窄
+     时仍占 192px，把热图挤到 64px 钳位并盖住 colorbar）；max-width 只封顶、
+     内容窄时仍让轨道收缩。 */
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-md);
@@ -335,6 +346,14 @@ body {
   gap: var(--space-md);
   min-width: 0;
   align-self: stretch;
+  /* 12rem 上限：值串在空格处换行需要「允许换行」的宽度上限，否则 auto 轨道按
+     max-content 长到 509px 把热图挤没（见 .wigner 的注释）。用 max-width 而非
+     minmax 轨道，内容窄时（fock）仍可收缩。 */
+  max-width: 12rem;
+  /* 12rem 上限下「各模式 ⟨n⟩」行数随 nmode 增长（n=2/4/8 → 1/4/8 行），侧列内容
+     会高于热图行高。侧列自己竖滚，把高度留在列内——否则溢出的行会撑高整个
+     .wigner 行，把 result 推过列高触发 scan_probe 守卫（实测 834/727）。 */
+  overflow-y: auto;
 }
 
 .wigner__plot {
@@ -1045,15 +1064,19 @@ body {
   padding: var(--space-md);
 }
 
-/* Bosonic 两列：Wigner 大图（左）+ 结果面板（右） */
+/* Bosonic 单列堆叠：Wigner → bosonic 结果面板 → measurement。
+   曾为两列（"wigner bosonic"），但 24rem 的结果面板 + colorbar 列 + 参数侧列把
+   Wigner 的可用宽挤到 0，frame 被 max(64, …) 钳位后与 colorbar 重叠（实测 1440/1280）。
+   单列后 Wigner 独占整列宽，无重叠；窄屏收益更大（<80rem 由两列 286px → 686px）。 */
 .result:has(#bosonic-panel:not([hidden])) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 24rem);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto;
   grid-template-areas:
-    "head head"
-    "wigner bosonic"
-    "meas meas";
+    "head"
+    "wigner"
+    "bosonic"
+    "meas";
   gap: var(--space-lg);
 }
 
