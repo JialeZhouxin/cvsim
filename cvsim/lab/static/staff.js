@@ -51,9 +51,61 @@ export function initStaff(root, api) {
   let dragPayload = null; // {kind:'op',op} | {kind:'move',id} — set on dragstart
                           // (dataTransfer.getData is empty during dragover in
                           // real browsers; read the closure instead)
+  /* C3 R3: 上一次高亮的轨道。替代 `dragover` 里 `querySelectorAll` 全树查询
+     （实测每次 dragover 1 次 querySelectorAll）。**耦合警告**：`render()` 会
+     `root.replaceChildren()`，使本引用变为游离节点；故 `clearHover()` 必须把它
+     置空，而 `render()` 开头已调 `clearHover()` —— 单点清理，三处调用方
+     （render / dragleave / drop）自动都覆盖。 */
+  let prevLane = null;
+
+  /* C3 R1: 拖拽几何缓存。实测 dragover 每次读 2 次 getBoundingClientRect
+     （root 一次取滚动带与坐标原点、grid 一次取列原点）。
+     这里缓存 **grid 相对 root 内容区的偏移**（不含滚动）：
+       gridOffsetLeft = gridRect.left - rootRect.left + root.scrollLeft
+     该值等于"grid 在 root 可滚动内容里的偏移"，与 root 的滚动位置、窗口滚动、
+     以及 root 的视口位置**都无关**，故拖拽中滚动**无需失效**
+     （公式里每次都重新减去当前 root.scrollLeft，自动补偿）。
+     仅在 dragstart 算一次；`render()` 会重建 grid 节点，但拖拽期间不 render
+     （R5 已确认），故缓存生命周期 = 一次拖拽。 */
+  let geom = null;
+
+  function cacheGeom() {
+    geom = null;
+    const grid = root.querySelector(".staff__grid");
+    if (!grid) return;
+    const rr = root.getBoundingClientRect();
+    const gr = grid.getBoundingClientRect();
+    geom = {
+      gridOffsetLeft: gr.left - rr.left + root.scrollLeft,
+      gridOffsetTop: gr.top - rr.top + root.scrollTop,
+    };
+  }
+
+  /* C3 R2: 自动滚动进 rAF（一帧最多滚一次）。实测 dragover 的频率是事件级
+     （可达 60–120/s），而每次滚动都写 scrollTop = 一次布局失效。 */
+  let scrollRaf = 0;
+  let scrollDir = 0;
+
+  function scheduleAutoScroll(dir) {
+    scrollDir = dir;
+    if (scrollRaf) return;
+    scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = 0;
+      if (scrollDir) root.scrollTop += scrollDir;
+    });
+  }
+
+  function clearAutoScroll() {
+    if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = 0; }
+    scrollDir = 0;
+  }
 
   function setDragPayload(p) {
     dragPayload = p;
+    /* 单点：两个 dragstart（staff 内 gate 拖动 / editor 的托盘卡片）都经此处，
+       故几何缓存的失效与建立都在这里，不会漏。 */
+    if (p) cacheGeom();
+    else geom = null;
   }
 
   function parseDrag(e) {
@@ -68,9 +120,12 @@ export function initStaff(root, api) {
   function clearHover() {
     hover = null;
     if (ghostEl) { ghostEl.remove(); ghostEl = null; }
-    root.querySelectorAll(".staff__lane--hover, .staff__lane--conflict").forEach((el) => {
-      el.classList.remove("staff__lane--hover", "staff__lane--conflict");
-    });
+    clearAutoScroll();
+    /* 单点清理 prevLane —— 见其声明处的耦合说明 */
+    if (prevLane) {
+      prevLane.classList.remove("staff__lane--hover", "staff__lane--conflict");
+      prevLane = null;
+    }
   }
 
   function render() {
@@ -158,11 +213,12 @@ export function initStaff(root, api) {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.dropEffect = "move";
         el.classList.add("is-dragging");
-        dragPayload = { kind: "move", id: g.node.id };
+        /* 经 setDragPayload 单点：顺带建立几何缓存（C3 R1） */
+        setDragPayload({ kind: "move", id: g.node.id });
       });
       el.addEventListener("dragend", () => {
         el.classList.remove("is-dragging");
-        dragPayload = null;
+        setDragPayload(null); // 顺带清几何缓存 + 取消挂起的自动滚动
         api.onDragEnd?.();
       });
       gatesEl.appendChild(el);
@@ -185,14 +241,22 @@ export function initStaff(root, api) {
     grid.addEventListener("dragover", (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === "move" ? "move" : "copy";
-      /* 拖到 staff 上/下边缘自动滚动（Fitts's Law：远目标可达） */
+      /* C3 R1: 只有这一次 getBoundingClientRect（root）。grid 的视口左边界由
+         缓存的偏移 + 当前的 root 位置/滚动量推出：
+           gridRect.left = rr.left - root.scrollLeft + geom.gridOffsetLeft
+         故拖拽中即便自动滚动了，坐标依然正确（公式里每次都重新减去当前
+         scrollLeft），无需让缓存失效。 */
       const rr = root.getBoundingClientRect();
-      if (e.clientY < rr.top + 56) root.scrollTop -= 14;
-      else if (e.clientY > rr.bottom - 56) root.scrollTop += 14;
+      const gridLeft = geom
+        ? rr.left - root.scrollLeft + geom.gridOffsetLeft
+        : grid.getBoundingClientRect().left;
+      /* 拖到 staff 上/下边缘自动滚动（Fitts's Law：远目标可达） */
+      if (e.clientY < rr.top + 56) scheduleAutoScroll(-14);
+      else if (e.clientY > rr.bottom - 56) scheduleAutoScroll(14);
+      else clearAutoScroll();
       const rowEl = e.target.closest(".staff__row");
       if (!rowEl) return;
-      const gridRect = grid.getBoundingClientRect();
-      const x = Math.max(0, Math.round((e.clientX - gridRect.left - MODE_W) / GATE_W));
+      const x = Math.max(0, Math.round((e.clientX - gridLeft - MODE_W) / GATE_W));
       const mode = Number(rowEl.dataset.mode);
       const drag = parseDrag(e);
       let op = null, moveId = null;
@@ -211,12 +275,16 @@ export function initStaff(root, api) {
         conflict = cellOccupied(nodes, mode, x);
       }
       const lane = rowEl.querySelector(".staff__lane");
-      root.querySelectorAll(".staff__lane--hover, .staff__lane--conflict").forEach((el) => {
-        el.classList.remove("staff__lane--hover", "staff__lane--conflict");
-      });
+      /* C3 R3: 只清上一次高亮的那条轨道（原为 querySelectorAll 全树查询） */
+      if (prevLane && prevLane !== lane) {
+        prevLane.classList.remove("staff__lane--hover", "staff__lane--conflict");
+        prevLane = null;
+      }
       const show = (moveId || op);
       if (!show) { clearHover(); return; }
-      lane.classList.add(conflict ? "staff__lane--conflict" : "staff__lane--hover");
+      lane.classList.toggle("staff__lane--conflict", conflict);
+      lane.classList.toggle("staff__lane--hover", !conflict);
+      prevLane = lane;
       hover = { mode, x, conflict };
       if (!ghostEl) {
         ghostEl = document.createElement("div");
@@ -225,8 +293,13 @@ export function initStaff(root, api) {
       }
       ghostEl.classList.toggle("gate--conflict", conflict);
       ghostEl.textContent = moveId ? "↔" : `${OPS[op].label} ?`;
-      ghostEl.style.left = `${MODE_W + x * GATE_W + 6}px`;   // centre on the cell
-      ghostEl.style.top = `${mode * ROW_H}px`;
+      /* C3 R4: ghost 位移走 transform（原写 left/top → 每帧两次样式失效 +
+         layout）。left/top 保持在 0，故 `.gate` 的 `margin-top: 6px` 仍照常
+         参与盒位置（transform 是绘制后位移，不影响 margin 参与的计算），
+         实测 rect 与改动前逐位一致。 */
+      ghostEl.style.left = "0";
+      ghostEl.style.top = "0";
+      ghostEl.style.transform = `translate(${MODE_W + x * GATE_W + 6}px, ${mode * ROW_H}px)`;
     });
     grid.addEventListener("dragleave", (e) => {
       if (!grid.contains(e.relatedTarget)) clearHover();
