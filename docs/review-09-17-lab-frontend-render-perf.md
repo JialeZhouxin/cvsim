@@ -76,7 +76,11 @@
 | §3.8 `renderPalette` 全量重建 | ✅ 已落地（C1） | C5 的 R3 应记为「已由 C1 承载」 |
 | §3.9 `setView` 全量 render | ✅ 已落地（C1） | 走 `syncChrome()` |
 | §3.10 joint 热图 rect | ✅ 已落地（C2） | WeakMap 按 SVG 分键；双向守卫 |
-| §4.1–§4.5 CSS / a11y / 杂项 | ⬜ 待做（C6） | — |
+| §4.1 `*` 滚动条改 `:root` | ❌ **实测否决（C6）** | 前提"两个属性都可继承"**只对一半**：`scrollbar-width` **不**继承 → 5/5 容器滚动条 12px→17px。保留 `*`，加**反向**断言守护 |
+| §4.2 `#staff` 的 `aria-live` | ✅ 已落地（C6） | 移除；`#status` 的 `role` + `aria-live` **两者保留**（唯一播报口） |
+| §4.3 `scrollIntoView` 进 rAF | ✅ 已落地（C6） | 两处都在 rAF 内；`lab_scan_probe` 守卫 |
+| §4.4 `init()` 串行 `await` | ✅ 已落地（C6） | `/health` 不再 await。**行为级 A/B**：CDP 扣住 `/health`，改动前 15s 不 boot，改动后 541ms boot |
+| §4.5 不加 `contain`/`content-visibility` | ✅ 已核验（C6） | 零命中；`container-type` 不算 |
 
 **与原判断不符的三处修正（最重要）**：
 
@@ -676,6 +680,31 @@ for (const c of cells) {
 这两个属性**都是可继承属性**，`*` 选择器让规则命中整棵 DOM 树（每次样式重算都要
 匹配全部元素）。改为 `:root` 即可，继承会自动下发到所有后代。
 
+> **❌ 已实测否决（C6 R1，2026-09-17）—— 本条的判断前提是错的。**
+> 上面这句「这两个属性**都是**可继承属性」**只对一半**。实测 Edge 153：
+> **`scrollbar-color` 可继承，`scrollbar-width` 不可继承** ——
+> `:root { scrollbar-width: thin }` 只让 `<html>` 算得 `thin`，
+> `<body>` 与全部后代回落 `auto`：
+>
+> ```
+> html → thin      body → auto      div → auto
+> div 的 scrollbar-color → oklch(...)  ← 这个继承了
+> ```
+>
+> **后果（同构 A/B + 真实页面 5 容器对拍）**：滚动条槽宽 **12px → 17px**，
+> 5/5 容器的 computed `scrollbar-width` 全变、4/5 的实际槽宽变宽。
+> 违反「改视觉即越界」，故**保留 `*`**。
+>
+> **这不是"待优化"，而是"不可优化"**：既然该属性不继承，除 `*`（或逐个列容器
+> 选择器，会漏掉将来新增的容器）外，没有写法能让每个滚动容器都拿到 `thin`。
+> 代价（`*` 命中整棵树）**必须接受**。
+>
+> 守卫方向已翻转：`test_scrollbar_rule_stays_universal_not_root` 断言 `*` 版
+> **必须存在**、`:root` 版**不得被重新引入**（与 §3.1 的 `container-type`
+> 反向断言同型）。
+> 证据：`.scratch/c6-ab.mjs`、`.scratch/c6-gutter-{before,after}.json`、
+> `.scratch/c6-sw-support.mjs`。
+
 ### §4.2 【P2-19】`aria-live="polite"` 挂在每编辑全量重建的 `#staff`
 
 **位置**: `index.html:59`
@@ -691,6 +720,12 @@ for (const c of cells) {
 
 **修法**: 从 `#staff` 移除 `aria-live`。
 
+> **✅ 已落地（C6 R2）**：`#staff` 去掉 `aria-live="polite"`，保留 `class="staff"`
+> 与 `aria-label="五线谱电路编辑区"`。`#status`（实测在 `index.html:224`，
+> 非本节的 `:219`）的 `role="status"` + `aria-live="polite"` **两者都保留**
+> —— 断言同时锁两个方向，防误删唯一播报口。
+> 守卫：`test_staff_is_not_a_live_region`（验证过改动前为红）。
+
 ### §4.3 【P2-20】`scrollIntoView` 紧跟 DOM 写入 → 强制 layout flush
 
 **位置**: `app.js:479`（`showMeasurement`）、`app.js:676`（`doScan` 成功回调）。
@@ -702,6 +737,13 @@ measurementPanel.scrollIntoView({ block: "nearest" });   // 立即读布局
 
 各一次/操作，频率低，但属同一类抖动。可放进 rAF。
 
+> **✅ 已落地（C6 R3）**：两处都包进 `requestAnimationFrame`。
+> **锚点更正**：实测两处在 `app.js:503`（`showMeasurement`）与 `app.js:720`
+> （`doScan` 的 `onOk`），非本节的 `:479` / `:676`。
+> 守卫：`test_scroll_into_view_runs_in_animation_frame`（断言恰好 2 处、
+> **都**在 rAF 内、无裸调用残留；验证过改动前为红）；
+> 行为守卫 `lab_scan_probe.mjs` + `lab_wigner_layout_probe.mjs` 全绿。
+
 ### §4.4 【P2-21】`init()` 串行 `await`
 
 **位置**: `app.js:795`（`fetch("/schema")`）与 `app.js:816`（`fetch("/health")`）。
@@ -710,11 +752,34 @@ measurementPanel.scrollIntoView({ block: "nearest" });   // 立即读布局
 `editor.render()`（`app.js:821`）多等一个 RTT。改 `Promise.all` 或让 `/health`
 后置不阻塞。
 
+> **✅ 已落地（C6 R4）**：采用"后置"方案 —— `/health` 改为
+> `void fetch(...).then(...)`，**不 await**；`/schema` 仍是唯一门控。
+> **行为级 A/B 验证**（不只是 grep）：用 CDP `Fetch` 域把 `/health`
+> **扣住不放行**，轮询页面是否已 boot：
+>
+> | | 结果 |
+> | --- | --- |
+> | 改动前 | `did NOT boot while /health held (within 15s)` |
+> | 改动后 | `BOOTED after 541ms with /health HELD`（调色板 3 组、run 按钮可用），页眉版本号在**放行后**才从 `"cvsim —"` 填成 `"cvsim 0.1.0 · circuit_v1"` |
+>
+> 这同时证明了两件事：`/health` **不再挡门**，且它**仍在跑**（版本号照填）。
+> 门控行为逐项未变（红条文案、6 个按钮 id、`schemaOk = true` 均由断言覆盖）。
+> 守卫：`test_health_does_not_gate_editor_boot`（验证过改动前为红）。
+> **诚实边界**：本地 `127.0.0.1` 上**不声称耗时改进**，收益表述为
+> "被扣住也能 boot"。
+
 ### §4.5 【P2-22】不要加 `contain` / `content-visibility`
 
 隐藏面板已经零布局成本：`[hidden] { display: none !important }`（`style.css:20-22`）
 + `.fold:not([open]) > * { display: none }`（`style.css:82-84`）。这条是**反向记录**：
 避免后续优化时误加 `contain` / `content-visibility` 引入新的容器/滚动副作用。
+
+> **✅ 已核验（C6 AC5）**：`grep -rn "content-visibility" cvsim/lab/static/` 与
+> `grep -rn "\bcontain:" cvsim/lab/static/` **均零命中**。
+> `container-type`（C4 引入的查询容器）**不算命中**。
+> 该约束另由 `test_wigner_frame_sizing_is_css_only` 的反向断言承载 ——
+> 这比文字 spec 更难绕过，故 C6 **未**把它落 `.trellis/spec/`（判断理由见
+> `.trellis/tasks/09-17-lab-css-a11y-misc/research/measurements.md` §6）。
 
 ---
 
