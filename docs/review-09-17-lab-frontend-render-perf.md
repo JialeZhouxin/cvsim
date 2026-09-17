@@ -5,7 +5,9 @@
 `colormap.js` `curve.js` `svg_kit.js` `steps_slider.js` `request.js` `schema_store.js`
 `initial.js` `ops_schema.js` `scan_form.js` `default_scene.js` `index.html` `tokens.css`）
 
-**基线**: `c583d78`（2026-09-15）
+**基线**: `c583d78`（2026-09-15）。审查时该状态下 Wigner frame 修复尚为**未提交的
+工作区改动**，现已经由 `d997fa4` 落盘；`docs` 提交 `ae3a1dc` 是当前 HEAD。
+本文所有 `file:line` 锚点对应**已提交的 `ae3a1dc`（工作区内容与审查时一致）**。
 **日期**: 2026-09-17
 **方法**: 静态代码审查（读-写交错、强制同步布局、重复计算、DOM 重建范围）
 **未做**: 未跑浏览器 profile、未跑 CDP `Performance` 域计数。本文所有结论是**源码级推理**，
