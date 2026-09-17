@@ -152,9 +152,13 @@ window.__snap = () => {
 };
 1`;
 
-/* Then wait until the layout stops moving. The size chain is .wigner →
-   fitWignerFrame → frame → (frame is a grid item of .wigner) → .wigner again, so a
-   single sample can land mid-convergence; require six identical consecutive reads. */
+/* Then wait until the layout stops moving. The size chain used to be .wigner →
+   fitWignerFrame → frame → (frame was a grid item of .wigner) → .wigner again, so a
+   single sample could land mid-convergence. Since C4 the frame is sized by CSS
+   (`.wigner__fit` query container), which converges in one pass, but the settle
+   loop is kept: the colourbar `auto` track still depends on the tick-label text
+   written after a run, so the geometry is not final on the first sample.
+   Require six identical consecutive reads. */
 async function waitStableGeom(ws) {
   return evalJs(ws, `(async () => {
     let last = null, same = 0;

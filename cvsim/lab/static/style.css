@@ -327,10 +327,33 @@ body {
   gap: var(--space-md);
 }
 
-.wigner__frame {
-  /* 正方形尺寸由 app.js fitWignerFrame 计算（min(可用宽, 可用高)），恒等比不溢出 */
+/* 查询容器包裹层：占 .wigner 的 1fr 轨道，为下方 frame 提供 cqw/cqh。
+   原实现是用 JS（fitWignerFrame）在解 CSS 循环依赖——frame 边长取决于 1fr 轨道宽，
+   而轨道宽又受 frame 内容挤压。这里用 size containment 断开「内容 → 轨道」的反馈：
+   包裹层是 size 容器，其内容不参与自身尺寸计算，故 cqw 就是轨道宽（实测与旧 JS
+   availW 逐位相等：1440 下 334.72 - 12(gap) = 322.72 = track0），
+   JS 端那个 `- gap` 无需在 CSS 里补偿。
+
+   窄屏（<80rem）分支：.wigner 在页面流里，高度由内容决定。若此处用 size 容器，
+   size containment 会让高度塌成 0（这正是原注释里「container-type 高度塌缩」的来源）
+   —— 窄屏只需宽度，故用 inline-size。 */
+.wigner__fit {
   min-width: 0;
   min-height: 0;
+  display: flex;
+  align-items: center; /* 宽屏下 frame 竖向居中，对齐原 grid align-items: center */
+  container-type: inline-size;
+}
+
+.wigner__frame {
+  /* 正方形边长 = 列可用宽：窄屏高度无约束，只受宽度约束（对齐原 JS 的窄屏分支） */
+  width: max(64px, 100cqw);
+  height: max(64px, 100cqw);
+  /* flex: none 不可省：frame 现在是包裹层的 flex item，默认 flex-shrink: 1 会在
+     「列宽 < 64px 钳位下限」时把它压到 57.25px（fock@1280 实测），使 max(64px,…)
+     的钳位失效。原实现是 grid item，固定 width 不会被压。钳位保持生效时 frame 会
+     溢出列宽少许（实测 6.75px）——与改动前一致，且 6.75 < 12px gap，不碰 colorbar。 */
+  flex: none;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-rule);
@@ -338,6 +361,20 @@ body {
   background: var(--color-paper-2);
   padding: var(--space-sm);
   position: relative;
+}
+
+@media (min-width: 80rem) {
+  .wigner__fit {
+    /* 三列布局：.wigner 高度确定（flex: 1 + 外壳 100dvh），align-self: stretch
+       让包裹层拿到行高，100cqh 才有意义（.wigner 是 align-items: center）。 */
+    align-self: stretch;
+    container-type: size;
+  }
+  .wigner__frame {
+    /* min(可用宽, 可用高) —— 与原 JS 的宽屏分支同式 */
+    width: max(64px, min(100cqw, 100cqh));
+    height: max(64px, min(100cqw, 100cqh));
+  }
 }
 
 .wigner__side {

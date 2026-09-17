@@ -78,12 +78,17 @@
       </div>
     </div>
     <div class="wigner">
-      <div class="wigner__frame">
-        <div class="wigner__plot">
-          <canvas id="wigner-canvas" width="64" height="64" role="img" aria-label="Wigner 函数热图">Wigner 热图（数值见 meters 与下方表格）</canvas>
-          <svg id="axis-svg" class="axis-svg" aria-hidden="true"></svg>
+      <!-- 查询容器包裹层：占 1fr 轨道，为下方 frame 提供 cqw/cqh。
+           它的宽度**就是** frame 的可用宽（实测与旧 JS availW 逐位相等），
+           故 CSS 能替代原 app.js fitWignerFrame 的 min(可用宽, 可用高) 计算。 -->
+      <div class="wigner__fit">
+        <div class="wigner__frame">
+          <div class="wigner__plot">
+            <canvas id="wigner-canvas" width="64" height="64" role="img" aria-label="Wigner 函数热图">Wigner 热图（数值见 meters 与下方表格）</canvas>
+            <svg id="axis-svg" class="axis-svg" aria-hidden="true"></svg>
+          </div>
+          <p id="wigner-note" class="hint" hidden>理想本征态，无有限 Wigner（不伪造数据）</p>
         </div>
-        <p id="wigner-note" class="hint" hidden>理想本征态，无有限 Wigner（不伪造数据）</p>
       </div>
       <div class="wigner__colorbar" aria-hidden="true"><span id="colorbar-max" class="mono">—</span><div class="wigner__colorbar-scale"><canvas id="colorbar-canvas" width="8" height="128"></canvas><span id="colorbar-zero" class="mono">0</span></div><span id="colorbar-min" class="mono">—</span></div>
       <div class="wigner__side" id="wigner-side">

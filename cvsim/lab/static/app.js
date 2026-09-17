@@ -23,45 +23,22 @@ const LUT = buildLut();
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("wigner-canvas");
-const wignerBox = document.querySelector(".wigner");
-const wignerFrame = document.querySelector(".wigner__frame");
-const wignerSide = $("wigner-side");
-const wignerColorbar = document.querySelector(".wigner__colorbar");
 
-/* frame 正方形 = min(可用宽, 可用高)：可用宽 = colorbar 左缘 - .wigner 左缘 - gap。
-   CSS 无原生解（aspect-ratio 遇双 definite 失效、container-type 高度塌缩）→ JS 算。
+/* frame 正方形 = min(可用宽, 可用高) —— 已由 CSS 承担（style.css 的 .wigner__fit
+   查询容器 + .wigner__frame 的 cqw/cqh），JS 不再测量、不再写 width/height。
 
-   陷阱：必须用 getBoundingClientRect() 的**同一坐标系差值**量宽度，禁用 offsetLeft。
-   .wigner__colorbar 的 offsetParent 是 BODY（.wigner 无 position），offsetLeft 含整页
-   左偏移，用它当「距 .wigner 的距离」会把 frame 撑到列外、盖住 colorbar 与参数表。
+   为什么删掉 JS：原 fitWignerFrame 是在用 JS 解一个 CSS 循环依赖——
+   frame 边长取决于 1fr 轨道宽，而轨道宽又受 frame 内容挤压。它带来两个必须靠
+   「调用点顺序」维持的不变量（标签宽度、侧列宽度都必须在 fit **之前**写完），
+   漏掉任一处 frame 就按旧输入定尺寸，且 .wigner 自身的 ResizeObserver 救不回来
+   （它的 border-box 没变，变的是内部 1fr 轨道宽）——实测过两种永久错位：
+   标签 0.5 → 0.00429 倒欠 24px；nmode 1→2 时 frame 恒定 354.06 而列宽 322.72，
+   与 colorbar 重叠 3224px²。
 
-   调用点契约：必须在所有会改 availW 的渲染**之后**调用。availW 有两个输入，都由
-   render 管线改写：
-    (1) colorbar 刻度标签宽度（auto 列）—— 在 drawHeatmap 内标签与画布像素之间调用；
-    (2) 侧列（meters / r̄ 表）宽度，随 nmode 变 —— 在 render() 末尾补一次。
-   漏掉任一处 frame 就按旧输入定尺寸：实测标签 0.5 → 0.00429 时倒欠 24px；
-   nmode 1→2 侧列 155 → 186.34 时 frame 恒定 354.06 而列宽只有 322.72，与 colorbar
-   重叠 3224px²。两种都不会被 .wigner 自身的 ResizeObserver 救回（它的 border-box
-   没变，变的是内部 1fr 轨道宽度）。 */
+   改用查询容器后，轨道宽由 CSS 自己解析，标签/侧列一变列宽即变，
+   整类「顺序错位」不复存在，3 个 fit 调用点契约测试也随之退役。
+   几何等价性由 tests/lab_wigner_layout_probe.mjs 的 5 条不变量守卫（未放宽）。 */
 
-/* C1 R5: 断点查询是**常量**——viewport 宽度在一次查询里不会变，故只建一次。
-   原先每次 fit 都调 matchMedia（每次分配新 MediaQueryList 对象）；滑条路径上
-   fit 每步都跑，实测 4 次 input = 4 次 matchMedia。 */
-const WIDE_QUERY = window.matchMedia("(min-width: 80rem)");
-
-function fitWignerFrame() {
-  if (!wignerBox || !wignerFrame || !wignerColorbar) return;
-  const gap = parseFloat(getComputedStyle(wignerBox).gap || "16");
-  const availW = wignerColorbar.getBoundingClientRect().left
-    - wignerBox.getBoundingClientRect().left - gap;
-  const h = wignerBox.clientHeight;
-  /* 单列（<80rem）页面流：高度无约束 → 画布 = 列宽；三列：min(宽, 高) */
-  const s = WIDE_QUERY.matches
-    ? Math.max(64, Math.min(availW, h))
-    : Math.max(64, availW);
-  wignerFrame.style.width = s + "px";
-  wignerFrame.style.height = s + "px";
-}
 const colorbar = $("colorbar-canvas");
 const statusEl = $("status");
 const runBtn = $("run-btn");
@@ -160,9 +137,6 @@ function drawHeatmap(W) {
   $("colorbar-max").textContent = axisVal(scale);
   $("colorbar-zero").textContent = "0";
   $("colorbar-min").textContent = axisVal(-scale);
-  /* 标签写完才 fit：标签宽度决定 colorbar 列宽，frame 的可用宽随之变（见 fitWignerFrame
-     调用点契约）。此处是唯一「标签刚定、画布像素未定」的窗口。 */
-  fitWignerFrame();
   /* 热图铺满 plot：宽高分别按 clientWidth/clientHeight × dpr（不再假设正方形） */
   const cw = Math.max(64, Math.round(canvas.clientWidth || 256));
   const ch = Math.max(64, Math.round(canvas.clientHeight || 256));
@@ -258,15 +232,6 @@ new ResizeObserver(() => {
   });
 }).observe(canvas);
 
-/* 容器尺寸变化（窗口/面板/fock 切换）→ 重算正方形画布 */
-new ResizeObserver(fitWignerFrame).observe(wignerBox);
-
-/* colorbar 列宽由刻度标签内容决定（auto 列），侧列宽由 meters/r̄ 表决定：两者都是
-   availW 的输入，字体延迟加载/标签变长/nmode 变化都会改它们。drawHeatmap 内与
-   render() 末尾的显式 fit 覆盖绘制与渲染路径，此处兜底其余时机（如字体加载完成）。 */
-new ResizeObserver(fitWignerFrame).observe(wignerColorbar);
-if (wignerSide) new ResizeObserver(fitWignerFrame).observe(wignerSide);
-
 /* R6 (ADR-0008 决策 3): meter 行标签 — 值消费者 (meter VALUE 读取口) 与
    渲染顺序的唯一前端声明处；键集来自 /schema meter 矩阵
    (schema_store.meterKeys，后端事实源 cvsim/lab/result.py)。 */
@@ -303,12 +268,10 @@ function render(result, mode) {
   scanSummary.textContent = "";
   if (result.backend === "fock") {
     renderFock(result, mode);
-    fitWignerFrame(); // 见 fitWignerFrame 调用点契约：所有会改 availW 的渲染之后
     return;
   }
   if (result.backend === "bosonic") {
     renderBosonic(result, mode);
-    fitWignerFrame();
     return;
   }
   drawWignerResult(result);
@@ -325,9 +288,6 @@ function render(result, mode) {
   renderMatrix($("v-table"), nm * 2, nm * 2, modeHead, (r, c) => fmt(result.V[r][c]));
 
   renderModeSelect(nm, mode);
-  /* 侧列宽度（meters / r̄ 表的行标签）由 nmode 决定，是 availW 的输入；上面的 render*
-     都会改它。放最后 → frame 与最终列宽一致。 */
-  fitWignerFrame();
 }
 
 /** Shared Wigner draw (gaussian + fock paths). */
@@ -508,7 +468,6 @@ function syncBackendPanels(backend) {
   if (backend === lastPanelsBackend) return; // 后端未变 → hidden 已是目标态
   lastPanelsBackend = backend;
   for (const [id, visible] of Object.entries(panels)) $(id).hidden = !visible;
-  fitWignerFrame(); // side 显隐变化 → 重算正方形画布
 }
 
 /* ── run pipeline: debounce (120ms) + seq guard ────────── */

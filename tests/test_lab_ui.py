@@ -127,87 +127,76 @@ def test_lut_clamp_guard():
     assert 'from "./colormap.js"' in js
 
 
-def test_wigner_frame_fit_contract():
-    """Wigner frame sizing contract (regression lock).
+def test_wigner_frame_sizing_is_css_only():
+    """C4: the Wigner frame square is sized by CSS, not JS.
 
-    `fitWignerFrame()` used `wignerColorbar.offsetLeft`, whose reference frame is
-    the element's offsetParent — BODY here, because `.wigner` is not positioned.
-    The measured width therefore included the whole page's left offset, so the
-    frame was sized far wider than its own grid column and covered the colourbar
-    and the parameter side panel.
+    `fitWignerFrame()` was JS solving a CSS circular dependency: the frame's edge is
+    `min(available width, available height)`, and the available width is the `1fr`
+    track, whose width depends on the colourbar (`auto`) and side (`auto`) tracks —
+    which are themselves content-sized. Keeping that in JS required two call-site
+    ordering invariants (labels written before the fit; side panel rendered before
+    the fit), each guarded by its own source-order test. Measured permanent
+    mis-sizes when the order slipped: labels 0.5 → 0.00429 left the frame 24px
+    short; nmode 1→2 kept the frame at 354.06 while the column was 322.72, a
+    3224px² colourbar overlap that `.wigner`'s own ResizeObserver never repaired
+    (its border-box is unchanged — only the inner `1fr` track narrows).
 
-    Two invariants, both cheap greps (the geometric half lives in
-    tests/lab_wigner_layout_probe.mjs, which needs uvicorn + Edge):
-      1. the width must come from a getBoundingClientRect() difference;
-      2. it must be measured from `.wigner`, not from the page.
+    The replacement is a query container on `.wigner__fit`, which occupies the `1fr`
+    track: `100cqw` **is** the available width, so no JS measurement is involved and
+    the whole class of ordering bugs is gone. The geometric half of this contract
+    lives in tests/lab_wigner_layout_probe.mjs (6 invariants, uvicorn + Edge), which
+    is unchanged by this task and still the hard gate.
     """
     js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    fit = js.split("function fitWignerFrame()", 1)
-    assert len(fit) == 2, "fitWignerFrame() not found in app.js"
-    body = fit[1].split("\n}\n", 1)[0]
-    assert "offsetLeft" not in body, (
-        "fitWignerFrame must not use offsetLeft: its reference frame is the "
-        "offsetParent (BODY), not .wigner — use getBoundingClientRect() deltas"
+    assert "fitWignerFrame" not in js.split("/*")[0], (
+        "fitWignerFrame must be gone; the frame is sized by CSS now"
     )
-    assert "wignerColorbar.getBoundingClientRect().left" in body
-    assert "wignerBox.getBoundingClientRect().left" in body
+    # the two names it used to measure with must not come back
+    for gone in ("wignerColorbar", "wignerBox", "WIDE_QUERY"):
+        assert gone not in js.replace("原 fitWignerFrame", ""), (
+            f"{gone} was only used by fitWignerFrame; remove it"
+        )
+    # JS must never write inline sizing back onto the frame
+    assert "wignerFrame.style.width" not in js and "wignerFrame.style.height" not in js
 
-
-def test_wigner_fit_runs_after_colorbar_labels():
-    """Call-site contract (a): colourbar tick labels decide the colourbar column
-    width (an `auto` grid track), so `fitWignerFrame()` must run after the labels
-    are written inside `drawHeatmap` and before the canvas pixel size is read.
-
-    With the wrong order the frame is sized from the *previous* circuit's labels:
-    measured slack went to 0 / -6 / -12 / -18px as labels widened, i.e. the frame
-    ate the 12px gap and overlapped the colourbar. The page's ResizeObserver
-    self-heals this a frame later, so a purely geometric probe cannot catch it —
-    hence this source-order assertion."""
-    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    draw = js.split("function drawHeatmap(W)", 1)
-    assert len(draw) == 2, "drawHeatmap() not found in app.js"
-    body = draw[1]
-    i_labels = body.find('$("colorbar-min").textContent')
-    i_fit = body.find("fitWignerFrame()")
-    i_canvas = body.find("canvas.clientWidth")
-    assert i_labels != -1 and i_fit != -1 and i_canvas != -1, (
-        "drawHeatmap must write colourbar labels, call fitWignerFrame(), and size "
-        "the canvas from canvas.clientWidth"
+    css = (STATIC_DIR / "style.css").read_text(encoding="utf-8")
+    import re
+    decls = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    fit = decls.split(".wigner__fit {", 1)[1].split("}", 1)[0]
+    assert "container-type: inline-size" in fit, (
+        "narrow branch must be inline-size: under <80rem `.wigner` is in page flow "
+        "and its height is content-driven, so a size container collapses to 0 "
+        "height (the original 'container-type height collapse' note)"
     )
-    assert i_labels < i_fit < i_canvas, (
-        f"fitWignerFrame() must sit between the colourbar label writes and the "
-        f"canvas sizing (labels@{i_labels} fit@{i_fit} canvas@{i_canvas})"
+    # wide branch upgrades to a size container and must stretch to get a real cqh
+    wide = decls.split("@media (min-width: 80rem) {", 1)[1]
+    wide_fit = wide.split(".wigner__fit {", 1)[1].split("}", 1)[0]
+    assert "container-type: size" in wide_fit
+    assert "align-self: stretch" in wide_fit, (
+        "`.wigner` is `align-items: center`, so without align-self: stretch the "
+        "wrapper is content-height and 100cqh collapses"
     )
-
-
-def test_wigner_fit_runs_after_side_panel_render():
-    """Call-site contract (b): the side panel (meters / r̄ table) is the other
-    input to `availW` — nmode 1→2 widens it 155 → 186.34px at 1440, shrinking
-    availW by 31.34px. `render()` must therefore fit the frame *after* the last
-    call that touches those tables.
-
-    Measured with the fit hoisted too early: frame stayed 354.06px while the
-    column was already 322.72px → 3224px² of colourbar overlap, and `.wigner`'s own
-    ResizeObserver never fired because its border-box is unchanged (only the inner
-    `1fr` track narrows). That makes this stale state permanent, not self-healing."""
-    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    body = js.split("function render(result, mode)", 1)
-    assert len(body) == 2, "render() not found in app.js"
-    # scope to the render() body only — other functions also call fitWignerFrame()
-    body = body[1].split("/** Shared Wigner draw", 1)[0]
-    # gaussian path: the fits inside the fock/bosonic branches come earlier in the
-    # source, so anchor on the gaussian path's own trailing render call.
-    i_mode = body.find("renderModeSelect(nm, mode);")
-    assert i_mode != -1, "render() must call renderModeSelect(nm, mode)"
-    gaussian_tail = body[i_mode:]
-    assert "fitWignerFrame();" in gaussian_tail, (
-        "render() must fit the frame after the gaussian path's last render call "
-        "(renderModeSelect), because that path renders the side panel"
+    # the frame rule appears twice: the narrow base rule first, then the wide
+    # override inside the media block — the min(width, height) form is the wide one
+    narrow_frame = decls.split(".wigner__frame {", 1)[1].split("}", 1)[0]
+    wide_frame = wide.split(".wigner__frame {", 1)[1].split("}", 1)[0]
+    assert "max(64px, 100cqw)" in narrow_frame, (
+        "narrow branch must be width-only: under <80rem the height is unconstrained "
+        "(page flow), so min(width, height) would have nothing to bind against"
     )
-    # every backend path must reach a fit: 3 render paths, one fit each
-    assert body.count("fitWignerFrame();") == 3, (
-        "each render path (gaussian / bosonic / fock) must fit the frame; "
-        f"found {body.count('fitWignerFrame();')}"
+    assert "min(100cqw, 100cqh)" in wide_frame, "wide branch must be min(width, height)"
+    assert "flex: none" in narrow_frame or "flex: none" in wide_frame, (
+        "the frame is now a flex item: default flex-shrink: 1 compresses it below "
+        "the max(64px, …) clamp when the column is narrower than 64px "
+        "(measured 57.25px on fock@1280, defeating the clamp)"
+    )
+    assert "max(64px," in narrow_frame and "max(64px," in wide_frame, (
+        "keep the 64px floor in both branches"
+    )
+    # reverse constraint (parent AC6): do not introduce contain / content-visibility
+    assert "contain:" not in css and "content-visibility" not in css, (
+        "container-type is a query container; `contain` / `content-visibility` are "
+        "explicitly out of scope (hidden panels already cost zero layout)"
     )
 
 
@@ -371,18 +360,11 @@ def test_scan_dirty_key_is_node_identity_not_array_ref():
     )
 
 
-def test_wigner_breakpoint_query_is_a_singleton():
-    """R5: 断点查询是常量，只建一次。
-
-    改动前 `fitWignerFrame()` 每次调用都 `window.matchMedia(...)`，每次分配新
-    MediaQueryList；滑条路径上 fit 每步都跑（实测 4 次 input = 4 次 matchMedia）。
-    """
-    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    assert 'const WIDE_QUERY = window.matchMedia("(min-width: 80rem)")' in js
-    fit = js.split("function fitWignerFrame()", 1)[1].split("\n}\n", 1)[0]
-    assert "window.matchMedia" not in fit, "fitWignerFrame 内仍有 matchMedia 调用"
-    assert "WIDE_QUERY.matches" in fit
-    assert js.count("window.matchMedia") == 1, "matchMedia 应只有单例那一处"
+# C1 的 `test_wigner_breakpoint_query_is_a_singleton` 已随 C4 退役：
+# 它断言的 `const WIDE_QUERY = window.matchMedia("(min-width: 80rem)")` 是
+# `fitWignerFrame` 的输入，而该函数已被删除 —— 断点判断现在由 CSS 的
+# `@media (min-width: 80rem)` 承担，不再有 JS 侧 matchMedia 可缓存。
+# 取代它的是 `test_wigner_frame_sizing_is_css_only`（含"WIDE_QUERY 不得复活"断言）。
 
 
 # ── C2 (09-17-lab-heatmap-redraw-cache) 源码级契约 ──────────────────────────
