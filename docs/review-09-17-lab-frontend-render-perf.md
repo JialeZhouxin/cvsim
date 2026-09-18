@@ -29,10 +29,15 @@
 >
 > **截断规则（不必记精确边界 —— 它会随本表变大而前移）**：
 > 窗口只有前 32768 **字节**，而本表本身在窗口内，故**每次往本表加内容，边界都会往前移**。
-> 因此**不要依赖"某节一定在窗口内"**。当前实测（文档 ~62KB，已含 C0 回填）：
-> 窗口内 ≈ §0 + §1 + §2（含 §2.1–§2.5）+ §3 前段；**§4 起（byte 44657）全部在窗口外**
-> （含 §4 P2 全部 5 条、§5 勿回退表、§6、§7、§8、§9）。
-> 复测方法：`.scratch/trunc-where.mjs`（按字节切片并列出窗口内标题）。
+> 因此**不要依赖"某节一定在窗口内"**。当前实测（2026-09-17，文档 ≈66KB，已含 C0 回填
+> 与审查后修复）：
+> 窗口内 = §0 + §1 + §2（含 §2.1–§2.5）+ §3.1 的前半；
+> **§3.2 起全部在窗口外**（含 §3.2–§3.12、§4 P2 全部 5 条、§5 勿回退表、§6、§7、§8、§9）。
+> 注意这里只给"哪一节起被截"，不给字节数 —— 写死字节数的话，本行自己一改它就过期了。
+> 复测方法（无需脚本，按字节切片即可）：读文件**前 32768 字节**，按 `^#{1,3} ` 列出其中的标题，
+> 最后一个标题即窗口内的末节；再定位下一节的字节偏移，即边界。
+> ⚠ 必须按**字节**切片：本文大量中文（UTF-8 下 3 字节/字），按字符切片会多覆盖约一倍内容。
+> （原用 `.scratch/trunc-where.mjs`，该临时脚本未随提交留存。）
 > **结论：凡下游任务需要的依据，要么前置到本表，要么写进该任务自己的
 > `prd.md` / `implement.md`。**
 > 因此 **C6 的实施依据不在本文**，而在它自己的
@@ -79,7 +84,7 @@
 | §3.8 `renderPalette` 全量重建 | ✅ 已落地（C1） | C5 的 R3 应记为「已由 C1 承载」 |
 | §3.9 `setView` 全量 render | ✅ 已落地（C1） | 走 `syncChrome()` |
 | §3.10 joint 热图 rect | ✅ 已落地（C2） | WeakMap 按 SVG 分键；双向守卫 |
-| §4.1 `*` 滚动条改 `:root` | ❌ **实测否决（C6）** | 前提"两个属性都可继承"**只对一半**：`scrollbar-width` **不**继承 → 5/5 容器滚动条 12px→17px。保留 `*`，加**反向**断言守护 |
+| §4.1 `*` 滚动条改 `:root` | ❌ **实测否决（C6）** | 前提"两个属性都可继承"**只对一半**：`scrollbar-width` **不**继承 → 5/5 容器的 computed 值翻转 `thin→auto`，但**只有 4/5 槽宽变宽**（3 个 12→17px、`.wigner__side` 10→15px；`.fock__meas` 本就不可滚动，0→0）。保留 `*`，加**反向**断言守护 |
 | §4.2 `#staff` 的 `aria-live` | ✅ 已落地（C6） | 移除；`#status` 的 `role` + `aria-live` **两者保留**（唯一播报口） |
 | §4.3 `scrollIntoView` 进 rAF | ✅ 已落地（C6） | 两处都在 rAF 内；`lab_scan_probe` 守卫 |
 | §4.4 `init()` 串行 `await` | ✅ 已落地（C6） | `/health` 不再 await。**行为级 A/B**：CDP 扣住 `/health`，改动前 15s 不 boot，改动后 541ms boot |
@@ -541,6 +546,16 @@ slider.oninput = () => show(slider.value);                // 365
 > `fitWignerFrame` 的唯一消费者，函数删除后它失去对象（断点判断改由 CSS `@media`
 > 承担，JS 侧再无 `matchMedia`）。这不是回退 C1 R5：其目的以更强方式消失。
 >
+> **补记（code-review 发现，当时漏记）**：`5eeddb5` 还顺带把 `#wigner-note`
+> **从 `.wigner` 的流内同级移入 `.wigner__frame` 内部**，并在 `style.css` 给它加了
+> `position: absolute` 浮层定位。这属父 PRD 明禁的"布局结构改动"，当时两个文件都没记录。
+> **判定为 C4 所必需，保留不回退**：frame 高度现在是确定值（`max(64px, 100cqw)` /
+> `max(64px, min(100cqw, 100cqh))`），note 若留在流内会再占一行、撑开 `.wigner` 行并
+> 挤压 frame，使 `100cqw`/`100cqh` 钳位失真、`.wigner__plot` 不再是正方形、
+> canvas 失去 1:1 像素映射。浮层不参与布局；且 note 只在"无有限 Wigner"时显示，
+> 而 `app.js` 是**先清空 canvas 再** `hidden = false`，故不遮挡任何数据。
+> 已补记入 C4 的 `implement.md` 变更表与 `research/measurements.md` §4.0。
+>
 > **已知边界**：窄屏（`<80rem`）**无自动探针覆盖**（所有浏览器探针都用 ≥1100 视口）；
 > 本任务手工对拍了 1100/900 但未纳入 CI 门。
 
@@ -799,8 +814,10 @@ for (const c of cells) {
 > 守卫方向已翻转：`test_scrollbar_rule_stays_universal_not_root` 断言 `*` 版
 > **必须存在**、`:root` 版**不得被重新引入**（与 §3.1 的 `container-type`
 > 反向断言同型）。
-> 证据：`.scratch/c6-ab.mjs`、`.scratch/c6-gutter-{before,after}.json`、
-> `.scratch/c6-sw-support.mjs`。
+> 证据为临时脚本（`.scratch/c6-ab.mjs`、`c6-gutter-{before,after}.json`、
+> `c6-sw-support.mjs`），**未随提交留存**；上列数值即其结论。
+> 若需重验：在 Edge 153 下分别注入 `*` 版与 `:root` 版规则，
+> 用 CDP 读每个滚动容器的 `offsetWidth - clientWidth`（槽宽）即可复现 12 vs 17px。
 
 ### §4.2 【P2-19】`aria-live="polite"` 挂在每编辑全量重建的 `#staff`
 
@@ -937,7 +954,8 @@ node tests/lab_render_perf_probe.mjs --compare=baseline.json  # 与基线对拍
 ### 环境验证（C0.1，动手前先做）
 
 原计划的**最大不确定项**是 `Input.dispatchMouseEvent` 能否驱动 HTML5 DnD。
-**实测结论：可以**（`.scratch/c0-env-verify.mjs` 环境验证）：
+**实测结论：可以**（动手前用一次性脚本 `.scratch/c0-env-verify.mjs` 验证；
+该脚本未留存，结论如下表，且已由 C0 探针自身的 `dispatch` 计数**持续**验证）：
 
 | 问题 | 实测 | 结论 |
 | --- | --- | --- |
@@ -1029,7 +1047,8 @@ S3 的核心证据是探针计数器（见 §2.4），不是这张表。
 `undoBtn.disabled` —— 该写入只在 `syncChrome()` 里（`editor.js:419-420`）。
 若按钮初始为 disabled，则**整个会话里它都不会变可用**。
 
-**实测**（headless Edge，`.scratch/undo-param-check.mjs`）：
+**实测**（headless Edge；一次性脚本 `.scratch/undo-param-check.mjs`，未留存，
+输出如下）：
 
 ```
 initial undo disabled: true
