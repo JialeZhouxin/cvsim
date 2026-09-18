@@ -16,6 +16,57 @@ client = TestClient(app)
 STATIC_DIR = Path(__file__).resolve().parents[1] / "cvsim" / "lab" / "static"
 
 
+def _strip_js_comments(src: str) -> str:
+    """Remove `/* */` and `//` comments from JS source so a source-level
+    assertion searches **code only**.
+
+    Needed because the frontend files legitimately name deleted symbols in their
+    explanatory comments (e.g. app.js says "原 fitWignerFrame"), so an honest
+    guard must ignore comments — while still covering the whole file. A simpler
+    `split("/*")[0]` looks equivalent but silently checks only the text *before
+    the first block comment*, which for app.js is the empty string.
+
+    Character-wise state machine rather than regex: `//` also occurs inside
+    string literals (`svg_kit.js`: "http://www.w3.org/2000/svg"), so blanket
+    stripping would corrupt code. Handles ' " ` quoting and backslash escapes;
+    template-literal `${}` nesting is not modelled (these files don't nest).
+    """
+    out: list[str] = []
+    i, n = 0, len(src)
+    quote: str | None = None
+    while i < n:
+        ch = src[i]
+        if quote:
+            out.append(ch)
+            if ch == "\\":                      # escape: copy the next char too
+                if i + 1 < n:
+                    out.append(src[i + 1])
+                    i += 2
+                    continue
+            elif ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in "\"'`":
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "/":
+            while i < n and src[i] != "\n":      # keep the newline itself
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and src[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (src[i] == "*" and src[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def load_default_scene() -> dict:
     """The shipped default scene (票3: 单一事实源 default_scene.js leaf).
     经 node 子进程取值 —— pytest 第一次硬依赖 node；缺失/失败 = 明确红，
@@ -148,12 +199,19 @@ def test_wigner_frame_sizing_is_css_only():
     is unchanged by this task and still the hard gate.
     """
     js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    assert "fitWignerFrame" not in js.split("/*")[0], (
+    # Strip comments BEFORE searching. app.js legitimately *mentions* these names
+    # in its explanatory comments ("原 fitWignerFrame", historical notes), so a
+    # raw full-text search would false-fail; but searching only a prefix is worse
+    # — the previous form here was `js.split("/*")[0]`, which is the EMPTY string
+    # because app.js line 1 opens with `/*`, making the assert vacuously true and
+    # the contract unguarded. Strip both comment forms and search all real code.
+    code = _strip_js_comments(js)
+    assert "fitWignerFrame" not in code, (
         "fitWignerFrame must be gone; the frame is sized by CSS now"
     )
-    # the two names it used to measure with must not come back
+    # the three names it used to measure with must not come back either
     for gone in ("wignerColorbar", "wignerBox", "WIDE_QUERY"):
-        assert gone not in js.replace("原 fitWignerFrame", ""), (
+        assert gone not in code, (
             f"{gone} was only used by fitWignerFrame; remove it"
         )
     # JS must never write inline sizing back onto the frame
@@ -524,19 +582,21 @@ def test_scrollbar_rule_stays_universal_not_root():
     """R1 **实测否决** → 反向约束：滚动条规则必须留在 `*`，不得改 `:root`。
 
     原计划的理由是「`scrollbar-width` / `scrollbar-color` 都是可继承属性」。
-    实测（Edge 153）**只有 `scrollbar-color` 可继承**；`:root { scrollbar-width:
-    thin }` 只让 `<html>` 算得 `thin`，`<body>` 与所有后代回落 `auto`
-    → 每个滚动容器滚动条从 12px 槽变 17px 槽，**5/5 容器外观全变**。
+    实测（Edge 153）**只有 `scrollbar-color` 可继承**；`:root` 上的 `scrollbar-width:
+    thin` 只让 `<html>` 算得 `thin`，`<body>` 与所有后代回落 `auto`
+    → 5 个滚动容器的 computed `scrollbar-width` **全部**翻转 `thin → auto`，
+    其中 **4/5 的实际槽宽变宽**（3 个 12px→17px，`.wigner__side` 10px→15px；
+    `.fock__meas` 本就不可滚动，0→0）。
 
     这是「改视觉即越界」的直接违反，故保留 `*`。
     守卫方式与 C4 的 `container-type` 反向断言同型：断言那个"看起来更优雅的
     改法"**没有被重新引入**。
-    证据：`.scratch/c6-gutter-{before,after}.json`、`.scratch/c6-ab.mjs`。
+    证据为临时脚本（`.scratch/c6-ab.mjs` 等），未随提交留存；上列数值即其结论。
     """
     css = (STATIC_DIR / "style.css").read_text(encoding="utf-8")
     # the universal rule must be present
     assert "* {\n  scrollbar-width: thin;" in css, (
-        "滚动条规则被移出 `*` —— 实测会让 5/5 容器滚动条变宽（见 docstring）"
+        "滚动条规则被移出 `*` —— 实测会让 4/5 容器滚动条槽宽变宽（见 docstring）"
     )
     assert "scrollbar-color: var(--color-rule) transparent;" in css
     # and the rejected variant must NOT be reintroduced

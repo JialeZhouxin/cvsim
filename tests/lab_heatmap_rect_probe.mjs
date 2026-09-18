@@ -75,6 +75,17 @@ try {
   await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
   ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id).res(m); pending.delete(m.id); } };
   await send(ws, "Runtime.enable");
+  /* Cache discipline — same as the 8 sibling probes. The persistent
+     --user-data-dir keeps Edge's HTTP cache across probe runs, and this probe
+     originally lacked the guard the others got in 6b994a9. That commit hit it for
+     real: a newly added colormap.js export was not seen, so the page threw
+     "does not provide an export named ..." and the probe timed out.
+     诚实标注：本次修复时**未能复现**陈旧读取 —— 单进程重载与跨进程（持久 profile）
+     两种情形下，Edge 都按 ETag 重新校验并取到了新内容（实测 V1→V2 均返回 V2），
+     而这两个 CDP 方法本身确实成功。故保留此纪律是为了与其余探针一致 + 防御该
+     已知缺陷，而不是因为本地能观察到差异。 */
+  await send(ws, "Network.enable");
+  await send(ws, "Network.clearBrowserCache");
   await send(ws, "Page.reload");
   await send(ws, "Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   if (!await waitFor(ws, `!!document.querySelector(".palette__item")`, 30000)) throw new Error("no boot");

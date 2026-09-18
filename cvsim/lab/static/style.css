@@ -1359,11 +1359,13 @@ body {
    C6 R1 **实测否决**（原计划要把 `*` 改成 `:root`，理由是两个属性都可继承）：
    `scrollbar-color` 确实可继承，但 **`scrollbar-width` 不可继承** ——
    实测 Edge 153 下 `:root { scrollbar-width: thin }` 只让 `<html>` 算得 `thin`，
-   `<body>` 与所有后代都回落 `auto`，于是每个滚动容器的滚动条从
-   细（12px 槽）变成默认（17px 槽）：5/5 容器外观**全变**。
+   `<body>` 与所有后代都回落 `auto`，于是滚动容器的滚动条从细槽变成默认槽。
+   实测（5 个滚动容器，A/B：`*` 域 12px vs `:root` 域 17px）：
+   3 个容器槽宽 12px → 17px，`.wigner__side` 10px → 15px，`.fock__meas` 本就不可滚动
+   （0 → 0）——即 5/5 的 computed `scrollbar-width` 翻转 `thin → auto`，但 **4/5 的实际槽宽变宽**。
    故保留 `*` —— 这是让 `scrollbar-width` 生效的唯一写法，
    代价（命中整棵树）无法用继承规避。
-   证据：`.scratch/c6-gutter-{before,after}.json`、`.scratch/c6-ab.mjs`。 */
+   （实测脚本为临时文件，未留存；上列数值即其结论。） */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-rule) transparent;
