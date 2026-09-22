@@ -258,7 +258,7 @@ def test_meters_within_declared_matrix():
 
     assert frozenset({"purity", "mean_photon", "mean_photon_per_mode"}) == METER_CORE
     assert {
-        "gaussian": frozenset({"log_negativity", "singular"}),
+        "gaussian": frozenset({"log_negativity", "duan_sum", "singular"}),
         "fock": frozenset({"leakage"}),
         "bosonic": frozenset(),
     } == METER_EXTENSIONS

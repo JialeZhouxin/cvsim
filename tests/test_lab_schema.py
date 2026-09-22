@@ -159,6 +159,8 @@ def test_extensions_lab_declared():
     assert ext["cutoff"] == {"min": 1, "max": 30}
     assert ext["view"]["n"] == [2, 512]
     assert ext["view"]["lim_max"] == 50.0
+    assert ext["view"]["lim_min_exclusive"] == 0
+    assert ext["view"]["planes"] == ["single", "xx", "pp", "epr"]
     assert ext["sweep"]["n"] == [2, 200]
     assert ext["shots"] == [1, 100000]
     assert ext["rounds"] == [1, 100]
@@ -183,7 +185,7 @@ def test_meters_matrix_embedded():
         "purity",
     ]
     assert payload["meters"]["extensions"] == {
-        "gaussian": ["log_negativity", "singular"],
+        "gaussian": ["duan_sum", "log_negativity", "singular"],
         "fock": ["leakage"],
         "bosonic": [],
     }
@@ -220,6 +222,21 @@ def test_get_schema_endpoint():
 def test_get_schema_content_type_json():
     r = client.get("/schema")
     assert "application/json" in r.headers["content-type"]
+
+
+def test_schema_endpoint_declares_planes():
+    """R8/D4: `planes` must be in the *served* payload, not only in
+    ``_EXTENSIONS``.
+
+    ``assemble_schema`` rebuilds the ``extensions.view`` block field by field, so
+    adding a key to ``_EXTENSIONS`` alone is silently invisible over HTTP — and
+    the frontend derives its dropdown from the response. Asserting on
+    ``assemble_schema()`` would not catch it, because both live in this module;
+    this goes through the endpoint.
+    """
+    r = client.get("/schema")
+    assert r.status_code == 200
+    assert r.json()["extensions"]["view"]["planes"] == ["single", "xx", "pp", "epr"]
 
 
 # -- 422 text contract (structured errors, single message template) ----------

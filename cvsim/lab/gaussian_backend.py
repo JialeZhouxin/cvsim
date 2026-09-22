@@ -36,16 +36,44 @@ from cvsim.lab.ir import (
     LabCircuit,
     View,
     _num,
+    _plane_axes,
     check_wigner_mode,
 )
 from cvsim.lab.result import LabResult, _wigner_slice, check_meters
-from cvsim.wigner import wigner_grid
+from cvsim.wigner import wigner_grid, wigner_plane
 
 
-def _meters(state: GaussianState, singular: bool) -> dict[str, Any]:
+def _duan_sum(V: np.ndarray, modes: tuple[int, int] | None) -> float:
+    """Duan inseparability sum for a mode pair: var(x_k−x_j) + var(p_k+p_j).
+
+    The EPR criterion: separable states give ``>= 2``, entangled ones ``< 2``
+    (vacuum is exactly 2). Deliberately *without* the 1/√2 that ``_plane_axes``
+    puts on its EPR rows — the published threshold is 2, not √2, so the two
+    scalings must not be conflated. ``modes`` is ``None`` when the view names no
+    pair; the caller then omits the key rather than fabricating a value.
+    """
+    if modes is None:
+        return float("nan")
+    m = V.shape[0] // 2
+    k, j = modes
+    u = np.zeros(2 * m)
+    u[k], u[j] = 1.0, -1.0
+    v = np.zeros(2 * m)
+    v[m + k], v[m + j] = 1.0, 1.0
+    return float(u @ V @ u + v @ V @ v)
+
+
+def _meters(
+    state: GaussianState, singular: bool, modes: tuple[int, int] | None = None
+) -> dict[str, Any]:
     """meters; purity/log_neg are undefined on singular conditional states
     (det V = 0) → None, never fabricated. mean_photon stays (computable;
-    negative values shown honestly)."""
+    negative values shown honestly).
+
+    ``duan_sum`` appears **only** when the view names a mode pair and at least
+    two modes survive — the same on-demand shape as ``log_negativity`` below.
+    Writing it unconditionally as ``None`` would add a key to every gaussian
+    response and break the byte-frozen goldens (R-A2)."""
     m = state.nmode
 
     def safe(fn: Callable[[], Any]) -> Any:
@@ -61,9 +89,26 @@ def _meters(state: GaussianState, singular: bool) -> dict[str, Any]:
     meters["mean_photon_per_mode"] = [mean_photon(state, mode=i) for i in range(m)]
     if m >= 2:
         meters["log_negativity"] = safe(lambda: log_negativity(state, modes_A=[0]))
+        if modes is not None:
+            meters["duan_sum"] = safe(lambda: _duan_sum(state.V, modes))
     meters["singular"] = singular
     check_meters("gaussian", meters)
     return meters
+
+
+def _plane_label(plane: str, modes: tuple[int, int]) -> dict[str, Any]:
+    """Axis labels for a cross-mode plane, generated here so the frontend does
+    not re-derive the physics (D5)."""
+    k, j = modes
+    if plane == "xx":
+        names = (f"x{k}", f"x{j}")
+    elif plane == "pp":
+        names = (f"p{k}", f"p{j}")
+    elif plane == "epr":
+        names = (f"(x{k}−x{j})/√2", f"(p{k}+p{j})/√2")
+    else:  # pragma: no cover - _parse_view restricts the preset set
+        names = (f"q{k}", f"q{j}")
+    return {"plane": plane, "modes": [k, j], "labels": list(names)}
 
 
 def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any]]) -> LabResult:
@@ -71,6 +116,19 @@ def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any
     (homodyne-conditioned mode, det(2V)=0) has no finite Wigner: report
     wigner=None + meters.singular instead of fabricating data. All modes
     measured away (nmode==0) → empty result, no Wigner, honest zero meters."""
+    # The pair feeds duan_sum. It is only meaningful when both modes survive
+    # execution (measurements remove modes), so validate it against the
+    # *post-run* nmode and drop it otherwise — duan_sum is an on-demand meter,
+    # and a pair that no longer names two existing modes must not be fabricated.
+    # Note this is deliberately NOT a 422 for plane="single": there the pair is
+    # not the plot's coordinates, and silently ignoring what the payload does not
+    # use is the pre-existing behaviour. When plane != "single" the pair *is* the
+    # coordinate definition, and _plane_axes has already raised (422) for it.
+    pair: tuple[int, int] | None = None
+    if view.joint_modes is not None:
+        k, j = view.joint_modes
+        if 0 <= k < state.nmode and 0 <= j < state.nmode and k != j:
+            pair = (k, j)
     if state.nmode == 0:
         meters: dict[str, Any] = {
             "purity": None,
@@ -89,19 +147,32 @@ def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any
             extensions={"rbar": np.zeros(0).tolist(), "V": np.zeros((0, 0)).tolist()},
         )
     check_wigner_mode(view.wigner_mode, state.nmode)
+    # Deliberately OUTSIDE the try below: _plane_axes raises CircuitV0Error for a
+    # bad/unknown pair, and CircuitV0Error subclasses ValueError — inside the try
+    # it would be caught by the "singular view" handler and silently degrade to
+    # wigner=null + singular=true with HTTP 200. A misspelled pair is a user
+    # error (422), not a singular state. The nmode==0 early return above keeps
+    # the existing honest-empty precedent (check_wigner_mode is skipped there
+    # for the same reason).
+    A = _plane_axes(view, state.nmode)
     wigner: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+    axes: dict[str, Any] | None = None
     singular = False
     try:
-        keep = partial_trace(state, keep=[view.wigner_mode])
-        X, P, W = wigner_grid(keep, lim=view.lim, n=view.n)
+        if A is None:
+            keep = partial_trace(state, keep=[view.wigner_mode])
+            X, P, W = wigner_grid(keep, lim=view.lim, n=view.n)
+        else:
+            X, P, W = wigner_plane(state.V, state.rbar, A, lim=view.lim, n=view.n)
+            axes = _plane_label(view.plane, (view.joint_modes[0], view.joint_modes[1]))
         wigner = (X, P, W)
     except (ValueError, FloatingPointError, np.linalg.LinAlgError):  # singular view
         singular = True
     return LabResult(
         backend="gaussian",
         nmode=state.nmode,
-        wigner=_wigner_slice(wigner),
-        meters=_meters(state, singular),
+        wigner=_wigner_slice(wigner, axes=axes),
+        meters=_meters(state, singular, pair),
         measured=measured,
         extensions={"rbar": state.rbar.tolist(), "V": state.V.tolist()},
     )

@@ -144,7 +144,12 @@ SWEEPABLE_PARAMS: dict[str, frozenset[str]] = {
 #: scales (slider ranges) stay in ops.js per Q6.
 _EXTENSIONS: dict[str, Any] = {
     "cutoff": {"min": 1, "max": 30},  # fock-only, per-mode (index.html slider)
-    "view": {"lim_max": 50.0, "lim_min_exclusive": 0, "n": [2, 512]},
+    "view": {
+        "lim_max": 50.0,
+        "lim_min_exclusive": 0,
+        "n": [2, 512],
+        "planes": ["single", "xx", "pp", "epr"],
+    },
     "sweep": {"n": [2, 200]},
     "sweepable": {op: sorted(params) for op, params in SWEEPABLE_PARAMS.items()},
     "shots": [1, 100000],
@@ -206,6 +211,7 @@ def assemble_schema() -> dict[str, Any]:
                 "lim_max": _EXTENSIONS["view"]["lim_max"],
                 "lim_min_exclusive": _EXTENSIONS["view"]["lim_min_exclusive"],
                 "n": list(_EXTENSIONS["view"]["n"]),
+                "planes": list(_EXTENSIONS["view"]["planes"]),
             },
             "sweep": {"n": list(_EXTENSIONS["sweep"]["n"])},
             "sweepable": {k: list(v) for k, v in _EXTENSIONS["sweepable"].items()},

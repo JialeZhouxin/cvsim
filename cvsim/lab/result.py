@@ -47,7 +47,7 @@ METER_CORE: frozenset[str] = frozenset({"purity", "mean_photon", "mean_photon_pe
 #: exactly the core trio). Declared once, embedded into ``GET /schema`` by
 #: ``schema.assemble_schema``; frontend consumption is a follow-up ticket (R6).
 METER_EXTENSIONS: dict[str, frozenset[str]] = {
-    "gaussian": frozenset({"log_negativity", "singular"}),
+    "gaussian": frozenset({"log_negativity", "duan_sum", "singular"}),
     "fock": frozenset({"leakage"}),
     "bosonic": frozenset(),
 }
@@ -70,14 +70,22 @@ LAB_RESULT_CORE_KEYS: frozenset[str] = frozenset(
 
 def _wigner_slice(
     w: tuple[np.ndarray, np.ndarray, np.ndarray] | None,
+    axes: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Single wigner-grid → ``{x, p, W}`` JSON slice (the one legal copy of
     this knowledge in the repo; previously duplicated 4×). ``None`` passes
-    through (singular view / empty state → honest null)."""
+    through (singular view / empty state → honest null).
+
+    ``axes`` is only present for a cross-mode plane (R8), which cannot be
+    described by the ``{x, p}`` key names alone. Omitting the argument keeps the
+    legacy byte shape — the default single-mode response is unchanged."""
     if w is None:
         return None
     X, P, W = w
-    return {"x": X[0].tolist(), "p": P[:, 0].tolist(), "W": W.tolist()}
+    out: dict[str, Any] = {"x": X[0].tolist(), "p": P[:, 0].tolist(), "W": W.tolist()}
+    if axes is not None:
+        out["axes"] = axes
+    return out
 
 
 def _measured_from_results(raw: dict[str, Any], results: dict[str, Any]) -> list[dict[str, Any]]:

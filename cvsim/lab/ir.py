@@ -23,6 +23,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 from cvsim.bosonic.ir import validate_ir as validate_bosonic_ir
 from cvsim.fock.ir import validate_ir as validate_fock_ir
 from cvsim.gaussian.ir import SCHEMA as SCHEMA
@@ -100,6 +102,7 @@ class View:
     wigner_mode: int = 0
     lim: float = 5.0
     n: int = 64
+    plane: str = "single"  # gaussian: cross-mode quadrature plane (R8)
     joint_modes: list[int] | None = None  # Fock: 2-mode joint heatmap modes
 
 
@@ -127,6 +130,69 @@ def check_wigner_mode(mode: int, nmode: int) -> None:
     """
     if mode >= nmode:
         raise CircuitV0Error(f"view.wigner_mode {mode} out of range (nmode={nmode})")
+
+
+def check_plane(modes: tuple[int, ...], nmode: int) -> None:
+    """Guard: a cross-mode plane's two modes must exist and be distinct.
+
+    Single point for the plane's 422 message template (ADR-0010 #5, same shape
+    as :func:`check_wigner_mode`). Post-run, because measurements remove modes:
+    ``joint_modes=[0,1]`` is a legal *load-time* request that stops being legal
+    once a measurement leaves one mode behind.
+
+    Fock's ``_fock_joint`` silently returns ``None`` for an out-of-range pair.
+    That is not copied here: on the Gaussian side the pair *is* the definition
+    of the plot's coordinates, so a missing mode must be an honest 422 rather
+    than an empty picture.
+    """
+    for mode in modes:
+        if mode < 0 or mode >= nmode:
+            raise CircuitV0Error(
+                f"view.joint_modes {list(modes)} out of range (nmode={nmode})"
+            )
+    if modes[0] == modes[1]:
+        raise CircuitV0Error(
+            f"view.joint_modes {list(modes)} must be two distinct modes"
+        )
+
+
+def _plane_axes(view: View, nmode: int) -> np.ndarray | None:
+    """The (2, 2m) quadrature-combination matrix ``A`` for ``view.plane``.
+
+    ``None`` means "single mode" — the caller keeps the legacy
+    ``partial_trace(keep=[wigner_mode]) + wigner_grid`` path. Otherwise ``A``'s
+    two rows are the plane's two axes in the full 2m xxpp space:
+    ``xx`` → (x_k, x_j), ``pp`` → (p_k, p_j), ``epr`` → ((x_k−x_j)/√2,
+    (p_k+p_j)/√2).
+
+    The EPR rows carry 1/√2 so the plane stays a *vacuum-referenced* phase-space
+    picture: a TMSV then shows an ellipse of variance e^{-2r}/2 against the
+    vacuum 1/2, instead of a raw sum that would be twice as large. Callers
+    validate the modes post-run via :func:`check_plane`.
+    """
+    if view.plane == "single":
+        return None
+    if view.joint_modes is None:
+        # Load-time rejection already covers this; kept as a belt-and-braces
+        # assert so a directly-constructed View cannot reach the grid as an
+        # unlabeled (and therefore unreadable) plane.
+        raise CircuitV0Error(f"view.plane {view.plane!r} requires view.joint_modes")
+    if nmode < 2:
+        raise CircuitV0Error(f"view.plane {view.plane!r} requires nmode >= 2 (nmode={nmode})")
+    check_plane(tuple(view.joint_modes), nmode)
+    k, j = view.joint_modes
+    A = np.zeros((2, 2 * nmode))
+    if view.plane == "xx":
+        A[0, k], A[1, j] = 1.0, 1.0
+    elif view.plane == "pp":
+        A[0, nmode + k], A[1, nmode + j] = 1.0, 1.0
+    elif view.plane == "epr":
+        s = 1.0 / np.sqrt(2.0)
+        A[0, k], A[0, j] = s, -s
+        A[1, nmode + k], A[1, nmode + j] = s, s
+    else:  # pragma: no cover - _parse_view rejects unknown presets first
+        raise CircuitV0Error(f"view.plane {view.plane!r} is not a known preset")
+    return A
 
 
 @dataclass
@@ -193,10 +259,19 @@ def _parse_view(raw: Any) -> View:
         or not all(isinstance(m, int) and not isinstance(m, bool) and m >= 0 for m in jm)
     ):
         raise CircuitV0Error("view.joint_modes must be a list of two distinct non-negative ints")
+    plane = raw.get("plane", "single")
+    _planes = _EXTENSIONS["view"]["planes"]
+    if plane not in _planes:
+        raise CircuitV0Error(f"view.plane must be one of {_planes!r}, got {plane!r}")
+    if plane != "single" and jm is None:
+        # Load-time fact, independent of nmode: a plane with no pair of modes
+        # cannot be labeled, so refusing here saves a full execution.
+        raise CircuitV0Error(f"view.plane {plane!r} requires view.joint_modes")
     return View(
         wigner_mode=wigner_mode,
         lim=float(lim),
         n=n,
+        plane=plane,
         joint_modes=None if jm is None else list(jm),
     )
 
@@ -219,6 +294,13 @@ def load_circuit(data: dict[str, Any]) -> LabCircuit:
     if backend not in ("gaussian", "fock", "bosonic"):
         raise CircuitV0Error(f"backend must be 'gaussian', 'fock' or 'bosonic', got {backend!r}")
     view = _parse_view(data.get("view", {}))
+    if view.plane != "single" and backend != "gaussian":
+        # R8 is gaussian-only. _parse_view is shared by all backends and runs
+        # before the dispatch below, so without this the other two would
+        # validate the plane, execute normally, and silently ignore it.
+        raise CircuitV0Error(
+            f"view.plane {view.plane!r} is only supported by the gaussian backend"
+        )
     seed = data.get("seed", 0)
     if not isinstance(seed, int) or isinstance(seed, bool) or seed < 0:
         raise CircuitV0Error("seed must be a non-negative int")
