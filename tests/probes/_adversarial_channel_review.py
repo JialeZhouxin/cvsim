@@ -1,6 +1,10 @@
 """Adversarial review tests for 07-29-phase1-channel-general.
 
-Run: PYTHONPATH=. py -3 tests/_adversarial_channel_review.py
+手工审查脚本，pytest 不收集（非 ``test_*`` 命名，且不在 ``testpaths`` 里）。
+原先放在 ``tests/`` 根目录，与 108 个真测试混在一起（审计 §4.3）——
+现收进 ``tests/probes/``，与同类"手工跑、非收集"的产物同居。
+
+Run: PYTHONPATH=. py -3 tests/probes/_adversarial_channel_review.py
 """
 
 from __future__ import annotations

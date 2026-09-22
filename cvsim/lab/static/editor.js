@@ -4,8 +4,9 @@
 "use strict";
 
 import { OPS, addNode, cellOccupied, completePlacing, moveNodeX, opGroup, paramsFromOp, placeSingle, removeMode, removeNode, toV1Json, updateParam } from "./ops.js";
-import { dropMode, initialCacheKey, parseInitial, remapForBackend, vacuumDefault, bosonicSourceOptions } from "./initial.js";
-import { opsForBackend, schemaTables } from "./schema_store.js";
+import { clampInitial, dropMode, initialCacheKey, parseInitial, remapForBackend, vacuumDefault, bosonicSourceOptions } from "./initial.js";
+import { opsForBackend } from "./schema_store.js";
+import { initialInputKind } from "./backend_panels.js";
 import { initStaff } from "./staff.js";
 
 /* ── state ─────────────────────────────────────────────── */
@@ -130,7 +131,14 @@ export function deriveEditorTables(schema) {
   };
 }
 
-/** 生效表（schema 注入后派生，未注入 = 旧常量回退，仅 node --test 旧路径）。 */
+/** 生效表（schema 注入后派生，未注入 = 旧常量回退，仅 node --test 旧路径）。
+    两态：EDITOR_DERIVED（app.js 注入）或本地常量。**没有中间态** ——
+    曾有一个读 schemaTables() 的回落分支，但发布表的键名是 uiToOp/uiToParam/
+    fockUiToParam（app.js:855-857），而它读 irToUiOp/v1ToUiParam/fockV1ToUiParam，
+    三个全部 undefined → `{...undefined}` = {} → op/参数改名静默全失效
+    （op 名不改 → "不在 Lab 白名单"）。该分支在生产不可达（publishSchema 只在
+    setEditorSchema 成功后调用，故 EDITOR_DERIVED 必非空），只会在测试里
+    构造出 store 已发布而 editor 未注入的混合态 —— 删掉它即回归两态契约。 */
 //: UI param → v1 IR param (inverse of UI_TO_V1_PARAM in ops.js).
 const V1_TO_UI_PARAM = { phase: { phi: "theta" } };
 //: Fock IR param → UI param (inverse of FOCK_UI_TO_V1_PARAM in ops.js;
@@ -139,19 +147,6 @@ const FOCK_V1_TO_UI_PARAM = { loss: { T: "eta", nbar: null } };
 
 function tables() {
   if (EDITOR_DERIVED) return EDITOR_DERIVED;
-  const s = schemaTables();
-  if (s) {
-    return {
-      viewN: [2, 512],
-      viewLimMax: 50,
-      viewLimMinExcl: 0,
-      cutoff: [1, 30],
-      shots: [0, 100000],
-      irToUi: { ...s.irToUiOp },
-      v1ToUiParam: { ...s.v1ToUiParam },
-      fockV1ToUiParam: { ...s.fockV1ToUiParam },
-    };
-  }
   return {
     viewN: [2, 512],
     viewLimMax: 50,
@@ -697,7 +692,15 @@ export function initEditor(root, hooks) {
       (state.initial ? state.initial[k] : fill));
     next[i] = v;
     pushHistory();
-    state = { ...state, initial: next };
+    // fock 光子数是**唯一**有 cutoff 上界的语义：服务端硬拒越界
+    // （fock/ir.py "must be in [0, c)" → 422），而浏览器不会自动夹到
+    // input.max，所以这里必须夹。bosonic 项是 null / 源名，不能过这个函数。
+    state = {
+      ...state,
+      initial: state.backend === "fock"
+        ? clampInitial(next, state.cutoffs, nm)
+        : next,
+    };
     // 初始态也进模行标签（`mode m · |v⟩`），故同样定点补标签而非重建 staff
     if (!staff.syncLabels()) render();
     else syncChrome();
@@ -733,14 +736,9 @@ export function initEditor(root, hooks) {
     }
   }
 
-  /* R7: per-backend 初始态输入配置表 — 差异知识单点（NOTES.md 债务收口）。
-     int = fock 光子数输入（cutoff 上限联动，syncFockInputValues）；
-     enum = bosonic 源名下拉（renderBosonicInitial）；null = 无 initial
-     字段（gaussian——卡片隐藏）。新后端加 initial 类型 = 添一行 + render* 分支。 */
-  const INITIAL_INPUT_KIND = { fock: "int", bosonic: "enum" };
-
+  /* R7: per-backend 初始态输入配置表已迁居 backend_panels.js leaf（§3.3 单点）。 */
   function renderFockControls() {
-    const kind = INITIAL_INPUT_KIND[state.backend];
+    const kind = initialInputKind(state.backend);
     // ADR-0014: ＋模 恒可见（gaussian 无源节点后，这是唯一的加模入口）
     if (!kind) { // 无 initial 字段（gaussian）：卡片隐藏
       if (dom.backendSelect) dom.backendSelect.value = state.backend;

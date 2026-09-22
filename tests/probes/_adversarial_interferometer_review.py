@@ -1,6 +1,9 @@
 """Adversarial review tests for 07-29-phase1-interferometer-gates.
 
-Run: py -3 tests/_adversarial_interferometer_review.py
+手工审查脚本，pytest 不收集（非 ``test_*`` 命名，且不在 ``testpaths`` 里）。
+现收进 ``tests/probes/``（审计 §4.3）。
+
+Run: py -3 tests/probes/_adversarial_interferometer_review.py
 """
 
 from __future__ import annotations

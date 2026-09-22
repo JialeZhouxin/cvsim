@@ -139,3 +139,18 @@ export function dropMode(arr, mode) {
 export function initialCacheKey(backend, nmode) {
   return `${backend}:${nmode}`;
 }
+
+/** per-mode Fock 光子数夹取到 `[0, cutoffs[i]-1]`（fock 语义单点）。
+    上界在服务端是**硬约束**（fock/ir.py ``initial[i]=n must be in [0, c)``
+    → 越界 422），而**浏览器不会把手工输入夹到 `input.max`** —— 所以前端
+    必须自己夹，否则 `cutoff=2` + 手工输入 `9` 会一路走到 422，
+    同时 modeLabel 先渲染出 `|9⟩`。
+    仅 fock 语义（bosonic 项是 null / 源名，不经此函数）。 */
+export function clampInitial(initial, cutoffs, nmode) {
+  const out = Array(nmode).fill(0);
+  for (let i = 0; i < nmode; i++) {
+    const n = initial && initial[i] !== undefined ? initial[i] : 0;
+    out[i] = Math.min(Math.max(0, Math.round(n)), (cutoffs[i] ?? 10) - 1);
+  }
+  return out;
+}

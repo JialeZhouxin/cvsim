@@ -20,10 +20,10 @@
 import { spawn, execSync } from "node:child_process";
 import { writeFileSync, readFileSync } from "node:fs";
 import { setTimeout as sleep } from "node:timers/promises";
+import { EDGE, port, userDataDir, uvicornPath } from "./probe_env.mjs";
 
-const PORT = 8773;        // 与既有探针错开（8765-8772 / 8860 已占用）
-const CDP_PORT = 9231;    // 与既有探针错开（9223-9230 已占用）
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+const PORT = port(8773, "PROBE_PORT");        // 与既有探针错开（8765-8772 / 8860 已占用）
+const CDP_PORT = port(9231, "PROBE_CDP_PORT");    // 与既有探针错开（9223-9230 已占用）
 
 const ARGS = process.argv.slice(2);
 const argVal = (name, dflt) => {
@@ -232,14 +232,14 @@ async function scenarioS3(ws, N) {
 
 const S1_N = 100, S2_N = 100, S3_N = 20;
 
-const server = spawn(process.cwd() + "/.venv/Scripts/uvicorn.exe",
+const server = spawn(uvicornPath(),
   ["cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"],
   { cwd: process.cwd(), stdio: "ignore" });
 const edge = spawn(EDGE, [
   "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
   "--remote-allow-origins=*", "--window-size=1440,900",
   `--remote-debugging-port=${CDP_PORT}`,
-  "--user-data-dir=" + process.cwd() + "/.probe-edge-perf",
+  "--user-data-dir=" + userDataDir(".probe-edge-perf"),
   "about:blank",
 ], { stdio: "ignore" });
 

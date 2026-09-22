@@ -11,8 +11,8 @@ import {
 // ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
 import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
 import { publishSchema, opsForBackend, meterKeys } from "../cvsim/lab/static/schema_store.js";
-import { setInitialSchema, dropMode } from "../cvsim/lab/static/initial.js";
 import { stateFromJson, loadJson, createHistory, deriveEditorTables, setEditorSchema } from "../cvsim/lab/static/editor.js";
+import { setInitialSchema, dropMode, clampInitial } from "../cvsim/lab/static/initial.js";
 
 // Minimal hand-written /schema payload (shape = ticket-2 golden; ops keys
 // are IR names; uiName present only where IR name differs). backends values
@@ -1166,6 +1166,112 @@ test("R6: meterKeys fail-fast — meters 块缺失 / 缺 backend 扩展行 / 未
   assert.throws(() => probe({ ops: {}, meters: { core: ["purity"] } }), /扩展行/);
   assert.throws(() => meterKeys("nosuch"), /扩展行/); // 上一行 finally 己恢复 MOCK_SCHEMA
 });
+
+/* ── §3.1 回归: 派生表键名是发布契约，消费方不得猜 ──────────────────────
+   历史缺陷: editor.js 的中间回落分支读 s.irToUiOp/s.v1ToUiParam/
+   s.fockV1ToUiParam，而 app.js:855-857 发布的是 uiToOp/uiToParam/
+   fockUiToParam —— 三个键全部 undefined，`{...undefined}` = {}，于是
+   op 改名（measure_homodyne→homodyne）与参数改名（theta→phi、eta→T）
+   全部静默失效，只有 op 那一路会报 "不在 Lab 白名单" 而暴露出来。
+   该分支已删（tables() 回归两态）。以下两条守卫分别锁行为与结构。 */
+test("§3.1: 混合态（store 已发布 / editor 未注入）改名仍然正确", () => {
+  // 与 app.js:854-859 同形发布 —— 键名逐字相同，这是契约本身
+  const dEt = deriveEditorTables(MOCK_SCHEMA);
+  publishSchema(MOCK_SCHEMA, {
+    uiToOp: Object.fromEntries(Object.entries(dEt.irToUi).map(([ir, ui]) => [ui, ir])),
+    uiToParam: dEt.v1ToUiParam,
+    fockUiToParam: dEt.fockV1ToUiParam,
+    ops: deriveOps(MOCK_SCHEMA),
+  });
+  try {
+    const VIEW = { wigner_mode: 0, lim: 5.0, n: 64 };
+    // op 改名（曾报 "op measure_homodyne 不在 Lab 白名单"）
+    const g = stateFromJson({
+      schema: "circuit_v1", nmode: 1, seed: 0, view: VIEW,
+      ops: [{ id: "h0", op: "measure_homodyne", modes: [0], params: {} }],
+    });
+    assert.equal(g.error, undefined);
+    assert.equal(g.state.nodes[0].op, "homodyne");
+    // 参数改名 theta→phi（曾报 "ops[0].params.phi 必须是有限数值"）
+    const p = stateFromJson({
+      schema: "circuit_v1", nmode: 1, seed: 0, view: VIEW,
+      ops: [{ id: "p0", op: "phase", modes: [0], params: { theta: 0.7 } }],
+    });
+    assert.equal(p.error, undefined);
+    assert.deepEqual(p.state.nodes[0].params, { phi: 0.7 });
+    // fock drop-table T→eta/nbar（曾报 "ops[0].params.T 必须是有限数值"）
+    const f = stateFromJson({
+      schema: "circuit_v1", backend: "fock", nmode: 1, seed: 0, view: VIEW,
+      ops: [{ id: "l0", op: "loss", modes: [0], params: { eta: 0.5 } }],
+    });
+    assert.equal(f.error, undefined);
+    // nbar 是 fock drop 表项且 advanced:true → 回落 UI 默认 0（editor.js:241），
+    // 序列化时再被 ops.js drop 表丢掉（round-trip 稳定）。曾报 "params.T 必须是有限数值"。
+    assert.deepEqual(f.state.nodes[0].params, { T: 0.5, nbar: 0 });
+    assert.equal(toV1Json(f.state).ops[0].params.nbar, undefined); // fock drop 表生效
+  } finally {
+    publishSchema(MOCK_SCHEMA, { ops: deriveOps(MOCK_SCHEMA), uiToOp: {}, uiToParam: {}, fockUiToParam: {} });
+  }
+});
+
+test("§3.1: editor.js 不读未经发布的派生表键（结构守卫）", async () => {
+  const { readFileSync } = await import("node:fs");
+  const raw = readFileSync(new URL("../cvsim/lab/static/editor.js", import.meta.url), "utf8");
+  // 去注释后再扫 —— 否则本次修复的历史说明注释自己就会命中
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  // 发布契约（app.js:854-859）= 这四个键；任何别的 s.<key> 读取都是猜名
+  const PUBLISHED = new Set(["uiToOp", "uiToParam", "fockUiToParam", "ops"]);
+  const bad = [...src.matchAll(/\bs\.([A-Za-z_$][\w$]*)/g)]
+    .map((m) => m[1])
+    .filter((k) => !PUBLISHED.has(k));
+  assert.deepEqual(bad, [], `editor.js 读了未发布的派生表键: ${bad.join(", ")}`);
+  // 且 tables() 不得再从 schemaTables() 取表（中间态已删）
+  assert.ok(!/schemaTables/.test(src), "editor.js 不应再 import/调用 schemaTables()");
+});
+
+/* ── §3.4: setInitial 必须按 cutoff 夹取（曾与自身注释矛盾）────────────
+   缺陷: editor.js 的 setInitial 直接 `next[i] = v`，无 cutoff 上界，
+   而 modeLabel 渲染 `|v⟩`、服务端 fock/ir.py 又硬拒越界（422
+   "initial[i]=n must be in [0, c)"）。浏览器**不会**把手工输入夹到
+   input.max，故 cutoff=2 + 输入 9 → 状态 initial=[9] + 标签 |9⟩ + 422。
+   clampInitial 原先只在 fock.js（结果面板）里，那条路是拖 cutoff 滑条，
+   与 initial 输入框这条路无关 —— 所以"唯一夹取实现"从没被走到。
+   修法: 夹取实现移到 initial.js（fock 语义单点），setInitial 里调。 */
+
+test("§3.4: clampInitial — per-mode Fock 光子数夹到 [0, cutoffs[i]-1]", () => {
+  // 原 fock.test.mjs 的用例逐条搬来（导出位置变了，语义未变）
+  assert.deepEqual(clampInitial([1, 1], [10, 10], 2), [1, 1]);
+  assert.deepEqual(clampInitial([99, -2], [10, 10], 2), [9, 0]);
+  assert.deepEqual(clampInitial(null, [5, 5], 2), [0, 0]);
+  assert.deepEqual(clampInitial([1], [10, 10], 2), [1, 0]); // pad
+  assert.deepEqual(clampInitial([1, 1, 1], [10, 10], 2), [1, 1]); // truncate
+  // 本次缺陷的核心场景：cutoff=2 时 9 必须夹成 1（= cutoff-1）
+  assert.deepEqual(clampInitial([9], [2], 1), [1]);
+  assert.deepEqual(clampInitial([9], [2, 2], 2), [1, 0]);
+});
+
+test("§3.4: clampInitial 归位 initial.js（fock.js 不再自己实现）", async () => {
+  const { readFileSync } = await import("node:fs");
+  const ini = readFileSync(new URL("../cvsim/lab/static/initial.js", import.meta.url), "utf8");
+  const fk = readFileSync(new URL("../cvsim/lab/static/fock.js", import.meta.url), "utf8");
+  assert.ok(/export function clampInitial\(/.test(ini), "clampInitial 必须由 initial.js 导出");
+  assert.ok(!/function clampInitial\(/.test(fk), "fock.js 不得再保留第二份实现");
+  assert.ok(/import \{[^}]*clampInitial[^}]*\} from "\.\/initial\.js"/.test(fk),
+    "fock.js 应从 initial.js import clampInitial");
+});
+
+test("§3.4: setInitial 走 clampInitial（结构守卫，fock 分支）", async () => {
+  const { readFileSync } = await import("node:fs");
+  const raw = readFileSync(new URL("../cvsim/lab/static/editor.js", import.meta.url), "utf8");
+  const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const body = src.split("function setInitial(i, v) {")[1].split("\n  }\n", 1)[0];
+  assert.ok(body, "找不到 setInitial");
+  assert.ok(/clampInitial\(/.test(body), "setInitial 必须调 clampInitial 夹 initial");
+  // 只对 fock 生效 —— bosonic 项是 null / 源名，过 clamp 会被毁成数字
+  assert.ok(/backend === "fock"/.test(body),
+    "clampInitial 必须限定在 fock 分支（bosonic 源名不能被当数字夹）");
+});
+
 /* ══════════════════════════════════════════════════════════════════════
    09-21-lab-gaussian-unhide-ops：解锁 5 个 gaussian op + 三个前端缺陷回归
    ──────────────────────────────────────────────────────────────────────

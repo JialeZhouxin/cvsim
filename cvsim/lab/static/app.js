@@ -15,6 +15,13 @@ import { el, fmt, axisVal, outcomeText } from "./svg_kit.js"; // SVG_NS 留在 l
 import { validateScanForm } from "./scan_form.js";
 import { initStepState, stepLabel, stepDesc, stepMeters } from "./steps_slider.js";
 import { DEFAULT_SCENE } from "./default_scene.js";
+import {
+  meterRowPlan, panelsFor, runBodyExtensions,
+} from "./backend_panels.js";
+import {
+  modesAOptions, scanEnabled, scanNodeListKey, sweepDefaults, sweepParamKeys, sweepableNodes,
+} from "./scan_panel.js";
+import { AXIS_THEME, FRAME_THEME, axisLabelSpecs, gridSegments, themeVars } from "./chart_frame.js";
 
 /* L5.5 默认场景字面量已迁居 default_scene.js（票3 单一事实源，ADR-0009）
    —— app.js 与 pytest 经同一 leaf 取值，测试不再正则读本文件。 */
@@ -184,9 +191,7 @@ function drawAxes(lim) {
   svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
   svg.replaceChildren();
 
-  const style = getComputedStyle(document.documentElement);
-  const axis = style.getPropertyValue("--color-axis").trim() || "#7fe0ff";
-  const paper = style.getPropertyValue("--color-paper").trim();
+  const { axis, paper } = themeVars(getComputedStyle(document.documentElement), AXIS_THEME);
   const cx = w / 2;
   const cy = h / 2;
 
@@ -232,15 +237,9 @@ new ResizeObserver(() => {
   });
 }).observe(canvas);
 
-/* R6 (ADR-0008 决策 3): meter 行标签 — 值消费者 (meter VALUE 读取口) 与
-   渲染顺序的唯一前端声明处；键集来自 /schema meter 矩阵
-   (schema_store.meterKeys，后端事实源 cvsim/lab/result.py)。 */
-const METER_ROWS = {
-  purity: { value: "m-purity", label: "纯度" },
-  mean_photon: { value: "m-nbar", label: "平均光子数" },
-  mean_photon_per_mode: { value: "m-permode", label: "各模式 ⟨n⟩" },
-  log_negativity: { value: "m-logneg", label: "对数负度" },
-};
+/* R6: meter 行标签表与渲染计划已迁居 backend_panels.js leaf（§3.3 单点）；
+   键集来自 /schema meter 矩阵 (schema_store.meterKeys，后端事实源
+   cvsim/lab/result.py)。本函数只做 DOM 汇点。 */
 
 /** meter 面板渲染 (gaussian/bosonic 共享)：矩阵定行可见性，值经 fmt
    (缺键/None → 诚实 "—")。矩阵外静态行隐藏 (防御：HTML 漂移时可见)；
@@ -248,13 +247,13 @@ const METER_ROWS = {
    showMeasurement (m-singular-note)。 */
 function renderMetersPanel(backend, m) {
   const keys = meterKeys(backend);
-  for (const [key, row] of Object.entries(METER_ROWS)) {
-    const tr = $(`m-row-${key}`);
+  for (const row of meterRowPlan(keys)) {
+    const tr = $(row.rowId);
     if (!tr) continue; // HTML 漂移防御：矩阵键无静态行则跳过，不渲染
-    tr.hidden = !keys.has(key);
-    if (keys.has(key)) {
-      const val = m[key];
-      $(row.value).textContent = Array.isArray(val)
+    tr.hidden = !row.visible;
+    if (row.visible) {
+      const val = m[row.key];
+      $(row.valueId).textContent = Array.isArray(val)
         ? val.map((v) => fmt(v)).join(" ")
         : fmt(val);
     }
@@ -447,14 +446,8 @@ async function runBosonicFidelity() {
   });
 }
 
-/* R7 (ADR-0008 follow-up): per-backend 面板可见性表 — 后端差异知识单点
-   （NOTES.md 已知债务：backend 条件散布收口，方向 = per-backend 配置表）。
-   syncBackendPanels 唯一消费者；新后端 = 一行，不添 if。 */
-const BACKEND_PANELS = {
-  gaussian: { "scan-panel": true, "state-grid": true, "fock-panel": false, "fock-charts": false, "bosonic-panel": false, "meters-panel": true, "wigner-side": true },
-  fock: { "scan-panel": false, "state-grid": false, "fock-panel": true, "fock-charts": true, "bosonic-panel": false, "meters-panel": false, "wigner-side": false },
-  bosonic: { "scan-panel": false, "state-grid": false, "fock-panel": false, "fock-charts": false, "bosonic-panel": true, "meters-panel": true, "wigner-side": true },
-};
+/* R7 (ADR-0008 follow-up): per-backend 面板可见性表已迁居 backend_panels.js
+   leaf（§3.3 单点）。syncBackendPanels 唯一消费者；新后端 = 一行，不添 if。 */
 
 /* C1 R3: 后端未变则面板可见性不可能变，故早退——但首次调用必须放行。
    调用点有两个：hooks.onState（每次 render 都跑）与 init() 首次同步。
@@ -463,7 +456,7 @@ const BACKEND_PANELS = {
 let lastPanelsBackend = null;
 
 function syncBackendPanels(backend) {
-  const panels = BACKEND_PANELS[backend];
+  const panels = panelsFor(backend);
   if (!panels) return; // 未知 backend：保持现状（schema 门已拦，防御不摸 DOM）
   if (backend === lastPanelsBackend) return; // 后端未变 → hidden 已是目标态
   lastPanelsBackend = backend;
@@ -506,15 +499,11 @@ function showMeasurement(body) {
   requestAnimationFrame(() => measurementPanel.scrollIntoView({ block: "nearest" }));
 }
 
-/* R7: per-backend run 请求体扩展 — bosonic 一次拉全部分步快照
-   （断点中间态）；gaussian/fock 无扩展。知识单点（原三元式散在 doRun）。 */
-const RUN_BODY_EXTENSIONS = {
-  bosonic: { detail: "steps" },
-};
+/* R7: per-backend run 请求体扩展表已迁居 backend_panels.js leaf（§3.3 单点）。 */
 
 async function doRun(circuitJson, seq) {
   const t0 = performance.now();
-  const payload = { ...circuitJson, ...(RUN_BODY_EXTENSIONS[circuitJson.backend] ?? {}) };
+  const payload = { ...circuitJson, ...runBodyExtensions(circuitJson.backend) };
   await requestLab("/run", {
     payload, seq, guard: seqGuard,
     busy: busyRunSample,
@@ -553,29 +542,14 @@ function scheduleRun(circuitJson) {
 }
 
 /* ── scan panel (L4, F-LAB-SCAN) ──────────────────────── */
-/* C1 R2: 脏键 = 「可 sweep 节点身份集合」+ nmode，**不是 nodes 数组引用**。
-   引用比较不可能命中：onParam 用 state.nodes.map(...) 重构数组，map 无论元素
-   是否变化都返回新数组，故每次滑条事件都是新引用 → 永不早退（实测：代码看似
-   改了、行为完全没变）。这里只取列表真正依赖的东西——哪些节点可 sweep 即
-   其 (id, op)，参数**值**不进列表。故拖滑条（id/op 不变）命中早退，
-   增删节点 / 改 op / 增删模（都在键里）则重建。 */
+/* C1 R2 脏键语义（节点身份而非数组引用）已迁居 scan_panel.js leaf（§3.3）。 */
 let lastScanKey = null;
 
-function scanNodeListKey() {
-  const st = editor.getState();
-  const sig = st.nodes
-    .filter((n) => Object.values(OPS[n.op]?.params || {}).some((d) => Array.isArray(d.sweep)))
-    .map((n) => `${n.id}:${n.op}`)
-    .join(",");
-  return `${st.nmode}|${sig}`;
-}
-
 function refreshScanNodes() {
-  const key = scanNodeListKey();
+  const key = scanNodeListKey(editor.getState(), OPS);
   if (key === lastScanKey) return; // 列表输入未变 → <option> 已是目标态
   lastScanKey = key;
-  const nodes = editor.getState().nodes.filter((n) =>
-    Object.values(OPS[n.op]?.params || {}).some((d) => Array.isArray(d.sweep)));
+  const nodes = sweepableNodes(editor.getState(), OPS);
   const prev = scanNode.value;
   scanNode.replaceChildren();
   for (const n of nodes) {
@@ -592,10 +566,7 @@ function refreshScanNodes() {
 
 function refreshScanParams() {
   const node = editor.getState().nodes.find((n) => n.id === scanNode.value);
-  const meta = node && OPS[node.op];
-  const keys = meta
-    ? Object.keys(meta.params).filter((k) => Array.isArray(meta.params[k].sweep))
-    : [];
+  const keys = sweepParamKeys(node, OPS);
   const prev = scanParam.value;
   scanParam.replaceChildren();
   for (const k of keys) {
@@ -611,28 +582,28 @@ function refreshScanParams() {
 
 function applyScanDefaults() {
   const node = editor.getState().nodes.find((n) => n.id === scanNode.value);
-  const d = node && OPS[node.op]?.params?.[scanParam.value];
-  if (!d || !Array.isArray(d.sweep)) return;
-  scanMin.value = d.sweep[0];
-  scanMax.value = d.sweep[1];
-  scanN.value = 50;
+  const d = sweepDefaults(node, scanParam.value, OPS);
+  if (!d) return;
+  scanMin.value = d.min;
+  scanMax.value = d.max;
+  scanN.value = d.n;
 }
 
 function refreshScanModesA() {
   const nmode = editor.getState().nmode;
   const prev = scanModesA.value;
   scanModesA.replaceChildren();
-  for (let k = 1; k <= nmode - 1; k++) {
+  for (const o of modesAOptions(nmode)) {
     const opt = document.createElement("option");
-    opt.value = k;
-    opt.textContent = `[0..${k - 1}]`;
-    if (String(k) === prev) opt.selected = true;
+    opt.value = o.value;
+    opt.textContent = o.label;
+    if (o.value === prev) opt.selected = true;
     scanModesA.appendChild(opt);
   }
   if (!scanModesA.value && scanModesA.options.length) scanModesA.options[0].selected = true;
   scanNote.hidden = nmode >= 2;
   if (nmode < 2) scanNote.textContent = "E_N 需要至少 2 个模式（先点「＋模」加一个）";
-  scanBtn.disabled = nmode < 2 || !scanNode.options.length;
+  scanBtn.disabled = !scanEnabled(nmode, scanNode.options.length);
 }
 
 function drawScanCurve(body) {
@@ -662,33 +633,24 @@ function drawScanCurve(body) {
   sum.hidden = false;
   sum.textContent = `E_N 最大 ${axisVal(ymax)} @ ${scanParam.value}=${axisVal(finite[iMax].x)}`;
   const { X, Y } = makeScale({ x0, x1, ylo, yhi, W, H, pad: { l: padL, r: padR, t: padT, b: padB } });
-  const style = getComputedStyle(document.documentElement);
-  const rule = style.getPropertyValue("--color-rule").trim();
-  const ink = style.getPropertyValue("--color-ink").trim();
-  const accent = style.getPropertyValue("--color-accent").trim();
+  const pad = { l: padL, r: padR, t: padT, b: padB };
+  const { rule, ink, accent } = themeVars(
+    getComputedStyle(document.documentElement), FRAME_THEME,
+  );
   scanSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   scanSvg.replaceChildren();
-  for (let i = 0; i <= 4; i++) { // grid
-    const gx = padL + (i / 4) * (W - padL - padR);
-    scanSvg.append(el("line", { x1: gx, y1: padT, x2: gx, y2: H - padB, stroke: rule, "stroke-width": 1 }));
-    const gy = padT + (i / 4) * (H - padT - padB);
-    scanSvg.append(el("line", { x1: padL, y1: gy, x2: W - padR, y2: gy, stroke: rule, "stroke-width": 1 }));
+  for (const g of gridSegments(W, H, pad, 4)) { // grid（原顺序：竖横交错）
+    scanSvg.append(el("line", { x1: g.x1, y1: g.y1, x2: g.x2, y2: g.y2, stroke: rule, "stroke-width": 1 }));
   }
   const slots = xs.map((x, i) => (typeof ys[i] === "number" && Number.isFinite(ys[i]) ? [x, ys[i]] : null));
   for (const seg of polylineSegments(slots, X, Y, xs.length)) {
     scanSvg.append(el("polyline", { points: seg, fill: "none", stroke: accent, "stroke-width": 1.5 }));
   }
-  const label = (tx, ty, anchor, text) => {
-    const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: ink });
-    t.textContent = text;
-    return t;
-  };
-  scanSvg.append(
-    label(padL, H - 4, "start", axisVal(x0)),
-    label(W - padR, H - 4, "end", axisVal(x1)),
-    label(padL - 6, padT + 4, "end", axisVal(yhi)),
-    label(padL - 6, H - padB, "end", axisVal(ylo)),
-  );
+  for (const s of axisLabelSpecs({ x0, x1, ylo, yhi, W, H, pad }, axisVal)) {
+    const t = el("text", { x: s.x, y: s.y, "text-anchor": s.anchor, fill: ink });
+    t.textContent = s.text;
+    scanSvg.append(t);
+  }
 }
 
 async function doScan() {

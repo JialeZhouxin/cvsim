@@ -1,4 +1,27 @@
-"""F-LAB-STATIC: static page serving, key elements, offline guard."""
+"""F-LAB-STATIC: static page serving, key elements, offline guard.
+
+**This file is the "source-shape" layer (review §4.6).** Most tests here read a
+frontend file's *text* and assert a shape (a call site exists, a table is
+declared, a CSS rule was not moved). They are deliberately kept — but they are
+NOT behaviour tests, and they must not be confused with the leaf layer:
+
+  * behaviour of a JS leaf  → ``tests/*.test.mjs`` (``node --test``, ADR-0009),
+    one file per leaf, real inputs and real assertions on the returned values;
+  * behaviour of the whole page → ``tests/lab_*_probe.mjs`` (headless Edge + CDP);
+  * **shape** of the markup/CSS/assembly → here.
+
+Why the split matters: a source-string assertion goes red when someone renames a
+local variable and stays green when the behaviour actually breaks. So a test
+belongs here **only** when its subject genuinely *is* the source text — an
+offline-URL sweep, a served-asset check, a "this visual regression was rejected,
+do not reintroduce it" reverse guard, or a wiring edge that no single leaf owns.
+Anything that can be expressed as "given this input, this function returns that"
+belongs in the leaf layer instead.
+
+``test_shape_guards_are_declared_not_silently_behavioural`` below enforces that
+every test in this file is accounted for in one of the two lists, so a new test
+cannot quietly join the source-string pile.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +37,90 @@ from cvsim.lab.server import app
 client = TestClient(app)
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "cvsim" / "lab" / "static"
+
+#: Tests whose subject is genuinely the source text / served bytes (see module
+#: docstring). Each needs a reason; "it was easier to grep" is not one.
+SHAPE_GUARDS = {
+    # serving + presence
+    "test_index_served": "serves the page (bytes over HTTP)",
+    "test_assets_served": "serves each asset (bytes over HTTP)",
+    "test_key_elements_present": "index.html declares the element ids the JS binds",
+    "test_offline_guard_no_external_urls": "no external URL anywhere in the page shell",
+    # cross-file wiring edges no single leaf owns
+    "test_l3_homodyne_in_palette_contract": "ops.js ↔ ir.py op-name/param contract",
+    "test_l4_amp_mz_in_palette_contract": "ops.js ↔ ir.py palette contract",
+    "test_lut_clamp_guard": "app.js still consumes colormap.js (edge + clamp text)",
+    "test_wigner_frame_sizing_is_css_only": "CSS-owns-geometry reverse guard",
+    "test_wigner_side_column_is_width_capped": "CSS width cap (visual regression)",
+    "test_interaction_light_paths_reuse_sync_chrome": "one side-effect sequence, not three",
+    "test_staff_labels_resync_on_cutoff_path": "cutoff path re-syncs mode labels",
+    "test_scan_dirty_key_is_node_identity_not_array_ref": "app.js passes state+OPS to the leaf key",
+    "test_heatmap_cache_key_covers_grid_not_size": "canvas cache key shape (pixel-gated)",
+    "test_canvas_size_guard_and_static_colorbar": "canvas size guard + colorbar reset path",
+    "test_r6_kept_high_smoothing": "rejected visual change must not return",
+    "test_fock_heat_rects_reused_not_rebuilt": "SVG rect reuse contract",
+    "test_renames_hoisted_out_of_node_loop": "hoisting + not-at-module-scope",
+    "test_one_to_v1_json_per_mutation": "single serialize path per mutation",
+    "test_fock_theme_vars_read_in_one_pass": "batched theme read, one getComputedStyle",
+    "test_scrollbar_rule_stays_universal_not_root": "rejected CSS change must not return",
+    "test_staff_is_not_a_live_region": "a11y: no aria-live on the staff",
+    "test_scroll_into_view_runs_in_animation_frame": "rAF-gated layout read",
+    "test_health_does_not_gate_editor_boot": "/health is not awaited before boot",
+    "test_dragover_reads_layout_at_most_once_and_never_queries_all": "no layout thrash in DnD",
+    "test_prev_lane_is_cleared_in_clear_hover": "hover state fully cleared",
+    "test_auto_scroll_is_raf_deduped": "rAF-deduped auto-scroll",
+    "test_ghost_uses_transform_with_zeroed_offsets": "transform-based ghost (no reflow)",
+}
+
+#: Tests that drive real code and assert observable behaviour — no source text.
+BEHAVIOUR_TESTS = {
+    "test_a3_logneg_freeze",
+    "test_default_scene_runs",
+    "test_view_bounds_enforced",
+    "test_default_scene_to_v1_byte_frozen",
+    "test_shape_guards_are_declared_not_silently_behavioural",
+}
+
+
+def test_shape_guards_are_declared_not_silently_behavioural():
+    """Every test in this file must be declared in exactly one list above.
+
+    The point of the two lists is that "source-shape guard" is a *conscious*
+    classification with a stated reason, not a default that new tests fall into
+    by copying their neighbour. Deleting this meta-guard would let the file
+    silently drift back into "grep the frontend source" (§4.6).
+    """
+    declared = set(SHAPE_GUARDS) | BEHAVIOUR_TESTS
+    assert not (set(SHAPE_GUARDS) & BEHAVIOUR_TESTS), (
+        "a test is in both lists — it cannot be a shape guard and a behaviour test"
+    )
+
+    src = Path(__file__).read_text(encoding="utf-8")
+    defined = set(re.findall(r"^def (test_\w+)", src, re.M))
+    missing = defined - declared
+    assert not missing, (
+        f"these tests are not declared in SHAPE_GUARDS or BEHAVIOUR_TESTS: "
+        f"{sorted(missing)}. Add each one with a reason — do not let a new "
+        f"source-string assertion join silently (§4.6)."
+    )
+    stale = declared - defined
+    assert not stale, f"declared but no longer defined: {sorted(stale)}"
+
+    # And the shape guards really are the source-reading ones: at least the
+    # overwhelming majority must read a frontend file's text.
+    readers = {name for name in SHAPE_GUARDS if _reads_frontend_source(name, src)}
+    assert len(readers) >= 24, (
+        f"only {len(readers)} of {len(SHAPE_GUARDS)} declared shape guards actually "
+        f"read frontend source — the classification has drifted"
+    )
+
+
+def _reads_frontend_source(name: str, src: str) -> bool:
+    """True if the test body calls read_text() on a frontend file."""
+    m = re.search(rf"^def {re.escape(name)}\(.*?\):(.*?)(?=^def |\Z)", src, re.M | re.S)
+    if not m:
+        return False
+    return "read_text(" in m.group(1) or "subprocess" in m.group(1)
 
 
 def _strip_js_comments(src: str) -> str:
@@ -160,11 +267,38 @@ def test_offline_guard_no_external_urls():
     """Local workbench hard constraint: zero external network references.
     Case-insensitive schemes (no protocol-relative / URL() forms allowed).
     SVG namespace URI (http://www.w3.org/2000/svg) is a constant, not a
-    network reference."""
-    for name in ("index.html", "tokens.css", "style.css", "app.js"):
+    network reference.
+
+    §3.3: the sweep walks **every** served frontend file (discovered, not a
+    hardcoded list) — a leaf extracted into a new module would otherwise be
+    served without ever being checked. Discovered via import graph, so a new
+    file is covered the moment app.js/editor.js/fock.js import it.
+    """
+    for name in sorted(_served_frontend_files()):
         src = (STATIC_DIR / name).read_text(encoding="utf-8")
         stripped = src.replace("http://www.w3.org/2000/svg", "")
         assert not re.search(r"(?i)https?://|@import", stripped), f"{name}: external ref"
+
+
+def _served_frontend_files() -> set[str]:
+    """Frontend sources reachable from index.html (transitively via imports).
+
+    Anchored on the served entry points, then followed through `from "./x.js"`.
+    """
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    entry = re.findall(r'<script[^>]+src="([^"]+)"', html)
+    seen: set[str] = set()
+    queue = [name.lstrip("./") for name in entry]
+    while queue:
+        name = queue.pop()
+        if name in seen or not (STATIC_DIR / name).is_file():
+            continue
+        seen.add(name)
+        js = (STATIC_DIR / name).read_text(encoding="utf-8")
+        queue.extend(re.findall(r'from\s+"\./([\w.]+\.js)"', js))
+    # CSS is linked, not imported
+    seen.update(re.findall(r'<link[^>]+href="([^"]+)"', html))
+    return seen
 
 
 def test_lut_clamp_guard():
@@ -408,13 +542,20 @@ def test_scan_dirty_key_is_node_identity_not_array_ref():
     `onParam` 用 `state.nodes.map(...)` 重构数组，map 无论元素是否变化都返回
     **新数组** → 用 `nodes` 引用当脏键**永不命中**，规划中的修复会是静默空操作。
     故脏键必须是节点身份（id/op）而非数组引用。
+
+    **§3.3 后本测试只剩接线边**：脏键算法已迁居 `scan_panel.js`（`scanNodeListKey`），
+    那里由 `tests/scan_panel.test.mjs` 用真实输入断言（含"重建数组同键"这条
+    正是本测试原本想守的性质）。这里只锁 app.js 仍然**把 state 与 OPS 交给
+    leaf**，而不再自己抄一份身份逻辑。
     """
-    js = (STATIC_DIR / "app.js").read_text(encoding="utf-8")
-    assert "function scanNodeListKey()" in js, "脏键函数缺失"
-    body = js.split("function scanNodeListKey() {", 1)[1].split("\n}\n", 1)[0]
-    assert "${n.id}:${n.op}" in body, "脏键未取节点身份（id/op）"
-    assert "state.nodes ===" not in body and "nodes === lastScanKey" not in body, (
-        "脏键不能用 nodes 数组引用：map() 恒返回新数组，永不命中"
+    js = _strip_js_comments((STATIC_DIR / "app.js").read_text(encoding="utf-8"))
+    assert "scanNodeListKey(editor.getState(), OPS)" in js, (
+        "app.js 未把 state+OPS 交给 scan_panel.js 的脏键函数"
+    )
+    assert "lastScanKey = key" in js, "脏键未接入早退"
+    # the identity logic itself must not be re-inlined here
+    assert "${n.id}:${n.op}" not in js, (
+        "app.js 又抄了一份可 sweep 身份拼接 —— 应留在 scan_panel.js 单点"
     )
 
 
@@ -548,28 +689,38 @@ def test_one_to_v1_json_per_mutation():
 
 
 def test_fock_theme_vars_read_in_one_pass():
-    """R4: fock 的 CSS 变量批量读取。
+    """R4: fock 的 CSS 变量批量读取（§3.3 后只剩 DOM 侧那一半）。
 
     原先 `cssVar()` 每读一个变量都调一次 `getComputedStyle(document.documentElement)`：
     `drawBars` 4 次 + `drawJointPair` 2 次 = 每帧 6 次样式解析入口。
-    改为 `readThemeVars(names)` 单次读取。缓存假设已记在函数注释里：
-    项目无主题切换 UI（tokens.css 静态 :root），故不得把它提到模块顶层。
+
+    **§3.3 后**：批量读取的纯逻辑（含回退值）已迁居 `chart_frame.js` 的
+    `themeVars(style, spec)`，由 tests/chart_frame.test.mjs 直测。fock.js 只保留
+    一个薄 DOM 边界 `themeVarsOf(spec)` —— 每帧仍只取一次 computed style，
+    且**不得**重新长出第二份局部实现（那正是 leaf 化的反面）。
+    缓存假设：项目无主题切换 UI，tokens.css 是静态 :root，故不得提到模块顶层。
     """
     js = (STATIC_DIR / "fock.js").read_text(encoding="utf-8")
-    assert "function readThemeVars(names)" in js, "缺少批量读取函数"
-    assert "function cssVar(" not in js, "旧 cssVar 应已被 readThemeVars 取代"
-    # exactly one getComputedStyle, inside readThemeVars
-    assert js.count("getComputedStyle(") == 1, "getComputedStyle 应只剩 readThemeVars 内那一处"
-    rtv = js.split("function readThemeVars(names) {", 1)[1].split("\n}\n", 1)[0]
-    assert "getComputedStyle(document.documentElement)" in rtv
-    # both draw paths must go through the batched reader
-    assert js.count("readThemeVars(") == 3, "两个调用点 + 定义处 = 3 次命中"
-    # fallbacks preserved verbatim
-    for fb in ('"#2e63d1"', '"#c33"', '"#ccc"', '"#333"'):
-        assert fb in js, f"缺回退色 {fb}"
+    boundary = (
+        "const themeVarsOf = (spec) => "
+        "themeVars(getComputedStyle(document.documentElement), spec);"
+    )
+    assert boundary in js, (
+        "缺少 themeVarsOf DOM 边界（或它不再委托 chart_frame.themeVars）"
+    )
+    assert "function readThemeVars(" not in js, "局部 readThemeVars 应已迁居 chart_frame.js"
+    # exactly one getComputedStyle, inside the single boundary
+    assert js.count("getComputedStyle(") == 1, "getComputedStyle 应只剩 themeVarsOf 内那一处"
+    # both draw paths must go through that one boundary (2 call sites; the
+    # definition is an arrow const, so it does not match "themeVarsOf(")
+    assert js.count("themeVarsOf(") == 2, "两处绘制点都必须走 themeVarsOf"
+    # the theme tables live in the leaf
+    assert 'from "./chart_frame.js"' in js, "fock.js 未消费 chart_frame.js"
     # pure-function exports must be untouched (可测性未破坏)
+    # clampInitial 已迁到 initial.js（§3.4：fock 语义单点，editor 也要用），
+    # 故不在此列表 —— 它在 initial.js 的导出由下方 §3.4 测试锁定。
     for name in ("histBars", "reshapeCounts", "marginalOf", "overlayHeat", "leakInfo",
-                 "slowCutoff", "clampInitial", "batchMeasRows"):
+                 "slowCutoff", "batchMeasRows"):
         assert f"export function {name}" in js or f"export const {name}" in js, (
             f"纯函数导出 {name} 被破坏"
         )
@@ -661,7 +812,9 @@ def test_health_does_not_gate_editor_boot():
     assert 'await (await fetch("/schema")).json()' in init, "/schema 门控被改"
     assert "schemaOk = true" in init
     assert "后端 schema 不可用" in init, "/schema 失败的红条被删"
-    for bid in ("run-btn", "sample-btn", "scan-btn", "save-btn", "fidelity-btn", "bos-fidelity-btn"):
+    for bid in (
+        "run-btn", "sample-btn", "scan-btn", "save-btn", "fidelity-btn", "bos-fidelity-btn",
+    ):
         assert f'"{bid}"' in init, f"失败禁用清单缺 {bid}"
     # ordering: /health must not sit between the /schema gate and editor.render()
     health_at = init.index('fetch("/health")')

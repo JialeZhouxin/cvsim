@@ -1,12 +1,14 @@
 /* Gaussian Lab F7 — fock.js pure logic tests (node --test, zero deps).
-   histBars / overlayHeat / leakInfo / clampInitial / batchMeasRows /
-   marginalOf / sampleSeries — no DOM. */
+   histBars / overlayHeat / leakInfo / batchMeasRows /
+   marginalOf / sampleSeries — no DOM.
+   clampInitial 已移到 initial.js（fock 语义单点，§3.4），其测试随之搬去
+   editor.test.mjs 的 initial 段。 */
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
   histBars, reshapeCounts, overlayHeat, leakInfo, slowCutoff,
-  clampInitial, batchMeasRows, sampleSeries, marginalOf,
+  batchMeasRows, sampleSeries, marginalOf,
 } from "../cvsim/lab/static/fock.js";
 
 test("histBars: theory-only view (counts=null → sample 0)", () => {
@@ -84,14 +86,6 @@ test("slowCutoff: cutoff>20 → Wigner 慢速提示", () => {
   assert.equal(slowCutoff([20]), false);
   assert.equal(slowCutoff([]), false);
   assert.equal(slowCutoff(null), false);
-});
-
-test("clampInitial: per-mode Fock number into [0, cutoffs[i]-1]", () => {
-  assert.deepEqual(clampInitial([1, 1], [10, 10], 2), [1, 1]);
-  assert.deepEqual(clampInitial([99, -2], [10, 10], 2), [9, 0]);
-  assert.deepEqual(clampInitial(null, [5, 5], 2), [0, 0]);
-  assert.deepEqual(clampInitial([1], [10, 10], 2), [1, 0]); // pad
-  assert.deepEqual(clampInitial([1, 1, 1], [10, 10], 2), [1, 1]); // truncate
 });
 
 test("batchMeasRows: measured histogram sorted desc", () => {

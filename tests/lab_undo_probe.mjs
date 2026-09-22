@@ -8,10 +8,10 @@
 
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { EDGE, port, userDataDir, uvicornPath } from "./probe_env.mjs";
 
-const PORT = 8767;
-const CDP_PORT = 9225;
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+const PORT = port(8767, "PROBE_PORT");
+const CDP_PORT = port(9225, "PROBE_CDP_PORT");
 const failures = [];
 const checks = [];
 
@@ -90,13 +90,13 @@ const undoDisabled = `document.getElementById("undo-btn").disabled`;
 const redoDisabled = `document.getElementById("redo-btn").disabled`;
 const jsonHas = (n) => `document.getElementById("json-input").value.includes(${JSON.stringify(n)})`;
 
-const server = spawn(process.cwd() + "/.venv/Scripts/uvicorn.exe", ["cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"], {
+const server = spawn(uvicornPath(), ["cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"], {
   cwd: process.cwd(), stdio: "ignore",
 });
 const edge = spawn(EDGE, [
   "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
   `--remote-debugging-port=${CDP_PORT}`,
-  "--user-data-dir=" + process.cwd() + "/.probe-edge-profile-undo",
+  "--user-data-dir=" + userDataDir(".probe-edge-profile-undo"),
   "about:blank",
 ], { stdio: "ignore" });
 

@@ -23,9 +23,9 @@
 "use strict";
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { EDGE, port, userDataDir, uvicornPath } from "./probe_env.mjs";
 
-const PORT = 8772, CDP_PORT = 9230;
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
+const PORT = port(8772, "PROBE_PORT"), CDP_PORT = port(9230, "PROBE_CDP_PORT");
 
 async function waitHttp(url, t = 60000) {
   const t0 = Date.now();
@@ -56,13 +56,13 @@ async function waitFor(ws, expr, t = 20000) {
   return false;
 }
 
-const server = spawn(process.cwd() + "/.venv/Scripts/uvicorn.exe",
+const server = spawn(uvicornPath(),
   ["cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"],
   { cwd: process.cwd(), stdio: "ignore" });
 const edge = spawn(EDGE, ["--headless=new", "--disable-gpu", "--no-first-run",
   "--no-default-browser-check", "--no-sandbox", "--disable-dev-shm-usage",
   "--remote-allow-origins=*", `--remote-debugging-port=${CDP_PORT}`,
-  "--user-data-dir=" + process.cwd() + "/.probe-edge-r7-profile", "about:blank"],
+  "--user-data-dir=" + userDataDir(".probe-edge-r7-profile"), "about:blank"],
   { stdio: "ignore" });
 const fails = [];
 function check(n, ok, d = "") { console.log(`${ok ? "PASS" : "FAIL"}  ${n}${d ? " — " + d : ""}`); if (!ok) fails.push(n); }

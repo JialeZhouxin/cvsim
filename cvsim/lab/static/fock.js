@@ -5,7 +5,9 @@
 "use strict";
 
 import { stateNmode } from "./ops.js";
+import { clampInitial } from "./initial.js";
 import { el, fmt } from "./svg_kit.js";
+import { FOCK_HEAT_THEME, FOCK_THEME, themeVars, yFractionScale } from "./chart_frame.js";
 
 /* ── pure logic ─────────────────────────────────────────── */
 
@@ -81,16 +83,6 @@ export function slowCutoff(cutoffs) {
   return Array.isArray(cutoffs) && cutoffs.length > 0 && cutoffs.some((c) => c > 20);
 }
 
-/** Clamp per-mode initial photon numbers into [0, cutoffs[i]-1]. */
-export function clampInitial(initial, cutoffs, nmode) {
-  const out = Array(nmode).fill(0);
-  for (let i = 0; i < nmode; i++) {
-    const n = initial && initial[i] !== undefined ? initial[i] : 0;
-    out[i] = Math.min(Math.max(0, Math.round(n)), (cutoffs[i] ?? 10) - 1);
-  }
-  return out;
-}
-
 /** Measured-batch histogram {key: count} → sorted rows (desc frequency). */
 export function batchMeasRows(counts) {
   return Object.entries(counts || {})
@@ -115,34 +107,24 @@ export function sampleSeries(distMode, batch) {
 
 /* ── DOM wiring (browser only) ──────────────────────────── */
 
-/* C5 R4: 一次 getComputedStyle 读全部需要的变量。
+/* C5 R4 / §3.3: 批量读取已迁居 chart_frame.js leaf（themeVars 单点，与 app.js
+   的 scan/fidelity 绘制共用）。本处只做 DOM 边界那一半：取 computed style。
    原先 cssVar() 每次调用都重新取 document.documentElement 的 computed style，
    drawBars 调 4 次、drawJointPair 调 2 次 = 每帧 6 次样式解析入口。
-   返回原始值（未 trim 的空串由调用处的 `|| fallback` 兜底）。
    缓存假设：项目无主题切换 UI，tokens.css 是静态 :root —— 若将来加了主题切换，
    必须让本函数的调用点重新读取（别把它提到模块顶层）。 */
-function readThemeVars(names) {
-  const cs = getComputedStyle(document.documentElement);
-  const out = {};
-  for (const n of names) out[n] = (cs.getPropertyValue(n) || "").trim();
-  return out;
-}
+const themeVarsOf = (spec) => themeVars(getComputedStyle(document.documentElement), spec);
 
 /** Grouped bars: theory (accent) + sample (error) side by side. */
 function drawBars(svg, bars) {
   const W = 320, H = 150, padL = 34, padR = 8, padT = 8, padB = 18;
   const vmax = Math.max(1e-12, ...bars.map((b) => Math.max(b.theory, b.sample)));
-  /* C5 R4: 4 次 getComputedStyle → 1 次 */
-  const { "--color-accent": accent0, "--color-error": error0, "--color-rule": rule0, "--color-ink": ink0 } =
-    readThemeVars(["--color-accent", "--color-error", "--color-rule", "--color-ink"]);
-  const accent = accent0 || "#2e63d1";
-  const error = error0 || "#c33";
-  const rule = rule0 || "#ccc";
-  const ink = ink0 || "#333";
+  /* C5 R4: 6 次 getComputedStyle → 每帧 2 次（每个绘制点一次） */
+  const { accent, error, rule, ink } = themeVarsOf(FOCK_THEME);
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.replaceChildren();
   // y 轴：0/0.5/1 网格线 + 数值刻度
-  const hOf = (v) => (v / vmax) * (H - padT - padB);
+  const hOf = yFractionScale(vmax, H, padT, padB); // §3.3: chart_frame leaf 单点
   for (const f of [0, 0.5, 1]) {
     const y = H - padB - hOf(vmax * f);
     svg.append(el("line", {
@@ -236,11 +218,8 @@ function drawJointPair(body, batch, dom) {
   const jointSvg = dom.jointSvg;
   const batchSvg = dom.batchSvg;
   if (!jointSvg || !batchSvg) return;
-  /* C5 R4: 2 次 getComputedStyle → 1 次 */
-  const { "--color-accent": accent0, "--color-error": error0 } =
-    readThemeVars(["--color-accent", "--color-error"]);
-  const accent = accent0 || "#2e63d1";
-  const error = error0 || "#c33";
+  /* C5 R4: 6 次 getComputedStyle → 每帧 2 次（每个绘制点一次） */
+  const { accent, error } = themeVarsOf(FOCK_HEAT_THEME);
   const joint = body.joint;
   if (!joint || !Array.isArray(joint.grid) || !joint.grid.length) {
     jointSvg.replaceChildren();

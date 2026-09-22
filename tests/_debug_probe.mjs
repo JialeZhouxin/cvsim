@@ -2,13 +2,13 @@
 "use strict";
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { EDGE, port, userDataDir, uvicornPath } from "./probe_env.mjs";
 
-const PORT = 8765, CDP_PORT = 9224;
-const EDGE = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
-const server = spawn(".venv/Scripts/uvicorn.exe", ["cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"], { stdio: "ignore" });
+const PORT = port(8765, "PROBE_PORT"), CDP_PORT = port(9224, "PROBE_CDP_PORT");
+const server = spawn(uvicornPath(), ["cvsim.lab.server:app", "--port", String(PORT), "--log-level", "warning"], { stdio: "ignore" });
 const edge = spawn(EDGE, [
   "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-  `--remote-debugging-port=${CDP_PORT}`, "--user-data-dir=" + process.env.TEMP + "/edge-debug-probe",
+  `--remote-debugging-port=${CDP_PORT}`, "--user-data-dir=" + userDataDir("edge-debug-probe"),
   "--window-size=1920,1200", `http://127.0.0.1:${PORT}/`,
 ], { stdio: "ignore" });
 
