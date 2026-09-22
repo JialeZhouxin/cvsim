@@ -74,6 +74,29 @@ jobs:
       - run: uv run --no-sync python -m pytest tests/test_public_api.py -q -v
 
   # -----------------------------------------------------------------------
+  # Frontend leaf contract layer (ADR-0009). The 9 *.test.mjs files run on
+  # `node --test` and import the static .js leaves directly (zero deps, no
+  # browser, no build). They never ran in CI before: pytest only collects
+  # test_*.py (pyproject testpaths/python_files), and node's *directory*
+  # mode does not pick up .mjs at all — `node --test tests/` fails with
+  # "Cannot find module .../tests", so the whole layer was a local ritual.
+  #
+  # The glob is expanded by the shell, so a new leaf test is collected with
+  # no edit here. tests/test_frontend_leaf_suite.py fails if the on-disk set
+  # and this command ever disagree (missing file, or a test wired nowhere).
+  # -----------------------------------------------------------------------
+  frontend:
+    name: Frontend leaf tests (node --test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"  # LTS; features used need >=17 (structuredClone, ??=)
+      - run: node --test tests/*.test.mjs
+
+  # -----------------------------------------------------------------------
   # Benchmark (vision Phase 3 exit #2/#5): m=100 compile+run must stay
   # under the time budget (default 2s in the script) or CI fails.
   # -----------------------------------------------------------------------

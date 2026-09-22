@@ -19,7 +19,7 @@ import pytest
 from cvsim.bosonic import BosonicCircuit, gkp0, gkp1, pure_fidelity, purity
 from cvsim.bosonic.cat import even_cat, odd_cat
 
-pytestmark = pytest.mark.phaseB6
+pytestmark = pytest.mark.phaseB7
 
 
 class TestKernelLogDomain:

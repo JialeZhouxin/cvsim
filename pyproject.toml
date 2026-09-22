@@ -121,11 +121,10 @@ disallow_untyped_defs   = false
 disallow_any_generics   = false
 warn_return_any         = true
 warn_unreachable        = true
+# `exclude = ["tests/"]` 已足够；原先另有一条
+# [[tool.mypy.overrides]] module="tests.*" ignore_errors=true 是**死配置**
+# —— exclude 先生效，那条 override 永远匹配不到任何文件（审计 §4.8）。
 exclude                 = ["tests/"]
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-ignore_errors = true
 
 [tool.pytest.ini_options]
 minversion    = "8"
@@ -145,6 +144,10 @@ markers = [
     "phaseB6: Bosonic B6 GUI three-piece tests",
     "phaseB7: Bosonic B7 complex-centre analyse kernel tests",
     "phaseB8: Bosonic B8 non-Gaussian kerr gate tests",
+    # B9/B10 的 marker 原**声明了但零文件使用**（审计 §4.8 实测：B9/B10 的
+    # 测试文件存在，却没有 pytestmark）——那等于两批测试在 CI 里无法被 -m 选中。
+    # 现补上声明对应的标记，并在 tests/README.md 写明"marker 是选择器，不是执行门"。
+    "phaseB9: Bosonic B9 single-mode PNR probability/sampling tests",
     "phaseB10: Bosonic B10 joint multimode PNR probability/sampling tests",
 ]
 filterwarnings = [
@@ -155,9 +158,20 @@ filterwarnings = [
 [tool.coverage.run]
 source   = ["cvsim"]
 branch   = true
-omit     = ["cvsim/demos/*"]
+# 原为 omit = ["cvsim/demos/*"] —— 但那把 m4_cross_rep.py 也排除了，而
+# tests/test_m4_cross_rep.py 唯一跑的就是它（审计 §4.8）。逐一列出**真正**
+# 无人执行的 demo 脚本，别用通配符盖住被测代码。
+omit = [
+    "cvsim/demos/m1_gaussian_squeeze.py",
+    "cvsim/demos/m2_fock_cutoff_scan.py",
+    "cvsim/demos/m3_cat_weights.py",
+    "cvsim/demos/user_acceptance.py",
+]
 
 [tool.coverage.report]
+# 实测基线 91.69%（1592 passed / 6095 stmts / 381 missed / 2258 branch / 283 partial）。
+# 留约 1.7 个点余量给正常的重构抖动，但不允许无声下滑。
+fail_under = 90
 exclude_also = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",

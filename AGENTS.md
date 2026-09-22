@@ -1,5 +1,10 @@
 uv run python -m cvsim.lab可拉起后端 FastAPI 和前端静态页 http://127.0.0.1:8000 。
+
 Edge headless 已能用（C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe）
+
+始终用中文与我沟通，并且最好用大白话回答我问题。
+
+浏览器探针生成的临时的 .probe*\ 文件使用完了就要删除。
  
 <!-- TRELLIS:START -->
 # Trellis Instructions

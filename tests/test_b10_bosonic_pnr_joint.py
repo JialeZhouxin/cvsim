@@ -23,6 +23,10 @@ from cvsim.bosonic import (
 )
 from cvsim.fock import FockState
 
+# §4.8: phaseB10 的 marker 声明在 pyproject 里但本文件漏打 —— 补上，
+# 否则 `pytest -m phaseB10` 选不到这批测试（marker 是选择器）。
+pytestmark = pytest.mark.phaseB10
+
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
