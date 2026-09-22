@@ -36,6 +36,7 @@ from cvsim.lab.ir import (
     LabCircuit,
     View,
     _num,
+    check_wigner_mode,
 )
 from cvsim.lab.result import LabResult, _wigner_slice, check_meters
 from cvsim.wigner import wigner_grid
@@ -87,8 +88,7 @@ def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any
             measured=measured,
             extensions={"rbar": np.zeros(0).tolist(), "V": np.zeros((0, 0)).tolist()},
         )
-    if view.wigner_mode >= state.nmode:
-        raise _wigner_mode_guard_fail(view.wigner_mode, state.nmode)
+    check_wigner_mode(view.wigner_mode, state.nmode)
     wigner: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
     singular = False
     try:
@@ -105,14 +105,6 @@ def _build_result(state: GaussianState, view: View, measured: list[dict[str, Any
         measured=measured,
         extensions={"rbar": state.rbar.tolist(), "V": state.V.tolist()},
     )
-
-
-def _wigner_mode_guard_fail(mode: int, nmode: int) -> CircuitV0Error:
-    """Single-point message template for post-run wigner_mode checks
-    (ADR-0010 #5): all three runners raise with this exact text (golden 422
-    and the template test lock it). Only the guard placement is per-backend
-    (post-run, because measurements can remove modes) — the wording is not."""
-    return CircuitV0Error(f"view.wigner_mode {mode} out of range (nmode={nmode})")
 
 
 # -- execution (ADR-0010 #3: moved from lab/ir.py, D1-A hack retired) --------
@@ -167,15 +159,19 @@ def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> 
     """Shared execution core: ordered ops → final GaussianState + result.
 
     Non-measurement ops are delegated to ``GaussianCircuit.from_ir().compile()``
-    merged segments (``_apply_merged``) — the Lab no longer keeps its own
-    13-branch op dispatch. Measurement break-point segments run via Lab's own
-    ``_apply_measure`` to preserve the mean/sample path split + ``measured``
-    entry contract (op/mode/phi/outcome).
+    merged segments — the Lab no longer keeps its own 13-branch op dispatch.
+    Measurement break-point segments run via Lab's own ``_apply_measure`` to
+    preserve the mean/sample path split + ``measured`` entry contract
+    (op/mode/phi/outcome).
 
     ``rng=None`` → mean path (/run); ``rng`` given → sample every measurement.
     Mode-removal mapping is handled by ``compile_segments`` (circuit_common);
     Lab only tracks logical mode indices (from IR nodes) for ``measured``
     entries, since segment ops already carry physical coords.
+
+    The traversal itself lives in ``CompiledCircuit.run_breaks``: Lab supplies
+    the break-point callback and receives the IR-node index, so it never reads
+    the compiled object's segment layout (CONTEXT.md: 不暴露段布局).
     """
     try:
         compiled = GaussianCircuit.from_ir(circuit.raw).compile()
@@ -184,24 +180,21 @@ def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> 
         # (e.g. displace after measured mode); Lab error surface is
         # CircuitV0Error (server 422 contract).
         raise CircuitV0Error(str(e)) from e
-    state = compiled._init_state()
     measured: list[dict[str, Any]] = []
-    # IR node pointer aligned with segment order: merged segments consume
-    # len(ops) IR nodes, break-point op segments consume 1.
     core = circuit.core
     assert core is not None  # execution path is Gaussian (Fock uses run_fock_circuit)
     ir_nodes = core.ops
-    ir_idx = 0
-    run_results: dict[str, float] = {}  # ParamRef sources for feedforward ops
-    for seg in compiled._segments:
-        if seg[0] == "merged":
-            _, nmode, ops = seg
-            state = compiled._apply_merged(ops, nmode, {}, state)
-            ir_idx += len(ops)
-            continue
-        op_name, phys_modes, fixed, pnames, refs = seg[1]
+
+    def on_break(
+        op: tuple[Any, ...],
+        state: GaussianState,
+        run_results: dict[str, float],
+        ir_idx: int,
+    ) -> tuple[GaussianState, dict[str, float]]:
+        """One break-point op: Lab's measurement path or the core dispatcher."""
+        op_name, phys_modes, fixed, _pnames, _refs = op
         node = ir_nodes[ir_idx]
-        ir_idx += 1
+        where = f"ops[{node.id or '?'}]"
         if op_name in MEASUREMENT_OPS:
             # Measurements: Lab owns the path (mean/sample split + entry).
             state, entry = _apply_measure(
@@ -210,41 +203,36 @@ def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> 
                 phys_modes,
                 node.modes[0],
                 fixed,
-                f"ops[{node.id or '?'}]",
+                where,
                 rng=rng,
             )
             # feedforward: record outcome under the measurement's name for
-            # later ParamRef resolution by _run_op.
+            # later ParamRef resolution by run_op.
             name = fixed.get("name")
             if name is not None:
                 run_results[name] = entry["outcome"]
             measured.append(entry)
-        else:
-            # Channels (loss/amplifier/phase_noise/gaussian_channel) and any
-            # ParamRef-bearing op: delegate to the compiled dispatcher. No
-            # measured entry; values already bound (no symbolic params here).
-            # Lab-specific guard: amplifier with modes=[] means all modes in
-            # core semantics, but the Lab workbench always emits an explicit
-            # mode — reject instead of 500 (preserves pre-unify behavior).
-            if op_name == "amplifier" and not phys_modes:
-                raise CircuitV0Error(
-                    f"ops[{node.id or '?'}]: amplifier requires an explicit mode in Lab"
-                )
-            # Lab requires explicit numeric params (no core defaults): the
-            # pre-unify _apply validated each param via _num; core from_ir
-            # silently fills OpMeta defaults, so Lab re-checks presence on
-            # the original IR node params for the channel ops that have them.
-            if op_name in _LAB_REQUIRED_PARAMS:
-                for pname in _LAB_REQUIRED_PARAMS[op_name]:
-                    if pname not in node.params:
-                        raise CircuitV0Error(f"ops[{node.id or '?'}]: {pname} must be a number")
-            state, run_results = compiled._run_op(
-                seg[1],
-                state,
-                run_results,
-                {},
-                rng=rng,
-            )
+            return state, run_results
+        # Channels (loss/amplifier/phase_noise/gaussian_channel) and any
+        # ParamRef-bearing op: delegate to the compiled dispatcher. No
+        # measured entry; values already bound (no symbolic params here).
+        # Lab-specific guard: amplifier with modes=[] means all modes in
+        # core semantics, but the Lab workbench always emits an explicit
+        # mode — reject instead of 500 (preserves pre-unify behavior).
+        if op_name == "amplifier" and not phys_modes:
+            raise CircuitV0Error(f"{where}: amplifier requires an explicit mode in Lab")
+        # Lab requires explicit numeric params (no core defaults): the
+        # pre-unify _apply validated each param via _num; core from_ir
+        # silently fills OpMeta defaults, so Lab re-checks presence on
+        # the original IR node params for the channel ops that have them.
+        if op_name in _LAB_REQUIRED_PARAMS:
+            for pname in _LAB_REQUIRED_PARAMS[op_name]:
+                if pname not in node.params:
+                    raise CircuitV0Error(f"{where}: {pname} must be a number")
+        state, run_results = compiled.run_op(op, state, run_results, rng=rng)
+        return state, run_results
+
+    state, _ = compiled.run_breaks(on_break)
     return _build_result(state, circuit.view, measured)
 
 

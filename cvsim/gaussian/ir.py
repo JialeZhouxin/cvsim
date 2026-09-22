@@ -17,6 +17,7 @@ from typing import Any
 
 import numpy as np
 
+from cvsim.circuit_common import check_matrix, check_value, is_leaf_pair, is_num, json_defaults
 from cvsim.gaussian.circuit import GaussianCircuit
 from cvsim.gaussian.circuit import ParamRef as ParamRef
 
@@ -92,85 +93,14 @@ class CircuitV1:
 
 
 # -- structural value checks ------------------------------------------------
-
-
-def _is_num(v: Any) -> bool:
-    return isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool)
-
-
-def _is_leaf_pair(v: Any) -> bool:
-    """``[re, im]`` complex leaf inside a matrix."""
-    return isinstance(v, list) and len(v) == 2 and _is_num(v[0]) and _is_num(v[1])
-
-
-def _check_matrix(v: Any, where: str) -> None:
-    if not isinstance(v, list) or not v:
-        raise ValueError(f"{where}: must be a non-empty array, got {v!r}")
-    if all(_is_num(x) for x in v):
-        return  # flat real vector (e.g. d)
-    style: str | None = None  # 'real' | 'complex'
-    ncols: int | None = None
-    for row in v:
-        if not isinstance(row, list) or not row:
-            raise ValueError(f"{where}: array rows must be non-empty lists, got {row!r}")
-        if ncols is None:
-            ncols = len(row)
-        elif len(row) != ncols:
-            raise ValueError(f"{where}: ragged array (row length {len(row)} != {ncols})")
-        if all(_is_num(x) for x in row):
-            row_style = "real"
-        elif all(_is_leaf_pair(x) for x in row):
-            row_style = "complex"
-        else:
-            raise ValueError(f"{where}: entries must be numbers or [re, im] pairs, got {row!r}")
-        if style is None:
-            style = row_style
-        elif style != row_style:
-            raise ValueError(f"{where}: mixed real/complex entries ({style} vs {row_style})")
-
-
-def _check_value(v: Any, kind: str, where: str) -> None:
-    if isinstance(v, dict):
-        if "$param" in v:
-            if kind not in ("num", "complex"):
-                raise ValueError(f"{where}: $param not allowed for {kind} param")
-            if set(v) != {"$param"}:
-                raise ValueError(f"{where}: $param must be the only key, got {sorted(v)}")
-            name = v["$param"]
-            if not isinstance(name, str) or not name:
-                raise ValueError(f"{where}: $param must be a non-empty string, got {name!r}")
-            return
-        if "$ref" in v:
-            if kind not in ("num", "complex"):
-                raise ValueError(f"{where}: $ref not allowed for {kind} param")
-            if not set(v) <= {"$ref", "gain"}:
-                raise ValueError(f"{where}: $ref allows only 'gain', got {sorted(v)}")
-            src = v["$ref"]
-            if not isinstance(src, str) or not src:
-                raise ValueError(f"{where}: $ref source must be a non-empty string, got {src!r}")
-            gain = v.get("gain", 1.0)
-            if not _is_num(gain):
-                raise ValueError(f"{where}: $ref gain must be a number, got {gain!r}")
-            return
-        raise ValueError(
-            f"{where}: unknown value form (expected $param/$ref or bare JSON), got {v!r}"
-        )
-    if kind == "num":
-        if not _is_num(v):
-            raise ValueError(f"{where}: must be a number, got {v!r}")
-    elif kind == "complex":
-        if _is_num(v):
-            return
-        if isinstance(v, list) and len(v) == 2 and _is_num(v[0]) and _is_num(v[1]):
-            return
-        raise ValueError(f"{where}: must be a number or [re, im], got {v!r}")
-    elif kind == "matrix":
-        _check_matrix(v, where)
-    elif kind == "str":
-        if not isinstance(v, str) or not v:
-            raise ValueError(f"{where}: must be a non-empty string, got {v!r}")
-    else:  # pragma: no cover — OP_META is static
-        raise ValueError(f"{where}: unknown value kind {kind!r}")
+#
+# Single source: ``cvsim.circuit_common`` (ADR-0004). These were per-package
+# copies that drifted apart; the private aliases keep this module's call
+# sites (and the historical names) intact.
+_is_num = is_num
+_is_leaf_pair = is_leaf_pair
+_check_matrix = check_matrix
+_check_value = check_value
 
 
 def ir_schema() -> dict[str, Any]:
@@ -205,16 +135,8 @@ def ir_schema() -> dict[str, Any]:
     }
 
 def _json_defaults(defaults: dict[str, Any]) -> dict[str, Any]:
-    """JSON-native defaults: numpy floats/arrays out, plain scalars/lists in."""
-    out: dict[str, Any] = {}
-    for k, v in defaults.items():
-        if isinstance(v, np.generic):
-            out[k] = v.item()
-        elif isinstance(v, np.ndarray):
-            out[k] = v.tolist()
-        else:
-            out[k] = v
-    return out
+    """JSON-native defaults (shared: ``cvsim.circuit_common``)."""
+    return json_defaults(defaults)
 
 def validate_ir(data: dict[str, Any]) -> CircuitV1:
     """Structural validation of a circuit_v1 JSON dict (ADR-0003 #6).

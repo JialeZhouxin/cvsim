@@ -24,8 +24,7 @@ from cvsim.bosonic import (
 from cvsim.bosonic import (
     purity as bosonic_purity,
 )
-from cvsim.lab.fock_backend import _wigner_mode_guard_fail
-from cvsim.lab.ir import LabCircuit, View
+from cvsim.lab.ir import LabCircuit, View, check_wigner_mode
 from cvsim.lab.result import LabResult, _measured_from_results, _wigner_slice, check_meters
 from cvsim.wigner import wigner_grid
 
@@ -123,8 +122,8 @@ def run_bosonic_circuit(
             state, results = out, {}
     measured = _measured_from_results(circuit.raw, results)
     wmode = circuit.view.wigner_mode
-    if state.nmode > 0 and wmode >= state.nmode:
-        raise _wigner_mode_guard_fail(wmode, state.nmode)
+    if state.nmode > 0:  # nmode==0 has no valid mode at all; guard is per-backend
+        check_wigner_mode(wmode, state.nmode)
     wigner = None
     if state.nmode > 0:
         wigner = _bosonic_single_wigner(state, wmode, circuit.view)

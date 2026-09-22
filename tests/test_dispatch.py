@@ -241,9 +241,192 @@ def test_ir_has_no_gaussian_execution_knowledge() -> None:
 
 # ---------------------------------------------------------------------------
 # 4. check_wigner_mode 模板单点（ADR-0010 #5）：三个 runner 的越界消息字节一致
+#    （模板与比较都在 cvsim.lab.ir.check_wigner_mode，backend 只保留调用点）
 # ---------------------------------------------------------------------------
 
 _WIGNER_OUT = "view.wigner_mode {mode} out of range (nmode={nmode})"
+
+
+# ---------------------------------------------------------------------------
+# 5. 分派零 backend 特判（§2.2）：路由体不得再长出 `if backend ==`
+# ---------------------------------------------------------------------------
+
+def test_dispatch_routing_has_no_backend_branch() -> None:
+    """§2.2 回归守卫：dispatch 的路由函数体内不得比较 circuit.backend。
+
+    原先三处特判（rng 派生、两处 steps 转发）让 ADR-0010 #1「一行一后端」
+    失效 —— 接第四个后端要么被分支漏掉，要么得回来改本模块。差异现由
+    ``_RUNNERS`` 行的 ``wants_rng`` 标志声明，路由体只剩查表 + 调用。
+
+    AST 判据与 ``test_server_run_body_has_no_backend_branch`` 同型：
+    函数体内同时出现 ``.backend`` 属性访问与后端名字面量 → 红。
+    """
+    tree = ast.parse((ROOT / "cvsim" / "lab" / "dispatch.py").read_text(encoding="utf-8"))
+    routed = ("run_circuit", "sample_circuit", "_invoke")
+    found = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.FunctionDef) and node.name in routed):
+            continue
+        for sub in ast.walk(node):
+            if not isinstance(sub, ast.Compare):
+                continue
+            names = set()
+            for cmp_node in ast.walk(sub):
+                if isinstance(cmp_node, ast.Attribute) and cmp_node.attr == "backend":
+                    names.add("backend")
+                if isinstance(cmp_node, ast.Constant) and cmp_node.value in (
+                    "fock", "bosonic", "gaussian"
+                ):
+                    names.add("lit")
+            if {"backend", "lit"} <= names:
+                found.append(f"{node.name}:{sub.lineno}")
+    assert not found, (
+        f"dispatch 路由体又长出 backend 特判 {found} —— 差异应声明在 "
+        f"_RUNNERS 行（ADR-0010 #1：新后端 = 一行，不改分派）"
+    )
+
+
+def test_runner_registry_rows_declare_rng_need() -> None:
+    """注册表每行都带 wants_rng 标志，且与 runner 的真实 rng 语义一致。
+
+    这条守的是**标志本身没说谎**：
+
+    * gaussian 的 ``rng=None`` 是「均值路径」信号，不是「没给生成器」→ False；
+    * bosonic 的 ``rng=None`` 会让测量层自造未播种生成器（同 seed 不可复现）
+      → True，**这是真正承载行为的那个标志**（已变异验证：翻成 False 时
+      ``test_bosonic_run_*`` 变红）；
+    * fock → True 属**防御性声明**：``run_fock_circuit`` 内部已兜
+      ``default_rng(circuit.seed)``，故这里翻成 False 不会改变可复现性
+      （也已实测）。标志仍写 True，因为「由 dispatch 保证播种」是更清楚的分工。
+    """
+    from cvsim.lab import dispatch as d
+
+    assert set(d._RUNNERS) == {"gaussian", "fock", "bosonic"}
+    assert d._RUNNERS["gaussian"].wants_rng is False, (
+        "gaussian 必须 wants_rng=False：rng=None 在它是「均值路径」而非「没给生成器」"
+    )
+    assert d._RUNNERS["bosonic"].wants_rng is True, (
+        "bosonic 必须 wants_rng=True：它没有内部播种兜底，不派生即不可复现"
+    )
+    assert d._RUNNERS["fock"].wants_rng is True
+
+
+def test_new_backend_row_needs_no_routing_change() -> None:
+    """「一行一后端」是可执行声明：伪造第四后端只加一行即能跑通。
+
+    若路由体仍有 backend 特判，这里会因未覆盖新 backend 而红 ——
+    这正是该守卫要钉的性质（ADR-0010 后果段）。
+    """
+    from cvsim.lab import LabCircuit
+    from cvsim.lab import dispatch as d
+
+    calls: list[tuple] = []
+
+    def fake_runner(circuit, rng, *, sampled=False, steps=False):
+        calls.append((circuit.backend, rng, sampled, steps))
+        return "ok"
+
+    d._RUNNERS["quantum_dots"] = d._Runner(fake_runner, wants_rng=True)
+    try:
+        circuit = LabCircuit(backend="quantum_dots", seed=5)
+        assert d.run_circuit(circuit) == "ok"
+        assert d.sample_circuit(circuit) == "ok"
+    finally:
+        del d._RUNNERS["quantum_dots"]
+
+    # both verbs reached the new row with a derived rng and no special-casing
+    assert [c[0] for c in calls] == ["quantum_dots", "quantum_dots"]
+    assert all(c[1] is not None for c in calls), "wants_rng=True 行必须收到派生 rng"
+    assert [c[2] for c in calls] == [False, True], "sampled 标志按动词传递"
+
+
+# ---------------------------------------------------------------------------
+# 6. §2.2 行为等价：rng 语义逐后端钉住（重构未改物理）
+# ---------------------------------------------------------------------------
+
+def _gaussian_meas_body(seed: int = 7, **extra) -> dict:
+    body = {
+        "schema": "circuit_v1", "nmode": 1, "seed": seed,
+        "ops": [
+            {"id": "s", "op": "squeeze", "modes": [0], "params": {"r": 0.1, "phi": 0.0}},
+            {"id": "m", "op": "measure_homodyne", "modes": [0], "params": {"name": "hd"}},
+        ],
+        "view": {"wigner_mode": 0, "lim": 4.0, "n": 16},
+    }
+    body.update(extra)
+    return body
+
+
+def test_gaussian_run_is_mean_path_but_sample_is_true_sampling() -> None:
+    """gaussian：/run 走均值（可复现的确定值），/sample 必须真采样。
+
+    这是 wants_rng=False 的**语义证明** —— 若 /run 也收到派生 rng，
+    均值路径会变成随机采样，两者相等（本断言即红）。
+    """
+    from cvsim.lab import dispatch
+
+    mean1 = dispatch.run_circuit(load_circuit(_gaussian_meas_body()))
+    mean2 = dispatch.run_circuit(load_circuit(_gaussian_meas_body()))
+    assert mean1.measured == mean2.measured, "/run 必须确定"
+    assert mean1.measured[0]["outcome"] == 0.0, (
+        "gaussian /run 的 homodyne 均值应为 0（rng=None → homodyne_mean）"
+    )
+    samp = dispatch.sample_circuit(load_circuit(_gaussian_meas_body()))
+    assert samp.measured != mean1.measured, "gaussian /sample 必须真采样（≠ 均值）"
+
+
+def test_bosonic_run_is_reproducible_per_seed() -> None:
+    """bosonic：/run 必须同 seed 可复现 —— wants_rng=True 承载的就是这条。
+
+    与 fock 不同，bosonic 没有内部播种兜底：``run_bosonic_circuit`` 直接把
+    ``rng`` 交给 ``bc.run(rng=rng)``，而测量层的 ``rng is None`` 分支会自造
+    一个**未播种**的 ``default_rng()``。故一旦把注册表里 bosonic 的
+    ``wants_rng`` 翻成 False，本断言即红（已变异验证）。
+    """
+    from cvsim.lab import dispatch
+
+    body = _v1_body("bosonic", initial=["gkp0"], ops=[
+        {"id": "l", "op": "loss", "modes": [0], "params": {"T": 0.9}},
+        {"id": "m", "op": "measure_homodyne", "modes": [0], "params": {"name": "hd"}},
+    ])
+    a = dispatch.run_circuit(load_circuit(body))
+    b = dispatch.run_circuit(load_circuit(body))
+    assert a.measured == b.measured, "bosonic /run 同 seed 必须可复现"
+
+
+def test_fock_run_is_reproducible_per_seed() -> None:
+    """fock：/run 也同 seed 可复现，但**不依赖** dispatch 派生。
+
+    ``run_fock_circuit`` 自己兜了 ``default_rng(circuit.seed)``，故这条即使在
+    ``wants_rng=False`` 下也成立 —— 它钉的是**可复现性这个结果**，
+    不是 dispatch 的实现方式（后者由上面的标志断言负责）。
+    """
+    from cvsim.lab import dispatch
+
+    body = _v1_body("fock", cutoff=4, ops=[
+        {"id": "s", "op": "squeeze", "modes": [0], "params": {"r": 0.1}},
+        {"id": "m", "op": "measure_homodyne", "modes": [0], "params": {"name": "hd"}},
+    ])
+    a = dispatch.run_circuit(load_circuit(body))
+    b = dispatch.run_circuit(load_circuit(body))
+    assert a.measured == b.measured, "fock /run 同 seed 必须可复现"
+
+
+def test_explicit_rng_reaches_gaussian_sampling_path() -> None:
+    """显式 rng 在 /sample 下必须送达 gaussian（测试注入通道）。
+
+    显式 rng 与同 seed 派生生成器等价 —— 这条同时证明 _invoke 的
+    「显式 rng 优先、不被 wants_rng=False 吞掉」分支是对的。
+    """
+    from cvsim.lab import dispatch
+
+    derived = dispatch.sample_circuit(load_circuit(_gaussian_meas_body()))
+    explicit = dispatch.sample_circuit(
+        load_circuit(_gaussian_meas_body()), rng=np.random.default_rng(7)
+    )
+    assert explicit.measured == derived.measured, (
+        "显式 rng(seed=7) 应与 circuit.seed=7 派生等价"
+    )
 
 
 def test_wigner_mode_guard_template_matches_all_backends() -> None:

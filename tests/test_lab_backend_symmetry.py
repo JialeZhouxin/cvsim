@@ -293,19 +293,138 @@ def test_result_py_dependency_bottom():
 
 
 def test_bosonic_no_fock_private_import():
-    """ADR-0008 Q3: the cross-package private break (bosonic importing fock's
-    _fock_measured) is gone — the shared collector lives in result.py.
+    """ADR-0008 Q3 / ADR-0010 #5: bosonic imports no fock private name.
 
-    ADR-0010 #5 bends this once, deliberately: bosonic imports fock's
-    ``_wigner_mode_guard_fail`` (the single-point 422 message template).
-    That is shared *message* knowledge, not fock execution knowledge —
-    ADR-0010 #5 registers the exception here so this guard stays honest."""
+    ADR-0008 Q3 removed the ``_fock_measured`` cross-package break (the shared
+    collector moved to result.py). ADR-0010 #5 then registered a *second*
+    exception: bosonic imported fock's ``_wigner_mode_guard_fail`` for the
+    single-point 422 message template.
+
+    That exception is now closed too — the template (and the comparison, which
+    every call site repeated) lives in ``cvsim.lab.ir.check_wigner_mode``, the
+    module that owns ``CircuitV0Error`` and ``View``. So this guard no longer
+    needs a carve-out: bosonic must not touch fock_backend at all.
+    """
     src = (ROOT / "cvsim/lab/bosonic_backend.py").read_text(encoding="utf-8")
     assert "from cvsim.lab.fock_backend import run_" not in src, (
         "bosonic_backend must not import fock execution"
     )
-    allowed = "from cvsim.lab.fock_backend import _wigner_mode_guard_fail"
-    stripped = src.replace(allowed, "")
-    assert "fock_backend" not in stripped.replace(
+    # No exception list any more: any fock_backend import is a violation.
+    stripped = src.replace(
         "previously this module imported fock's private ``_fock_measured``", ""
-    ), "bosonic_backend must not import fock_backend (beyond the ADR-0010 template)"
+    )
+    assert "fock_backend" not in stripped, (
+        "bosonic_backend must not import fock_backend at all — the ADR-0010 #5 "
+        "wigner template moved to cvsim.lab.ir.check_wigner_mode"
+    )
+
+
+def test_wigner_guard_is_single_point():
+    """ADR-0010 #5: the wigner_mode guard exists exactly once, in ir.py.
+
+    Before this, the template was defined twice byte-identically (fock +
+    gaussian) and imported cross-package by bosonic, with the message text
+    also inlined in a test. Nothing stopped a fourth copy: the wording is a
+    frozen 422 string, so a drift would silently change the API contract.
+    """
+    needle = "view.wigner_mode {mode} out of range (nmode={nmode})"
+    offenders = []
+    for path in sorted((ROOT / "cvsim/lab").glob("*.py")):
+        src = path.read_text(encoding="utf-8")
+        if needle in src and path.name != "ir.py":
+            offenders.append(path.name)
+    assert not offenders, (
+        f"the wigner_mode 422 template must live only in ir.py "
+        f"(check_wigner_mode); also found in: {offenders}"
+    )
+
+    ir_src = (ROOT / "cvsim/lab/ir.py").read_text(encoding="utf-8")
+    assert needle in ir_src, "ir.py must own the template (check_wigner_mode)"
+    assert "def check_wigner_mode(" in ir_src, "check_wigner_mode missing from ir.py"
+
+    # And no backend may define its own guard again.
+    for name in ("fock_backend", "gaussian_backend", "bosonic_backend"):
+        src = (ROOT / f"cvsim/lab/{name}.py").read_text(encoding="utf-8")
+        assert "_wigner_mode_guard_fail" not in src, (
+            f"{name}.py re-grew a local wigner guard; call "
+            f"cvsim.lab.ir.check_wigner_mode instead"
+        )
+
+
+def test_check_wigner_mode_raises_circuitv0error():
+    """Behavior: out-of-range raises the 422 type; in-range is a no-op."""
+    import pytest as _pytest
+
+    from cvsim.lab.ir import CircuitV0Error, check_wigner_mode
+
+    check_wigner_mode(0, 1)  # in range: no raise
+    check_wigner_mode(2, 3)
+    with _pytest.raises(CircuitV0Error) as ei:
+        check_wigner_mode(3, 2)
+    assert str(ei.value) == "view.wigner_mode 3 out of range (nmode=2)"
+
+
+def test_lab_does_not_touch_compiled_private_surface():
+    """ADR-0004: Lab drives compiled circuits through the public protocol only.
+
+    ``_execute`` used to read ``compiled._init_state`` / ``._segments`` /
+    ``._apply_merged`` / ``._run_op`` directly — Lab was hard-coded to
+    gaussian's private implementation, so a different representation's
+    compiled product would have broken it. The traversal now lives in
+    ``CompiledCircuit.run_breaks``; ``run_op`` is the public per-op hook.
+    """
+    for name in ("gaussian_backend", "fock_backend", "bosonic_backend"):
+        src = (ROOT / f"cvsim/lab/{name}.py").read_text(encoding="utf-8")
+        for banned in ("_init_state", "_segments", "_apply_merged", "_run_op"):
+            assert f".{banned}" not in src, (
+                f"{name}.py reaches into CompiledCircuit private surface "
+                f"({banned}); use run_breaks/run_op instead"
+            )
+
+
+def test_compiled_circuit_public_protocol():
+    """The public protocol Lab relies on exists and works on all three reps.
+
+    Guards the seam itself, not just Lab's usage: without this, a rename of
+    ``run_breaks``/``run_op`` would surface as a confusing Lab failure.
+    """
+    import inspect
+
+    import numpy as np
+
+    from cvsim.circuit_common import CompiledCircuit
+
+    for meth in ("run", "run_breaks", "run_op"):
+        fn = getattr(CompiledCircuit, meth, None)
+        assert fn is not None, f"CompiledCircuit.{meth} missing"
+        assert not meth.startswith("_"), f"{meth} must stay public"
+        assert fn.__doc__, f"CompiledCircuit.{meth} needs a docstring"
+    sig = inspect.signature(CompiledCircuit.run_breaks)
+    assert "on_break" in sig.parameters, "run_breaks must take the break callback"
+
+    # Segment layout stays private: no public accessor may expose it.
+    for attr in ("segments", "init_state", "apply_merged"):
+        assert not hasattr(CompiledCircuit, attr), (
+            f"CompiledCircuit.{attr} would expose the segment layout "
+            f"(CONTEXT.md: CompiledGaussian 不暴露段布局)"
+        )
+
+    # Behavioral: run_breaks sees break points and IR indices; run() agrees.
+    from cvsim.gaussian import GaussianCircuit
+
+    c = GaussianCircuit(2)
+    c.squeeze(0, r=0.5)
+    c.loss(1, T=0.9)
+    c.displace(0, alpha=0.3)
+    compiled = c.compile()
+
+    seen: list[int] = []
+
+    def on_break(op, st, results, ir_idx):
+        seen.append(ir_idx)
+        return compiled.run_op(op, st, results)
+
+    st_a, _ = compiled.run_breaks(on_break)
+    assert seen == [1], f"expected one break point at IR index 1, got {seen}"
+    st_b = compiled.run()
+    assert np.allclose(st_a.V, st_b.V), "run_breaks must agree with run()"

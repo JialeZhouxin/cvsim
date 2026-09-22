@@ -17,7 +17,10 @@ import cvsim.gaussian as gaussian
 
 # -- shared shape contract ---------------------------------------------------
 
-ARITIES = {"one", "two", "all", "any", "none"}
+ARITIES = {"one", "two", "all", "any", "none", "subset"}
+#: 'subset' is fock-only (apply_unitary: any set of distinct modes, [] = all).
+#: gaussian/bosonic 'any' means at most 1 mode (amplifier/phase_noise).
+FOCK_ONLY_ARITIES = {"subset"}
 VALUE_KINDS = {"num", "complex", "matrix", "str", "kraus"}
 
 def _check_ops_shape(ops: object) -> None:

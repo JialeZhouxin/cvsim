@@ -95,6 +95,41 @@ def test_roundtrip_kraus_ops() -> None:
     np.testing.assert_allclose(ops[1], K[1], atol=1e-12)
 
 
+def test_roundtrip_kraus_ops_real_dtype() -> None:
+    """A purely real Kraus decomposes to nested reals, not [re, im] pairs.
+
+    ``to_ir`` emits whichever form the operator's dtype is, so the decoder and
+    the validator must both accept real matrices. They did not: ``from_ir``
+    raised ``TypeError: 'float' object is not subscriptable`` on output
+    produced by this very package (the loss sqrt(T) family is all-real).
+    """
+    K = [np.array([[0.9, 0.0], [0.0, 0.8]]), np.array([[0.0, 0.5], [0.0, 0.0]])]
+    c = FockCircuit(1, cutoff=4)
+    c.apply_kraus(0, K)
+    doc = c.to_ir()
+    assert doc["ops"][0]["params"]["kraus_ops"][0][0][0] == 0.9  # plain real leaf
+    c2 = FockCircuit.from_ir(doc)
+    for a, b in zip(K, c2._ops[0][2]["kraus_ops"], strict=True):
+        np.testing.assert_allclose(np.asarray(b, dtype=complex), a, atol=1e-12)
+
+
+@pytest.mark.parametrize(
+    "bad",
+    ["kraus", [], [[]], [1, 2], [[[1, 0], [0]], [[0, 0], [1, 0]]], [[[[1, 0]], 5]]],
+    ids=["str", "empty", "empty-matrix", "flat", "ragged", "scalar-entry"],
+)
+def test_validate_rejects_malformed_kraus(bad) -> None:
+    """Malformed kraus_ops must raise ValueError (Lab maps that to 422)."""
+    with pytest.raises(ValueError):
+        validate_ir(
+            {
+                "schema": "circuit_v1",
+                "nmode": 1,
+                "ops": [{"op": "apply_kraus", "modes": [0], "params": {"kraus_ops": bad}}],
+            }
+        )
+
+
 def test_roundtrip_measurements() -> None:
     c = FockCircuit(2, cutoff=6)
     c.measure_pnr(0, name="a")

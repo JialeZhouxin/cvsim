@@ -103,6 +103,32 @@ class View:
     joint_modes: list[int] | None = None  # Fock: 2-mode joint heatmap modes
 
 
+def check_wigner_mode(mode: int, nmode: int) -> None:
+    """Guard: post-run ``wigner_mode`` must index a mode that still exists.
+
+    Single point for the 422 message template (ADR-0010 #5), and for the
+    comparison itself — every call site tested exactly ``mode >= nmode``.
+
+    Why the guard is *post*-run and not in :func:`_parse_view`: load time does
+    not know ``nmode``. Measurements remove modes, so the surviving mode count
+    is only known after execution — that is the one part that is genuinely
+    per-backend (gaussian/fock raise from their assembly paths, bosonic also
+    from its runner). The wording is not per-backend, and lived in three
+    places: two byte-identical definitions plus a cross-package import from
+    bosonic into fock (the ADR-0010 #5 registered exception).
+
+    Callers with an extra precondition keep it locally: bosonic skips the
+    guard when ``nmode == 0``, which cannot be folded in here because
+    ``mode >= 0`` is true for every non-negative mode.
+
+    Note the name: ADR-0010 #5 already called this ``check_wigner_mode``; the
+    code had drifted to a private ``_wigner_mode_guard_fail`` whose name said
+    "fail" but whose body did not check anything (callers did the compare).
+    """
+    if mode >= nmode:
+        raise CircuitV0Error(f"view.wigner_mode {mode} out of range (nmode={nmode})")
+
+
 @dataclass
 class LabCircuit:
     """Lab-loaded circuit: core :class:`CircuitV1` + UI extension fields.

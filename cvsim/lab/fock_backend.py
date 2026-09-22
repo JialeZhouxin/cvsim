@@ -24,17 +24,9 @@ from cvsim.fock import (
 from cvsim.fock import (
     partial_trace as fock_partial_trace,
 )
-from cvsim.lab.ir import CircuitV0Error, LabCircuit, View
+from cvsim.lab.ir import CircuitV0Error, LabCircuit, View, check_wigner_mode
 from cvsim.lab.result import LabResult, _measured_from_results, _wigner_slice, check_meters
 from cvsim.wigner import wigner_grid
-
-
-def _wigner_mode_guard_fail(mode: int, nmode: int) -> CircuitV0Error:
-    """Single-point message template for post-run wigner_mode checks
-    (ADR-0010 #5): all three runners raise with this exact text (golden 422
-    and the template test lock it). Only the guard placement is per-backend
-    (post-run, because measurements can remove modes) — the wording is not."""
-    return CircuitV0Error(f"view.wigner_mode {mode} out of range (nmode={nmode})")
 
 #: Cap on the higher-cutoff comparison tensor for the leakage estimate
 #: (vision-fock §7 memory budget; honest null above it).
@@ -106,8 +98,7 @@ def _fock_wigner(
     """Single-mode Wigner via partial_trace + wigner_grid (Fock branch).
     cutoff > 20 degrades the grid to N=48 (design §2.4 perf budget)."""
     mode = view.wigner_mode
-    if mode >= state.nmode:
-        raise _wigner_mode_guard_fail(mode, state.nmode)
+    check_wigner_mode(mode, state.nmode)
     try:
         keep = fock_partial_trace(state, keep=[mode])
         max_c = max(state.amps.shape) if isinstance(state, FockState) else state.cutoff
@@ -166,8 +157,7 @@ def run_fock_circuit(
     measured = _measured_from_results(circuit.raw, results)
     wigner = _fock_wigner(state, circuit.view) if state.nmode > 0 else None
     dist_mode = circuit.view.wigner_mode
-    if dist_mode >= state.nmode:
-        raise _wigner_mode_guard_fail(dist_mode, state.nmode)
+    check_wigner_mode(dist_mode, state.nmode)
     probs = _fock_mode_probs(state, dist_mode)
     joint = _fock_joint(state, circuit.view, measured)
     mean_list = [_fock_mean_photon(state, i) for i in range(state.nmode)]
@@ -251,8 +241,7 @@ def batch_fock_circuit(circuit: LabCircuit, shots: int, seed: int) -> dict[str, 
             "counts": np.bincount(idx, minlength=flat.size).tolist(),
         }
     mode = circuit.view.wigner_mode
-    if mode >= state.nmode:
-        raise _wigner_mode_guard_fail(mode, state.nmode)
+    check_wigner_mode(mode, state.nmode)
     p = _fock_mode_probs(state, mode)
     idx = rng.choice(p.size, size=shots, p=p)
     return {

@@ -17,6 +17,27 @@ backend 分派散在 `server.py` 7 处 `backend ==` 判断；gaussian 执行体 
 
 1. **新建 `cvsim/lab/dispatch.py`**：`/run` `/sample` 的唯一执行入口，按
    `LabCircuit.backend` 路由到三表示 runner（runner 注册表，一行一后端）。
+
+   > **补记（2026-09-18 审计后修复）**：注册表建起来了，但路由体里还留着
+   > **三处 `if circuit.backend == ...`**（`rng` 派生一处、`steps` 转发两处），
+   > 于是"一行一后端"对本条决策**部分失效** —— 接第四个后端仍要回来读分派。
+   >
+   > 现已收口：
+   > - **`steps` 两处是纯冗余，已删**。bosonic 的 `run_bosonic_circuit:114`
+   >   本来就 `want_steps = steps or circuit.detail == "steps"` —— 即 #4
+   >   已经落地，dispatch 再转发一次没有意义；且三个 runner 签名早已统一为
+   >   `(circuit, rng, *, sampled, steps)`。
+   > - **`rng` 一处改为注册表数据**：行类型从"callable"变成
+   >   `_Runner(callable, wants_rng)`。之所以不能简单统一，是因为
+   >   `rng=None` 的语义三表示不同 —— gaussian 是"走均值路径"（必须保持
+   >   `None`），bosonic 是"没给生成器 → 测量层自造未播种 `default_rng()`"
+   >   （必须派生），fock 的测量层同样会自造、但 `run_fock_circuit:152`
+   >   自己兜了种子（故 dispatch 派生与否对它行为冗余，标志属防御性声明）。
+   >   `wants_rng` 只描述**非采样**路径；`/sample` 下三者都派生。
+   >
+   > 配套守卫：`test_dispatch.py` 用 AST 断言路由函数体内**零** backend
+   > 比较，并加"伪造第四后端只加一行即两动词跑通"的可执行声明。
+   > 变异验证：换回 `circuit.backend != "gaussian"` → 红。
 2. **双动词 interface 不变**：`run_circuit(circuit)` / `sample_circuit(circuit, rng=None)`
    保留现名，实现移居 dispatch.py。`rng=None` 时 dispatch 内部
    `default_rng(circuit.seed)` 派生——server 的 4 处 rng 构造收单点。
@@ -31,6 +52,22 @@ backend 分派散在 `server.py` 7 处 `backend ==` 判断；gaussian 执行体 
    收消息模板；三表示 wigner 失败兜底语义不同（gaussian → singular=True、
    bosonic → 每步 None、fock → raise）是物理事实，docstring 声明，学 meter 支持矩阵
    「差异是物理事实，永不 paper over」。
+
+   > **补记（2026-09-18 审计后修复）**：本条的**落地方式**原与决策文本不符 ——
+   > 代码里叫 `_wigner_mode_guard_fail`，**定义在 `fock_backend.py`**，
+   > `gaussian_backend.py` 里有**第二份逐字节相同的定义**，`bosonic_backend.py`
+   > 则**跨包 import fock 的私名**（这就是被登记的那个例外）。
+   > 且函数名说"fail"、函数体却不做判断 —— 五个调用点各自手写 `if mode >= nmode`。
+   >
+   > 现已按决策文本归位：`cvsim/lab/ir.py` 的 **`check_wigner_mode(mode, nmode)`**
+   > 同时持有**模板与比较**，三个 backend 只保留调用点，
+   > 跨包 import 与两份重复定义一起消失，`test_lab_backend_symmetry.py` 的
+   > 例外开洞同步删除（改为"不得 import fock_backend"的硬断言）。
+   > 选 `ir.py` 而非 `result.py` 的理由：`result.py` 的章程是"只管响应侧"且被
+   > `test_result_py_dependency_bottom` 锁成"只 import numpy"（见下方权衡），
+   > 而 `CircuitV0Error` 与 `View` 都定义在 `ir.py`，三个 backend 本来就 import 它。
+   > 仍留在各 backend 的只有**兜底语义**（本条决策后半段）与 bosonic 的
+   > `nmode == 0` 前置条件 —— 那两样确实是物理事实。
 6. **422 错误元组提为单点常量**（`DOMAIN_ERRORS`），每路由 except 照旧两行；
    route-wrapper 装饰器被否：golden 422 文本路径变绕，两行重复的税更便宜。
 7. **/batch /scan /fidelity 门禁不动**：曲线形端点已由 ADR-0008 决策 5 排除在

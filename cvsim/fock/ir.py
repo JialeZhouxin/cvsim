@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from cvsim.circuit_common import ParamRef
+from cvsim.circuit_common import ParamRef, check_value, json_defaults
 from cvsim.fock.circuit import FockCircuit
 
 SCHEMA = "circuit_v1"
@@ -42,7 +42,7 @@ INITIAL_REGISTRY: dict[str, Any] = {"kind": "int", "min": 0}
 
 @dataclass(frozen=True)
 class OpMeta:
-    arity: str  # 'one' | 'two' | 'all' | 'any' | 'none'
+    arity: str  # 'one' | 'two' | 'all' | 'subset'
     value_kind: dict[str, str]  # 'num' | 'complex' | 'matrix' | 'str' | 'kraus'
     defaults: dict[str, Any]
 
@@ -58,7 +58,11 @@ OP_META: dict[str, OpMeta] = {
     "cx": OpMeta("two", {"weight": "num"}, {"weight": 1.0}),
     "mach_zehnder": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
     "interferometer": OpMeta("all", {"U": "matrix"}, {}),
-    "apply_unitary": OpMeta("any", {"U": "matrix"}, {}),
+    # 'subset' (fock-only): any subset of DISTINCT modes; [] = whole space.
+    # Deliberately not gaussian/bosonic's 'any', which means at most 1 mode
+    # (their amplifier/phase_noise take ``mode: int | None``). Sharing the
+    # label across two meanings is what let this op go unchecked.
+    "apply_unitary": OpMeta("subset", {"U": "matrix"}, {}),
     "loss": OpMeta("one", {"eta": "num"}, {"eta": 1.0}),
     "amplifier": OpMeta("one", {"G": "num", "nbar": "num"}, {"G": 1.0, "nbar": 0.0}),
     "phase_noise": OpMeta("one", {"sigma": "num"}, {"sigma": 0.0}),
@@ -67,8 +71,6 @@ OP_META: dict[str, OpMeta] = {
     "measure_homodyne": OpMeta("one", {"phi": "num", "name": "str"}, {"phi": 0.0}),
     "measure_heterodyne": OpMeta("one", {"name": "str"}, {}),
 }
-
-_ARITY_MAX = {"one": 1, "two": 2}
 
 
 def _encode(v: Any) -> Any:
@@ -95,17 +97,33 @@ def _decode(v: Any, kind: str) -> Any:
         if kind == "complex":
             return complex(v[0], v[1])
         if kind == "kraus":
-            return [np.array([[complex(x[0], x[1]) for x in row] for row in k]) for k in v]
-        if v and isinstance(v[0], list) and v[0] and isinstance(v[0][0], list):
-            return np.array([[complex(x[0], x[1]) for x in row] for row in v], dtype=complex)
-        return np.asarray(v, dtype=float)
+            # Each matrix is either nested reals or [re, im] pairs, whichever
+            # the operator's dtype made to_ir emit — mirror _decode's matrix
+            # branch so a real Kraus round-trips instead of raising TypeError.
+            return [_decode_matrix(k) for k in v]
+        return _decode_matrix(v)
     if kind == "complex":
         return complex(v)
     return v
 
 
+def _decode_matrix(v: list[Any]) -> np.ndarray:
+    """Nested list → ndarray; ``[re, im]`` leaves → complex, else real."""
+    if v and isinstance(v[0], list) and v[0] and isinstance(v[0][0], list):
+        return np.array([[complex(x[0], x[1]) for x in row] for row in v], dtype=complex)
+    return np.asarray(v, dtype=float)
+
+
 def validate_ir(data: dict[str, Any]) -> None:
-    """Structural validation of a Fock circuit_v1 dict (mirror of gaussian)."""
+    """Structural validation of a Fock circuit_v1 dict (mirror of gaussian).
+
+    Mirrors ``cvsim.gaussian.ir.validate_ir`` check-for-check — that is the
+    Lab's contract, since one payload can be routed to any backend via
+    ``backend`` (ADR-0003 #6). Historically this copy was weaker: it checked
+    only arity and param *names*, so out-of-range / negative mode indices
+    (negative ones silently wrapped) and malformed param values passed
+    validation and only blew up — or silently mis-computed — at run time.
+    """
     if not isinstance(data, dict):
         raise ValueError(f"payload must be a JSON object, got {type(data).__name__}")
     if data.get("schema") != SCHEMA:
@@ -119,6 +137,14 @@ def validate_ir(data: dict[str, Any]) -> None:
         ) or key in EXTENSION_FIELDS:
             continue
         raise ValueError(f"unknown top-level field {key!r}")
+    if "view" in data and not isinstance(data["view"], dict):
+        raise ValueError(f"view must be an object, got {type(data['view']).__name__}")
+    if "seed" in data and (
+        not isinstance(data["seed"], int) or isinstance(data["seed"], bool) or data["seed"] < 0
+    ):
+        raise ValueError(f"seed must be a non-negative int, got {data['seed']!r}")
+    if "ui" in data and not isinstance(data["ui"], dict):
+        raise ValueError(f"ui must be an object, got {type(data['ui']).__name__}")
     if "detail" in data and data["detail"] not in (None, "steps"):
         raise ValueError(f"detail must be None or 'steps', got {data['detail']!r}")
     cutoff = data.get("cutoff")
@@ -149,23 +175,58 @@ def validate_ir(data: dict[str, Any]) -> None:
         for i, (n, c) in enumerate(zip(initial, cutoffs, strict=True)):
             if not 0 <= n < c:
                 raise ValueError(f"initial[{i}]={n} must be in [0, {c})")
-    if not isinstance(data.get("ops"), list):
-        raise ValueError("ops must be a list")
-    for op in data["ops"]:
-        if not isinstance(op, dict) or "op" not in op:
-            raise ValueError("each op must be an object with 'op'")
-        name = op["op"]
-        if name not in OP_META:
-            raise ValueError(f"unsupported op {name!r}")
+    raw_ops = data.get("ops")
+    if not isinstance(raw_ops, list):
+        raise ValueError(f"ops must be a list, got {type(raw_ops).__name__}")
+    seen_ids: set[str] = set()
+    for i, rn in enumerate(raw_ops):
+        where = f"ops[{i}]"
+        if not isinstance(rn, dict):
+            raise ValueError(f"{where}: must be an object, got {type(rn).__name__}")
+        name = rn.get("op")
+        if not isinstance(name, str) or name not in OP_META:
+            raise ValueError(f"{where}: unknown op {name!r}")
         meta = OP_META[name]
-        modes = op.get("modes", [])
-        if not isinstance(modes, list) or not all(isinstance(m, int) for m in modes):
-            raise ValueError(f"op {name}: modes must be a list of ints")
-        if meta.arity in ("one", "two") and len(modes) != _ARITY_MAX[meta.arity]:
-            raise ValueError(f"op {name}: expected {meta.arity} mode(s), got {len(modes)}")
-        for k in op.get("params", {}):
+        nid = rn.get("id")
+        if nid is not None:
+            if not isinstance(nid, str) or not nid:
+                raise ValueError(f"{where}: id must be a non-empty string, got {nid!r}")
+            if nid in seen_ids:
+                raise ValueError(f"{where}: duplicate id {nid!r}")
+            seen_ids.add(nid)
+        modes = rn.get("modes")
+        if not isinstance(modes, list):
+            raise ValueError(f"{where}: modes must be a list, got {type(modes).__name__}")
+        if meta.arity == "one" and len(modes) != 1:
+            raise ValueError(f"{where}: op {name!r} requires exactly 1 mode, got {len(modes)}")
+        if meta.arity == "two" and len(modes) != 2:
+            raise ValueError(f"{where}: op {name!r} requires exactly 2 modes, got {len(modes)}")
+        if meta.arity == "all" and modes != list(range(nmode)):
+            raise ValueError(
+                f"{where}: op {name!r} requires modes == list(range(nmode)), got {modes!r}"
+            )
+        for m in modes:
+            if not isinstance(m, int) or isinstance(m, bool) or m < 0:
+                raise ValueError(f"{where}: mode index must be a non-negative int, got {m!r}")
+            if m >= nmode:
+                raise ValueError(f"{where}: mode {m} out of range (nmode={nmode})")
+        if meta.arity == "subset" and len(set(modes)) != len(modes):
+            # [] means whole space, hence no lower bound. Duplicates are not
+            # "any subset": they build fine and then die in run() with
+            # ``ValueError: repeated axis in `source` argument``.
+            # (Checked after the loop above so an unhashable mode like [0]
+            # is reported as a bad index, not a TypeError.)
+            raise ValueError(f"{where}: op {name!r} modes must be distinct, got {modes!r}")
+        params = rn.get("params")
+        if not isinstance(params, dict):
+            raise ValueError(f"{where}: params must be an object, got {type(params).__name__}")
+        for k, v in params.items():
             if k not in meta.value_kind:
-                raise ValueError(f"op {name}: unknown param {k!r}")
+                raise ValueError(f"{where}: unknown param {k!r} for op {name!r}")
+            check_value(v, meta.value_kind[k], f"{where}.params.{k}")
+        for k in meta.value_kind:
+            if k not in meta.defaults and k not in params:
+                raise ValueError(f"{where}: op {name!r} requires param {k!r} (no default)")
 
 
 def to_ir(circuit: FockCircuit) -> dict[str, Any]:
@@ -286,13 +347,5 @@ def ir_schema() -> dict[str, Any]:
     }
 
 def _json_defaults(defaults: dict[str, Any]) -> dict[str, Any]:
-    """JSON-native defaults: numpy floats/arrays out, plain scalars/lists in."""
-    out: dict[str, Any] = {}
-    for k, v in defaults.items():
-        if isinstance(v, np.generic):
-            out[k] = v.item()
-        elif isinstance(v, np.ndarray):
-            out[k] = v.tolist()
-        else:
-            out[k] = v
-    return out
+    """JSON-native defaults (shared: ``cvsim.circuit_common``)."""
+    return json_defaults(defaults)
