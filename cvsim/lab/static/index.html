@@ -78,6 +78,16 @@
       <div class="panel__actions">
         <label class="hint" for="wigner-mode-select">mode</label>
         <select id="wigner-mode-select" class="select mono"></select>
+        <!-- R8: 跨模平面预设。pair 控件留在 head（不在 #wigner-side）——
+             lab_wigner_layout_probe 断言 frame 宽度**只**随色带标签变化，
+             往 side 加宽会挤掉 frame（历史上 nmode 1→2 曾因此重叠色带）。 -->
+        <label class="hint" for="wigner-plane-select">plane</label>
+        <select id="wigner-plane-select" class="select mono"></select>
+        <span id="plane-pair" class="plane-pair" hidden>
+          <label class="hint" for="plane-mode-a">pair</label>
+          <select id="plane-mode-a" class="select mono"></select>
+          <select id="plane-mode-b" class="select mono"></select>
+        </span>
       </div>
     </div>
     <div class="wigner">
@@ -107,6 +117,9 @@
           <div class="meter" id="m-row-mean_photon"><span class="meter__label">平均光子数</span><span id="m-nbar" class="meter__value mono">—</span></div>
           <div class="meter" id="m-row-mean_photon_per_mode"><span class="meter__label">各模式 ⟨n⟩</span><span id="m-permode" class="meter__value mono">—</span></div>
           <div class="meter" id="m-row-log_negativity"><span class="meter__label">对数负度</span><span id="m-logneg" class="meter__value mono">—</span></div>
+          <!-- R8: 按需出键。无模对时后端不发该键，此行渲染 honest "—"。
+               真空参考 2.0：可分离态 ≥ 2，纠缠态 < 2（EPR 判据）。 -->
+          <div class="meter" id="m-row-duan_sum"><span class="meter__label">Duan 和 (纠缠 &lt; 2)</span><span id="m-duan" class="meter__value mono">—</span></div>
         </div>
       </div>
     </div>

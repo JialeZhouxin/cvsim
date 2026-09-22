@@ -931,6 +931,41 @@ test("F7: stateFromJson — view.joint_modes 解析 + 校验", () => {
   assert.ok(stateFromJson({ ...base, view: { ...base.view, joint_modes: [0, -1] } }).error);
 });
 
+test("R8: stateFromJson — view.plane 双向保真 + 校验（D4b 白名单不丢字段）", () => {
+  const base = {
+    schema: "circuit_v1", nmode: 2, seed: 0, ops: [],
+    view: { wigner_mode: 0, lim: 5, n: 64 },
+  };
+  // 缺省：导入 → "single"，导出不写键（缺省字节不变）
+  const g = stateFromJson(base);
+  assert.equal(g.error, undefined);
+  assert.equal(g.state.view.plane, "single");
+  assert.equal(toV1Json(g.state).view.plane, undefined);
+
+  // 非缺省：导入必须**留住** plane（此前是硬编码白名单重建 → 静默丢失）
+  const e = stateFromJson({ ...base, view: { ...base.view, plane: "epr", joint_modes: [0, 1] } });
+  assert.equal(e.error, undefined);
+  assert.equal(e.state.view.plane, "epr");
+  assert.equal(toV1Json(e.state).view.plane, "epr");
+  assert.deepEqual(toV1Json(e.state).view.joint_modes, [0, 1]);
+
+  // 未知预设 → 导入即报错
+  assert.ok(stateFromJson({ ...base, view: { ...base.view, plane: "zz" } }).error);
+  // 非 single 缺 pair → 导入即报错（否则要等一次 /run 才 422）
+  assert.ok(stateFromJson({ ...base, view: { ...base.view, plane: "xx" } }).error);
+  // single 不需要 pair
+  assert.equal(stateFromJson({ ...base, view: { ...base.view, plane: "single" } }).error, undefined);
+  // R-G: 非 gaussian 后端带 plane → 导入即报错（后端 load_circuit 同样拒绝；
+  // 否则 fock 请求会校验通过、正常执行、静默忽略 plane）
+  assert.ok(stateFromJson({
+    ...base, backend: "fock",
+    view: { ...base.view, plane: "xx", joint_modes: [0, 1] },
+  }).error);
+  assert.equal(stateFromJson({
+    ...base, backend: "fock", view: { ...base.view, plane: "single" },
+  }).error, undefined);
+});
+
 test("F7: v1 直载解析 backend/initial（无 backend 字段 → gaussian）", () => {
   const v1 = {
     schema: "circuit_v1",

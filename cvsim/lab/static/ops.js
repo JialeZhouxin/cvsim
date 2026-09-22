@@ -451,6 +451,11 @@ export function toV1Json(state) {
   if (Array.isArray(v.joint_modes) && v.joint_modes.length === 2) {
     outDoc.view.joint_modes = v.joint_modes;
   }
+  // R8: plane 只在非缺省时写 —— 缺省 "single" 不写键，缺省场景字节不变
+  // （test_lab_ui.py::test_default_scene_to_v1_byte_frozen 锁死该字符串）。
+  if (typeof v.plane === "string" && v.plane !== "single") {
+    outDoc.view.plane = v.plane;
+  }
   if (state.backend === "fock" && Array.isArray(state.cutoffs)) {
     const cut = state.cutoffs.slice(0, nmode);
     if (cut.some((c) => c !== 10)) {

@@ -14,7 +14,7 @@ const defaultState = () => ({
   seed: 0,
   nmode: 1,            // ADR-0014: 模数唯一事实源（前端一等字段）
   nodes: [],
-  view: { wigner_mode: 0, lim: 5.0, n: 64, joint_modes: null },
+  view: { wigner_mode: 0, lim: 5.0, n: 64, plane: "single", joint_modes: null },
   ui: {},
   backend: "gaussian", // F7: representation backend (缺省 gaussian = 旧 JSON 零破坏)
   initial: null,       // F7/B6: per-mode 初始态，语义按 backend 二分（见 initial.js）
@@ -123,6 +123,9 @@ export function deriveEditorTables(schema) {
     viewN: ext.view?.n ?? [2, 512],
     viewLimMax: ext.view?.lim_max ?? 50,
     viewLimMinExcl: ext.view?.lim_min_exclusive ?? 0,
+    // R8: 预设名单来自 /schema（后端 load 期同表拒绝集合外名字）。回退常量
+    // 保证 schema 未注入时的 node --test 旧路径仍可校验。
+    viewPlanes: ext.view?.planes ?? ["single", "xx", "pp", "epr"],
     cutoff,
     shots: ext.shots ?? [0, 100000],
     irToUi,
@@ -151,6 +154,7 @@ function tables() {
     viewN: [2, 512],
     viewLimMax: 50,
     viewLimMinExcl: 0,
+    viewPlanes: ["single", "xx", "pp", "epr"],
     cutoff: [1, 30],
     shots: [0, 100000],
     irToUi: { ...V1_TO_UI_OP },
@@ -347,7 +351,18 @@ function stateFromV1(payload) {
       || rawView.n < T.viewN[0] || rawView.n > T.viewN[1]) {
     return { error: `view.n 必须在 [${T.viewN[0]}, ${T.viewN[1]}]` };
   }
-  const view = { wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n, joint_modes: null };
+  const view = {
+    wigner_mode: rawView.wigner_mode, lim: rawView.lim, n: rawView.n,
+    plane: "single", joint_modes: null,
+  };
+  // R8/D4b: 导入侧必须与导出侧对称 —— 此前 view 是白名单重建，非白名单字段
+  // 静默丢失（实测 plane:'epr' 导入后消失）。缺省/未给 → "single"。
+  if (rawView.plane !== undefined && rawView.plane !== null) {
+    if (!T.viewPlanes.includes(rawView.plane)) {
+      return { error: `view.plane 必须是 ${T.viewPlanes.join(" / ")} 之一` };
+    }
+    view.plane = rawView.plane;
+  }
   if (rawView.joint_modes !== undefined && rawView.joint_modes !== null) {
     if (!Array.isArray(rawView.joint_modes) || rawView.joint_modes.length !== 2
         || rawView.joint_modes[0] === rawView.joint_modes[1]
@@ -356,8 +371,17 @@ function stateFromV1(payload) {
     }
     view.joint_modes = [...rawView.joint_modes];
   }
+  // 后端侧契约（ir.py::_parse_view）：非 single 平面必须有模对，否则 422。
+  // 前移到导入期 = 导入即报错，而不是看起来成功了、等一次 /run 才红。
+  if (view.plane !== "single" && !Array.isArray(view.joint_modes)) {
+    return { error: `view.plane "${view.plane}" 需要 view.joint_modes` };
+  }
   const ext = parseExtensions(payload, payload.nmode);
   if (ext.error) return ext;
+  // load_circuit 同样拒绝非 gaussian 后端带 plane（R-G：不静默 no-op）。
+  if (view.plane !== "single" && ext.backend !== "gaussian") {
+    return { error: `view.plane "${view.plane}" 仅 gaussian 后端支持` };
+  }
   return { state: { seed, nmode: payload.nmode, nodes, view, ui: {}, ...ext } };
 }
 
@@ -546,6 +570,10 @@ export function initEditor(root, hooks) {
       const jointModes = !Array.isArray(jm0) || nmode < 2 || jm0.includes(mode)
         ? null
         : jm0.map((m) => (m > mode ? m - 1 : m));
+      /* R8/D4a: a cross-mode plane without a pair is rejected by the backend
+         (422), so dropping the pair must drop the plane with it — otherwise
+         deleting a mode silently leaves a request that can no longer run. */
+      const plane = jointModes === null ? "single" : state.view.plane;
       state = { ...state,
         nodes: removeMode(state.nodes, mode),
         nmode,
@@ -554,6 +582,7 @@ export function initEditor(root, hooks) {
         cutoffs: padTo(dropMode(state.cutoffs, mode), nmode, 10),
         view: { ...state.view,
           wigner_mode: Math.max(0, Math.min(state.view.wigner_mode, nmode - 1)),
+          plane,
           joint_modes: jointModes } };
       render();
     },
@@ -656,6 +685,13 @@ export function initEditor(root, hooks) {
     pushHistory();
     let view = state.view;
     let cutoffs = state.cutoffs;
+    // R8/R-G: the plane is gaussian-only — the backend rejects it with a 422.
+    // Switching away clears it, and says so (a silent drop would look like the
+    // user's setting simply vanished).
+    if (next !== "gaussian" && view.plane && view.plane !== "single") {
+      hooks.onStatus(`跨模平面 ${view.plane} 仅 gaussian 后端支持，已回落单模`, false);
+      view = { ...view, plane: "single" };
+    }
     // 模数与源无关（ADR-0014）：不再造源节点
     if (next === "fock") {
       const nm = state.nmode;

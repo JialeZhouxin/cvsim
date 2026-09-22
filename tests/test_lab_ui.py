@@ -78,6 +78,8 @@ BEHAVIOUR_TESTS = {
     "test_default_scene_runs",
     "test_view_bounds_enforced",
     "test_default_scene_to_v1_byte_frozen",
+    "test_plane_survives_json_round_trip",
+    "test_plane_rejections_happen_at_import_not_at_run",
     "test_shape_guards_are_declared_not_silently_behavioural",
 }
 
@@ -236,6 +238,14 @@ def test_key_elements_present():
         "scan-modes-a",
         "scan-btn",
         "scan-svg",
+        # R8: cross-mode plane chrome (plane dropdown + the pair controls that
+        # only appear for a non-single plane on gaussian with nmode>=2)
+        "wigner-plane-select",
+        "plane-pair",
+        "plane-mode-a",
+        "plane-mode-b",
+        "m-row-duan_sum",
+        "m-duan",
     ):
         assert f'id="{el}"' in html, el
 
@@ -493,6 +503,72 @@ def test_default_scene_to_v1_byte_frozen():
         raise AssertionError("node 不可用 —— node 是前端测试链硬依赖") from e
     assert proc.returncode == 0, proc.stderr[:500]
     assert proc.stdout.strip() == golden
+
+
+def _run_node(script: str) -> str:
+    """Run a node ESM snippet from the static dir and return stdout."""
+    try:
+        proc = subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            capture_output=True, text=True, cwd=STATIC_DIR,
+        )
+    except FileNotFoundError as e:
+        raise AssertionError("node 不可用 —— node 是前端测试链硬依赖") from e
+    assert proc.returncode == 0, proc.stderr[:500]
+    return proc.stdout.strip()
+
+
+_BASE_VIEW_JS = (
+    'const base = { schema:"circuit_v1", nmode:2, seed:0, ops:[],'
+    ' view:{ wigner_mode:0, lim:5, n:64 } };'
+)
+
+
+def test_plane_survives_json_round_trip():
+    """R8/D4b: `view.plane` and its pair must survive import → export.
+
+    `stateFromJson` rebuilds `view` from a hardcoded whitelist, so a field the
+    whitelist forgets is silently dropped on import — the user saves a plane,
+    reloads, and silently gets `single` back. This drives the real leaf pair
+    (editor.js + ops.js) in node rather than re-reading their source, so it is a
+    behaviour test, not a shape guard.
+    """
+    out = json.loads(_run_node(
+        'import { stateFromJson } from "./editor.js";'
+        'import { toV1Json } from "./ops.js";'
+        + _BASE_VIEW_JS +
+        'const r = stateFromJson({ ...base, view:{ ...base.view, plane:"epr",'
+        ' joint_modes:[0,1] } });'
+        'console.log(JSON.stringify(r.error ? { error: r.error }'
+        ' : toV1Json(r.state).view));'
+    ))
+    assert "error" not in out, f"valid plane rejected on import: {out}"
+    assert out.get("plane") == "epr", f"plane dropped by the import whitelist: {out}"
+    assert out["joint_modes"] == [0, 1]
+
+    # the default scene must NOT gain a plane key (its export is byte-frozen)
+    default_view = json.loads(_run_node(
+        'import { stateFromJson } from "./editor.js";'
+        'import { toV1Json } from "./ops.js";'
+        + _BASE_VIEW_JS +
+        'console.log(JSON.stringify(toV1Json(stateFromJson(base).state).view));'
+    ))
+    assert "plane" not in default_view, default_view
+
+
+def test_plane_rejections_happen_at_import_not_at_run():
+    """An unknown preset or a plane without its pair must fail on load, so the
+    user sees the error in the editor instead of as a 422 after a run."""
+    flags = json.loads(_run_node(
+        'import { stateFromJson } from "./editor.js";'
+        + _BASE_VIEW_JS +
+        'const bad = stateFromJson({ ...base, view:{ ...base.view, plane:"zz" } });'
+        'const nopair = stateFromJson({ ...base, view:{ ...base.view, plane:"xx" } });'
+        'const ok = stateFromJson({ ...base, view:{ ...base.view, plane:"xx",'
+        ' joint_modes:[0,1] } });'
+        'console.log(JSON.stringify([!!bad.error, !!nopair.error, !!ok.error]));'
+    ))
+    assert flags == [True, True, False], flags
 
 
 # ── C1 (09-17-lab-interaction-path-rerender) 源码级契约 ─────────────────────

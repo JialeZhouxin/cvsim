@@ -3,7 +3,7 @@
 
 import { initEditor, loadJson } from "./editor.js";
 import { OPS, toV1Json } from "./ops.js";
-import { meterKeys, publishSchema } from "./schema_store.js";
+import { meterKeys, publishSchema, schemaDoc } from "./schema_store.js";
 import { deriveOps } from "./ops_schema.js";
 import { setInitialSchema } from "./initial.js";
 import { setEditorSchema, deriveEditorTables } from "./editor.js";
@@ -16,7 +16,7 @@ import { validateScanForm } from "./scan_form.js";
 import { initStepState, stepLabel, stepDesc, stepMeters } from "./steps_slider.js";
 import { DEFAULT_SCENE } from "./default_scene.js";
 import {
-  meterRowPlan, panelsFor, runBodyExtensions,
+  meterRowPlan, panelsFor, planeOptions, runBodyExtensions, showPairControls,
 } from "./backend_panels.js";
 import {
   modesAOptions, scanEnabled, scanNodeListKey, sweepDefaults, sweepParamKeys, sweepableNodes,
@@ -50,6 +50,10 @@ const colorbar = $("colorbar-canvas");
 const statusEl = $("status");
 const runBtn = $("run-btn");
 const modeSelect = $("wigner-mode-select");
+const planeSelect = $("wigner-plane-select");
+const planePair = $("plane-pair");
+const planeModeA = $("plane-mode-a");
+const planeModeB = $("plane-mode-b");
 const saveBtn = $("save-btn");
 const loadInput = $("load-input");
 const seedInput = $("seed-input");
@@ -181,6 +185,7 @@ function drawHeatmap(W) {
    ice-cyan (--color-axis, complementary to inferno), values in ink with a
    paper halo (paint-order: stroke) so they read on any heatmap region. */
 let lastLim = 5;
+let lastAxes = null; // R8: latest plane axis labels (null = single mode)
 let lastWigner = null; // latest W grid — ResizeObserver 重绘用（dpr）
 
 function drawAxes(lim) {
@@ -219,6 +224,23 @@ function drawAxes(lim) {
     /* y ticks on the vertical center line, values to the left */
     svg.append(el("line", { x1: cx - 3, y1: y, x2: cx + 3, y2: y, stroke: axis, "stroke-width": 1 }));
     if (label !== null) svg.append(mkText(cx - 7, y + 3.5, "end"));
+  }
+
+  /* R8: name the axes when the plane is not a single mode's (x, p) — the tick
+     numbers alone cannot say what is being plotted. Labels are in the SVG, not
+     in the DOM beside the canvas, so the layout probe's geometry invariants
+     (frame width, colourbar overlap) keep holding: an SVG overlay does not
+     participate in layout. */
+  if (lastAxes && Array.isArray(lastAxes.labels)) {
+    const mkName = (tx, ty, anchor, text) => {
+      const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: axis });
+      t.setAttribute("stroke", `${paper} / 0.92`);
+      t.setAttribute("stroke-width", 3);
+      t.textContent = text;
+      return t;
+    };
+    svg.append(mkName(cx, 12, "middle", lastAxes.labels[0]));
+    svg.append(mkName(6, cy - 6, "start", lastAxes.labels[1]));
   }
 }
 
@@ -294,6 +316,7 @@ function drawWignerResult(result) {
   if (!result.wigner) {
     // singular conditional state: no finite Wigner, never fabricated
     lastWigner = null;
+    lastAxes = null;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const cb = colorbar.getContext("2d");
@@ -308,6 +331,7 @@ function drawWignerResult(result) {
     wignerNote.hidden = true;
     const { x, p, W } = result.wigner;
     lastWigner = result.wigner;
+    lastAxes = result.wigner.axes ?? null; // R8: axis names only for a plane
     drawHeatmap(W);
     drawAxes(x[x.length - 1]); // lim = +x max
   }
@@ -722,7 +746,11 @@ const fockPanel = initFockPanel(document, {
 const editor = initEditor(document.querySelector(".workbench"), {
   defaultScene: DEFAULT_SCENE,
   onRun: scheduleRun,
-  onState: (state) => { refreshScanNodes(); syncBackendPanels(state.backend); }, // sweep selects mirror the graph
+  onState: (state) => {
+    refreshScanNodes();
+    syncBackendPanels(state.backend);
+    syncPlaneControls(state); // R8: plane/pair chrome mirrors the graph
+  }, // sweep selects mirror the graph
   onStatus: setStatus,
   onPickSweep: (id) => {
     // L5: opening a sweepable gate's param card syncs the scan target
@@ -796,6 +824,108 @@ modeSelect.addEventListener("change", () => {
   // route through editor so JSON textarea stays in sync (OCR finding)
   editor.setView({ wigner_mode: Number(modeSelect.value) || 0 });
 });
+
+/* ── R8: plane selector + pair controls ──────────────────────────────── */
+/** AC13: the plane dropdown is derived from `/schema` (`extensions.view.planes`),
+    not from a frontend constant — the backend owns the preset list and rejects
+    anything outside it (422). `backend_panels.planeOptions` supplies labels only.
+    Fail-fast like `meterKeys`: an un-injected /schema means no list is available,
+    and an empty dropdown would silently look like "no planes exist". */
+function renderPlaneSelect() {
+  const doc = schemaDoc();
+  const planes = doc?.extensions?.view?.planes;
+  if (!Array.isArray(planes) || planes.length === 0) {
+    throw new Error("/schema 未提供 extensions.view.planes — 禁止静默回退（frozen-graph）");
+  }
+  const opts = planeOptions(planes);
+  // idempotent: same values in the same order → no DOM churn on every onState
+  const current = [...planeSelect.options].map((o) => o.value);
+  if (current.length === opts.length && current.every((v, i) => v === opts[i].value)) return;
+  planeSelect.replaceChildren();
+  for (const { value, label } of opts) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    planeSelect.appendChild(opt);
+  }
+}
+
+/** Fill the two pair dropdowns with every mode index. The backend re-validates
+    the pair against the post-run nmode (422), so this list is the load-time
+    superset, not a guarantee. */
+function renderPairSelects(nm) {
+  for (const [idx, sel] of [planeModeA, planeModeB].entries()) {
+    const prev = sel.value;
+    sel.replaceChildren();
+    for (let k = 0; k < nm; k++) {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = `mode ${k}`;
+      sel.appendChild(opt);
+    }
+    if (prev !== "" && Number(prev) < nm) sel.value = prev;
+    else sel.value = String(Math.min(idx, Math.max(0, nm - 1)));
+  }
+  // the two selects must not silently offer an invalid (equal) pair
+  if (planeModeA.value === planeModeB.value && nm >= 2) {
+    planeModeB.value = String((Number(planeModeA.value) + 1) % nm);
+  }
+}
+
+/** Sync the plane chrome to the current editor state. Visibility only depends
+    on (backend, plane, nmode) — all three are known without a run.
+
+    Offline boot (`/schema` failed) leaves the dropdown empty and the editor is
+    already blocked behind the red status bar, so this returns quietly rather
+    than throwing from a later `onState` — the fail-fast belongs at boot, not on
+    every subsequent keystroke. */
+function syncPlaneControls(state) {
+  try {
+    renderPlaneSelect();
+  } catch {
+    return; // offline boot: no plane chrome, editor gate already reports it
+  }
+  const plane = state.view?.plane ?? "single";
+  planeSelect.value = plane;
+  renderPairSelects(state.nmode);
+  const jm = state.view?.joint_modes;
+  if (Array.isArray(jm) && jm.length === 2) {
+    if (Number(planeModeA.value) !== jm[0]) planeModeA.value = String(jm[0]);
+    if (Number(planeModeB.value) !== jm[1]) planeModeB.value = String(jm[1]);
+  }
+  planePair.hidden = !showPairControls(state.backend, plane, state.nmode);
+}
+
+planeSelect.addEventListener("change", () => {
+  const plane = planeSelect.value;
+  const state = editor.getState();
+  // pair is required for every non-single plane: seed it from the dropdowns (or
+  // the existing view) so selecting "epr" cannot produce a 422 by itself.
+  if (plane !== "single") {
+    const fallback = Array.isArray(state.view?.joint_modes) && state.view.joint_modes.length === 2
+      ? state.view.joint_modes
+      : [Number(planeModeA.value) || 0, Number(planeModeB.value) || 0];
+    let [a, b] = fallback;
+    if (a === b) b = (a + 1) % Math.max(2, state.nmode); // never submit an equal pair
+    editor.setView({ plane, joint_modes: [a, b] });
+  } else {
+    editor.setView({ plane });
+  }
+});
+
+for (const sel of [planeModeA, planeModeB]) {
+  sel.addEventListener("change", () => {
+    let a = Number(planeModeA.value) || 0;
+    let b = Number(planeModeB.value) || 0;
+    if (a === b) {
+      // nudge the select the user just moved away from the other one, so the
+      // visible controls never disagree with the payload
+      if (sel === planeModeA) { b = (a + 1) % Math.max(2, editor.getState().nmode); planeModeB.value = String(b); }
+      else { a = (b + 1) % Math.max(2, editor.getState().nmode); planeModeA.value = String(a); }
+    }
+    editor.setView({ joint_modes: [a, b] });
+  });
+}
 
 async function init() {
   /* 票3: 先拉 /schema —— 单一事实源注入（ops/initial/editor 合并层）。

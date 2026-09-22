@@ -5,8 +5,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  BACKEND_PANELS, INITIAL_INPUT_KIND, METER_ROWS, RUN_BODY_EXTENSIONS,
-  initialInputKind, meterRowPlan, panelsFor, runBodyExtensions,
+  BACKEND_PANELS, INITIAL_INPUT_KIND, METER_ROWS, PLANE_LABELS, RUN_BODY_EXTENSIONS,
+  initialInputKind, meterRowPlan, panelsFor, planeOptions, runBodyExtensions,
+  showPairControls,
 } from "../cvsim/lab/static/backend_panels.js";
 
 test("panelsFor: three backends, unknown → undefined", () => {
@@ -90,4 +91,34 @@ test("initialInputKind: fock int / bosonic enum / gaussian undefined", () => {
 
 test("RUN_BODY_EXTENSIONS is the single declaration (no second table drifted in)", () => {
   assert.deepEqual(Object.keys(RUN_BODY_EXTENSIONS), ["bosonic"]);
+});
+
+test("planeOptions: schema owns the key set and order, the table owns labels", () => {
+  // the backend's list decides what exists — including a preset this file has
+  // never heard of (forward-compat: show it rather than dropping it silently)
+  const opts = planeOptions(["single", "epr", "brand_new"]);
+  assert.deepEqual(opts.map((o) => o.value), ["single", "epr", "brand_new"]);
+  assert.equal(opts[0].label, PLANE_LABELS.single);
+  assert.equal(opts[1].label, PLANE_LABELS.epr);
+  assert.equal(opts[2].label, "brand_new"); // unknown key falls back to the raw name
+});
+
+test("planeOptions: never invents a preset and never throws on a bad payload", () => {
+  // the frontend must not be a second source of truth for the preset list
+  assert.equal(planeOptions(["single"]).length, 1);
+  assert.deepEqual(planeOptions([]), []);
+  assert.deepEqual(planeOptions(undefined), []);
+  assert.deepEqual(planeOptions(null), []);
+  assert.deepEqual(planeOptions("single"), []); // a bare string is not a list
+  assert.ok(!planeOptions(["single"]).some((o) => o.value === "xx"));
+});
+
+test("showPairControls: gaussian + non-single plane + nmode>=2 only", () => {
+  assert.equal(showPairControls("gaussian", "xx", 2), true);
+  assert.equal(showPairControls("gaussian", "epr", 4), true);
+  // single needs no pair; one mode has no pair to point at; other backends 422
+  assert.equal(showPairControls("gaussian", "single", 3), false);
+  assert.equal(showPairControls("gaussian", "xx", 1), false);
+  assert.equal(showPairControls("fock", "xx", 3), false);
+  assert.equal(showPairControls("bosonic", "epr", 3), false);
 });

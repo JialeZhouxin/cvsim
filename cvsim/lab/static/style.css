@@ -215,6 +215,19 @@ body {
   flex-shrink: 0;
 }
 
+/* R8: plane pair controls. Inline group inside .panel__actions so the frame
+   column's width is unaffected — the layout probe asserts the frame tracks only
+   the colourbar label width, so this must never become a width variable. */
+.plane-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.plane-pair[hidden] {
+  display: none;
+}
+
 /* 工具栏分组（Proximity：相近相关）+ 竖分隔线 */
 .btn-group {
   display: flex;

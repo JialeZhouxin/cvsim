@@ -30,7 +30,35 @@ export const METER_ROWS = {
   mean_photon: { value: "m-nbar", label: "平均光子数" },
   mean_photon_per_mode: { value: "m-permode", label: "各模式 ⟨n⟩" },
   log_negativity: { value: "m-logneg", label: "对数负度" },
+  duan_sum: { value: "m-duan", label: "Duan 和 (纠缠 < 2)" },
 };
+
+/** R8: 跨模 Wigner 平面的**呈现**表（键 → 中文标签）。键集**不**在这里 ——
+    键集来自 /schema `extensions.view.planes`（后端事实源
+    `cvsim/lab/schema.py::_EXTENSIONS["view"]["planes"]`），同 METER_ROWS 与
+    meterKeys 的分工：静态表管标签，schema 管键集与顺序。 */
+export const PLANE_LABELS = {
+  single: "单模 (x, p)",
+  xx: "x–x 平面",
+  pp: "p–p 平面",
+  epr: "EPR 平面 (x₋, p₊)",
+};
+
+/** R8: 平面下拉的纯渲染计划 —— schema 的 `planes` 列表 → 逐项 {value, label}。
+    顺序取 schema（后端是事实源），标签取静态表、缺失则回落原始键名（不静默丢弃：
+    后端新加一个预设时前端仍能选到，只是暂时显示英文键名）。 */
+export function planeOptions(planes) {
+  return (Array.isArray(planes) ? planes : []).map((value) => ({
+    value,
+    label: PLANE_LABELS[value] ?? value,
+  }));
+}
+
+/** R8: pair 控件是否该出现。只有 gaussian 且 plane != single 且至少两模时
+    模对才有意义 —— single 不用 pair，fock/bosonic 后端直接 422。 */
+export function showPairControls(backend, plane, nmode) {
+  return backend === "gaussian" && plane !== "single" && nmode >= 2;
+}
 
 /** meter 面板的纯渲染计划：矩阵键集 → 逐行 {可见?、行 id、值 id}。
 
