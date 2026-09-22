@@ -636,10 +636,11 @@ try {
     JSON.stringify(delMode.jointModes) === JSON.stringify([0, 1]),
     JSON.stringify({ wignerMode: delMode.wignerMode, jointModes: delMode.jointModes }));
 
-  /* AC13b: joint_modes 命中被删模 → 清空（对不再存在） */
+  /* AC13b: joint_modes 命中被删模 → 清空（对不再存在）；R8: plane 必须跟着回落
+     —— 非 single 的 plane 没有 pair 就是后端 422，留着 = 留下一个跑不动的请求 */
   await evalJs(ws, `(async () => {
     const payload = { schema: "circuit_v1", seed: 0, nmode: 3, ops: [],
-      view: { wigner_mode: 0, lim: 5.0, n: 64, joint_modes: [0, 1] }, ui: {} };
+      view: { wigner_mode: 0, lim: 5.0, n: 64, plane: "xx", joint_modes: [0, 1] }, ui: {} };
     const input = document.getElementById("json-input");
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
     setter.call(input, JSON.stringify(payload));
@@ -648,10 +649,13 @@ try {
     document.querySelectorAll(".staff__mode-del")[1].dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 300));
     const j = JSON.parse(document.getElementById("json-input").value);
-    return { nmode: j.nmode, jointModes: j.view.joint_modes };
+    return { nmode: j.nmode, jointModes: j.view.joint_modes, plane: j.view.plane };
   })()`).then((r) => {
     check("delete mode: joint_modes 命中被删模 → 清空（回退默认 [0,1]）",
       r.nmode === 2 && r.jointModes === undefined, JSON.stringify(r));
+    /* plane=xx 无 pair 会被后端拒（422），故必须一起回落 single */
+    check("delete mode: plane 随 pair 一起回落 single（不留下跑不动的请求）",
+      r.plane === undefined, JSON.stringify(r));
   });
 
   const delLast = await evalJs(ws, `(async () => {

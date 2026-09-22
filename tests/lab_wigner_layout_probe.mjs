@@ -176,8 +176,28 @@ async function waitStableGeom(ws) {
    a reliable signal: re-running the same circuit can produce an identical duration
    string ("ok · 246 ms"), so a text-change wait times out. The run button's
    disabled flag is driven by the ref-counted busy wrapper, so waiting for
-   true → false brackets the request exactly. */
+   true → false brackets the request exactly.
+
+   Because the busy flag is an *edge* that now lasts only a few milliseconds
+   (vectorizing the Gaussian Wigner grid cut /run from ~250ms to ~6ms at n=64), a
+   50ms poll can step right over it and report a false "timeout". So the settle
+   condition is a LEVEL: a patched fetch counts page-side requests, which cannot
+   be missed however coarsely we sample. This is a harness fix, not a product
+   change — the probe's assertions are unchanged. */
+async function installRunCounter(ws) {
+  await evalJs(ws, `(() => {
+    if (!window.__probeFetchCount) {
+      window.__probeFetchCount = 0;
+      const orig = window.fetch;
+      window.fetch = (...a) => { window.__probeFetchCount++; return orig(...a); };
+    }
+    window.__probeFetchMark = window.__probeFetchCount;
+    return true;
+  })()`);
+}
+
 async function runAndSettle(ws) {
+  await installRunCounter(ws);
   await evalJs(ws, `document.getElementById("run-btn").click()`);
   const state = await evalJs(ws, `(async () => {
     let sawBusy = false;
@@ -185,6 +205,7 @@ async function runAndSettle(ws) {
       const btn = document.getElementById("run-btn");
       const s = document.getElementById("status");
       if (btn.disabled) sawBusy = true;
+      if (window.__probeFetchCount > window.__probeFetchMark) sawBusy = true;
       if (s.dataset.state === "error") return "err:" + s.textContent;
       if (sawBusy && !btn.disabled && s.dataset.state === "ok") return "ok";
       await new Promise((r) => setTimeout(r, 50));
@@ -215,6 +236,7 @@ async function injectAndSettle(ws, payload) {
     const j = await r.json();
     return axisVal(wignerScale(j.wigner.W));
   })()`);
+  await installRunCounter(ws);
   await evalJs(ws, `(() => {
     const input = document.getElementById("json-input");
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
@@ -228,6 +250,7 @@ async function injectAndSettle(ws, payload) {
       const btn = document.getElementById("run-btn");
       const st = document.getElementById("status");
       if (btn.disabled) sawBusy = true;
+      if (window.__probeFetchCount > window.__probeFetchMark) sawBusy = true;
       if (st.dataset.state === "error") return "err:" + st.textContent;
       /* 400ms editor debounce + request + render, then the label must have landed */
       if (sawBusy && !btn.disabled && document.getElementById("colorbar-max").textContent === ${JSON.stringify(expected)}) return "ok";

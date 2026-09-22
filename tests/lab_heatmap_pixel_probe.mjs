@@ -111,8 +111,29 @@ const SCENES = {
 /* Same settle discipline as lab_wigner_layout_probe.mjs: the run button's busy
    toggle brackets the debounced request, and the colourbar max label must equal
    what the backend returns for THIS circuit (a repeated label value would
-   otherwise let us read geometry/pixels from the previous run). */
+   otherwise let us read geometry/pixels from the previous run).
+
+   Settle detection is LEVEL-based, not edge-based. The busy flag is only asserted
+   for the duration of the request, and the vectorized Wigner grid made /run ~40x
+   faster (n=64: ~250ms → ~6ms). A 50ms poll therefore misses the whole busy
+   window and reports a false "timeout" (observed when S3 vectorized the Gaussian
+   branch). Patching fetch to count requests gives a state that cannot be missed,
+   however coarsely we poll. */
+async function installRunCounter(ws) {
+  await evalJs(ws, `(() => {
+    if (!window.__probeFetchCount) {
+      window.__probeFetchCount = 0;
+      const orig = window.fetch;
+      window.fetch = (...a) => { window.__probeFetchCount++; return orig(...a); };
+    }
+    window.__probeFetchMark = window.__probeFetchCount;
+    return true;
+  })()`);
+}
+
 async function injectAndSettle(ws, payload) {
+  /* Compute the expected label BEFORE installing the counter, so this probe's own
+     diagnostic fetch is not mistaken for the page's run request. */
   const expected = await evalJs(ws, `(async () => {
     const { wignerScale } = await import("/colormap.js");
     const { axisVal } = await import("/svg_kit.js");
@@ -122,6 +143,7 @@ async function injectAndSettle(ws, payload) {
     const j = await r.json();
     return axisVal(wignerScale(j.wigner.W));
   })()`);
+  await installRunCounter(ws);
   await inject(ws, payload);
   const state = await evalJs(ws, `(async () => {
     let sawBusy = false;
@@ -129,6 +151,7 @@ async function injectAndSettle(ws, payload) {
       const btn = document.getElementById("run-btn");
       const st = document.getElementById("status");
       if (btn.disabled) sawBusy = true;
+      if (window.__probeFetchCount > window.__probeFetchMark) sawBusy = true;
       if (st.dataset.state === "error") return "err:" + st.textContent;
       if (sawBusy && !btn.disabled
           && document.getElementById("colorbar-max").textContent === ${JSON.stringify(expected)}) return "ok";
