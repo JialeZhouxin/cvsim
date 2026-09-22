@@ -71,23 +71,61 @@ def test_per_op_keys_and_backends():
     assert set(ops["mz"]["backends"]) == {"gaussian"}
     assert set(ops["mach_zehnder"]["backends"]) == {"fock", "bosonic"}
     assert set(ops["kerr"]["backends"]) == {"fock"}
-    assert set(ops["interferometer"]["backends"]) == {"bosonic"}
-    assert set(ops["gaussian_channel"]["backends"]) == {"bosonic"}
+    # 09-21-lab-gaussian-unhide-ops: 这 5 个 op 归入 gaussian 白名单。
+    # cz/cx/phase_noise 出托盘卡片；interferometer/gaussian_channel 仍
+    # palette:false（JSON-only，矩阵参数无面板块）。
+    assert set(ops["interferometer"]["backends"]) == {"gaussian", "bosonic"}
+    assert set(ops["gaussian_channel"]["backends"]) == {"gaussian", "bosonic"}
+    assert set(ops["cz"]["backends"]) == {"gaussian", "fock", "bosonic"}
+    assert set(ops["cx"]["backends"]) == {"gaussian", "fock", "bosonic"}
+    assert set(ops["phase_noise"]["backends"]) == {"gaussian", "fock", "bosonic"}
+    # 仍隐藏的两个：gaussian 不得出现
+    assert "gaussian" not in ops["mach_zehnder"]["backends"]
+    assert ops["measure_threshold"]["backends"] == ["bosonic"]
 
 
 def test_per_op_meta_from_core_ir_schema():
-    """meta comes from the package's ir_schema() — the core is the authority."""
+    """meta comes from the package's ir_schema() — the core is the authority.
+
+    09-21-lab-gaussian-unhide-ops: which package's meta a shared op gets is
+    decided by BACKENDS order (gaussian → fock → bosonic: the FIRST backend
+    whose whitelist lists it). Unhiding an op in gaussian therefore *changes*
+    the meta the frontend sees for every backend. This is display-only —
+    arity/param enforcement stays per-package (each package's validate_ir) —
+    and the new values are locked here so a silent revert is caught.
+    """
     ops = assemble_schema()["ops"]
     assert ops["squeeze"]["meta"] == {
         "arity": "one",
         "value_kind": {"r": "num", "phi": "num"},
         "defaults": {"r": 0.0, "phi": 0.0},
     }
-    # bosonic-only op carries bosonic meta (incl. d: None default)
-    assert ops["gaussian_channel"]["meta"]["defaults"] == {"d": None}
+    # meta now comes from GAUSSIAN for these two (was bosonic-only before):
+    # gaussian's gaussian_channel has no `d` default (bosonic's was {"d": None}),
+    # so the payload carries {} — a hand-written d is REQUIRED on the gaussian
+    # path, which the gaussian_channel tip states.
+    assert ops["gaussian_channel"]["meta"]["arity"] == "none"
+    assert ops["gaussian_channel"]["meta"]["defaults"] == {}
+    assert ops["gaussian_channel"]["meta"]["value_kind"] == {
+        "X": "matrix",
+        "Y": "matrix",
+        "d": "matrix",
+    }
+    # interferometer meta unchanged (arity all, matrix U) — now also gaussian
+    assert ops["interferometer"]["meta"]["arity"] == "all"
+    assert ops["interferometer"]["meta"]["value_kind"] == {"U": "matrix"}
+    # cz/cx: gaussian default weight is 0.0 (the gaussian core's real default);
+    # fock's 1.0 is no longer what the single shared meta reports.
+    assert ops["cz"]["meta"]["defaults"] == {"weight": 0.0}
+    assert ops["cx"]["meta"]["defaults"] == {"weight": 0.0}
+    # phase_noise: gaussian/bosonic say 'any', fock says 'one' → first
+    # whitelist backend (gaussian) wins → 'any'.
+    assert ops["phase_noise"]["meta"]["arity"] == "any"
     # bosonic ir_schema has no 'mz' — gaussian meta must be used there
     assert ops["mz"]["meta"]["arity"] == "two"
     assert ops["mz"]["meta"]["value_kind"] == {"theta": "num", "phi": "num"}
+    # mach_zehnder stays fock-first (gaussian hidden) → still fock's values
+    assert ops["mach_zehnder"]["meta"]["defaults"] == {"theta": 0.7853981633974483, "phi": 0.0}
 
 
 def test_core_ranges_merged_per_op():
@@ -194,12 +232,17 @@ def _detail(body: dict) -> str:
 
 
 def test_422_whitelist_message_format_unified():
-    """Three whitelists, one message template; allowed list sorted."""
+    """Three whitelists, one message template; allowed list sorted.
+
+    09-21-lab-gaussian-unhide-ops: the gaussian counterexample moved from
+    `cz` (now whitelisted) to `measure_threshold` (still hidden, and rejected
+    by the gaussian runner for the same whitelist reason).
+    """
     msg_g = _detail_for(
         {
             "schema": "circuit_v1",
             "nmode": 2,
-            "ops": [{"op": "cz", "modes": [0, 1], "params": {"weight": 1.0}}],
+            "ops": [{"op": "measure_threshold", "modes": [0], "params": {"name": "t"}}],
         }
     )
     msg_f = _detail_for(

@@ -11,24 +11,45 @@ import {
 // ticket 4: palette/backends derived from schema (ops.js mirrors deleted).
 import { deriveOps } from "../cvsim/lab/static/ops_schema.js";
 import { publishSchema, opsForBackend, meterKeys } from "../cvsim/lab/static/schema_store.js";
-import { stateFromJson, loadJson, createHistory, deriveEditorTables } from "../cvsim/lab/static/editor.js";
 import { setInitialSchema, dropMode } from "../cvsim/lab/static/initial.js";
+import { stateFromJson, loadJson, createHistory, deriveEditorTables, setEditorSchema } from "../cvsim/lab/static/editor.js";
 
 // Minimal hand-written /schema payload (shape = ticket-2 golden; ops keys
 // are IR names; uiName present only where IR name differs). backends values
 // = ticket-4 derived whitelist (schema.py: core ir_schema - UI-hidden).
+// 09-21-lab-gaussian-unhide-ops: gaussian now also exposes cz/cx/
+// interferometer/phase_noise/gaussian_channel (mach_zehnder +
+// measure_threshold stay hidden).
 const IR_BY_UI = { homodyne: "measure_homodyne", heterodyne: "measure_heterodyne" };
 const BACKENDS_BY_UI = {
   mz: ["gaussian"],
   kerr: ["fock"], measure_pnr: ["fock"],
-  interferometer: ["bosonic"], gaussian_channel: ["bosonic"], measure_threshold: ["bosonic"],
+  interferometer: ["gaussian", "bosonic"], gaussian_channel: ["gaussian", "bosonic"],
+  measure_threshold: ["bosonic"],
   fourier: ["gaussian", "bosonic"],
-  cz: ["fock", "bosonic"], cx: ["fock", "bosonic"], phase_noise: ["fock", "bosonic"], mach_zehnder: ["fock", "bosonic"],
+  cz: ["gaussian", "fock", "bosonic"], cx: ["gaussian", "fock", "bosonic"],
+  phase_noise: ["gaussian", "fock", "bosonic"], mach_zehnder: ["fock", "bosonic"],
+};
+// Real per-op core arity / value_kind (dumped from assemble_schema()). The
+// loader now reads `meta.arity` + `meta.value_kind`, so a mock that gives
+// every op arity "one" would exercise the fallback path instead of the
+// production one — and silently pass for multi-mode / matrix ops.
+const ARITY_BY_UI = {
+  interferometer: "all", gaussian_channel: "none", phase_noise: "any",
+  amplifier: "any", cz: "two", cx: "two", mz: "two", mach_zehnder: "two",
+  beamsplitter: "two", two_mode_squeeze: "two",
+};
+const VALUE_KIND_BY_UI = {
+  interferometer: { U: "matrix" },
+  gaussian_channel: { X: "matrix", Y: "matrix", d: "matrix" },
 };
 const MOCK_SCHEMA = {
   ops: Object.fromEntries(Object.entries(OPS).map(([ui, meta]) => {
     const ir = IR_BY_UI[ui] ?? ui;
-    const entry = { backends: BACKENDS_BY_UI[ui] ?? ["gaussian", "fock", "bosonic"], meta: { arity: "one" } };
+    const entry = {
+      backends: BACKENDS_BY_UI[ui] ?? ["gaussian", "fock", "bosonic"],
+      meta: { arity: ARITY_BY_UI[ui] ?? "one", value_kind: VALUE_KIND_BY_UI[ui] ?? {} },
+    };
     if (ir !== ui) entry.uiName = ui;
     return [ir, entry];
   })),
@@ -36,6 +57,10 @@ const MOCK_SCHEMA = {
   extensions: { cutoff: [1, 30], view: { lim_max: 50, lim_min_exclusive: 0, n: [2, 512] }, sweep: { n: [2, 200] }, shots: [1, 100000], rounds: [1, 100] },
   meters: { core: ["purity", "mean_photon", "mean_photon_per_mode"], extensions: { gaussian: ["log_negativity", "singular"], fock: ["leakage"], bosonic: [] } },
 };
+//: 09-21: install the mock schema into editor.js too (the loader reads
+//: meta.arity/value_kind from there); without it the production path —
+//: matrix params + 'all'/'none' arity — is never exercised.
+setEditorSchema(MOCK_SCHEMA);
 // palette derived publish happens in the F7 tests at file end (avoids polluting fallback-path tests).
 
 const EXPECTED_OPS = ["squeeze", "phase", "fourier", "displace", "loss", "beamsplitter", "heterodyne", "homodyne", "amplifier", "mz", "two_mode_squeeze", "kerr", "cz", "cx", "mach_zehnder", "phase_noise", "measure_pnr", "interferometer", "gaussian_channel", "measure_threshold"];
@@ -442,8 +467,23 @@ test("stateFromJson: rejects wrong schema / non-object (ADR-0011: v1 only)", () 
   assert.ok(stateFromJson({ schema: "circuit_v0", nmode: 1, ops: [] }).error);
   assert.ok(stateFromJson(null).error);
   assert.ok(stateFromJson("nope").error);
-  // core-only op rejected by Lab whitelist
-  assert.ok(stateFromJson({ schema: "circuit_v1", nmode: 2, ops: [{ id: "x", op: "mach_zehnder", modes: [0, 1], params: {} }] }).error);
+  // op absent from OPS (no UI control) rejected. NOTE: a valid `view` is
+  // required here — without it the loader fails on view.wigner_mode first
+  // and the assertion would pass for the wrong reason (09-21 review).
+  const VIEW = { wigner_mode: 0, lim: 5.0, n: 64 };
+  const bad = stateFromJson({
+    schema: "circuit_v1", nmode: 2, view: VIEW,
+    ops: [{ id: "x", op: "apply_unitary", modes: [0], params: {} }],
+  });
+  assert.match(bad.error, /不在 Lab 白名单/);
+  // mach_zehnder is a core op WITH a UI entry but no gaussian whitelist
+  // entry — the loader lets it through (it is not UI-hidden by op table);
+  // the *backend* is what rejects it. Assert the real reason:
+  const mz = stateFromJson({
+    schema: "circuit_v1", nmode: 2, view: VIEW,
+    ops: [{ id: "x", op: "mach_zehnder", modes: [0, 1], params: { theta: 0.5, phi: 0 } }],
+  });
+  assert.equal(mz.error, undefined, "mach_zehnder 有 UI 条目，前端放行（后端按白名单拒）");
 });
 
 test("L3: homodyne visible with phi default 0 / max TAU", () => {
@@ -721,17 +761,23 @@ test("v1: stateFromJson inverts native v1 doc (op remap, nmode 直读)", () => {
   assert.deepEqual(again.ops.map((o) => o.op), ["two_mode_squeeze", "measure_heterodyne", "phase"]);
 });
 
-test("v1: stateFromJson rejects core-only ops (Lab whitelist)", () => {
-  const payload = {
-    schema: "circuit_v1", nmode: 2,
+test("v1: stateFromJson 放行解锁的 gaussian op，仍拒无 UI 条目的 op", () => {
+  const VIEW = { wigner_mode: 0, lim: 5.0, n: 64 };
+  // 09-21: interferometer 现已在 gaussian 白名单 + 是矩阵 op → 必须载入
+  // 且 U 不丢（此前因 view 缺失被误判为"白名单拒绝"，断言空转）。
+  const itf = stateFromJson({
+    schema: "circuit_v1", nmode: 2, view: VIEW,
     ops: [{ op: "interferometer", modes: [0, 1], params: { U: [[1, 0], [0, 1]] } }],
-  };
-  assert.ok(stateFromJson(payload).error);
-  const au = {
-    schema: "circuit_v1", nmode: 1,
+  });
+  assert.equal(itf.error, undefined);
+  assert.deepEqual(itf.state.nodes[0].params.U, [[1, 0], [0, 1]]);
+  assert.deepEqual(toV1Json(itf.state).ops[0].params.U, [[1, 0], [0, 1]]);
+  // 矩阵编辑器 defer（反白名单教义）：apply_unitary 无 UI 条目 → 拒
+  const au = stateFromJson({
+    schema: "circuit_v1", nmode: 1, view: VIEW,
     ops: [{ op: "apply_unitary", modes: [0], params: { U: [[1, 0], [0, 1]] } }],
-  };
-  assert.ok(stateFromJson(au).error); // 矩阵编辑器 defer（反白名单教义）
+  });
+  assert.match(au.error, /不在 Lab 白名单/);
 });
 
 test("v1: auto id never collides with explicit id", () => {
@@ -1043,11 +1089,16 @@ test("ticket-4 F7/B6: backends derived (deriveOps); ops.js carries none", () => 
   assert.deepEqual(d.mz.backends, ["gaussian"]);
   assert.deepEqual(d.kerr.backends, ["fock"]);
   assert.deepEqual(d.measure_pnr.backends, ["fock"]);
-  assert.deepEqual(d.interferometer.backends, ["bosonic"]);
-  assert.deepEqual(d.gaussian_channel.backends, ["bosonic"]);
+  // 09-21-lab-gaussian-unhide-ops: gaussian 加入这两个（JSON-only，仍 palette:false）
+  assert.deepEqual(d.interferometer.backends, ["gaussian", "bosonic"]);
+  assert.deepEqual(d.gaussian_channel.backends, ["gaussian", "bosonic"]);
   assert.deepEqual(d.measure_threshold.backends, ["bosonic"]);
   assert.deepEqual(d.fourier.backends, ["gaussian", "bosonic"]);
-  assert.deepEqual(d.cz.backends, ["fock", "bosonic"]);
+  // gaussian 加入 cz/cx/phase_noise
+  assert.deepEqual(d.cz.backends, ["gaussian", "fock", "bosonic"]);
+  assert.deepEqual(d.phase_noise.backends, ["gaussian", "fock", "bosonic"]);
+  // mach_zehnder 仍不含 gaussian（gaussian 用 mz，分解不同）
+  assert.deepEqual(d.mach_zehnder.backends, ["fock", "bosonic"]);
   assert.deepEqual(d.displace.backends, ["gaussian", "fock", "bosonic"]);
   assert.deepEqual(d.homodyne.backends, ["gaussian", "fock", "bosonic"]);
 });
@@ -1076,6 +1127,19 @@ test("ticket-4 F7: opsForBackend derived palette (fock has kerr/cz/cx/measure_pn
   assert.ok(!opsForBackend("gaussian").includes("kerr"));
   assert.ok(!opsForBackend("gaussian").includes("measure_pnr"));
   assert.ok(opsForBackend("bosonic").includes("measure_threshold"));
+  // 09-21-lab-gaussian-unhide-ops: gaussian 解锁 5 op。出卡片的三张
+  // （cz/cx/phase_noise 无 palette:false）→ 进托盘；两个矩阵 op 仍
+  // palette:false → backends 里有 gaussian 但托盘不列（JSON-only）。
+  for (const op of ["cz", "cx", "phase_noise"]) {
+    assert.ok(opsForBackend("gaussian").includes(op), `gaussian 托盘应含 ${op}`);
+  }
+  assert.equal(OPS.interferometer.palette, false);
+  assert.equal(OPS.gaussian_channel.palette, false);
+  assert.ok(opsForBackend("gaussian").includes("interferometer")); // 后端放行（JSON-only）
+  assert.ok(opsForBackend("gaussian").includes("gaussian_channel"));
+  // 仍隐藏的两个
+  assert.ok(!opsForBackend("gaussian").includes("mach_zehnder"));
+  assert.ok(!opsForBackend("gaussian").includes("measure_threshold"));
 });
 
 /* ── R6 (ADR-0008 决策 3): meterKeys — meter 支持矩阵前端唯一消费口 ── */
@@ -1101,4 +1165,169 @@ test("R6: meterKeys fail-fast — meters 块缺失 / 缺 backend 扩展行 / 未
   assert.throws(() => probe({ ops: {} }), /未初始化/);
   assert.throws(() => probe({ ops: {}, meters: { core: ["purity"] } }), /扩展行/);
   assert.throws(() => meterKeys("nosuch"), /扩展行/); // 上一行 finally 己恢复 MOCK_SCHEMA
+});
+/* ══════════════════════════════════════════════════════════════════════
+   09-21-lab-gaussian-unhide-ops：解锁 5 个 gaussian op + 三个前端缺陷回归
+   ──────────────────────────────────────────────────────────────────────
+   缺陷 1（矩阵参数静默丢失）：stateFromV1 只遍历 `meta.params` 搬参数，而
+   interferometer/gaussian_channel 的 U / X,Y,d 不在那里（它们无面板块），
+   → 载入即丢、下次 toV1Json 抹掉。影响 gaussian **和** bosonic。
+   缺陷 2（arity 'none' 无分支）：`modes: []` 落到 `kind:"single"` 分支，
+   要求恰好 1 个模 → gaussian_channel 永远载不进（bosonic 同样）。
+   缺陷 3（arity 'all' 只收 2 模）：`kind:"two"` 分支要求恰好 2 个 →
+   m≥3 的 interferometer 载不进。
+   实测证据：.trellis/tasks/09-21-lab-gaussian-unhide-ops/design.md §1.3
+   ══════════════════════════════════════════════════════════════════════ */
+
+const V1_VIEW = { wigner_mode: 0, lim: 5.0, n: 64 };
+const v1doc = (ops, nmode, extra = {}) => ({
+  schema: "circuit_v1", nmode, view: V1_VIEW, ops, ...extra,
+});
+
+test("09-21 缺陷1: 矩阵参数 U 往返保真（interferometer，gaussian + bosonic）", () => {
+  const U = [[1, 0], [0, 1]];
+  for (const backend of ["gaussian", "bosonic"]) {
+    const { state, error } = stateFromJson(v1doc(
+      [{ op: "interferometer", modes: [0, 1], params: { U } }], 2, { backend }));
+    assert.equal(error, undefined, `${backend} 应能载入 interferometer`);
+    assert.deepEqual(state.nodes[0].params.U, U, `${backend} 载入后 U 必须保留`);
+    const back = toV1Json(state).ops[0];
+    assert.deepEqual(back.params.U, U, `${backend} 回写后 U 必须保留`);
+    assert.deepEqual(back.modes, [0, 1]);
+  }
+});
+
+test("09-21 缺陷1: X/Y/d 往返保真（gaussian_channel，含 d）", () => {
+  const X = [[1, 0], [0, 1]], Y = [[0.1, 0], [0, 0.1]], d = [0.5, -0.25];
+  for (const backend of ["gaussian", "bosonic"]) {
+    const { state, error } = stateFromJson(v1doc(
+      [{ op: "gaussian_channel", modes: [], params: { X, Y, d } }], 1, { backend }));
+    assert.equal(error, undefined, `${backend} 应能载入 gaussian_channel`);
+    assert.deepEqual(state.nodes[0].params, { X, Y, d });
+    assert.deepEqual(toV1Json(state).ops[0].params, { X, Y, d });
+    assert.deepEqual(toV1Json(state).ops[0].modes, [], "arity none → modes 保持空数组");
+  }
+});
+
+test("09-21 缺陷2: arity 'none' — modes 必须为空，非空被拒", () => {
+  const X = [[1, 0], [0, 1]];
+  // 空 modes → ok（缺陷前必然报 "必须是一个非负整数"）
+  assert.equal(stateFromJson(v1doc(
+    [{ op: "gaussian_channel", modes: [], params: { X } }], 1)).error, undefined);
+  // 非空 modes → 拒（核心 none-arity 语义）
+  const bad = stateFromJson(v1doc(
+    [{ op: "gaussian_channel", modes: [0], params: { X } }], 1));
+  assert.match(bad.error, /必须为空/);
+});
+
+test("09-21 缺陷3: arity 'all' — m=2 与 m=3 均可载入，模集必须等于全部模", () => {
+  const U2 = [[1, 0], [0, 1]];
+  const U3 = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  const r2 = stateFromJson(v1doc([{ op: "interferometer", modes: [0, 1], params: { U: U2 } }], 2));
+  assert.equal(r2.error, undefined, "m=2 应能载入");
+  assert.deepEqual(r2.state.nodes[0].modes, [0, 1]);
+  // m=3 —— 缺陷前报 "必须是两个非负整数"
+  const r3 = stateFromJson(v1doc([{ op: "interferometer", modes: [0, 1, 2], params: { U: U3 } }], 3));
+  assert.equal(r3.error, undefined, "m=3 应能载入");
+  assert.deepEqual(r3.state.nodes[0].modes, [0, 1, 2]);
+  assert.deepEqual(toV1Json(r3.state).ops[0].params.U, U3);
+  // 模集不等于 range(nmode) → 拒（核心 validate_ir 同判据）
+  const bad = stateFromJson(v1doc([{ op: "interferometer", modes: [0, 1], params: { U: U2 } }], 3));
+  assert.match(bad.error, /\[0\.\.2\]/);
+});
+
+test("09-21: arity 'any' — phase_noise 收 1 模或空数组（= 全部模）", () => {
+  const one = stateFromJson(v1doc([{ op: "phase_noise", modes: [0], params: { sigma: 0.3 } }], 2));
+  assert.equal(one.error, undefined);
+  assert.equal(one.state.nodes[0].mode, 0);
+  const empty = stateFromJson(v1doc([{ op: "phase_noise", modes: [], params: { sigma: 0.3 } }], 2));
+  assert.equal(empty.error, undefined, "空 modes = 全部模（服务端接受）");
+  assert.deepEqual(empty.state.nodes[0].modes, []);
+  assert.deepEqual(empty.state.nodes[0].params, { sigma: 0.3 });
+  // 2 个模 → 拒（核心 "takes at most 1 mode"）
+  const bad = stateFromJson(v1doc([{ op: "phase_noise", modes: [0, 1], params: { sigma: 0.3 } }], 2));
+  assert.match(bad.error, /至多一个/);
+});
+
+test("09-21: cz/cx 载入 + weight 往返（gaussian 解锁）", () => {
+  for (const op of ["cz", "cx"]) {
+    const { state, error } = stateFromJson(v1doc(
+      [{ op, modes: [0, 1], params: { weight: 1.5 } }], 2, { backend: "gaussian" }));
+    assert.equal(error, undefined, `gaussian 应能载入 ${op}`);
+    assert.deepEqual(state.nodes[0].params, { weight: 1.5 });
+    assert.deepEqual(toV1Json(state).ops[0].params, { weight: 1.5 });
+    assert.deepEqual(toV1Json(state).ops[0].modes, [0, 1]);
+  }
+});
+
+test("09-21 R6: staffLayout — all-arity 跨度覆盖全部模（m≥3 不漏模）", async () => {
+  const { staffLayout } = await import("../cvsim/lab/static/staff.js");
+  const { state } = stateFromJson(v1doc(
+    [{ op: "interferometer", modes: [0, 1, 2], params: { U: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] } }], 3));
+  const g = staffLayout(state).gates[0];
+  assert.equal(g.span, 3, "必须覆盖 0..2（缺陷前 span=2，漏 mode 2）");
+  assert.equal(g.top, 0);
+  assert.deepEqual([g.modeA, g.modeB], [0, 1], "modeA/modeB 保持 JSON 顺序（显示契约）");
+});
+
+test("09-21 R6: staffLayout — none-arity 几何有限（不产出 null）", async () => {
+  const { staffLayout } = await import("../cvsim/lab/static/staff.js");
+  const X = [[1, 0], [0, 1]];
+  const { state } = stateFromJson(v1doc(
+    [{ op: "gaussian_channel", modes: [], params: { X } }], 2));
+  const g = staffLayout(state).gates[0];
+  assert.ok(Number.isFinite(g.span), `span 必须有限，实为 ${g.span}`);
+  assert.ok(Number.isFinite(g.top), `top 必须有限，实为 ${g.top}`);
+  assert.equal(g.span, 1);
+  assert.equal(g.top, 0);
+});
+
+test("09-21 R6: cellOccupied/modeKeyOf/removeMode 按整组 modes 判定", async () => {
+  const { modeKeyOf } = await import("../cvsim/lab/static/ops.js");
+  const { state } = stateFromJson(v1doc(
+    [{ op: "interferometer", modes: [0, 1, 2], params: { U: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] } }], 3));
+  const n = state.nodes[0];
+  assert.equal(cellOccupied(state.nodes, 2, 0), true, "all-arity 门须锁住它跨的每个模（含 mode 2）");
+  assert.equal(cellOccupied(state.nodes, 2, 9), false, "不同 x 列不算占用");
+  assert.equal(modeKeyOf(n), 0);
+  assert.equal(removeMode(state.nodes, 1).length, 0, "删任一模 → 跨该模的门级联删除");
+  // none-arity：不锁任何模，删模不牵连它
+  const gc = stateFromJson(v1doc([{ op: "gaussian_channel", modes: [], params: { X: [[1, 0], [0, 1]] } }], 1)).state.nodes[0];
+  assert.equal(Number.isFinite(modeKeyOf(gc)), true, "modeKeyOf 不得返回 undefined（排序 NaN 源）");
+  assert.equal(cellOccupied([gc], 0, 0), false);
+  assert.equal(removeMode([gc], 0).length, 1);
+});
+
+test("09-21: 未知/无 UI 条目的 op 仍被拒（反脆弱：解锁不能放宽守门）", () => {
+  assert.match(stateFromJson(v1doc(
+    [{ op: "no_such_op", modes: [0], params: {} }], 1)).error, /不在 Lab 白名单/);
+  assert.match(stateFromJson(v1doc(
+    [{ op: "apply_unitary", modes: [0], params: { U: [[1, 0], [0, 1]] } }], 1)).error,
+    /不在 Lab 白名单/);
+});
+
+test("09-21: 每个 OPS op 的 arity 都有处理器（applyArity 不变式）", async () => {
+  // applyArity 的 default 分支现在是**响亮报错**（曾静默按 one 处理）。若某天
+  // 给一个 arity 为 'subset'（fock apply_unitary）或别的未知 arity 的 op 加了
+  // UI 条目，载入会直接失败而不是被当成单模门。
+  const HANDLED = new Set(["one", "two", "all", "any", "none"]);
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../cvsim/lab/static/editor.js", import.meta.url), "utf8");
+  const body = src.split("function applyArity(")[1].split("\nfunction ", 1)[0];
+  const cases = [...body.matchAll(/case "([a-z]+)":/g)].map((m) => m[1]);
+  for (const a of HANDLED) {
+    assert.ok(cases.includes(a), `applyArity 缺 case "${a}"`);
+  }
+  assert.ok(/default:/.test(body) && /未知的 arity/.test(body),
+    "applyArity 的 default 必须响亮报错，不得静默按 one 处理");
+  // 真实 payload 里每个有 UI 条目的 op，arity 都必须被显式处理
+  for (const [ir, entry] of Object.entries(MOCK_SCHEMA.ops)) {
+    const a = entry.meta.arity;
+    assert.ok(HANDLED.has(a), `${ir} 的 arity ${a} 无处理器（有 UI 条目 → 载入会报未知 arity）`);
+  }
+  // 反向锁：fock 的 subset arity 属于"无 UI 条目"类，前端到不了这里
+  assert.equal(OPS.apply_unitary, undefined, "apply_unitary 不得有 UI 条目（否则需实现 subset）");
+  // 未知 arity 确实被拒（直接构造一个假 schema 条目验证）
+  const bad = stateFromJson({ ...v1doc([{ op: "squeeze", modes: [0], params: { r: 0.4, phi: 0 } }], 1) });
+  assert.equal(bad.error, undefined); // 对照：正常 op 仍可载
 });

@@ -52,25 +52,32 @@ _PKG_SCHEMAS: dict[str, Any] = {
 #: states only the UI decision (ops the workbench deliberately keeps off
 #: its palette/loader); a newly added core op requires no change here.
 #:
-#: - gaussian: v1-era deferrals kept off the v0-legacy Lab workbench
-#:   (cz/cx/interferometer/phase_noise/gaussian_channel/mach_zehnder) +
-#:   measure_threshold (B6 unlocked it for fock/bosonic only).
+#: - gaussian: `mach_zehnder` + `measure_threshold` — the two remaining
+#:   deferrals (09-21-lab-gaussian-unhide-ops). The other five v1-era
+#:   deferrals (cz/cx/interferometer/phase_noise/gaussian_channel) are now
+#:   unlocked: cz/cx/phase_noise ship palette cards; interferometer/
+#:   gaussian_channel stay JSON-only (`palette: false` in ops.js) because
+#:   their matrix params have no editor panel.
+#:   Why these two stay hidden:
+#:   - `mach_zehnder`: gaussian already exposes the same physical gate as
+#:     `mz` with a *different* decomposition (mz = BS(θ)→phase→BS(θ);
+#:     mach_zehnder = BS(θ)→phase→BS(π/4)). Unhiding both would put two
+#:     identically-labelled cards with different physics on one palette.
+#:   - `measure_threshold`: the Lab runner rejects it (gaussian_backend.py,
+#:     Q6=C) — an outcome-only measurement has no `/run` mean-path semantics.
+#:   NOTE: unlocking changes each op's `/schema` `meta`, because that meta is
+#:   taken from the FIRST backend (BACKENDS order) whose whitelist lists the
+#:   op. Concretely cz/cx `weight` default now shows 0.0 (gaussian's — which
+#:   is what the gaussian core always used) and phase_noise arity shows
+#:   "any". Arity/param *enforcement* is per-package (each package's own
+#:   ``validate_ir``), so this is display-only — see
+#:   .trellis/tasks/09-21-lab-gaussian-unhide-ops/design.md §1.3b/§3.1.
 #: - fock: apply_unitary/apply_kraus (matrix editor deferred, F7
 #:   anti-whitelist creed) + interferometer.
 #: - bosonic: none — B6 unlocked the full gate/channel/measure set
 #:   wholesale (no historical v0 UI restriction to honor).
 _UI_HIDDEN: dict[str, frozenset[str]] = {
-    "gaussian": frozenset(
-        {
-            "cx",
-            "cz",
-            "gaussian_channel",
-            "interferometer",
-            "mach_zehnder",
-            "measure_threshold",
-            "phase_noise",
-        }
-    ),
+    "gaussian": frozenset({"mach_zehnder", "measure_threshold"}),
     "fock": frozenset({"apply_unitary", "apply_kraus", "interferometer"}),
     "bosonic": frozenset(),
 }

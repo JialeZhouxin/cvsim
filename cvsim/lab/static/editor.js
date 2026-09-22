@@ -165,17 +165,78 @@ function tables() {
 }
 
 function nextFreeV1Id(i, seenIds) {
-  // auto ids must never collide with explicit ids (n0 + explicit "n0")
+  // auto ids must never collide with explicit ones (n0 + explicit "n0")
   let id = `n${i}`;
   for (let k = 1; seenIds.has(id); k++) id = `n${i}_${k}`;
   return id;
 }
 
+/** Core IR meta for one op, keyed by **IR name** (`o.op`, not the UI name).
+    `deriveOps` does NOT forward `meta` (its derived entries carry only
+    label/kind/palette/tip/params/backends), so the raw `/schema` payload
+    held by `setEditorSchema` is the only source of `arity` / `value_kind`
+    for the loader. Returns null when the schema is not injected (the
+    `node --test` fallback path), where callers degrade to the base `kind`. */
+function irMeta(irOp) {
+  return (EDITOR_SCHEMA && EDITOR_SCHEMA.ops && EDITOR_SCHEMA.ops[irOp]
+    && EDITOR_SCHEMA.ops[irOp].meta) || null;
+}
+
+/** Mode list → node shape, driven by core arity (`one|two|all|any|none`).
+    Returns {ok:true} or {error}. Mode *validation* is deliberately looser
+    than the per-package ``validate_ir`` in one place: `any` accepts the
+    0-mode ("all modes") form that gaussian/bosonic cores accept but fock
+    rejects — the backend stays the authority (design §1.3b). */
+function applyArity(node, arity, modes, nmode, where) {
+  const isInt = (m) => Number.isInteger(m) && m >= 0;
+  if (!Array.isArray(modes) || !modes.every(isInt)) {
+    return { error: `${where}.modes 必须是非负整数` };
+  }
+  switch (arity) {
+    case "two":
+      if (modes.length !== 2) return { error: `${where}.modes 必须是两个非负整数` };
+      node.modes = [...modes];
+      return { ok: true };
+    case "all": {
+      // core: modes must equal range(nmode) exactly (gaussian/fock ir.py)
+      const want = Array.from({ length: nmode }, (_, i) => i);
+      if (modes.length !== want.length || modes.some((m, i) => m !== want[i])) {
+        return { error: `${where}.modes 必须是 [0..${nmode - 1}]（该 op 作用于全部模）` };
+      }
+      node.modes = [...modes];
+      return { ok: true };
+    }
+    case "none":
+      if (modes.length !== 0) return { error: `${where}.modes 必须为空（该 op 不带模参数）` };
+      node.modes = [];
+      return { ok: true };
+    case "any":
+      if (modes.length > 1) return { error: `${where}.modes 至多一个（空数组 = 全部模）` };
+      if (modes.length === 1) node.mode = modes[0];
+      else node.modes = [];
+      return { ok: true };
+    case "one":
+      if (modes.length !== 1) return { error: `${where}.modes 必须是一个非负整数` };
+      node.mode = modes[0];
+      return { ok: true };
+    default:
+      /* Unreachable for every op that has an `OPS` entry: the fallback path
+         computes one|two from `kind`, and the schema path supplies a core
+         arity that `_UI_HIDDEN`/whitelist derivation limits to
+         one|two|all|any|none. Fock's `subset` arity (apply_unitary) never
+         gets here — that op has no `OPS` entry, so it is rejected as
+         not-in-whitelisted first. Scream rather than silently treat an
+         unknown arity as `one`: the arity invariant test locks this. */
+      return { error: `${where}: 未知的 arity ${JSON.stringify(arity)}（前端未实现）` };
+  }
+}
+
 /** circuit_v1 → graph model (inverse of toV1Json). v1 has no source
     concept: the top-level `nmode` is the mode count (ADR-0014); ops map 1:1
     to UI nodes; phase ``theta`` maps back to the UI ``phi`` param.
-    Core-only ops (cz/cx/interferometer/…) are rejected — same whitelist
-    the backend load enforces. */
+    Ops absent from `OPS` (apply_unitary/apply_kraus/unknown) are rejected;
+    mode arity comes from the core `meta` (see ``applyArity``) and matrix
+    params from `meta.value_kind` (see ``irMeta``). */
 function stateFromV1(payload) {
   if (!Array.isArray(payload.ops)) return { error: "ops 必须是数组" };
   if (!Number.isInteger(payload.nmode) || payload.nmode < 1) {
@@ -256,19 +317,26 @@ function stateFromV1(payload) {
       }
       node.params[k] = v;
     }
-    if (meta.kind === "two") {
-      if (!Array.isArray(o.modes) || o.modes.length !== 2 || o.modes.some((m) => !Number.isInteger(m) || m < 0)) {
-        return { error: `ops[${i}].modes 必须是两个非负整数` };
+    /* Matrix params (U / X,Y,d) have no editor panel, so `meta.params` is
+       empty for those ops and the loop above never sees them — they would be
+       silently dropped on load and erased on the next toV1Json.
+       `value_kind` from the core snapshot is the authority for which keys
+       those are (no hardcoded op list); they are carried through verbatim
+       (JSON-native, no numeric clamping). */
+    const im = irMeta(o.op);
+    if (im && im.value_kind) {
+      for (const [irKey, kind] of Object.entries(im.value_kind)) {
+        if (kind !== "matrix") continue;
+        // matrix params have no editor panel and no rename entry
+        // (`pnames` maps UI→IR, so looking up by IR key there would be the
+        // wrong direction) — carry them under their IR name.
+        if (Object.hasOwn(params, irKey)) node.params[irKey] = params[irKey];
       }
-      node.modes = [...o.modes];
-      node.ui = { x: staff && Number.isFinite(staff[id]) ? staff[id] : gateIdx++ };
-    } else {
-      if (!Array.isArray(o.modes) || o.modes.length !== 1 || !Number.isInteger(o.modes[0]) || o.modes[0] < 0) {
-        return { error: `ops[${i}].modes 必须是一个非负整数` };
-      }
-      node.mode = o.modes[0];
-      node.ui = { x: staff && Number.isFinite(staff[id]) ? staff[id] : gateIdx++ };
     }
+    const arity = im && im.arity ? im.arity : (meta.kind === "two" ? "two" : "one");
+    const modeRes = applyArity(node, arity, o.modes, payload.nmode, `ops[${i}]`);
+    if (modeRes.error) return { error: modeRes.error };
+    node.ui = { x: staff && Number.isFinite(staff[id]) ? staff[id] : gateIdx++ };
     nodes.push(node);
   }
   const rawView = payload.view && typeof payload.view === "object" ? payload.view : {};

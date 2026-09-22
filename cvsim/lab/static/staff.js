@@ -3,7 +3,7 @@
    DOM/DnD work lives only inside initStaff. */
 "use strict";
 
-import { OPS, clampParam, cellOccupied, stateNmode, visibleParams } from "./ops.js";
+import { OPS, clampParam, cellOccupied, modeListOf, stateNmode, visibleParams } from "./ops.js";
 
 export const GATE_W = 72;   // px per x unit (gate cell width)
 export const ROW_H = 44;    // px per lane
@@ -25,7 +25,12 @@ export function modeLabel(state, mode) {
 }
 
 /** Pure: state → staff geometry. rows: one per mode (`label` = D1(b) text,
-    not the raw initial value); gates: placed ops with span for two-mode crossing. */
+    not the raw initial value); gates: placed ops with the lane span they
+    cross. `modeA`/`modeB` keep the JSON-given order (display contract);
+    `top`/`span` are the real geometry and are computed over **every** mode
+    the gate touches, so an all-mode gate (interferometer over m≥3) covers
+    all its lanes instead of only the first two. A mode-less gate (arity
+    "none") has no lanes to cross: it renders as a single-lane block on 0. */
 export function staffLayout(state) {
   const nmode = stateNmode(state);
   const rows = Array.from({ length: nmode },
@@ -34,10 +39,13 @@ export function staffLayout(state) {
   for (const n of state.nodes) {
     const meta = OPS[n.op];
     if (!meta) continue;
-    const two = meta.kind === "two";
-    const modeA = two ? n.modes[0] : n.mode;
-    const modeB = two ? n.modes[1] : n.mode;
-    gates.push({ node: n, two, modeA, modeB, span: Math.abs(modeB - modeA) + 1, top: Math.min(modeA, modeB), x: n.ui?.x ?? 0 });
+    const ms = modeListOf(n);
+    const two = ms.length > 1 || meta.kind === "two";
+    const modeA = ms.length ? ms[0] : 0;
+    const modeB = ms.length > 1 ? ms[1] : modeA;
+    const top = ms.length ? Math.min(...ms) : 0;
+    const span = ms.length ? Math.max(...ms) - top + 1 : 1;
+    gates.push({ node: n, two, modeA, modeB, span, top, x: n.ui?.x ?? 0 });
   }
   return { rows, gates, nmode };
 }
@@ -268,7 +276,9 @@ export function initStaff(root, api) {
         const n = nodes.find((y) => y.id === moveId);
         const meta = n && OPS[n.op];
         if (n && meta) {
-          const cells = meta.kind === "two" ? [[n.modes[0], x], [n.modes[1], x]] : [[n.mode, x]];
+          // every mode the gate touches must have a free cell at x (an
+          // all-mode gate locks one cell per lane it spans)
+          const cells = modeListOf(n).map((m) => [m, x]);
           conflict = cells.some(([m, cx]) => cellOccupied(nodes, m, cx, moveId));
         }
       } else if (op) {
@@ -382,7 +392,10 @@ export function initStaff(root, api) {
 
     const head = document.createElement("div");
     head.className = "gate-card__head";
-    const modeInfo = g.two ? `modes ${g.modeA}, ${g.modeB}` : `mode ${g.modeA}`;
+    // 显示真实跨度（top…top+span-1），不用 modeA/modeB —— 后者是 JSON 给定
+    // 顺序，m≥3 的 all-mode 门（干涉仪）会漏掉尾部的模。
+    const hi = g.top + g.span - 1;
+    const modeInfo = g.two ? (hi > g.top ? `modes ${g.top}–${hi}` : `mode ${g.top}`) : `mode ${g.top}`;
     head.textContent = `${meta.label} · ${modeInfo}`;
     card.appendChild(head);
 

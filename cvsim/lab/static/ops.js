@@ -150,12 +150,16 @@ export const OPS = {
     tip: "光子数分辨测量：投影到光子数基，按序坍缩并移除被测模",
     params: { name: { string: true, def: "", optional: true } },
   },
-  /* ── Bosonic-only (B6, mirrors ir.py BOSONIC_WHITELIST) ───── */
+  /* ── JSON-only matrix ops (palette:false — 无面板块，见下) ────
+     interferometer 由 gaussian + bosonic 共用；gaussian_channel 同理。
+     两 op 的矩阵参数（U / X,Y,d）没有编辑器面板，只能在 JSON 里给，
+     故不进托盘。gaussian 下 gaussian_channel 的 d **必填**（核心无默认值），
+     漏给会得到 422 —— tip 里写明。 */
   interferometer: {
     label: "干涉仪",
     kind: "two",
     palette: false, // 矩阵参数 JSON-only（类比 Fock apply_unitary defer）
-    tip: "干涉仪：任意酉 U 矩阵（JSON-only，面板不编辑）",
+    tip: "干涉仪：作用于全部模的任意酉 U（JSON-only，面板不编辑；U 尺寸须等于模数）",
     params: {},
   },
   gaussian_channel: {
@@ -163,7 +167,7 @@ export const OPS = {
     kind: "single",
     channel: true,
     palette: false, // X/Y/d 矩阵参数 JSON-only
-    tip: "高斯通道：一般 (X,Y,d) CPTP 通道（JSON-only，面板不编辑）",
+    tip: "高斯通道：一般 (X,Y,d) CPTP 通道（JSON-only，面板不编辑；三者均须给出，d 无默认值）",
     params: {},
   },
   measure_threshold: {
@@ -201,10 +205,26 @@ export function xOf(n) {
   return n.ui && Number.isFinite(n.ui.x) ? n.ui.x : 0;
 }
 
-/** Sort key within one x column: mode ascending (two-mode uses modes[0]). */
+/** All modes a node touches — single point for multi-mode arities.
+    Node shape is `node.mode` (arity one, or any-with-1) or `node.modes`
+    (arity two / all / none / any-with-0). Returns [] for a mode-less node
+    (`arity: "none"`, e.g. gaussian_channel), which is why callers must
+    handle the empty case (`.includes`/`length` are safe; index access is
+    not). Core arity lives in the op's `meta`; this shape helper is the one
+    place the UI reads it back. */
+export function modeListOf(n) {
+  if (Array.isArray(n.modes)) return n.modes;
+  if (Number.isInteger(n.mode)) return [n.mode];
+  return [];
+}
+
+/** Sort key within one x column: the gate's first mode (`modes[0]` for a
+    multi-mode gate, `mode` for a single-mode one). A mode-less gate
+    (arity "none") has no lane to sort by and falls back to 0, so the
+    comparator never sees undefined → NaN. */
 export function modeKeyOf(n) {
-  const meta = OPS[n.op];
-  return meta?.kind === "two" ? n.modes[0] : n.mode;
+  const ms = modeListOf(n);
+  return ms.length ? ms[0] : 0;
 }
 
 /** Execution order = array order = stable sort by (x, modeKey). */
@@ -238,20 +258,17 @@ export function removeNode(nodes, id) {
   return nodes.filter((n) => n.id !== id);
 }
 
-/** L5.5: true if a gate occupies the cell (mode, round(x)). Two-mode gates
-    lock both their lanes. excludeId lets a moving gate ignore its own cells. */
+/** L5.5: true if a gate occupies the cell (mode, round(x)). Every mode the
+    gate touches locks that lane (two-mode locks both; an all-mode gate locks
+    each mode it spans; a mode-less gate locks none). excludeId lets a moving
+    gate ignore its own cells. */
 export function cellOccupied(nodes, mode, x, excludeId = null) {
   const cx = Math.round(x);
   for (const n of nodes) {
     if (n.id === excludeId) continue;
-    const meta = OPS[n.op];
-    if (!meta) continue;
+    if (!OPS[n.op]) continue;
     if (Math.round(n.ui?.x ?? 0) !== cx) continue;
-    if (meta.kind === "two") {
-      if (n.modes[0] === mode || n.modes[1] === mode) return true;
-    } else if (n.mode === mode) {
-      return true;
-    }
+    if (modeListOf(n).includes(mode)) return true;
   }
   return false;
 }
@@ -296,19 +313,17 @@ export function moveNodeX(nodes, id, x) {
   return sortNodes(out);
 }
 
-/** Delete one mode: cascade-delete every gate on it (single-mode match /
-    either lane of a two-mode gate), shift lanes above it up by one.
-    Returns the new nodes array. */
+/** Delete one mode: cascade-delete every gate touching it (any mode of a
+    multi-mode gate), shift lanes above it up by one. Returns the new nodes
+    array. */
 export function removeMode(nodes, mode) {
   const keep = [];
   for (const n of nodes) {
     const meta = OPS[n.op];
     if (!meta) { keep.push(n); continue; }
-    const hits = meta.kind === "two"
-      ? n.modes[0] === mode || n.modes[1] === mode
-      : n.mode === mode;
-    if (hits) continue;
-    keep.push(meta.kind === "two"
+    const ms = modeListOf(n);
+    if (ms.includes(mode)) continue;
+    keep.push(Array.isArray(n.modes)
       ? { ...n, modes: n.modes.map((m) => (m > mode ? m - 1 : m)) }
       : { ...n, mode: n.mode > mode ? n.mode - 1 : n.mode });
   }

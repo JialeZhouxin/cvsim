@@ -50,14 +50,91 @@ def test_run_main_scene():
 
 
 def test_run_422_op_not_whitelisted():
+    # 09-21-lab-gaussian-unhide-ops: `cz` is now whitelisted for gaussian, so
+    # the counterexample is `measure_threshold` (still hidden: the gaussian
+    # runner rejects it, gaussian_backend Q6=C).
     data = {
         "schema": "circuit_v1",
         "nmode": 2,
-        "ops": [{"id": "x", "op": "cz", "modes": [0, 1], "params": {"weight": 0.5}}],
+        "ops": [{"id": "x", "op": "measure_threshold", "modes": [0], "params": {"name": "t"}}],
     }
     r = client.post("/run", json=data)
     assert r.status_code == 422
     assert "not in Lab whitelist" in r.json()["detail"]
+
+
+def test_run_200_unlocked_gaussian_ops():
+    """09-21-lab-gaussian-unhide-ops: the five newly-unlocked gaussian ops must
+    run. Guards that stay are asserted separately (they are correct physics,
+    not regressions) — see test_run_422_* below."""
+    view = {"wigner_mode": 0, "lim": 4.0, "n": 32}
+    cases = [
+        ("phase_noise", 2, [{"op": "phase_noise", "modes": [0], "params": {"sigma": 0.3}}]),
+        ("cz", 2, [{"op": "cz", "modes": [0, 1], "params": {"weight": 1.0}}]),
+        ("cx", 2, [{"op": "cx", "modes": [0, 1], "params": {"weight": 1.0}}]),
+        (
+            "interferometer m=2",
+            2,
+            [
+                {"op": "interferometer", "modes": [0, 1], "params": {"U": [[0, 1], [1, 0]]}},
+            ],
+        ),
+        (
+            "interferometer m=3",
+            3,
+            [
+                {
+                    "op": "interferometer",
+                    "modes": [0, 1, 2],
+                    "params": {"U": [[1, 0, 0], [0, 1, 0], [0, 0, 1]]},
+                },
+            ],
+        ),
+        (
+            "gaussian_channel",
+            1,
+            [
+                {
+                    "op": "gaussian_channel",
+                    "modes": [],
+                    "params": {"X": [[1, 0], [0, 1]], "Y": [[0, 0], [0, 0]], "d": [0.5, 0.0]},
+                },
+            ],
+        ),
+    ]
+    for name, nmode, ops in cases:
+        r = client.post(
+            "/run",
+            json={
+                "schema": "circuit_v1",
+                "nmode": nmode,
+                "ops": ops,
+                "view": view,
+            },
+        )
+        assert r.status_code == 200, f"{name}: {r.status_code} {r.text[:200]}"
+
+
+def test_run_422_gaussian_channel_d_is_required():
+    """gaussian core gives `d` no default → a hand-written payload omitting it
+    must 422 with a diagnosable message (not silently default to 0)."""
+    r = client.post(
+        "/run",
+        json={
+            "schema": "circuit_v1",
+            "nmode": 1,
+            "view": {"wigner_mode": 0, "lim": 4.0, "n": 32},
+            "ops": [
+                {
+                    "op": "gaussian_channel",
+                    "modes": [],
+                    "params": {"X": [[1, 0], [0, 1]], "Y": [[0, 0], [0, 0]]},
+                }
+            ],
+        },
+    )
+    assert r.status_code == 422
+    assert "d" in r.json()["detail"]
 
 
 def test_run_422_bad_view():
