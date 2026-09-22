@@ -56,7 +56,13 @@ def wigner_bosonic(state: BosonicState, x: float, p: float) -> float:
 
 
 def _wigner_kernel_nm(n: int, m: int, x: float, p: float) -> complex:
-    """⟨n|W|m⟩ kernel at (x,p); α=(x+ip)/√2, ħ=1."""
+    """⟨n|W|m⟩ kernel at (x,p); α=(x+ip)/√2, ħ=1.
+
+    The two branches differ in which of α / ᾱ carries the (m−n)/(n−m) power:
+    ``n ≤ m`` uses α, ``n > m`` uses ᾱ. They are **not** interchangeable —
+    ``W(α) = W(−α)`` only holds for a real α, so swapping them is invisible on
+    the imaginary axis but mirrors the distribution in p once ⟨p̂⟩ ≠ 0.
+    """
     alpha = (x + 1j * p) / np.sqrt(2.0)
     r2 = float(abs(alpha) ** 2)
     pref = np.exp(-2.0 * r2) / np.pi
@@ -66,12 +72,16 @@ def _wigner_kernel_nm(n: int, m: int, x: float, p: float) -> complex:
             pref
             * ((-1.0) ** n)
             * np.sqrt(factorial(n) / factorial(m))
-            * (2.0 * np.conj(alpha)) ** (m - n)
+            * (2.0 * alpha) ** (m - n)
             * lag
         )
     lag = eval_genlaguerre(m, n - m, 4.0 * r2)
     return complex(
-        pref * ((-1.0) ** m) * np.sqrt(factorial(m) / factorial(n)) * (2.0 * alpha) ** (n - m) * lag
+        pref
+        * ((-1.0) ** m)
+        * np.sqrt(factorial(m) / factorial(n))
+        * (2.0 * np.conj(alpha)) ** (n - m)
+        * lag
     )
 
 
@@ -105,6 +115,9 @@ def _wigner_grid_fock(rho: np.ndarray, X: np.ndarray, P: np.ndarray) -> np.ndarr
     The scalar path is an O(grid) loop of O(N²) kernels — ~0.5 s for
     n=64, N=10. Vectorizing over the grid first drops that to ~10 ms:
     ``eval_genlaguerre`` runs on the whole 64×64 array per pair.
+
+    α / ᾱ must match :func:`_wigner_kernel_nm` branch-for-branch (see the
+    docstring there): ``n ≤ m`` takes α, ``n > m`` takes ᾱ.
     """
     N = rho.shape[0]
     alpha = (X + 1j * P) / np.sqrt(2.0)
@@ -122,7 +135,7 @@ def _wigner_grid_fock(rho: np.ndarray, X: np.ndarray, P: np.ndarray) -> np.ndarr
                     pref
                     * ((-1.0) ** n)
                     * np.sqrt(factorial(n) / factorial(m))
-                    * (2.0 * np.conj(alpha)) ** (m - n)
+                    * (2.0 * alpha) ** (m - n)
                     * lag
                 )
             else:
@@ -131,7 +144,7 @@ def _wigner_grid_fock(rho: np.ndarray, X: np.ndarray, P: np.ndarray) -> np.ndarr
                     pref
                     * ((-1.0) ** m)
                     * np.sqrt(factorial(m) / factorial(n))
-                    * (2.0 * alpha) ** (n - m)
+                    * (2.0 * np.conj(alpha)) ** (n - m)
                     * lag
                 )
             W += (rnm * kern).real
