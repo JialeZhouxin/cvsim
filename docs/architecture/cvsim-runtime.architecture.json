@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "cvsim 运行时架构",
+    "locale": "zh-CN",
+    "output": "cvsim-runtime.architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Lab 请求主线",
+        "focus": ["labui", "server", "labir", "dispatch", "runners", "result"],
+        "note": "浏览器提交电路 JSON，经 IR 装载与单点分派选中一个表示执行体，返回统一结果快照。"
+      },
+      {
+        "id": "dispatch-contract",
+        "label": "单点分派契约",
+        "focus": ["server", "labir", "dispatch", "runners"],
+        "note": "注册表一行一后端；接第四个表示是加一行，不改路由体（ADR-0010）。"
+      },
+      {
+        "id": "root-foundations",
+        "label": "根级共享地基",
+        "focus": ["foundations", "runners"],
+        "note": "表示包互不 import，跨表示共享只放根级模块（ADR-0001）。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "labui",
+      "type": "frontend",
+      "label": "Lab UI 前端",
+      "sublabel": "cvsim/lab/static",
+      "tag": "零 CDN 离线工作台",
+      "pos": [40, 80],
+      "size": [170, 70]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "FastAPI 服务",
+      "sublabel": "cvsim/lab/server.py",
+      "tag": "/run /sample /batch /scan",
+      "pos": [310, 80],
+      "size": [170, 70]
+    },
+    {
+      "id": "labir",
+      "type": "backend",
+      "label": "电路 IR 装载",
+      "sublabel": "cvsim/lab/ir.py",
+      "tag": "circuit_v1 · ADR-0003",
+      "pos": [580, 80],
+      "size": [170, 70]
+    },
+    {
+      "id": "dispatch",
+      "type": "backend",
+      "label": "单点分派",
+      "sublabel": "cvsim/lab/dispatch.py",
+      "tag": "注册表一行一后端 · ADR-0010",
+      "pos": [850, 80],
+      "size": [170, 70]
+    },
+    {
+      "id": "foundations",
+      "type": "database",
+      "label": "根级共享地基",
+      "sublabel": "conventions / symplectic / wigner / backend / bridge / ad",
+      "tag": "表示包互不 import，跨表示共享只放根级",
+      "pos": [40, 340],
+      "size": [380, 120]
+    },
+    {
+      "id": "runners",
+      "type": "backend",
+      "label": "三表示执行体",
+      "sublabel": "gaussian / fock / bosonic runner",
+      "tag": "签名同形 (circuit, rng, *, sampled, steps)",
+      "pos": [560, 340],
+      "size": [380, 120]
+    },
+    {
+      "id": "result",
+      "type": "backend",
+      "label": "结果快照",
+      "sublabel": "cvsim/lab/result.py",
+      "tag": "LabResult · ADR-0008",
+      "pos": [1090, 340],
+      "size": [210, 120]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "cvsim/lab 工作台层",
+      "wraps": ["server", "labir", "dispatch", "runners", "result"]
+    },
+    {
+      "kind": "region",
+      "label": "根级共享（ADR-0001）",
+      "wraps": ["foundations"]
+    }
+  ],
+  "connections": [
+    { "id": "ui-to-server", "from": "labui", "to": "server", "label": "HTTP · 静态页", "variant": "emphasis" },
+    { "id": "server-to-ir", "from": "server", "to": "labir", "label": "load_circuit" },
+    { "id": "ir-to-dispatch", "from": "labir", "to": "dispatch", "label": "LabCircuit" },
+    { "id": "dispatch-to-runners", "from": "dispatch", "to": "runners", "label": "按 circuit.backend 选行", "fromSide": "bottom", "toSide": "top" },
+    { "id": "foundations-to-runners", "from": "foundations", "to": "runners", "label": "编译段 · 辛矩阵", "variant": "dashed", "labelAt": [490, 372] },
+    { "id": "runners-to-result", "from": "runners", "to": "result", "label": "LabResult", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Lab 分派契约（ADR-0010）",
+      "items": [
+        "注册表一行一后端（_RUNNERS），接第四个表示是加一行，不改路由体",
+        "三个 runner 签名统一为 (circuit, rng, *, sampled, steps)",
+        "wants_rng 把 rng 语义差异写进数据：gaussian 的 rng=None 即均值路径"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "结果与 schema 单一事实源",
+      "items": [
+        "LabResult 是 /run /sample 的统一快照，serialize 是唯一 JSON 出口（ADR-0008）",
+        "meter 支持矩阵：gaussian 加 log_negativity / singular，fock 加 leakage，bosonic 无扩展",
+        "GET /schema = 三包 ir_schema() 快照 + Lab 白名单，模块导入时 one-shot"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "表示包互不 import（ADR-0001）",
+      "items": [
+        "Gaussian / Fock / Bosonic 三包零交叉 import，由 tests/test_ast_boundaries.py 守护",
+        "分析概念（purity / entropy / fidelity）跨表示同名，实现按表示私有",
+        "公开 API = 各 __init__.py 的 __all__ 白名单，由 tests/test_public_api.py 冻结"
+      ]
+    }
+  ]
+}

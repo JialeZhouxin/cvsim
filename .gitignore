@@ -58,3 +58,7 @@ lab_server*.log*
 .pi-loop.json.lock
 .pi-subagents/
 
+# archify 生成物：源 json + visual-check.json 入库，其余是渲染产物（体积大、可重生成）
+docs/architecture/*.html
+docs/architecture/*.png
+
