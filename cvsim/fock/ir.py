@@ -54,8 +54,8 @@ OP_META: dict[str, OpMeta] = {
     "kerr": OpMeta("one", {"chi": "num"}, {"chi": 0.0}),
     "beamsplitter": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
     "two_mode_squeeze": OpMeta("two", {"r": "num"}, {"r": 0.0}),
-    "cz": OpMeta("two", {"weight": "num"}, {"weight": 1.0}),
-    "cx": OpMeta("two", {"weight": "num"}, {"weight": 1.0}),
+    "cz": OpMeta("two", {"weight": "num"}, {"weight": 0.0}),
+    "cx": OpMeta("two", {"weight": "num"}, {"weight": 0.0}),
     "mach_zehnder": OpMeta("two", {"theta": "num", "phi": "num"}, {"theta": np.pi / 4, "phi": 0.0}),
     "interferometer": OpMeta("all", {"U": "matrix"}, {}),
     # 'subset' (fock-only): any subset of DISTINCT modes; [] = whole space.

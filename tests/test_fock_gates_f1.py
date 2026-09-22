@@ -145,6 +145,39 @@ def test_cx_sign_follows_weight() -> None:
     np.testing.assert_allclose(back.amps, ref.amps, atol=1e-10)
 
 
+def test_cz_cx_default_weight_is_identity() -> None:
+    """Omitted ``weight`` must be the identity, in all three representations.
+
+    Every other gate in every package defaults to identity (squeeze r=0, phase
+    θ=0, displace α=0, kerr χ=0, two_mode_squeeze r=0). fock's cz/cx alone
+    defaulted to 1.0 — i.e. building a circuit while omitting the weight gave a
+    full entangling gate on fock but nothing on gaussian/bosonic, so the same
+    partial circuit meant different physics per backend.
+    """
+    from cvsim.bosonic.circuit import BosonicCircuit
+    from cvsim.bosonic.ir import OP_META as B_META
+    from cvsim.fock.circuit import FockCircuit
+    from cvsim.fock.ir import OP_META as F_META
+    from cvsim.gaussian.circuit import GaussianCircuit
+    from cvsim.gaussian.ir import OP_META as G_META
+
+    assert G_META["cz"].defaults == {"weight": 0.0}
+    assert F_META["cz"].defaults == {"weight": 0.0}, F_META["cz"].defaults
+    assert F_META["cx"].defaults == {"weight": 0.0}, F_META["cx"].defaults
+    assert B_META["cz"].defaults == G_META["cz"].defaults == F_META["cz"].defaults
+    assert B_META["cx"].defaults == G_META["cx"].defaults == F_META["cx"].defaults
+
+    # circuit level: an omitted weight records 0.0, not the old fock 1.0
+    for cls in (FockCircuit, GaussianCircuit, BosonicCircuit):
+        c = cls(2)
+        c.cz(0, 1)
+        c.cx(0, 1)
+        name_cz, _modes, kwargs_cz = c._ops[-2][0], c._ops[-2][1], c._ops[-2][2]
+        name_cx, _m2, kwargs_cx = c._ops[-1][0], c._ops[-1][1], c._ops[-1][2]
+        assert name_cz == "cz" and kwargs_cz["weight"] == 0.0, (cls, c._ops[-2])
+        assert name_cx == "cx" and kwargs_cx["weight"] == 0.0, (cls, c._ops[-1])
+
+
 def test_cx_mode_order_matches_gaussian() -> None:
     """CX is NOT symmetric under mode swap: mode1/mode2 are physical.
 

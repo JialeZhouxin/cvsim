@@ -44,8 +44,8 @@ gaussian/bosonic `phi` 是**协方差旋转角**（`gaussian.gates.squeeze` = `R
 | `phase(theta)` | ✅ | ✅ | ✅ | |
 | `beamsplitter(theta, phi)` | ✅ | ✅ | ✅ | 三表示均带 mode 参数。**曾缺失**：fock 原签名 `(state, theta, phi)` 无模式参数，`09-22-fock-wigner-cx-bs` 尾加 `mode1=0, mode2=1`（kw-only，向后兼容）。BS **不是模式对称的**（实测 `(0,1) ≠ (1,0)`），反序走 SWAP 共轭 |
 | `two_mode_squeeze(r)` | ✅ | ✅ | ✅ | fock 忽略 mode 序但该门对模式交换**对称**，无害 |
-| `cz(weight)` | ✅ | ✅ | ✅ | CV 受控 Z；对模式交换对称，fock 忽略 mode 序无害 |
-| `cx(weight)` | ✅ | ✅ | ✅ | CV 受控 X `exp(−i·w·x̂₁p̂₂)`。**曾符号分歧**：fock `_cx_U` 误用 `+i`（= 高斯的逆门），`09-21-fock-cx-sign-mismatch` 已对齐；`cz = exp(+i·w·x₁x₂)` 是 `+i`，两者符号本应相反。**曾忽略 mode 序**：`09-22-fock-wigner-cx-bs` 已修（CX **不对称**，反序走 SWAP 共轭）。注意 Lab 走 `FockCircuit`（本来就对），只有 `cvsim.fock.gates.cx` 这条独立实现曾错 |
+| `cz(weight)` | ✅ | ✅ | ✅ | CV 受控 Z `exp(+i·w·x̂₁x̂₂)`；对模式交换对称，fock 忽略 mode 序无害。**曾默认值分歧**：fock 的 `weight` 默认 `1.0`（其余所有门、所有包都是恒等 `0.0`），省略 weight 时 fock 建出纠缠门而 gaussian/bosonic 建出恒等 —— 同一段残缺电路在三后端含义不同。`09-22-fock-cz-cx-weight-default` 已对齐为 `0.0` |
+| `cx(weight)` | ✅ | ✅ | ✅ | CV 受控 X `exp(−i·w·x̂₁p̂₂)`。**曾符号分歧**：fock `_cx_U` 误用 `+i`（= 高斯的逆门），`09-21-fock-cx-sign-mismatch` 已对齐；`cz = exp(+i·w·x₁x₂)` 是 `+i`，两者符号本应相反。**曾忽略 mode 序**：`09-22-fock-wigner-cx-bs` 已修（CX **不对称**，反序走 SWAP 共轭）。注意 Lab 走 `FockCircuit`（本来就对），只有 `cvsim.fock.gates.cx` 这条独立实现曾错。**曾默认值分歧**：同 `cz`，fock `weight` 默认 `1.0` → 已对齐 `0.0`（`09-22-fock-cz-cx-weight-default`） |
 | `fourier()` | ✅ | ✅ | ✅ | = phase(π/2) |
 | `mach_zehnder(m1, m2, theta, phi)` | ✅ | ✅ | ✅ | canonical `BS(π/4,0)·(P(φ)⊗I)·BS(θ,0)`（= `S_mach_zehnder`，**相位在 mode1**）。**曾分歧**：fock 相位加在 mode2 且首 BS 多带 φ，`09-22-fock-mz-divergence` 已对齐。**曾参数序分歧**：fock `gates.mach_zehnder` 原为 `(state, theta, phi, mode1, mode2)` —— 五个参数名相同、中间三个含义不同，位置调用会静默把 modes 和 angles 对调（不报错，只是换了个门），`09-22-fock-mz-arg-order` 已对齐为 `(state, mode1, mode2, theta, phi)`（vision `docs/vision-gaussian-simulator.md:333` 冻结序）。**Lab op 名陷阱**：gaussian 的 `mz` 是**另一个门**（`BS(θ)→P(φ)→BS(θ)`，`cvsim/gaussian/ir.py::_expand_mz`），与 `mach_zehnder` 不同；fock/bosonic 只有 `mach_zehnder`。跨后端对拍不能用 `mz` vs `mach_zehnder` |
 | `interferometer(U)` | ✅ | ✅(m≤2) | ✅ | fock 仅 2×2 |

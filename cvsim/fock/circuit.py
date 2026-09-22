@@ -341,11 +341,11 @@ class FockCircuit:
         self._ops.append(self._partition("two_mode_squeeze", [mode1, mode2], r=r))
         return self
 
-    def cz(self, mode1: int, mode2: int, weight: float | str = 1.0) -> FockCircuit:
+    def cz(self, mode1: int, mode2: int, weight: float | str = 0.0) -> FockCircuit:
         self._ops.append(self._partition("cz", [mode1, mode2], weight=weight))
         return self
 
-    def cx(self, mode1: int, mode2: int, weight: float | str = 1.0) -> FockCircuit:
+    def cx(self, mode1: int, mode2: int, weight: float | str = 0.0) -> FockCircuit:
         self._ops.append(self._partition("cx", [mode1, mode2], weight=weight))
         return self
 
