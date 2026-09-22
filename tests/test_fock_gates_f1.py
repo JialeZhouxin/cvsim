@@ -241,7 +241,7 @@ def test_mz_matches_gaussian() -> None:
     alpha = 0.4
     N = 22
     for theta, phi in ((0.6, 0.7), (0.0, 0.7), (np.pi / 4, 0.7), (1.1, 1.9)):
-        fst = mach_zehnder(displace(FockState.vacuum(N, nmode=2), alpha, 0), theta, phi, 0, 1)
+        fst = mach_zehnder(displace(FockState.vacuum(N, nmode=2), alpha, 0), 0, 1, theta, phi)
         V_f, mu_f = _fock_quadrature_moments(fst, N)
 
         gc = GaussianCircuit(2)
@@ -257,8 +257,8 @@ def test_mz_phi_matters() -> None:
     """φ must actually change the state — the pre-fix fock MZ ignored it entirely."""
     N = 16
     st = displace(FockState.vacuum(N, nmode=2), 0.4, 0)
-    mu0 = _fock_quadrature_moments(mach_zehnder(st, 0.6, 0.0, 0, 1), N)[1]
-    mu7 = _fock_quadrature_moments(mach_zehnder(st, 0.6, 0.7, 0, 1), N)[1]
+    mu0 = _fock_quadrature_moments(mach_zehnder(st, 0, 1, 0.6, 0.0), N)[1]
+    mu7 = _fock_quadrature_moments(mach_zehnder(st, 0, 1, 0.6, 0.7), N)[1]
     assert not np.allclose(mu0, mu7, atol=1e-6), "mach_zehnder: φ has no effect"
 
 
@@ -270,7 +270,7 @@ def test_mz_mode_order() -> None:
     N = 22
     seen = []
     for m1, m2 in ((0, 1), (1, 0)):
-        fst = mach_zehnder(displace(FockState.vacuum(N, nmode=2), alpha, 0), theta, phi, m1, m2)
+        fst = mach_zehnder(displace(FockState.vacuum(N, nmode=2), alpha, 0), m1, m2, theta, phi)
         V_f, mu_f = _fock_quadrature_moments(fst, N)
 
         gc = GaussianCircuit(2)
@@ -287,7 +287,7 @@ def test_mz_mode_order() -> None:
 
 def test_mz_rejects_equal_modes() -> None:
     with pytest.raises(ValueError):
-        mach_zehnder(FockState.vacuum(8, nmode=2), 0.6, 0.3, 1, 1)
+        mach_zehnder(FockState.vacuum(8, nmode=2), 1, 1, 0.6, 0.3)
 
 
 def test_mz_analytic_anchor() -> None:
@@ -298,7 +298,7 @@ def test_mz_analytic_anchor() -> None:
     #   amps[1,0] = (cosθ·e^{iφ} − sinθ)/√2
     #   amps[0,1] = −(cosθ·e^{iφ} + sinθ)/√2
     theta, phi = 0.6, 0.3
-    out = mach_zehnder(FockState.fock2(1, 0, 10), theta, phi, 0, 1)
+    out = mach_zehnder(FockState.fock2(1, 0, 10), 0, 1, theta, phi)
     e = np.exp(1j * phi)
     np.testing.assert_allclose(
         out.amps[1, 0], (np.cos(theta) * e - np.sin(theta)) / np.sqrt(2.0), atol=1e-12
@@ -311,7 +311,7 @@ def test_mz_analytic_anchor() -> None:
 def test_mz_phi_zero_analytic_anchor() -> None:
     """φ=0 reduces to the real textbook form on |1,0⟩."""
     theta = 0.6
-    out = mach_zehnder(FockState.fock2(1, 0, 10), theta, 0.0, 0, 1)
+    out = mach_zehnder(FockState.fock2(1, 0, 10), 0, 1, theta, 0.0)
     np.testing.assert_allclose(
         out.amps[1, 0], (np.cos(theta) - np.sin(theta)) / np.sqrt(2.0), atol=1e-12
     )
@@ -322,7 +322,29 @@ def test_mz_phi_zero_analytic_anchor() -> None:
 
 def test_mz_requires_two_modes() -> None:
     with pytest.raises(ValueError):
-        mach_zehnder(FockState.vacuum(8), 0.5)
+        mach_zehnder(FockState.vacuum(8), 0, 1, 0.5)
+
+
+def test_mz_arg_order_matches_gaussian_bosonic() -> None:
+    """Signature lock: (state, mode1, mode2, theta, phi) across all three reps.
+
+    fock's ``gates.mach_zehnder`` alone used to be ``(state, theta, phi, mode1,
+    mode2)`` — same five names, different meaning for the middle three, so a
+    positional cross-representation call silently transposed modes and angles
+    (no exception, just a different gate). The vision table freezes
+    ``m1, m2, theta, phi`` (docs/vision-gaussian-simulator.md:333).
+    """
+    import inspect
+
+    from cvsim.bosonic.gates import mach_zehnder as b_mz
+    from cvsim.gaussian.gates import mach_zehnder as g_mz
+
+    fock_params = list(inspect.signature(mach_zehnder).parameters)
+    assert fock_params == ["state", "mode1", "mode2", "theta", "phi"], fock_params
+    for other in (g_mz, b_mz):
+        assert list(inspect.signature(other).parameters) == fock_params, (
+            f"{other.__module__} disagrees with fock on mach_zehnder argument order"
+        )
 
 
 # -- interferometer ---------------------------------------------------------

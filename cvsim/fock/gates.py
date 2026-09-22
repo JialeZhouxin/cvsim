@@ -252,12 +252,16 @@ def cx(state: FockState, weight: float, mode1: int = 0, mode2: int = 1) -> FockS
 
 
 def mach_zehnder(
-    state: FockState, theta: float, phi: float = 0.0, mode1: int = 0, mode2: int = 1
+    state: FockState, mode1: int, mode2: int, theta: float, phi: float = 0.0
 ) -> FockState:
     """Mach–Zehnder: BS(θ,0) → phase(φ) on mode1 → BS(π/4,0).
 
     U = BS(π/4,0)·(P(φ)⊗I)·BS(θ,0) on the N²×N² space, same fixed decomposition as
     ``cvsim.symplectic.S_mach_zehnder`` (and hence gaussian/bosonic). Requires nmode==2.
+
+    Argument order is ``(state, mode1, mode2, theta, phi)``, matching
+    ``cvsim.gaussian.gates.mach_zehnder`` / ``cvsim.bosonic.gates.mach_zehnder``
+    and the frozen vision table (docs/vision-gaussian-simulator.md:333).
     """
     if state.nmode != 2:
         raise ValueError("mach_zehnder requires two-mode state")
