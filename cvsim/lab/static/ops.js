@@ -118,13 +118,13 @@ export const OPS = {
   cz: {
     label: "CZ",
     kind: "two",
-    tip: "CZ：受控相位门（Fock qudit 编码），weight 为耦合强度",
+    tip: "CZ：连续变量受控相位门 exp(i·w·x₁x₂)（两模耦合，weight 为耦合强度；w=0 即恒等）",
     params: { weight: { min: -2, max: 2, step: 0.01, def: 1 } },
   },
   cx: {
     label: "CX",
     kind: "two",
-    tip: "CX：受控 X 门（Fock qudit 编码），weight 为耦合强度",
+    tip: "CX：连续变量受控 X 门 exp(−i·w·x₁p₂)（两模耦合，weight 为耦合强度；w=0 即恒等）",
     params: { weight: { min: -2, max: 2, step: 0.01, def: 1 } },
   },
   mach_zehnder: {

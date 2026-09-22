@@ -21,6 +21,18 @@ gaussian/bosonic `phi` 是**协方差旋转角**（`gaussian.gates.squeeze` = `R
 → **两者差 2 倍**：`FockState.squeezed(φ=0.8)` 与 gaussian `φ=0.4` 同物理态（maxdiff 6.7e-16）。
 已由 `tests/test_fock_squeeze_phi.py` 哨兵锁死；统一 = 破坏性变更（改已提交 gold `tests/test_b9_bosonic_pnr.py`），独立任务。
 
+### 已修的跨表示缺陷（留档，防回退）
+
+| 缺陷 | 位置 | 修复 | 任务 |
+|---|---|---|---|
+| `cx` 生成元符号 `+i`（= 高斯的逆门） | `cvsim/fock/gates.py` `_cx_U` | 改 `−i`（CZ `+i` / CX `−i` 本应相反） | `09-21-fock-cx-sign-mismatch` |
+| `mach_zehnder` 相位加在 mode2 + 首 BS 多带 φ | `cvsim/fock/{circuit,gates}.py` 两份 | 改 canonical `BS(π/4,0)·(P(φ)⊗I)·BS(θ,0)` | `09-22-fock-mz-divergence` |
+| **fock Wigner 核 `α`/`ᾱ` 两分支对调**（`⟨p̂⟩ ≠ 0` 时热图 p 轴镜像） | `cvsim/wigner.py` `_wigner_kernel_nm` + `_wigner_grid_fock` | 两处对调 | `09-22-fock-wigner-cx-bs` |
+| `cx` 忽略 `mode1`/`mode2`（CX 不对称） | `cvsim/fock/gates.py` | SWAP 共轭 | `09-22-fock-wigner-cx-bs` |
+| `beamsplitter` 无 mode 参数（BS 不对称） | `cvsim/fock/gates.py` | 尾加 `mode1=0, mode2=1` + SWAP 共轭 | `09-22-fock-wigner-cx-bs` |
+
+共同病因：**跨表示/跨分支断言对被测参数不敏感** —— 详见 `.trellis/spec/cvsim/index.md` 的「对称性陷阱」条。
+
 ---
 
 ## 1. 高斯门（三表示基本都有）
@@ -30,12 +42,12 @@ gaussian/bosonic `phi` 是**协方差旋转角**（`gaussian.gates.squeeze` = `R
 | `squeeze(r[, phi])` | ✅ | ✅ | ✅ | 三表示均带 `phi`（fock 09-14 补齐；**约定分歧**：fock `phi` 是压缩幅角 `ξ=r·e^{iφ}`，gaussian/bosonic 是协方差旋转角 —— 差 2 倍，见下） |
 | `displace(alpha)` | ✅ | ✅ | ✅ | 纯相空间平移 |
 | `phase(theta)` | ✅ | ✅ | ✅ | |
-| `beamsplitter(theta, phi)` | ✅ | ✅ | ✅ | |
-| `two_mode_squeeze(r)` | ✅ | ✅ | ✅ | |
-| `cz(weight)` | ✅ | ✅ | ✅ | CV 受控 Z |
-| `cx(weight)` | ✅ | ✅ | ✅ | CV 受控 X |
+| `beamsplitter(theta, phi)` | ✅ | ✅ | ✅ | 三表示均带 mode 参数。**曾缺失**：fock 原签名 `(state, theta, phi)` 无模式参数，`09-22-fock-wigner-cx-bs` 尾加 `mode1=0, mode2=1`（kw-only，向后兼容）。BS **不是模式对称的**（实测 `(0,1) ≠ (1,0)`），反序走 SWAP 共轭 |
+| `two_mode_squeeze(r)` | ✅ | ✅ | ✅ | fock 忽略 mode 序但该门对模式交换**对称**，无害 |
+| `cz(weight)` | ✅ | ✅ | ✅ | CV 受控 Z；对模式交换对称，fock 忽略 mode 序无害 |
+| `cx(weight)` | ✅ | ✅ | ✅ | CV 受控 X `exp(−i·w·x̂₁p̂₂)`。**曾符号分歧**：fock `_cx_U` 误用 `+i`（= 高斯的逆门），`09-21-fock-cx-sign-mismatch` 已对齐；`cz = exp(+i·w·x₁x₂)` 是 `+i`，两者符号本应相反。**曾忽略 mode 序**：`09-22-fock-wigner-cx-bs` 已修（CX **不对称**，反序走 SWAP 共轭）。注意 Lab 走 `FockCircuit`（本来就对），只有 `cvsim.fock.gates.cx` 这条独立实现曾错 |
 | `fourier()` | ✅ | ✅ | ✅ | = phase(π/2) |
-| `mach_zehnder(theta, phi)` | ✅ | ✅ | ✅ | |
+| `mach_zehnder(theta, phi)` | ✅ | ✅ | ✅ | canonical `BS(π/4,0)·(P(φ)⊗I)·BS(θ,0)`（= `S_mach_zehnder`，**相位在 mode1**）。**曾分歧**：fock 相位加在 mode2 且首 BS 多带 φ，`09-22-fock-mz-divergence` 已对齐。**Lab op 名陷阱**：gaussian 的 `mz` 是**另一个门**（`BS(θ)→P(φ)→BS(θ)`，`cvsim/gaussian/ir.py::_expand_mz`），与 `mach_zehnder` 不同；fock/bosonic 只有 `mach_zehnder`。跨后端对拍不能用 `mz` vs `mach_zehnder` |
 | `interferometer(U)` | ✅ | ✅(m≤2) | ✅ | fock 仅 2×2 |
 
 **差异**：gaussian/bosonic 门走 symplectic 映射（O(m²)），fock 走 `expm` 矩阵（O(N²ᵐ)，慢但精确）。fock 的 `interferometer` 仅支持 m≤2（稠密锚）。

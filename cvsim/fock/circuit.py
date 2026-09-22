@@ -135,15 +135,15 @@ def _cz_U(N: int, weight: float) -> np.ndarray:
 
 def _cx_U(N: int, weight: float) -> np.ndarray:
     x, p = _quadrature_matrices(N)
-    return np.asarray(expm(1j * weight * np.kron(x, p)))
+    return np.asarray(expm(-1j * weight * np.kron(x, p)))
 
 
 def _mz_U(N: int, theta: float, phi: float) -> np.ndarray:
-    """MZ(θ,φ) = BS(π/4,0)·(I⊗P(φ))·BS(θ,φ) — gates convention."""
-    bs1 = _bs_U(N, theta, phi)
+    """MZ(θ,φ) = BS(π/4,0)·(P(φ)⊗I)·BS(θ,0) — same as ``S_mach_zehnder``."""
+    bs1 = _bs_U(N, theta, 0.0)
     ph = _phase_diag(N, phi)
     bs2 = _bs_U(N, np.pi / 4, 0.0)
-    return np.asarray(bs2 @ np.kron(np.eye(N), ph) @ bs1)
+    return np.asarray(bs2 @ np.kron(ph, np.eye(N)) @ bs1)
 
 
 def _factor1(op_name: str, N: int, fixed: dict[str, Any]) -> np.ndarray:

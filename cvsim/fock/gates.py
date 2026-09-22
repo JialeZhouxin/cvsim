@@ -123,10 +123,35 @@ def kerr(state: FockLike1, chi: float, mode: int = 0) -> FockLike1:
     return _diag_phase_pure(state, np.exp(1j * chi * n * n), mode)
 
 
-def beamsplitter(state: FockState, theta: float, phi: float = 0.0) -> FockState:
-    """Two-mode BS(θ, φ) = exp[θ(e^{iφ} a0† a1 − h.c.)]. Requires nmode==2."""
+def _swap2_U(N: int) -> np.ndarray:
+    """Two-mode SWAP on the N²×N² space: SWAP @ (A⊗B) @ SWAP == B⊗A."""
+    sw = np.zeros((N * N, N * N), dtype=complex)
+    for a in range(N):
+        for b in range(N):
+            sw[b * N + a, a * N + b] = 1.0
+    return sw
+
+
+def beamsplitter(
+    state: FockState,
+    theta: float,
+    phi: float = 0.0,
+    mode1: int = 0,
+    mode2: int = 1,
+) -> FockState:
+    """Two-mode BS(θ, φ) = exp[θ(e^{iφ} a_{m1}† a_{m2} − h.c.)]. Requires nmode==2.
+
+    ``mode1``/``mode2`` default to ``(0, 1)``, so the historical three-argument
+    call ``beamsplitter(state, theta, phi)`` is unchanged. The gate is *not*
+    symmetric under swapping the two modes, so ``(1, 0)`` is a genuinely
+    different gate — applied as the SWAP conjugate ``SWAP·U_(0,1)·SWAP``.
+    """
     if state.nmode != 2:
         raise ValueError("beamsplitter requires two-mode state")
+    if mode1 == mode2:
+        raise ValueError("mode1 and mode2 must differ")
+    if {mode1, mode2} != {0, 1}:
+        raise ValueError("beamsplitter: modes must be 0 and 1")
     N = state.cutoff
     a = annihilation(N)
     eye = np.eye(N, dtype=complex)
@@ -136,8 +161,12 @@ def beamsplitter(state: FockState, theta: float, phi: float = 0.0) -> FockState:
     ad1 = a1.conj().T
     eip = np.exp(1j * phi)
     G = theta * (eip * ad0 @ a1 - np.conj(eip) * ad1 @ a0)
+    U = expm(G)
+    if (mode1, mode2) == (1, 0):
+        sw = _swap2_U(N)
+        U = sw @ U @ sw
     vec = state.amps.reshape(N * N)
-    out = expm(G) @ vec
+    out = U @ vec
     return FockState(amps=out.reshape(N, N))
 
 
@@ -195,7 +224,14 @@ def cz(state: FockState, weight: float, mode1: int = 0, mode2: int = 1) -> FockS
 
 
 def cx(state: FockState, weight: float, mode1: int = 0, mode2: int = 1) -> FockState:
-    """Controlled-X CX(g) = exp(i·g·x̂⊗p̂) (continuous-variable, matches Gaussian cx).
+    """Controlled-X CX(g) = exp(-i·g·x̂₁⊗p̂₂) (continuous-variable, matches Gaussian cx).
+
+    Same sign as `cvsim.symplectic.S_CX` / `cvsim.gaussian.cx`. In xxpp this maps
+    x̂₂ → x̂₂ + g·x̂₁ and p̂₁ → p̂₁ − g·p̂₂ — note the `-i`, opposite to CZ's `+i`.
+
+    ``mode1``/``mode2`` are physical: CX is **not** symmetric under mode swap
+    (``mode1`` is the control-like x̂, ``mode2`` the target-like p̂), so ``(1, 0)``
+    is a different gate — applied as the SWAP conjugate ``SWAP·U_(0,1)·SWAP``.
 
     Fock matrix via expm on the N²×N² space. Requires nmode==2.
     """
@@ -207,7 +243,10 @@ def cx(state: FockState, weight: float, mode1: int = 0, mode2: int = 1) -> FockS
         raise ValueError("cx: modes must be 0 and 1")
     N = state.cutoff
     x, p = _quadrature_matrices(N)
-    U = expm(1j * weight * np.kron(x, p))
+    U = expm(-1j * weight * np.kron(x, p))
+    if (mode1, mode2) == (1, 0):
+        sw = _swap2_U(N)
+        U = sw @ U @ sw
     vec = state.amps.reshape(N * N)
     return FockState(amps=(U @ vec).reshape(N, N))
 
@@ -215,12 +254,17 @@ def cx(state: FockState, weight: float, mode1: int = 0, mode2: int = 1) -> FockS
 def mach_zehnder(
     state: FockState, theta: float, phi: float = 0.0, mode1: int = 0, mode2: int = 1
 ) -> FockState:
-    """Mach–Zehnder: BS(θ,φ) → phase(φ) on mode1 → BS(π/4) (Gaussian convention).
+    """Mach–Zehnder: BS(θ,0) → phase(φ) on mode1 → BS(π/4,0).
 
-    U = BS(π/4,0)·(I⊗P(φ))·BS(θ,φ) applied on the N²×N² space. Requires nmode==2.
+    U = BS(π/4,0)·(P(φ)⊗I)·BS(θ,0) on the N²×N² space, same fixed decomposition as
+    ``cvsim.symplectic.S_mach_zehnder`` (and hence gaussian/bosonic). Requires nmode==2.
     """
     if state.nmode != 2:
         raise ValueError("mach_zehnder requires two-mode state")
+    if mode1 == mode2:
+        raise ValueError("mode1 and mode2 must differ")
+    if {mode1, mode2} != {0, 1}:
+        raise ValueError("mach_zehnder: modes must be 0 and 1")
     N = state.cutoff
     eye = np.eye(N, dtype=complex)
     a = annihilation(N)
@@ -233,7 +277,10 @@ def mach_zehnder(
 
     n = np.arange(N)
     P = np.diag(np.exp(1j * phi * n))
-    U = expm(G_bs(np.pi / 4.0, 0.0)) @ np.kron(eye, P) @ expm(G_bs(theta, phi))
+    U = expm(G_bs(np.pi / 4.0, 0.0)) @ np.kron(P, eye) @ expm(G_bs(theta, 0.0))
+    if (mode1, mode2) == (1, 0):
+        sw = _swap2_U(N)
+        U = sw @ U @ sw
     vec = state.amps.reshape(N * N)
     return FockState(amps=(U @ vec).reshape(N, N))
 

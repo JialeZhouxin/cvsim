@@ -69,7 +69,7 @@ cvsim/fock/
 |------|------|------|
 | state | 标量 `cutoff`（A）；per-mode `cutoffs` 元组 F2/F3 演进，`cutoff` 保持兼容 | 工厂：`coherent(cutoff, alpha)` / `squeezed(cutoff, r, phi=0)` / `cat(cutoff, alpha, even=True)` 类方法；thermal 归 density |
 | leakage | `truncation_leakage(state) -> float \| None`（工厂态精确，非工厂态 None）+ `check_leakage(state, *, validate=False, warn_threshold=1e-6, fail_threshold=1e-3)` + `estimate_leakage(state, cutoff2)`（高 cutoff 对照工具，m≤2） | 三件套（B）；未知不误报 |
-| gates | F1 新增 `cz/cx(state, weight, m1, m2)`（连续变量物理 e^{i g x̂⊗x̂}，与高斯一致）、`mach_zehnder`、`interferometer(state, U)`（全模式张量积）、`apply_unitary(state, U, modes=None)`（Fock 独有通用入口） | 不引入 qubit 编码门（YAGNI） |
+| gates | F1 新增 `cz/cx(state, weight, m1, m2)`（连续变量物理：`cz = e^{+i g x̂⊗x̂}`、`cx = e^{-i g x̂⊗p̂}`，同 `cvsim.symplectic.S_CZ`/`S_CX`，与高斯/玻色一致）、`mach_zehnder`、`interferometer(state, U)`（全模式张量积）、`apply_unitary(state, U, modes=None)`（Fock 独有通用入口） | 不引入 qubit 编码门（YAGNI） |
 | observables | F2：`pnr_sample/pnr_condition/pnr_sample_and_condition`、`heterodyne_condition/heterodyne_sample_and_condition` | 镜像高斯族命名；不做 heterodyne mean（YAGNI） |
 | analyse | F2 镜像 `cvsim/gaussian/analyse.py` 签名 | nats |
 | circuit | F3：FockCircuit builder 镜像高斯 + `measure_pnr`；`compile()/run()/to_ir()/from_ir()` 同构 | 测量语义走注册表回调；IR schema 演进 F3 定 |
