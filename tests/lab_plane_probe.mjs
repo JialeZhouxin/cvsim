@@ -208,6 +208,46 @@ try {
     && JSON.stringify(observed.epr.axisTexts.slice(-2)) === JSON.stringify(["(x0−x1)/√2", "(p0+p1)/√2"]),
     JSON.stringify({ xx: observed.xx.axisTexts, epr: observed.epr.axisTexts }));
 
+  /* 1b. 轴名要挂在**自己那根轴**上（曾经两个都转 90°：横轴名挂竖轴头顶、
+      竖轴名挂横轴左端）。判据来自后端语义 + 位移实验：
+      `labels[0]` 是网格**第一**个自变量（水平轴，位移 mode0 时峰值沿列走），
+      `labels[1]` 是第二个（垂直轴）。故 labels[0] 该在横线右端、labels[1] 在竖线顶端。
+      同时断言不与刻度数字撞位：横轴刻度在线**下**方（cy+13），竖轴刻度在线**左**侧（cx−7）。 */
+  await loadAndSettle(ws, scene("epr"));
+  const placement = await evalJs(ws, `(async () => {
+    const svg = document.getElementById("axis-svg");
+    const vb = svg.getAttribute("viewBox").split(" ").map(Number);
+    const w = vb[2], h = vb[3], cx = w / 2, cy = h / 2;
+    const texts = [...svg.querySelectorAll("text")];
+    const names = texts.filter((t) => /√2/.test(t.textContent));
+    const ticks = texts.filter((t) => /^-?\\d/.test(t.textContent));
+    const at = (e) => ({ text: e.textContent, x: +e.getAttribute("x"), y: +e.getAttribute("y"),
+                         anchor: e.getAttribute("text-anchor") });
+    const r = await fetch("/run", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify(${JSON.stringify(scene("epr"))}) });
+    const j = await r.json();
+    return { labels: j.wigner.axes.labels, w, h, cx, cy,
+             names: names.map(at), ticks: ticks.map(at) };
+  })()`);
+  const [n0, n1] = placement.names;
+  check("axis names sit on their own axis (horizontal name right, vertical name top)",
+    placement.labels[0] === n0.text && placement.labels[1] === n1.text
+    /* labels[0] → 横轴右端：贴右边界、位于横线上方、右对齐 */
+    && n0.x === placement.w - 6 && n0.y === placement.cy - 6 && n0.anchor === "end"
+    /* labels[1] → 竖轴顶端：贴顶边、位于竖线右侧、左对齐 */
+    && n1.y === 12 && n1.x === placement.cx + 8 && n1.anchor === "start",
+    JSON.stringify(placement));
+  check("axis names do not collide with the tick numbers",
+    /* 横轴名在横线上方 → 与线下方的横轴刻度分离 */
+    n0.y < placement.cy
+    /* 竖轴名在竖线右侧 → 与线左侧的竖轴刻度分离 */
+    && n1.x > placement.cx
+    /* 逐对实算：名字盒与任一刻度盒不得有交集（名字是单行小字，按 x/y 估 10px 高） */
+    && !placement.ticks.some((t) => Math.abs(t.x - n0.x) < 14 && Math.abs(t.y - n0.y) < 14)
+    && !placement.ticks.some((t) => Math.abs(t.x - n1.x) < 14 && Math.abs(t.y - n1.y) < 14),
+    JSON.stringify({ names: placement.names, tickCount: placement.ticks.length,
+                     cx: placement.cx, cy: placement.cy }));
+
   /* ── 2. pair 控件可见性 ───────────────────────────────────── */
   check("pair controls hidden for single, shown for a cross-mode plane",
     observed.single.pairHidden === true

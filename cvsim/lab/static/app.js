@@ -230,7 +230,17 @@ function drawAxes(lim) {
      numbers alone cannot say what is being plotted. Labels are in the SVG, not
      in the DOM beside the canvas, so the layout probe's geometry invariants
      (frame width, colourbar overlap) keep holding: an SVG overlay does not
-     participate in layout. */
+     participate in layout.
+
+     Which end: `labels[0]` is the quadrature the **first** grid argument varies
+     with, i.e. the horizontal axis (pinned by the displace test: shifting mode 0
+     moves the peak along columns, not rows). So `labels[0]` rides the right end
+     of the horizontal line and `labels[1]` the top end of the vertical one.
+     Neither collides with the tick numbers: horizontal ticks sit *below* the
+     line (`cy + 13`), vertical ticks *left* of it (`cx - 7`).
+
+     Append order stays `labels[0]` then `labels[1]` — the probe reads the last
+     two texts positionally. */
   if (lastAxes && Array.isArray(lastAxes.labels)) {
     const mkName = (tx, ty, anchor, text) => {
       const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: axis });
@@ -239,8 +249,8 @@ function drawAxes(lim) {
       t.textContent = text;
       return t;
     };
-    svg.append(mkName(cx, 12, "middle", lastAxes.labels[0]));
-    svg.append(mkName(6, cy - 6, "start", lastAxes.labels[1]));
+    svg.append(mkName(w - 6, cy - 6, "end", lastAxes.labels[0]));
+    svg.append(mkName(cx + 8, 12, "start", lastAxes.labels[1]));
   }
 }
 
@@ -875,15 +885,27 @@ function renderPairSelects(nm) {
 /** Sync the plane chrome to the current editor state. Visibility only depends
     on (backend, plane, nmode) — all three are known without a run.
 
-    Offline boot (`/schema` failed) leaves the dropdown empty and the editor is
-    already blocked behind the red status bar, so this returns quietly rather
-    than throwing from a later `onState` — the fail-fast belongs at boot, not on
-    every subsequent keystroke. */
+    Two distinct failure modes, deliberately handled differently:
+
+    - **`/schema` never loaded** (offline boot): the editor is already blocked
+      behind the red status bar, so return quietly — the fail-fast belongs at
+      boot, not on every subsequent keystroke.
+    - **`/schema` loaded but has no `planes`**: a *stale server*, i.e. the page
+      (read fresh from disk) is newer than the running process. This is the
+      "point the dropdown open and see nothing" symptom, and staying silent here
+      is exactly the silent-no-op this task's R-G section forbids — say what is
+      wrong and what to do. */
 function syncPlaneControls(state) {
   try {
     renderPlaneSelect();
-  } catch {
-    return; // offline boot: no plane chrome, editor gate already reports it
+  } catch (e) {
+    if (schemaDoc()) {
+      planeSelect.replaceChildren();
+      planePair.hidden = true;
+      setStatus("plane 下拉为空：运行中的服务比页面旧（/schema 无 extensions.view.planes）"
+        + " — 请重启后端（uv run python -m cvsim.lab）后刷新", false);
+    }
+    return;
   }
   const plane = state.view?.plane ?? "single";
   planeSelect.value = plane;
