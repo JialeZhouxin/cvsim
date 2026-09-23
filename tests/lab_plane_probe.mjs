@@ -136,6 +136,12 @@ try {
     if (m.id && pending.has(m.id)) { pending.get(m.id).resolve(m); pending.delete(m.id); }
   };
   await send(ws, "Runtime.enable");
+  /* 探针 profile 是**持久**的（userDataDir 固定 tag），Edge 会把 ES module 一起
+     缓存 —— 改完前端再跑，页面仍加载旧的 backend_panels.js，报
+     "does not provide an export named ..."，看着像代码坏了其实是缓存。
+     与其余探针同款：先清缓存再 reload，探针必须看到磁盘现状。 */
+  await send(ws, "Network.enable");
+  await send(ws, "Network.clearBrowserCache");
   await send(ws, "Page.reload");
   if (!(await (async () => {
     for (let k = 0; k < 60; k++) {
@@ -193,20 +199,31 @@ try {
     hashes.xx !== hashes.single && hashes.pp !== hashes.single && hashes.epr !== hashes.single,
     JSON.stringify(hashes));
 
-  /* 轴名是 **额外**的 text；单模只有刻度数字。断言"多出两个"而不是"没有 text"
-     —— 刻度数字一直存在（那是既有的 x/p 数值标注）。 */
-  const tickOnly = (texts) => texts.filter((t) => !["x0", "x1", "(x0−x1)/√2", "(p0+p1)/√2"].includes(t));
-  check("axis names appear exactly for a cross-mode plane (single has none)",
-    observed.single.axisTexts.length === 8 && observed.xx.axisTexts.length === 10
-    && observed.epr.axisTexts.length === 10
-    && !observed.single.axisTexts.includes("x0"),
+  /* S11: 轴名**每个**平面都有 —— 单模是前端合成的 `x{k}`/`p{k}`（后端不能发，
+     golden 字节冻结 + AC7），跨模用后端 labels。刻度数字一直存在，故总是 8 + 2 = 10。 */
+  check("every plane names its two axes (single synthesises x0/p0)",
+    observed.single.axisTexts.length === 10 && observed.xx.axisTexts.length === 10
+    && observed.pp.axisTexts.length === 10 && observed.epr.axisTexts.length === 10
+    && JSON.stringify(observed.single.axisTexts.slice(-2)) === JSON.stringify(["x0", "p0"]),
     JSON.stringify({ single: observed.single.axisTexts.length, xx: observed.xx.axisTexts.length,
-                     tickOnly: tickOnly(observed.xx.axisTexts).length }));
+                     pp: observed.pp.axisTexts.length, epr: observed.epr.axisTexts.length,
+                     singleNames: observed.single.axisTexts.slice(-2) }));
 
   check("axis names match the preset (xx → x0/x1, epr → the (x−, p+) pair)",
     JSON.stringify(observed.xx.axisTexts.slice(-2)) === JSON.stringify(["x0", "x1"])
+    && JSON.stringify(observed.pp.axisTexts.slice(-2)) === JSON.stringify(["p0", "p1"])
     && JSON.stringify(observed.epr.axisTexts.slice(-2)) === JSON.stringify(["(x0−x1)/√2", "(p0+p1)/√2"]),
-    JSON.stringify({ xx: observed.xx.axisTexts, epr: observed.epr.axisTexts }));
+    JSON.stringify({ xx: observed.xx.axisTexts, pp: observed.pp.axisTexts, epr: observed.epr.axisTexts }));
+
+  /* S11: 单模轴名要跟着 mode 走。wigner_mode=1 时必须 `x1`/`p1` —— 写死
+     `x0`/`p0` 会在 nmode≥2 时指错模（刻度数字与 mode 选择器就在旁边）。 */
+  await loadAndSettle(ws, scene("single", { wigner_mode: 1 }));
+  const mode1 = await evalJs(ws, `(() => {
+    const svg = document.getElementById("axis-svg");
+    return [...svg.querySelectorAll("text")].map((t) => t.textContent).slice(-2);
+  })()`);
+  check("single-mode axis names follow wigner_mode (mode 1 → x1/p1)",
+    JSON.stringify(mode1) === JSON.stringify(["x1", "p1"]), JSON.stringify(mode1));
 
   /* 1b. 轴名要挂在**自己那根轴**上（曾经两个都转 90°：横轴名挂竖轴头顶、
       竖轴名挂横轴左端）。判据来自后端语义 + 位移实验：

@@ -16,7 +16,8 @@ import { validateScanForm } from "./scan_form.js";
 import { initStepState, stepLabel, stepDesc, stepMeters } from "./steps_slider.js";
 import { DEFAULT_SCENE } from "./default_scene.js";
 import {
-  meterRowPlan, panelsFor, planeOptions, runBodyExtensions, showPairControls,
+  axisLabelPlan, meterRowPlan, panelsFor, planeOptions, runBodyExtensions,
+  showPairControls,
 } from "./backend_panels.js";
 import {
   modesAOptions, scanEnabled, scanNodeListKey, sweepDefaults, sweepParamKeys, sweepableNodes,
@@ -185,7 +186,7 @@ function drawHeatmap(W) {
    ice-cyan (--color-axis, complementary to inferno), values in ink with a
    paper halo (paint-order: stroke) so they read on any heatmap region. */
 let lastLim = 5;
-let lastAxes = null; // R8: latest plane axis labels (null = single mode)
+let lastAxes = null; // R8/S11: latest axis labels `{labels:[horiz, vert]}` (null = nothing drawn)
 let lastWigner = null; // latest W grid — ResizeObserver 重绘用（dpr）
 
 function drawAxes(lim) {
@@ -226,11 +227,13 @@ function drawAxes(lim) {
     if (label !== null) svg.append(mkText(cx - 7, y + 3.5, "end"));
   }
 
-  /* R8: name the axes when the plane is not a single mode's (x, p) — the tick
-     numbers alone cannot say what is being plotted. Labels are in the SVG, not
-     in the DOM beside the canvas, so the layout probe's geometry invariants
-     (frame width, colourbar overlap) keep holding: an SVG overlay does not
-     participate in layout.
+  /* R8/S11: name the two axes — the tick numbers alone cannot say what is being
+     plotted. Single mode shows `x{k}`/`p{k}` (synthesised in `axisLabelPlan`,
+     because the backend must not add `axes` there: golden byte-frozen + AC7);
+     a cross-mode plane shows the backend's own component names.
+     Labels are in the SVG, not in the DOM beside the canvas, so the layout
+     probe's geometry invariants (frame width, colourbar overlap) keep holding:
+     an SVG overlay does not participate in layout.
 
      Which end: `labels[0]` is the quadrature the **first** grid argument varies
      with, i.e. the horizontal axis (pinned by the displace test: shifting mode 0
@@ -241,7 +244,7 @@ function drawAxes(lim) {
 
      Append order stays `labels[0]` then `labels[1]` — the probe reads the last
      two texts positionally. */
-  if (lastAxes && Array.isArray(lastAxes.labels)) {
+  if (lastAxes && Array.isArray(lastAxes.labels) && lastAxes.labels.length === 2) {
     const mkName = (tx, ty, anchor, text) => {
       const t = el("text", { x: tx, y: ty, "text-anchor": anchor, fill: axis });
       t.setAttribute("stroke", `${paper} / 0.92`);
@@ -305,7 +308,7 @@ function render(result, mode) {
     renderBosonic(result, mode);
     return;
   }
-  drawWignerResult(result);
+  drawWignerResult(result, mode);
   $("rbar-block").hidden = false; // 均值表常驻侧列（有数据才显示）
 
   renderMetersPanel(result.backend, result.meters); // R6: 矩阵驱动（原隐式键缺席分派退役）
@@ -321,8 +324,12 @@ function render(result, mode) {
   renderModeSelect(nm, mode);
 }
 
-/** Shared Wigner draw (gaussian + fock paths). */
-function drawWignerResult(result) {
+/** Shared Wigner draw (gaussian + fock + bosonic paths).
+    `mode` = the plotted mode (view.wigner_mode); it feeds only the single-mode
+    axis names (`x{k}`/`p{k}`) — a cross-mode plane's labels come from the
+    backend. Omit it only when the plotted mode is genuinely unknown, which
+    falls back to mode 0. */
+function drawWignerResult(result, mode) {
   if (!result.wigner) {
     // singular conditional state: no finite Wigner, never fabricated
     lastWigner = null;
@@ -341,7 +348,9 @@ function drawWignerResult(result) {
     wignerNote.hidden = true;
     const { x, p, W } = result.wigner;
     lastWigner = result.wigner;
-    lastAxes = result.wigner.axes ?? null; // R8: axis names only for a plane
+    /* R8/S11: 后端给 labels 就用后端的（跨模平面）；单模后端不发 axes（golden
+       字节冻结），在此合成 x{k}/p{k}。 */
+    lastAxes = { labels: axisLabelPlan(result.wigner, mode) };
     drawHeatmap(W);
     drawAxes(x[x.length - 1]); // lim = +x max
   }
@@ -362,7 +371,7 @@ function renderModeSelect(nm, mode) {
 /* F7: Fock 结果面板 — Wigner（复用）+ PNR 分布柱 + joint heatmap +
    截断护栏；gaussian-only 面板（meters/scan/state）隐藏。 */
 function renderFock(result, mode) {
-  drawWignerResult(result);
+  drawWignerResult(result, mode);
   renderModeSelect(result.nmode, mode);
   fockPanel.renderResult(result);
 }
@@ -370,14 +379,14 @@ function renderFock(result, mode) {
 /* B6: Bosonic 结果面板 — Wigner（复用）+ meters（矩阵驱动，R6）+
    分步执行滑条（/run?detail=steps 断点快照；fidelity 曲线走独立 Sweep 按钮）。 */
 function renderBosonic(result, mode) {
-  drawWignerResult(result);
+  drawWignerResult(result, mode);
   renderMetersPanel(result.backend, result.meters || {}); // R6: 矩阵驱动（原 logneg 硬编码 "—" 退役）
   $("nmode-tag").textContent = `nmode ${result.nmode}`;
   renderModeSelect(result.nmode, mode);
-  renderBosonicSteps(result.steps);
+  renderBosonicSteps(result.steps, mode);
 }
 
-function renderBosonicSteps(steps) {
+function renderBosonicSteps(steps, mode) {
   const slider = $("bos-step");
   const tag = $("bos-step-tag");
   const info = $("bos-step-info");
@@ -400,7 +409,8 @@ function renderBosonicSteps(steps) {
     info.textContent = `${stepDesc(s.op)} · nmode ${s.nmode}`;
     meters.textContent = stepMeters(s.meters, fmt);
     // Step slider drives Wigner evolution, not only text meters.
-    if (s.wigner) drawWignerResult({ wigner: s.wigner });
+    // Same plotted mode for every step (wigner_mode is a view field, not per-step).
+    if (s.wigner) drawWignerResult({ wigner: s.wigner }, mode);
   };
   slider.oninput = () => show(slider.value);
   show(slider.value);

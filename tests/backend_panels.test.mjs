@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 
 import {
   BACKEND_PANELS, INITIAL_INPUT_KIND, METER_ROWS, PLANE_LABELS, RUN_BODY_EXTENSIONS,
-  initialInputKind, meterRowPlan, panelsFor, planeOptions, runBodyExtensions,
+  axisLabelPlan, initialInputKind, meterRowPlan, panelsFor, planeOptions, runBodyExtensions,
   showPairControls,
 } from "../cvsim/lab/static/backend_panels.js";
 
@@ -121,4 +121,34 @@ test("showPairControls: gaussian + non-single plane + nmode>=2 only", () => {
   assert.equal(showPairControls("gaussian", "xx", 1), false);
   assert.equal(showPairControls("fock", "xx", 3), false);
   assert.equal(showPairControls("bosonic", "epr", 3), false);
+});
+
+test("axisLabelPlan: backend labels win when present (cross-mode plane)", () => {
+  const w = { x: [0], p: [0], W: [[0]], axes: { plane: "epr", modes: [0, 2],
+    labels: ["(x0−x2)/√2", "(p0+p2)/√2"] } };
+  assert.deepEqual(axisLabelPlan(w, 0), ["(x0−x2)/√2", "(p0+p2)/√2"]);
+  // the mode argument must NOT leak into a cross-mode plane's names
+  assert.deepEqual(axisLabelPlan(w, 3), ["(x0−x2)/√2", "(p0+p2)/√2"]);
+});
+
+test("axisLabelPlan: single mode synthesises x{k}/p{k} from the plotted mode", () => {
+  const w = { x: [0], p: [0], W: [[0]] }; // no `axes` — the frozen golden shape
+  assert.deepEqual(axisLabelPlan(w, 0), ["x0", "p0"]);
+  assert.deepEqual(axisLabelPlan(w, 1), ["x1", "p1"]);
+  assert.deepEqual(axisLabelPlan(w, 7), ["x7", "p7"]);
+});
+
+test("axisLabelPlan: never throws on a missing/odd payload (falls back to mode 0)", () => {
+  assert.deepEqual(axisLabelPlan(undefined, 2), ["x2", "p2"]);
+  assert.deepEqual(axisLabelPlan(null, 2), ["x2", "p2"]);
+  assert.deepEqual(axisLabelPlan({}, 2), ["x2", "p2"]);
+  // a malformed axes block must not produce `undefined` axis names
+  assert.deepEqual(axisLabelPlan({ axes: null }, 1), ["x1", "p1"]);
+  assert.deepEqual(axisLabelPlan({ axes: {} }, 1), ["x1", "p1"]);
+  assert.deepEqual(axisLabelPlan({ axes: { labels: ["only-one"] } }, 1), ["x1", "p1"]);
+  assert.deepEqual(axisLabelPlan({ axes: { labels: "x0" } }, 1), ["x1", "p1"]);
+  // non-finite mode → 0 rather than "xNaN"
+  assert.deepEqual(axisLabelPlan({}, undefined), ["x0", "p0"]);
+  assert.deepEqual(axisLabelPlan({}, NaN), ["x0", "p0"]);
+  assert.deepEqual(axisLabelPlan({}, "2"), ["x0", "p0"]); // a string is not a mode number
 });

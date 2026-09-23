@@ -60,6 +60,25 @@ export function showPairControls(backend, plane, nmode) {
   return backend === "gaussian" && plane !== "single" && nmode >= 2;
 }
 
+/** R8/S11: 热图轴名计划 → `[水平轴名, 垂直轴名]`。
+
+    优先用后端给的 `wigner.axes.labels`（跨模平面：后端才是分量组合的事实源，
+    前端**不得**重推物理，design D5）。没有 `axes` 就是单模的 (x, p) —— 后端
+    **不能**给单模发这个键：`tests/test_lab_golden.py` 深比对 `body == golden`，
+    多一个键即值漂移，而 9 个 golden 禁止重捕；AC7 也明写 single 必须保持字节兼容。
+    所以单模轴名在此**前端合成**。
+
+    带 mode 下标（`x1`/`p1`）而不是裸 `x`/`p`：nmode≥2 时 mode 选择器就在旁边，
+    不写下标会指不明是哪一模，且与跨模平面的 `x0`/`x2` 风格一致。
+
+    `mode` 非有限数时回落 0（`render` 的调用方可能没带 wigner_mode）。 */
+export function axisLabelPlan(wigner, mode) {
+  const labels = wigner && wigner.axes ? wigner.axes.labels : null;
+  if (Array.isArray(labels) && labels.length === 2) return labels;
+  const m = Number.isFinite(mode) ? mode : 0;
+  return [`x${m}`, `p${m}`];
+}
+
 /** meter 面板的纯渲染计划：矩阵键集 → 逐行 {可见?、行 id、值 id}。
 
     矩阵定行可见性（矩阵外的静态行隐藏）；flag 型扩展键（singular）不占
