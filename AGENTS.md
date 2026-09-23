@@ -43,3 +43,6 @@ Issues 跟踪在 GitHub Issues（repo `JialeZhouxin/cvsim`），用 `gh` CLI。�
 
 ### Domain docs
 单上下文：根 `CONTEXT.md` + `docs/adr/`。见 `docs/agents/domain.md`。
+
+### Deploy target
+公网部署环境（Oracle Cloud，`ssh oracle1`，498 MiB 内存有特殊性）。见 `docs/agents/server.md`。
