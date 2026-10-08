@@ -211,7 +211,8 @@ def test_heterodyne_ref_feedforward_scales_the_complex_outcome():
     data = _circuit([
         {"id": "s", "op": "squeeze", "params": {"r": 1.2, "phi": 0.0}, "modes": [1]},
         _heterodyne(name="h", mode=1),
-        {"id": "d", "op": "displace", "params": {"alpha": {"$ref": "h", "gain": 1.0}}, "modes": [0]},
+        {"id": "d", "op": "displace", "modes": [0],
+         "params": {"alpha": {"$ref": "h", "gain": 1.0}}},
     ])
     res = sample_circuit(load_circuit(data), np.random.default_rng(11))
     outcome = res.measured[0]["outcome"]

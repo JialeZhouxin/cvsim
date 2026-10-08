@@ -259,9 +259,9 @@ def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> 
     def on_break(
         op: tuple[Any, ...],
         state: GaussianState,
-        run_results: dict[str, float],
+        run_results: dict[str, float | complex],
         ir_idx: int,
-    ) -> tuple[GaussianState, dict[str, float]]:
+    ) -> tuple[GaussianState, dict[str, float | complex]]:
         """One break-point op: Lab's measurement path or the core dispatcher."""
         op_name, phys_modes, fixed, _pnames, _refs = op
         node = ir_nodes[ir_idx]
