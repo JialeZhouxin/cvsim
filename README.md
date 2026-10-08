@@ -111,6 +111,7 @@ mypy cvsim/                          # 类型检查
 - **API 稳定性政策**：[`docs/api-stability.md`](./docs/api-stability.md)——公开面以 `__all__` 为准，由 `tests/test_public_api.py` 冻结
 - **架构决策记录**：[`docs/adr/`](./docs/adr/)——模块边界、Bosonic 架构、IR schema 等
 - **代码审查标准**：[`CODE_REVIEW_GUIDE.md`](./CODE_REVIEW_GUIDE.md)
+- **同类软件对照**：[`docs/cv-simulator-comparison.md`](./docs/cv-simulator-comparison.md)——cvsim vs Strawberry Fields / Piquasso / MrMustard 的功能实测对照与差距定级
 
 ## 许可证
 
