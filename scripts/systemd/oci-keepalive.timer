@@ -1,0 +1,18 @@
+# Deployed to /etc/systemd/system/oci-keepalive.timer on the Oracle box.
+#
+# 3.5 h/day puts ~15% of the 7-day sample series above the 20% CPU bar, which is
+# what the 95th-percentile test needs (it reads the value 5% from the top, not
+# the average).  Window picked for the local lull: 00:30-04:00 GMT.
+#
+# See docs/agents/server.md.
+[Unit]
+Description=Daily OCI anti-idle CPU load
+
+[Timer]
+OnCalendar=*-*-* 00:30:00
+AccuracySec=1min
+# If the box was down at 00:30, run the missed window at boot.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

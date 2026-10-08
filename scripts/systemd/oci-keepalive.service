@@ -1,0 +1,34 @@
+# Deployed to /etc/systemd/system/oci-keepalive.service on the Oracle box.
+# Started by oci-keepalive.timer; not enabled directly (no [Install] section).
+#
+# Why this exists: Oracle reclaims Always Free instances that look idle over a
+# 7-day window - CPU 95th percentile < 20% AND network < 20% AND (A1 shapes
+# only) memory < 20%.  Memory is not checked on E2.1.Micro, network here is
+# negligible, so CPU is the one bar to clear.
+#
+# Details and the tuning knob: docs/agents/server.md
+[Unit]
+Description=OCI Always Free anti-idle CPU load
+Documentation=https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm#compute__idleinstances
+After=network-online.target
+
+[Service]
+Type=simple
+User=opc
+Group=opc
+# Safety net; the script exits on its own after the duration passed below.
+RuntimeMaxSec=4h
+
+# The quota, not the script, sets the level: 50% of one vCPU is ~22% of this
+# 2-vCPU machine, which clears the 20% bar with headroom.  The script then keeps
+# busy ~90% of the time, so it holds roughly that quota.
+CPUQuota=50%
+# Never let the blip reach the Lab service or sshd.
+Nice=19
+CPUWeight=10
+MemoryMax=64M
+OOMScoreAdjust=500
+
+# /usr/bin/python3 is bin_t, so systemd's init_t can exec it directly (unlike
+# ~/.local paths - see "SELinux 拦的" in docs/agents/server.md).
+ExecStart=/usr/bin/python3 /usr/local/bin/oci_keepalive.py 12600 0.9

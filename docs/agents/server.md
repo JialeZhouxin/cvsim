@@ -52,6 +52,74 @@ Host oracle1
 
 **498 MiB 内存是这台机器最重要的约束**。任何 `dnf` 操作实测需要 341 MB RAM + 2665 MB swap，因此所有工具都装在 `~/.local` 下（静态二进制），不走系统包管理。
 
+## Oracle 闲置回收规则与保活
+
+### 官方规则（原文出处）
+
+**实例回收** — `https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm#compute__idleinstances`
+
+> Idle Always Free compute instances may be reclaimed by Oracle. Oracle will deem virtual machine and bare metal compute instances as idle if, during a 7-day period, the following are true:
+>
+> - CPU utilization for the 95th percentile is less than 20%
+> - Network utilization is less than 20%
+> - Memory utilization is less than 20% *(applies to A1 shapes only)*
+
+**账户回收** — `https://www.oracle.com/cloud/free/faq/`
+
+> Accounts left idle for 30 days or more may be deemed abandoned and become eligible for suspension or termination.
+
+要点：
+
+- 只看**资源利用率**，不看进程是否存在。挂一个空转进程不影响指标。
+- 三条是 **AND**：全部低于阈值才判 idle。
+- 本机是 `VM.Standard.E2.1.Micro`，**内存那条不适用**；网络 15 天累计 RX/TX 约 4.4 GB，平均约 20 kbps，离 20% 门槛差两个数量级 → 实际只需顶住 CPU。
+- 95 百分位读的是"第 95 百分位那个值"，不是平均值。要让这个数超过 20%，需要约 5% 以上的采样点落在高负载 —— 偶尔跑一下不够，7 天里约需 8.4 小时。
+
+### 不确定性（官方未说明，别当成事实）
+
+- E2.1.Micro 的 CPU 利用率分母是 1/8 OCPU 基线还是整机 vCPU，文档没写。下面按保守假设（分母 = vCPU）取参。
+- "升级成 PAYG 账户可免回收"只是社区共识，官方 FAQ 未确认。
+- 官方没承诺回收前的通知或宽限期。唯一可靠反馈是 **OCI 控制台 → 实例 → Metrics → CPU utilization**（从 VM 内部读不到 OCI 的 host metrics）。
+
+### 保活实现
+
+`oci-keepalive.timer` → `oci-keepalive.service`。仓库内源文件：`scripts/systemd/oci-keepalive.{service,timer}` + 负载脚本 `scripts/oci_keepalive.py`，测试 `tests/test_oci_keepalive.py`。
+
+| 项 | 值 |
+|---|---|
+| 触发 | 每天 `00:30 GMT`，跑 3.5 小时（`12600` 秒） |
+| 负载 | `CPUQuota=50%` → 约 0.5 vCPU，即整机 2 vCPU 的 ~25% |
+| 实测配额效果 | 配额 30% 时单位用量 0.298 vCPU，机器侧仅多 0.03 vCPU 基线 |
+| 内存 | `MemoryMax=64M`，实测峰值 **2.8 MB** |
+| 优先级 | `Nice=19` + `CPUWeight=10`，实测负载期间 Lab 健康检查 200、SSH 往返约 1 s |
+| SELinux | 装在 `/usr/local/bin`（`bin_t`），systemd 的 `init_t` 可直接 exec —— 见下文"systemd 起不来" |
+
+3.5 h/天 = 一天约 15% 的采样点在高位，高于 95 百分位所需的 5%，留有余量。
+
+**调参**：`ExecStart` 里 `12600` 是持续秒数、`0.9` 是每秒内燃烧比例；`CPUQuota` 决定实际负载高度。保守些就加时长。
+
+### 运行状态与验证
+
+```bash
+systemctl list-timers oci-keepalive.timer   # 下次触发时间
+systemctl status oci-keepalive              # 运行中 / 上次结果
+journalctl -u oci-keepalive                 # 历史
+```
+
+负载是不是真被算进"利用率"，只能看 OCI 控制台的 CPU 曲线，本机看不到。
+
+### 账户级：每月登一次控制台
+
+30 天账户闲置这条在服务器上跑负载解决不了。**约定：每月至少登一次 OCI 控制台**（登录即算活动）。
+
+### 回滚保活
+
+```bash
+sudo systemctl disable --now oci-keepalive.timer
+sudo rm /etc/systemd/system/oci-keepalive.service /etc/systemd/system/oci-keepalive.timer
+sudo rm /usr/local/bin/oci_keepalive.py
+sudo systemctl daemon-reload
+```
 ## 部署了什么
 
 ```
