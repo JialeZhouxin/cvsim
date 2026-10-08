@@ -213,7 +213,62 @@ plt.tight_layout(); plt.show()
 """
     ),
     md(
-        r"""## 5. 生存曲线：最优设计随损耗 η 变化
+        r"""## 5. 系统化做法：`cvsim.optim`
+
+第 4 节的循环手写公式，教学上看得见每一步；但代价是：
+
+1. **两个学习率是魔数**（`0.05` / `0.02`）——正是本教程硬需求 per-parameter lr 的原因；
+2. **跑满 150 步**：到底"到了"还是"没到"，代码不说；
+3. **`np.clip` 盒子投影**是手写的，且会静默掩盖"其实想跑出去"的信号。
+
+`cvsim.optim.minimize` 收进一个带测试的入口，接受**任意 pytree** 参数
+（所以 `{"r": ..., "c": ...}` 和上一节的写法一一对应）、**逐参数学习率**，
+并把 `(x, f)` 轨迹与梯度范数直接返回。
+
+约定：**`minimize` 是下降**，要最大化就取负；`converged` 只在真判据
+（梯度范数降到 `grad_tol`）满足时为 `True`，跑满步数只报
+`reason="max_steps"`。
+
+> 有意没做盒子投影：`np.clip` 会把"已经撞到边界"这件事藏起来。
+> 需要时在外层包一层即可（`ponytail:` 一个参数就够）。
+> 本节的初值 `r_init` 离 `r=0` 很远，实测不撞边界，故不需要。"""
+    ),
+    code(
+        r"""
+from cvsim.optim import minimize
+
+# 逐参数学习率：和第 4 节的 0.05 / 0.02 一一对应
+res = minimize(
+    lambda p, eta=ETA: -cat_fidelity("jax", p["r"], p["c"], alpha=ALPHA, T=eta, cutoff=CUT),
+    {"r": jnp.asarray(r_init), "c": jnp.asarray(c_init)},
+    optimiser="sgd", lr={"r": 0.05, "c": 0.02}, max_steps=300,
+)
+
+print(f"cvsim.optim  → r* = {float(res.x['r']):.4f}, χ* = {float(res.x['c']):.4f}, "
+      f"F* = {-res.f:.4f}")
+print(f"  收敛吗 = {res.converged}   原因 = {res.reason}   走了 {res.n_steps} 步")
+
+assert res.converged and res.reason == "grad_norm"
+assert abs(float(res.x["c"]) - np.pi / 4) < 1e-3     # 第 4 节同款物理断言
+assert abs(float(res.x["r"]) - r) < 1e-3            # 与第 4 节手写循环同一个最优
+
+# 两条曲线：目标上升 + 梯度范数下降（判据的直接证据）
+plt.figure(figsize=(10, 3.5))
+plt.subplot(1, 2, 1)
+plt.plot([f for _, f in res.history]); plt.axhline(F[i0, j0], color="r", ls="--", label="网格最优")
+plt.xlabel("步数"); plt.ylabel("F"); plt.title("保真度上升（自动停机）"); plt.legend()
+plt.subplot(1, 2, 2)
+plt.semilogy(res.grad_norm_history); plt.axhline(res.grad_norm_history[-1], color="r", ls="--")
+plt.xlabel("步数"); plt.ylabel(r"$\|\nabla\|_\infty$"); plt.title("梯度范数 → 判据")
+plt.tight_layout(); plt.show()
+"""
+    ),
+    md(
+        r"""同一个最优（`r*` 与 `χ* = π/4`），但这次多知道三件事：
+**是收敛还是跑满**、**梯度真的降下去了吗**、以及**轨迹不用自己攒**。"""
+    ),
+    md(
+        r"""## 6. 生存曲线：最优设计随损耗 η 变化
 
 把"反向设计"重复在多个 η 上：每个 η 都从网格初值重新跑一遍梯度上升，
 记录最优 (r*, χ*)。得到**设计曲线**：
@@ -256,7 +311,7 @@ plt.tight_layout(); plt.show()
 """
     ),
     md(
-        r"""## 6. 小结
+        r"""## 7. 小结
 
 - **正向**（教程 02）：给定 (r, χ, η) 算态、算保真度
 - **反向**（本教程）：`cvsim.fock_ad` 把整条链变成可微函数，
@@ -264,6 +319,8 @@ plt.tight_layout(); plt.show()
 - 优化器"发现"了 χ* = π/4（Kerr 猫态配方）—— 没喂它任何解析公式
 - **诚实性**：保真度是截断基内的值（cutoff=12），强损耗区的最优 r 回升
   部分来自截断边界效应（泄漏检查见上）；加大 cutoff 可验证收敛
+- **系统化**：`cvsim.optim.minimize` 把「学习率 + 步数 + 停止判据」收进一个带测试的入口，
+  接受 pytree 参数与逐参数学习率；`converged` 只在真判据满足时为 `True`
 - JAX 是可选后端：numpy 路径复用 `cvsim.fock.gates` 真源公式，
   双后端共享同一套测试（`tests/test_fock_ad_f4.py`）
 

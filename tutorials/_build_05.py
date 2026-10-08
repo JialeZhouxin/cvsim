@@ -251,13 +251,60 @@ plt.grid(alpha=0.3); plt.show()
 """
     ),
     md(
-        r"""## 6. 小结
+        r"""## 6. 系统化做法：`cvsim.optim`
+
+第 4 节的循环手写公式，教学上看得见每一步；但它有三个隐患：
+
+1. **学习率是魔数**：`0.03` 是试出来的，换个目标（比如第 5 节的每个 λ）就未必合适；
+2. **步数写死**：跑满 60 步到底"到了"还是"没到"，代码不说；`history` 得自己攒；
+3. **没有停止判据**：发散时只能眼睁睁看着 `nan` 一路传下去。
+
+`cvsim.optim.minimize` 把这些收进一个带测试的入口。约定：**`minimize` 是下降**，
+要最大化就取负（和 `scipy.optimize.minimize` 一样）。
+
+返回的 `Result` 里，`converged` 只在**真判据**满足时为 `True`（这里是梯度范数
+降到 `grad_tol` 以下）；跑满步数只报 `reason="max_steps"`，绝不冒充收敛。"""
+    ),
+    code(
+        r"""
+from cvsim.optim import minimize
+
+# 目标取负 → 最小化 -obj 就是最大化 obj
+res = minimize(lambda r: -objective(r), jnp.asarray(0.1),
+               optimiser="adam", lr=0.05, max_steps=500)
+
+print(f"cvsim.optim  → r* = {float(res.x):.4f}")
+print(f"  收敛吗 = {res.converged}   原因 = {res.reason}   走了 {res.n_steps} 步")
+print(f"  最终梯度范数 = {res.grad_norm_history[-1]:.2e}")
+
+assert res.converged and res.reason == "grad_norm"
+assert abs(float(res.x) - r_scan) < 0.05        # 与第 4 节的扫描参照一致
+
+# 轨迹直接返回，不用自己攒：history 是 (x, f) 列表，起于初始点
+plt.figure(figsize=(10, 3.5))
+plt.subplot(1, 2, 1)
+plt.plot([h[1] for h in res.history]); plt.xlabel("步数")
+plt.ylabel("obj"); plt.title("目标上升（自动停机）")
+plt.subplot(1, 2, 2)
+plt.semilogy(res.grad_norm_history); plt.xlabel("步数")
+plt.ylabel(r"$\|\nabla\|_\infty$"); plt.title("梯度范数 → 判据")
+plt.tight_layout(); plt.show()
+"""
+    ),
+    md(
+        r"""对比第 4 节手写循环：`r*` 相同（都在 0.918），但这里多知道两件事
+——**是收敛还是跑满**，以及**梯度真的降下去了吗**。"""
+    ),
+    md(
+        r"""## 7. 小结
 
 - **正向**：给定 $r$ 算 $E_N$（教程 01–04 的路线）
 - **反向**：给定目标与成本，优化器用梯度找 $r$ —— 自动微分让电路参数可训练
 - `cvsim.ad` 提供可微的 `apply_gaussian` + `log_neg_loss`，
   numpy / JAX 双后端共享同一套数学与测试
 - JAX 是可选的：`pip install -e ".[jax]"`（或 `uv pip install "jax[cpu]"`）
+- **系统化**：`cvsim.optim.minimize` 把「学习率 + 步数 + 停止判据」收进一个带测试的入口；
+  `converged` 只在真判据满足时为 `True`，跑满步数绝不冒充收敛
 
 下一步可玩：把损耗换成放大器/相位噪声通道，或优化多参数（r 和 BS 角度一起）。"""
     ),
