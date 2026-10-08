@@ -85,7 +85,7 @@ Lab 侧 UI 隐藏（core 有，`/run` 返 422）：`mach_zehnder`（Lab 用 `mz`
 | **可微分 / 梯度后端** | ✅ **jax**⁵（gauss+fock，函数式） | ⚠️ tf **仅 Fock 引擎**⁷ | ✅ jax/tf 连接器（`custom_gradient`） | ✅ tf + `training.Optimizer` |
 | **GPU 加速** | ❌ | ⚠️ | ✅(cuQuantum) | ⚠️ |
 | **批量执行** | ❌ | ⚠️⁴ | ✅(`BatchApply`) | ❌ |
-| **变分训练 / 优化器** | ⚠️⁶ 手写梯度上升 | ⚠️ `apps.train.VGBS`（变分 GBS，非通用优化器） | ✅ | ✅✅ `training.Optimizer`（4 个 lr 分参数类型） |
+| **变分训练 / 优化器** | ✅⁶ `cvsim.optim.minimize`（Adam / SGD + 停止判据） | ⚠️ `apps.train.VGBS`（变分 GBS，非通用优化器） | ✅ | ✅✅ `training.Optimizer`（4 个 lr 分参数类型 + Tensorboard） |
 | **应用层（qchem/图算法）** | ❌ | ✅(`clique/subgraph/similarity/points/qchem/vibronic`) | ⚠️ | ❌ |
 | 扫描（参数扫） | ✅ | ⚠️ | ⚠️ | ⚠️ |
 | 本地 UI + HTTP API | ✅✅ 独有 | ❌ | ❌ | ❌ |
@@ -96,7 +96,7 @@ Lab 侧 UI 隐藏（core 有，`/run` 返 422）：`mach_zehnder`（Lab 用 `mz`
 ³ 实测：SF 的 `state` 方法表无 `log_negativity`（只有 `fidelity`/`purity` 类），整个 `strawberryfields.backends.states` 无 `neg` 相关名；Piquasso 无 `log_negativity`（只有 `get_purity`/`fidelity`）；MrMustard 0.7.3 只有 `purity`。**`log_negativity` 是 cvsim 内建、三家都要自己写的功能。**
 ⁴ SF 的 `Engine.run(program, *, args, compile_options)` **无电路级 batch 参数**；批量只出现在 `apps.sample.sample(A, n_mean, n_samples)` 的采样层面。Piquasso 的 `BatchApply`/`BatchPrepare` 是真正的电路级批量。
 ⁵ cvsim 的 AD 是**已完成功能**（vision Phase 4 / F4，2026-08-10/12）：`cvsim/backend.py`（唯一 jax 感知点，懒加载）→ `cvsim/symplectic.py` 19 函数 `backend=` 参数化 → `cvsim/ad.py`（高斯链：`apply_gaussian` + `log_neg_loss`）+ `cvsim/fock_ad.py`（Fock 链：`squeeze_u`/`bs_u`/`kerr_diag`/`cat_fidelity`/`bs_overlap`），加 `tutorials/05_ad_designer.ipynb`、`07_fock_ad_designer.ipynb`。实测（2026-10-04）`jax.grad` 对 TMSV 的 dE_N/dr == 解析值 2/ln2，相对误差 6.8e-11。可选 extra `[jax]`，核心 import 路径零 JAX。
-⁶ cvsim 的 notebook 用**手写梯度上升**（`for step in range(60): r += lr * jax.grad(obj)(r)`），无 Adam/optax 抽象、无 `scipy.optimize` 封装。SF 的 `apps.train` 实测只有 `VGBS`/`Exp`/`KL`/`Stochastic` 等变分 GBS 组件，**无通用优化器**（`optimize`/`Optimizer` 不存在）；MrMustard 的 `training.Optimizer` 才是有 4 个分类型学习率的通用封装。所以「通用优化器」这一格实际是 **MrMustard 独有**。
+⁶ cvsim **现在有**一个最小优化器（2026-10-04 起）：`cvsim/optim.py` 的 `minimize(f, x0, optimiser="adam"|"sgd", lr=..., max_steps=..., grad_tol=..., f_tol=...)`，手写 Adam + 朴素 SGD（可选动量），接受任意 pytree 参数与**逐参数学习率**，返回带 `converged`/`reason`/`history`/`grad_norm_history` 的 `Result` dataclass。零新依赖（不引 optax）。**关键设计**：`f_tol` 默认关（设计目标平顶，小 Δf 不等于小梯度）；`converged` 只在真判据满足时为 `True`，`max_steps` 与发散分别报 `reason="max_steps"` / `"diverged"`，绝不冒充收敛。对照：SF 的 `apps.train` 实测只有 `VGBS`/`Exp`/`KL`/`Stochastic` 等变分 GBS 组件，**无通用优化器**（`optimize`/`Optimizer` 不存在）；Piquasso 无；MrMustard 的 `training.Optimizer` 是最完备的（4 个分类型 lr + `TensorboardCallback` + 每门每参数 `*_trainable`/`*_bounds`），仍是**唯一带训练框架**的。所以「有优化器」已不是独有，**「参数对象化的训练框架」**才是。
 ⁷ cvsim 的 AD 覆盖 **gaussian + fock** 两条链，`cvsim/bosonic/` 零 backend 引用（无 AD）。对照：SF 的 tf 后端**只接 Fock 引擎**（`tfbackend` 全文件 42 处 `Fock`、0 处 `bosonic`，Gaussian 后端 0 处 tf 引用），SF 的高斯/bosonic 路径亦无 AD。**所以这一格 cvsim 不落后，是「双方都未覆盖 Bosonic AD」。**
 
 ---
@@ -108,7 +108,7 @@ Lab 侧 UI 隐藏（core 有，`/run` 返 422）：`mach_zehnder`（Lab 用 `mz`
 | # | 能力 | 谁有 | 对 cvsim 的意义 |
 |---|---|---|---|
 | G1 | **参数级（stateful）可微 API** | MrMustard（每门每参数 `*_trainable`/`*_bounds` 原生字段）、SF/Piquasso（引擎级后端切换） | cvsim 的 AD 是**函数式**的：`backend="jax"` 传参 + `jax.grad` 包住自己的目标函数（⁵）。缺的不是梯度，是「把参数做成可训练对象」的 API 层——MrMustard 是此形态标杆。 |
-| G2 | **通用优化器 / 训练框架** | **MrMustard 独有**（`training.Optimizer`，4 个分类型 lr） | cvsim 有梯度（`jax.grad`）但训练循环要手写（⁶）：无优化器抽象、无目标函数基类、无 callback/TensorBoard。SF 也只有变分 GBS 组件，无通用优化器。 |
+| G2 | **参数对象化的训练框架** | **MrMustard 独有**（`training.Optimizer`，4 个分类型 lr + Tensorboard + 每门每参数 `*_trainable`/`*_bounds`） | cvsim 已有最小优化器（`cvsim.optim`，⁶，Adam/SGD + 停止判据 + 轨迹），但**参数是函数式的**：pytree 传进 `minimize`，不是「门对象自带 `trainable` 字段」。无目标函数基类、无 callback/TensorBoard。SF/Piquasso 亦无通用优化器。 |
 | G3 | **GPU 加速** | Piquasso(cuQuantum) | Piquasso 已把高斯+非高斯搬上 GPU。cvsim 纯 numpy。 |
 | G4 | **非高斯门（Kerr/cubic/SNAP/CrossKerr）** | SF、Piquasso | cvsim 仅在 Fock 截断层有 `kerr`，无 cubic/SNAP/CrossKerr。vision 标「远期」。 |
 | G5 | **图嵌入 / GBS 应用层** | SF(`apps.sample/clique/qchem`)、Piquasso(`Graph`) | 最大团、分子振动谱、点云配准等。cvsim 无。 |
@@ -140,7 +140,7 @@ Lab 侧 UI 隐藏（core 有，`/run` 返 422）：`mach_zehnder`（Lab 用 `mz`
 **cvsim 的定位不是「又一个 CV 模拟器」，而是「单一 IR + 三表示一致 + 可交互工作台」。**
 
 - **门/测量覆盖度**：与 SF/Piquasso 相比，**Gaussian 侧已齐**（唯一缺口是图嵌入与非高斯门）。
-- **真实差距**：训练框架封装（G2）、GPU（G3）、非高斯与应用层（G4/G5）。**注意：可微分本身 cvsim 已有**（jax，gauss+fock 两链，实测梯度对解析值 6.8e-11）；缺的是 MrMustard 那种「参数即训练对象」的 API 形态（G1）。Bosonic AD 是双方空档（⁷），不算落后。
+- **真实差距**：参数对象化训练框架（G2）、GPU（G3）、非高斯与应用层（G4/G5）。**注意：可微分本身 cvsim 已有**（jax，gauss+fock 两链，实测梯度对解析值 6.8e-11）；**优化器也已补上**（`cvsim.optim`，⁶）；缺的是 MrMustard 那种「门对象自带 `trainable` 字段 + callback」的 API 形态（G1/G2）。
 - **一处反超**：Piquasso 的「通道 + 条件化」是坏的，cvsim 是好的——**cvsim 在这格比头部库更可靠**。
 - **一处设计取舍**：Hafnian 走 The Walrus 薄适配，是 vision 明示的「不自造重轮子」，**不算差距**。
 - **两处反超（新发现）**：`log_negativity` 与 `duan_sum` 三家都不内建（SF/Piquasso/MrMustard 都要自己写）；cvsim 直接可呼。
@@ -150,7 +150,7 @@ Lab 侧 UI 隐藏（core 有，`/run` 返 422）：`mach_zehnder`（Lab 用 `mz`
 1. **G5 图嵌入**（`GraphEmbed` 是 GBS 全部应用层的入口，代码量小、杠杆大）
 2. **G1 参数级可微 API**（不是造梯度——梯度已有；是把 `*_trainable` 形态包上去）
 3. **G4 非高斯门**（Fock 层已有 `kerr`，加 cubic/SNAP 是延伸而非重构）
-4. G2 优化器封装 / GPU（工程量大，收益依赖规模，最低优先）
+4. 训练框架封装（G2：参数对象化 + callback/Tensorboard；优化器本体已有）、GPU 加速（G3）（工程量大，收益依赖规模，最低优先）
 
 ---
 
