@@ -277,11 +277,16 @@ def _execute(circuit: LabCircuit, *, rng: np.random.Generator | None = None) -> 
                 where,
                 rng=rng,
             )
-            # feedforward: record outcome under the measurement's name for
-            # later ParamRef resolution by run_op.
+            # feedforward: record the outcome under the measurement's name for
+            # later ParamRef resolution by run_op. ``run_results`` is the core
+            # channel and holds *native* values (fock/bosonic store the raw
+            # float/complex too); ``entry["outcome"]`` is the JSON-shaped
+            # version — heterodyne's is a ``[re, im]`` list, which run_op's
+            # ``complex(results[src] * gain)`` cannot scale. Convert back.
             name = fixed.get("name")
             if name is not None:
-                run_results[name] = entry["outcome"]
+                out = entry["outcome"]
+                run_results[name] = complex(out[0], out[1]) if isinstance(out, list) else out
             measured.append(entry)
             return state, run_results
         # Channels (loss/amplifier/phase_noise/gaussian_channel) and any

@@ -195,3 +195,30 @@ def test_sample_homodyne_phi_controls_variance():
     assert abs(vx - vx_analytic) < 0.1 * vx_analytic
     assert abs(vp - vp_analytic) < 0.1 * vp_analytic
     assert vp > vx
+
+
+# --- feedforward ParamRef resolution against the *native* outcome ----------
+
+
+def test_heterodyne_ref_feedforward_scales_the_complex_outcome():
+    """Complex heterodyne outcome must reach a ParamRef as a complex number.
+
+    Regression: ``on_break`` recorded the JSON-shaped ``[re, im]`` entry into
+    the core ``run_results`` dict, so ``run_op``'s ``complex(results[src] *
+    gain)`` died on a list — TypeError → HTTP 500 on an otherwise legal
+    payload. The runner now converts back to ``complex`` for that channel.
+    """
+    data = _circuit([
+        {"id": "s", "op": "squeeze", "params": {"r": 1.2, "phi": 0.0}, "modes": [1]},
+        _heterodyne(name="h", mode=1),
+        {"id": "d", "op": "displace", "params": {"alpha": {"$ref": "h", "gain": 1.0}}, "modes": [0]},
+    ])
+    res = sample_circuit(load_circuit(data), np.random.default_rng(11))
+    outcome = res.measured[0]["outcome"]
+    assert isinstance(outcome, list) and len(outcome) == 2  # JSON shape, unchanged
+    beta = complex(outcome[0], outcome[1])
+    assert beta != 0.0  # the squeezed mode gives a nonzero beta
+    # alpha = beta, and displace shifts rbar by sqrt(2) * alpha on the xxpp view.
+    rbar = gaussian_rbar(res)
+    np.testing.assert_allclose(rbar[0], beta.real * np.sqrt(2), atol=1e-12)
+    np.testing.assert_allclose(rbar[1], beta.imag * np.sqrt(2), atol=1e-12)
